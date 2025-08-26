@@ -79,7 +79,6 @@ type userConfig struct {
 	cacheRetentionDuration     int      // User-defined cache retention duration. Default is '2'
 	cacheRetentionUnit         string   // User-defined cache retention unit (sec, min, hours, days). Default is 'days'
 	cacheRetentionDurationSec  int      // Sets 'file_cache.timeout-sec' from 'cacheRetentionDuration'
-	theme                      uiTheme  // Holds color and label settings for UI elements
 }
 
 // Struct to hold UI theme settings, including colors and labels for various widgets.
@@ -156,14 +155,14 @@ func newAppContext() *appContext {
 
 // Main function to run the TUI application.
 // Initializes the tview application, builds the TUI application, and runs it.
-func (ctx *appContext) runTUI() error {
-	ctx.app.EnableMouse(true)
-	ctx.app.EnablePaste(true)
+func (tui *appContext) runTUI() error {
+	tui.app.EnableMouse(true)
+	tui.app.EnablePaste(true)
 
-	ctx.buildTUI()
+	tui.buildTUI()
 
 	// Run the application
-	if err := ctx.app.Run(); err != nil {
+	if err := tui.app.Run(); err != nil {
 		panic(err)
 	}
 
@@ -171,32 +170,32 @@ func (ctx *appContext) runTUI() error {
 }
 
 // Function to build the TUI application. Initializes the pages and adds them to the page stack.
-func (ctx *appContext) buildTUI() {
+func (tui *appContext) buildTUI() {
 
 	// Initialize the pages
-	homePage := ctx.buildHomePage()         // --- Home Page ---
-	page1 := ctx.buildStorageProviderPage() // --- Page 1: Storage Provider Selection ---
-	page2 := ctx.buildEndpointURLPage()     // --- Page 2: Endpoint URL Entry ---
-	page3 := ctx.buildCredentialsPage()     // --- Page 3: Credentials Entry ---
-	page4 := ctx.buildBucketSelectionPage() // --- Page 4: Bucket Selection ---
-	page5 := ctx.buildCachingPage()         // --- Page 5: Caching Settings ---
+	homePage := tui.buildHomePage()         // --- Home Page ---
+	page1 := tui.buildStorageProviderPage() // --- Page 1: Storage Provider Selection ---
+	page2 := tui.buildEndpointURLPage()     // --- Page 2: Endpoint URL Entry ---
+	page3 := tui.buildCredentialsPage()     // --- Page 3: Credentials Entry ---
+	page4 := tui.buildBucketSelectionPage() // --- Page 4: Bucket Selection ---
+	page5 := tui.buildCachingPage()         // --- Page 5: Caching Settings ---
 
 	// Add pages to the page stack
-	ctx.pages.AddPage("home", homePage, true, true)
-	ctx.pages.AddPage("page1", page1, true, false)
-	ctx.pages.AddPage("page2", page2, true, false)
-	ctx.pages.AddPage("page3", page3, true, false)
-	ctx.pages.AddPage("page4", page4, true, false)
-	ctx.pages.AddPage("page5", page5, true, false)
+	tui.pages.AddPage("home", homePage, true, true)
+	tui.pages.AddPage("page1", page1, true, false)
+	tui.pages.AddPage("page2", page2, true, false)
+	tui.pages.AddPage("page3", page3, true, false)
+	tui.pages.AddPage("page4", page4, true, false)
+	tui.pages.AddPage("page5", page5, true, false)
 
-	ctx.app.SetRoot(ctx.pages, true)
+	tui.app.SetRoot(tui.pages, true)
 }
 
 //	--- Page 0: Home Page ---
 //
 // Function to build the home page of the TUI application. Displays a
 // welcome banner, instructions, and buttons to start or quit the application.
-func (ctx *appContext) buildHomePage() tview.Primitive {
+func (tui *appContext) buildHomePage() tview.Primitive {
 	bannerText := "[#6EBE49::b]" +
 		" █▀▀░█░░░█▀█░█░█░█▀▄░█▀▀░█░█░█▀▀░█▀▀\n" +
 		"░█░░░█░░░█░█░█░█░█░█░█▀▀░█░█░▀▀█░█▀▀\n" +
@@ -225,14 +224,14 @@ func (ctx *appContext) buildHomePage() tview.Primitive {
 
 	// Start/Quit buttons widget
 	startQuitButtonsWidget := tview.NewForm().
-		AddButton(ctx.theme.navigationStartLabel, func() {
-			ctx.pages.SwitchToPage("page1")
+		AddButton(tui.theme.navigationStartLabel, func() {
+			tui.pages.SwitchToPage("page1")
 		}).
-		AddButton(ctx.theme.navigationQuitLabel, func() {
-			ctx.app.Stop()
+		AddButton(tui.theme.navigationQuitLabel, func() {
+			tui.app.Stop()
 		}).
-		SetButtonBackgroundColor(ctx.theme.navigationButtonColor).
-		SetButtonTextColor(ctx.theme.navigationButtonTextColor)
+		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
+		SetButtonTextColor(tui.theme.navigationButtonTextColor)
 
 	aboutText := "[#FFD700::b]ABOUT[-::-]\n" +
 		"[white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n" +
@@ -268,7 +267,7 @@ func (ctx *appContext) buildHomePage() tview.Primitive {
 //
 // Function to build the storage provider selection page. Allows users to select their cloud storage provider
 // from a dropdown list. The options are: LyveCloud, Microsoft, AWS, and Other S3.
-func (ctx *appContext) buildStorageProviderPage() tview.Primitive {
+func (tui *appContext) buildStorageProviderPage() tview.Primitive {
 	instructionsText := "[#6EBE49::b] Select Your Cloud Storage Provider[-::-]\n" +
 		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" +
 		"[white::b] Choose your cloud storage provider from the dropdown below.[-::-]\n" +
@@ -285,59 +284,59 @@ func (ctx *appContext) buildStorageProviderPage() tview.Primitive {
 	storageProviderDropdownWidget := tview.NewDropDown().
 		SetLabel("📦 Storage Provider: ").
 		SetOptions([]string{" LyveCloud ⬇️", " Microsoft ", " AWS ", " Other (s3) "}, func(option string, index int) {
-			ctx.config.storageProvider = option
+			tui.config.storageProvider = option
 			switch option {
 			case " LyveCloud ⬇️":
-				ctx.config.storageProtocol = "s3storage"
-				ctx.config.storageProvider = "LyveCloud"
+				tui.config.storageProtocol = "s3storage"
+				tui.config.storageProvider = "LyveCloud"
 			case " Microsoft ":
-				ctx.config.storageProtocol = "azstorage"
-				ctx.config.storageProvider = "Microsoft"
+				tui.config.storageProtocol = "azstorage"
+				tui.config.storageProvider = "Microsoft"
 			case " AWS ":
-				ctx.config.storageProtocol = "s3storage"
-				ctx.config.storageProvider = "AWS"
+				tui.config.storageProtocol = "s3storage"
+				tui.config.storageProvider = "AWS"
 			case " Other (s3) ":
-				ctx.config.storageProtocol = "s3storage"
-				ctx.config.storageProvider = "Other"
-				ctx.config.endpointURL = ""
+				tui.config.storageProtocol = "s3storage"
+				tui.config.storageProvider = "Other"
+				tui.config.endpointURL = ""
 			default:
-				ctx.config.storageProtocol = "s3storage"
-				ctx.config.storageProvider = "LyveCloud"
+				tui.config.storageProtocol = "s3storage"
+				tui.config.storageProvider = "LyveCloud"
 			}
 		}).
 		SetCurrentOption(0).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack).
 		SetFieldWidth(14)
 
 	// Navigation buttons widget
 	navigationButtonsWidget := tview.NewForm().
-		AddButton(ctx.theme.navigationHomeLabel, func() {
-			ctx.pages.SwitchToPage("home")
+		AddButton(tui.theme.navigationHomeLabel, func() {
+			tui.pages.SwitchToPage("home")
 		}).
-		AddButton(ctx.theme.navigationNextLabel, func() {
+		AddButton(tui.theme.navigationNextLabel, func() {
 			// If Microsoft is selected, switch to page 3 and skip endpoint entry, handled internally by Azure SDK.
-			if ctx.config.storageProvider == "Microsoft" {
-				page3 := ctx.buildCredentialsPage()
-				ctx.pages.AddPage("page3", page3, true, false)
-				ctx.pages.SwitchToPage("page3")
+			if tui.config.storageProvider == "Microsoft" {
+				page3 := tui.buildCredentialsPage()
+				tui.pages.AddPage("page3", page3, true, false)
+				tui.pages.SwitchToPage("page3")
 			} else {
-				page2 := ctx.buildEndpointURLPage()
-				ctx.pages.AddPage("page2", page2, true, false)
-				ctx.pages.SwitchToPage("page2")
+				page2 := tui.buildEndpointURLPage()
+				tui.pages.AddPage("page2", page2, true, false)
+				tui.pages.SwitchToPage("page2")
 			}
 		}).
-		AddButton(ctx.theme.navigationPreviewLabel, func() {
-			previewPage := ctx.buildPreviewPage("page1")
-			ctx.pages.AddPage("previewPage", previewPage, true, false)
-			ctx.pages.SwitchToPage("previewPage")
+		AddButton(tui.theme.navigationPreviewLabel, func() {
+			previewPage := tui.buildPreviewPage("page1")
+			tui.pages.AddPage("previewPage", previewPage, true, false)
+			tui.pages.SwitchToPage("previewPage")
 		}).
-		AddButton(ctx.theme.navigationQuitLabel, func() {
-			ctx.app.Stop()
+		AddButton(tui.theme.navigationQuitLabel, func() {
+			tui.app.Stop()
 		}).
-		SetButtonBackgroundColor(ctx.theme.navigationButtonColor).
-		SetButtonTextColor(ctx.theme.navigationButtonTextColor)
+		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
+		SetButtonTextColor(tui.theme.navigationButtonTextColor)
 
 	// Assemble page layout
 	layout := tview.NewFlex().
@@ -345,7 +344,7 @@ func (ctx *appContext) buildStorageProviderPage() tview.Primitive {
 		AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false).
 		AddItem(nil, 1, 0, false).
 		AddItem(storageProviderDropdownWidget, 2, 0, false).
-		AddItem(navigationButtonsWidget, ctx.theme.navigationWidgetHeight, 0, false).
+		AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false).
 		AddItem(nil, 1, 0, false)
 
 	layout.SetBorder(true).SetBorderColor(colorGreen).SetBorderPadding(1, 1, 1, 1)
@@ -357,11 +356,11 @@ func (ctx *appContext) buildStorageProviderPage() tview.Primitive {
 //
 // Function to build the endpoint URL page. Allows users to enter the endpoint URL for their cloud storage provider.
 // It validates the endpoint URL format and provides help text based on the selected provider.
-func (ctx *appContext) buildEndpointURLPage() tview.Primitive {
+func (tui *appContext) buildEndpointURLPage() tview.Primitive {
 	var urlRegionHelpText string
 
 	// Determine URL help text based on selected provider
-	switch ctx.config.storageProvider {
+	switch tui.config.storageProvider {
 	case "LyveCloud":
 		urlRegionHelpText = "[::b]You selected LyveCloud as your storage provider.[::-]\n\n" +
 			"For LyveCloud, the endpoint URL format is generally:\n" +
@@ -387,7 +386,7 @@ func (ctx *appContext) buildEndpointURLPage() tview.Primitive {
 
 	instructionsText := fmt.Sprintf("[#6EBE49::b] Enter Endpoint URL for %s[-]\n"+
 		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
-		"[white]\n %s", ctx.config.storageProvider, urlRegionHelpText)
+		"[white]\n %s", tui.config.storageProvider, urlRegionHelpText)
 
 	instructionsTextWidget := tview.NewTextView().
 		SetText(instructionsText).
@@ -396,54 +395,54 @@ func (ctx *appContext) buildEndpointURLPage() tview.Primitive {
 
 	endpointURLFieldWidget := tview.NewInputField().
 		SetLabel("🔗 Endpoint URL: ").
-		SetText(ctx.config.endpointURL).
+		SetText(tui.config.endpointURL).
 		SetFieldWidth(50).
 		SetChangedFunc(func(url string) {
-			ctx.config.endpointURL = url
+			tui.config.endpointURL = url
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER URL HERE>").
 		SetPlaceholderTextColor(tcell.ColorGray).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Navigation buttons widget
 	navigationButtonsWidget := tview.NewForm().
-		AddButton(ctx.theme.navigationHomeLabel, func() {
-			ctx.pages.SwitchToPage("home")
+		AddButton(tui.theme.navigationHomeLabel, func() {
+			tui.pages.SwitchToPage("home")
 		}).
-		AddButton(ctx.theme.navigationNextLabel, func() {
-			if err := ctx.validateEndpointURL(ctx.config.endpointURL); err != nil {
-				ctx.showErrorModal(
+		AddButton(tui.theme.navigationNextLabel, func() {
+			if err := tui.validateEndpointURL(tui.config.endpointURL); err != nil {
+				tui.showErrorModal(
 					fmt.Sprintf("[red::b]ERROR: %s[-::-]", err.Error()),
 					func() {
-						ctx.pages.RemovePage("page2")
-						page2 := ctx.buildEndpointURLPage()
-						ctx.pages.AddPage("page2", page2, true, false)
-						ctx.pages.SwitchToPage("page2")
+						tui.pages.RemovePage("page2")
+						page2 := tui.buildEndpointURLPage()
+						tui.pages.AddPage("page2", page2, true, false)
+						tui.pages.SwitchToPage("page2")
 					},
 				)
 				return
 			}
-			ctx.pages.RemovePage("page3")
-			page3 := ctx.buildCredentialsPage()
-			ctx.pages.AddPage("page3", page3, true, false)
-			ctx.pages.SwitchToPage("page3")
+			tui.pages.RemovePage("page3")
+			page3 := tui.buildCredentialsPage()
+			tui.pages.AddPage("page3", page3, true, false)
+			tui.pages.SwitchToPage("page3")
 		}).
-		AddButton(ctx.theme.navigationBackLabel, func() {
-			ctx.pages.SwitchToPage("page1")
+		AddButton(tui.theme.navigationBackLabel, func() {
+			tui.pages.SwitchToPage("page1")
 		}).
-		AddButton(ctx.theme.navigationPreviewLabel, func() {
-			previewPage := ctx.buildPreviewPage("page2")
-			ctx.pages.AddPage("previewPage", previewPage, true, false)
-			ctx.pages.SwitchToPage("previewPage")
+		AddButton(tui.theme.navigationPreviewLabel, func() {
+			previewPage := tui.buildPreviewPage("page2")
+			tui.pages.AddPage("previewPage", previewPage, true, false)
+			tui.pages.SwitchToPage("previewPage")
 		}).
-		AddButton(ctx.theme.navigationQuitLabel, func() {
-			ctx.app.Stop()
+		AddButton(tui.theme.navigationQuitLabel, func() {
+			tui.app.Stop()
 		}).
-		SetButtonBackgroundColor(ctx.theme.navigationButtonColor).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetButtonTextColor(ctx.theme.navigationButtonTextColor)
+		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetButtonTextColor(tui.theme.navigationButtonTextColor)
 
 	// Assemble page layout
 	layout := tview.NewFlex().
@@ -451,7 +450,7 @@ func (ctx *appContext) buildEndpointURLPage() tview.Primitive {
 		AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false).
 		AddItem(nil, 2, 0, false).
 		AddItem(endpointURLFieldWidget, 2, 0, false).
-		AddItem(navigationButtonsWidget, ctx.theme.navigationWidgetHeight, 0, false).
+		AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false).
 		AddItem(nil, 1, 0, false)
 
 	layout.SetBorder(true).SetBorderColor(colorGreen).SetBorderPadding(1, 1, 1, 1)
@@ -464,14 +463,14 @@ func (ctx *appContext) buildEndpointURLPage() tview.Primitive {
 // Function to build the credentials page. Allows users to enter their cloud storage credentials.
 // If the storage protocol is "s3", it provides input fields for access key, secret key.
 // If the storage protocol is "azure", it provides input fields for account name, account key, and container name.
-func (ctx *appContext) buildCredentialsPage() tview.Primitive {
+func (tui *appContext) buildCredentialsPage() tview.Primitive {
 	layout := tview.NewFlex()
 	layout.Clear()
 
 	// Determine labels for input fields based on storage protocol.
 	accessLabel := ""
 	secretLabel := ""
-	if ctx.config.storageProtocol == "azstorage" {
+	if tui.config.storageProtocol == "azstorage" {
 		accessLabel = "🔑 Account Name: "
 		secretLabel = "🔑 Account Key: "
 	} else {
@@ -502,7 +501,7 @@ func (ctx *appContext) buildCredentialsPage() tview.Primitive {
 			colorYellow,
 		)
 
-	if ctx.config.storageProtocol == "azstorage" {
+	if tui.config.storageProtocol == "azstorage" {
 		instructionsText += fmt.Sprintf(
 			"[%s::b] -Container Name:[-::-] This is the name of your Azure Blob Storage container.\n",
 			colorYellow,
@@ -520,75 +519,75 @@ func (ctx *appContext) buildCredentialsPage() tview.Primitive {
 	// Access key field widget
 	accessKeyFieldWidget := tview.NewInputField().
 		SetLabel(accessLabel).
-		SetText(ctx.config.accessKey).
+		SetText(tui.config.accessKey).
 		SetFieldWidth(50).
 		SetChangedFunc(func(key string) {
-			ctx.config.accessKey = key
-			ctx.config.accountName = key
+			tui.config.accessKey = key
+			tui.config.accountName = key
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER KEY HERE>").
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Secret key field widget with masked input
 	secretKeyFieldWidget := tview.NewInputField().
 		SetLabel(secretLabel).
-		SetText(string(ctx.config.secretKey)).
+		SetText(string(tui.config.secretKey)).
 		SetFieldWidth(50).
 		SetChangedFunc(func(key string) {
-			ctx.config.secretKey = key
-			ctx.config.accountKey = key
+			tui.config.secretKey = key
+			tui.config.accountKey = key
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER KEY HERE>").
 		SetMaskCharacter('*').
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Container name field widget for Azure storage
 	containerNameFieldWidget := tview.NewInputField().
 		SetLabel("🪣 Container Name: ").
-		SetText(ctx.config.containerName).
+		SetText(tui.config.containerName).
 		SetPlaceholder("\t\t\t\t<ENTER NAME HERE>").
 		SetChangedFunc(func(name string) {
-			ctx.config.containerName = name
-			ctx.config.bucketName = name
+			tui.config.containerName = name
+			tui.config.bucketName = name
 		}).
 		SetFieldWidth(50).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Passphrase field widget for config file encryption
 	passphraseFieldWidget := tview.NewInputField().
 		SetLabel("🔒 Passphrase: ").
-		SetText(ctx.config.configEncryptionPassphrase).
+		SetText(tui.config.configEncryptionPassphrase).
 		SetFieldWidth(50).
 		SetChangedFunc(func(passphrase string) {
-			ctx.config.configEncryptionPassphrase = strings.TrimSpace(passphrase)
+			tui.config.configEncryptionPassphrase = strings.TrimSpace(passphrase)
 		}).
 		SetPlaceholder("\t\t\t <ENTER PASSPHRASE HERE>").
 		SetMaskCharacter('*').
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Navigation buttons widget
 	navigationButtonsWidget := tview.NewForm().
-		AddButton(ctx.theme.navigationHomeLabel, func() {
-			ctx.pages.SwitchToPage("home")
+		AddButton(tui.theme.navigationHomeLabel, func() {
+			tui.pages.SwitchToPage("home")
 		}).
-		AddButton(ctx.theme.navigationNextLabel, func() {
+		AddButton(tui.theme.navigationNextLabel, func() {
 			// TODO: Add validation for access key and secret key HERE
 			// For now, just check that they are not empty
-			if (ctx.config.storageProtocol == "s3storage" && (len(ctx.config.accessKey) == 0 || len(ctx.config.secretKey) == 0)) ||
-				(ctx.config.storageProtocol == "azstorage" && (len(ctx.config.accountName) == 0 || len(ctx.config.accountKey) == 0 || len(ctx.config.containerName) == 0)) ||
-				len(ctx.config.configEncryptionPassphrase) == 0 {
-				ctx.showErrorModal(
+			if (tui.config.storageProtocol == "s3storage" && (len(tui.config.accessKey) == 0 || len(tui.config.secretKey) == 0)) ||
+				(tui.config.storageProtocol == "azstorage" && (len(tui.config.accountName) == 0 || len(tui.config.accountKey) == 0 || len(tui.config.containerName) == 0)) ||
+				len(tui.config.configEncryptionPassphrase) == 0 {
+				tui.showErrorModal(
 					"[red::b]ERROR: Credential fields cannot be empty.\nPlease try again.[-::-]",
 					func() {
-						ctx.pages.SwitchToPage("page3")
+						tui.pages.SwitchToPage("page3")
 					},
 				)
 				return
@@ -596,46 +595,46 @@ func (ctx *appContext) buildCredentialsPage() tview.Primitive {
 			// TODO: Fix bug here where calling listBuckets() in the checkCredentials() function
 			// causes the layout to shift upwards and the widgets to be misaligned if the user incorrectly
 			// enters credentials.
-			if err := ctx.checkCredentials(); err != nil {
-				ctx.showErrorModal(fmt.Sprintf("[red::b]ERROR: %s", err.Error()), func() {
-					ctx.pages.RemovePage("page3")                  // Remove the current page
-					page3 := ctx.buildCredentialsPage()            // Rebuild the page
-					ctx.pages.AddPage("page3", page3, true, false) // Add the new page
-					ctx.pages.SwitchToPage("page3")
+			if err := tui.checkCredentials(); err != nil {
+				tui.showErrorModal(fmt.Sprintf("[red::b]ERROR: %s", err.Error()), func() {
+					tui.pages.RemovePage("page3")                  // Remove the current page
+					page3 := tui.buildCredentialsPage()            // Rebuild the page
+					tui.pages.AddPage("page3", page3, true, false) // Add the new page
+					tui.pages.SwitchToPage("page3")
 				})
 				return
 			}
 
-			if ctx.config.storageProtocol == "azstorage" {
-				ctx.pages.RemovePage("page4") // Remove previous page if it exists
-				ctx.pages.SwitchToPage("page5")
+			if tui.config.storageProtocol == "azstorage" {
+				tui.pages.RemovePage("page4") // Remove previous page if it exists
+				tui.pages.SwitchToPage("page5")
 			} else {
-				page4 := ctx.buildBucketSelectionPage()
-				ctx.pages.AddPage("page4", page4, true, false)
-				ctx.pages.SwitchToPage("page4")
+				page4 := tui.buildBucketSelectionPage()
+				tui.pages.AddPage("page4", page4, true, false)
+				tui.pages.SwitchToPage("page4")
 			}
 		}).
-		AddButton(ctx.theme.navigationBackLabel, func() {
-			if ctx.config.storageProvider == "Microsoft" || ctx.config.storageProvider == "AWS" {
-				ctx.pages.RemovePage("page2")
-				ctx.pages.SwitchToPage("page1")
+		AddButton(tui.theme.navigationBackLabel, func() {
+			if tui.config.storageProvider == "Microsoft" || tui.config.storageProvider == "AWS" {
+				tui.pages.RemovePage("page2")
+				tui.pages.SwitchToPage("page1")
 			} else {
-				page2 := ctx.buildEndpointURLPage()
-				ctx.pages.AddPage("page2", page2, true, false)
-				ctx.pages.SwitchToPage("page2")
+				page2 := tui.buildEndpointURLPage()
+				tui.pages.AddPage("page2", page2, true, false)
+				tui.pages.SwitchToPage("page2")
 			}
 		}).
-		AddButton(ctx.theme.navigationPreviewLabel, func() {
-			previewPage := ctx.buildPreviewPage("page3")
-			ctx.pages.AddPage("previewPage", previewPage, true, false)
-			ctx.pages.SwitchToPage("previewPage")
+		AddButton(tui.theme.navigationPreviewLabel, func() {
+			previewPage := tui.buildPreviewPage("page3")
+			tui.pages.AddPage("previewPage", previewPage, true, false)
+			tui.pages.SwitchToPage("previewPage")
 		}).
-		AddButton(ctx.theme.navigationQuitLabel, func() {
-			ctx.app.Stop()
+		AddButton(tui.theme.navigationQuitLabel, func() {
+			tui.app.Stop()
 		}).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetButtonBackgroundColor(ctx.theme.navigationButtonColor).
-		SetButtonTextColor(ctx.theme.navigationButtonTextColor)
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
+		SetButtonTextColor(tui.theme.navigationButtonTextColor)
 
 	// Combine all credential widgets into a single form
 	credentialsWidget := tview.NewForm().
@@ -643,11 +642,11 @@ func (ctx *appContext) buildCredentialsPage() tview.Primitive {
 		AddFormItem(secretKeyFieldWidget).
 		AddFormItem(passphraseFieldWidget).
 		SetFieldTextColor(tcell.ColorBlack).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor)
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor)
 
 	// If Azure is selected, add the container name field
-	if ctx.config.storageProvider == "Microsoft" {
+	if tui.config.storageProvider == "Microsoft" {
 		credentialsWidget.AddFormItem(containerNameFieldWidget)
 	}
 
@@ -656,7 +655,7 @@ func (ctx *appContext) buildCredentialsPage() tview.Primitive {
 	layout.AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false)
 	layout.AddItem(nil, 1, 0, false)
 	layout.AddItem(credentialsWidget, credentialsWidget.GetFormItemCount()*2+1, 0, false)
-	layout.AddItem(navigationButtonsWidget, ctx.theme.navigationWidgetHeight, 0, false)
+	layout.AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false)
 	layout.AddItem(nil, 1, 0, false)
 	layout.SetBorder(true).SetBorderColor(colorGreen).SetBorderPadding(1, 1, 1, 1)
 
@@ -667,7 +666,7 @@ func (ctx *appContext) buildCredentialsPage() tview.Primitive {
 //
 // Function to build the bucket selection page. Allows users to select a bucket from a dropdown list
 // of retrieved buckets based on provided s3 credentials. For s3 storage users only. Azure storage users will skip this page.
-func (ctx *appContext) buildBucketSelectionPage() tview.Primitive {
+func (tui *appContext) buildBucketSelectionPage() tview.Primitive {
 	instructionsText := "[#6EBE49::b] Select Your Bucket Name[-::-]\n" +
 		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" +
 		"[white::b] Select the name of your storage bucket from the dropdown below.[-::-]\n\n" +
@@ -683,36 +682,36 @@ func (ctx *appContext) buildBucketSelectionPage() tview.Primitive {
 	// Dropdown widget for selecting bucket name
 	bucketSelectionWidget := tview.NewDropDown().
 		SetLabel(" 🪣 Bucket Name: ").
-		SetOptions(ctx.config.bucketList, func(name string, index int) {
-			ctx.config.bucketName = name
+		SetOptions(tui.config.bucketList, func(name string, index int) {
+			tui.config.bucketName = name
 		}).
 		SetCurrentOption(0).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack).
 		SetFieldWidth(25)
 
 	// Navigation buttons widget
 	navigationButtonsWidget := tview.NewForm().
-		AddButton(ctx.theme.navigationHomeLabel, func() {
-			ctx.pages.SwitchToPage("home")
+		AddButton(tui.theme.navigationHomeLabel, func() {
+			tui.pages.SwitchToPage("home")
 		}).
-		AddButton(ctx.theme.navigationNextLabel, func() {
-			ctx.pages.SwitchToPage("page5")
+		AddButton(tui.theme.navigationNextLabel, func() {
+			tui.pages.SwitchToPage("page5")
 		}).
-		AddButton(ctx.theme.navigationBackLabel, func() {
-			ctx.pages.SwitchToPage("page3")
+		AddButton(tui.theme.navigationBackLabel, func() {
+			tui.pages.SwitchToPage("page3")
 		}).
-		AddButton(ctx.theme.navigationPreviewLabel, func() {
-			previewPage := ctx.buildPreviewPage("page4")
-			ctx.pages.AddPage("previewPage", previewPage, true, false)
-			ctx.pages.SwitchToPage("previewPage")
+		AddButton(tui.theme.navigationPreviewLabel, func() {
+			previewPage := tui.buildPreviewPage("page4")
+			tui.pages.AddPage("previewPage", previewPage, true, false)
+			tui.pages.SwitchToPage("previewPage")
 		}).
-		AddButton(ctx.theme.navigationQuitLabel, func() {
-			ctx.app.Stop()
+		AddButton(tui.theme.navigationQuitLabel, func() {
+			tui.app.Stop()
 		}).
-		SetButtonBackgroundColor(ctx.theme.navigationButtonColor).
-		SetButtonTextColor(ctx.theme.navigationButtonTextColor)
+		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
+		SetButtonTextColor(tui.theme.navigationButtonTextColor)
 
 	// Assemble page layout
 	layout := tview.NewFlex().
@@ -720,7 +719,7 @@ func (ctx *appContext) buildBucketSelectionPage() tview.Primitive {
 		AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false).
 		AddItem(nil, 2, 0, false).
 		AddItem(bucketSelectionWidget, 2, 0, false).
-		AddItem(navigationButtonsWidget, ctx.theme.navigationWidgetHeight, 0, false).
+		AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false).
 		AddItem(nil, 1, 0, false)
 
 	layout.SetBorder(true).SetBorderColor(colorGreen).SetBorderPadding(1, 1, 1, 1)
@@ -732,7 +731,7 @@ func (ctx *appContext) buildBucketSelectionPage() tview.Primitive {
 //
 // Function to build the caching page that allows users to configure caching settings.
 // Includes options for enabling/disabling caching, specifying cache location, size, and retention settings.
-func (ctx *appContext) buildCachingPage() tview.Primitive {
+func (tui *appContext) buildCachingPage() tview.Primitive {
 	// Main layout container. Must be instantiated first to allow nested items.
 	layout := tview.NewFlex().SetDirection(tview.FlexRow)
 
@@ -751,75 +750,75 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 	// Dropdown widget for enabling/disabling caching
 	cacheLocationFieldWidget := tview.NewInputField().
 		SetLabel("📁 Cache Location: ").
-		SetText(ctx.config.cacheLocation).
+		SetText(tui.config.cacheLocation).
 		SetFieldWidth(40).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack).
 		SetChangedFunc(func(text string) {
-			ctx.config.cacheLocation = text
+			tui.config.cacheLocation = text
 		})
 
 		// Input field widget for cache size percentage
 	cacheSizeFieldWidget := tview.NewInputField().
 		SetLabel("📊 Cache Size (%): ").
-		SetText(ctx.config.cacheSize). // Default to 80%
+		SetText(tui.config.cacheSize). // Default to 80%
 		SetFieldWidth(4).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack).
 		SetChangedFunc(func(size string) {
 			if size, err := strconv.Atoi(size); err != nil || size < 1 || size > 100 {
-				ctx.showErrorModal(
+				tui.showErrorModal(
 					"[red::b]ERROR: Cache size must be between 1 and 100.\nPlease try again.[-::-]",
 					func() {
-						ctx.pages.SwitchToPage("page5")
+						tui.pages.SwitchToPage("page5")
 					},
 				)
 				return
 			}
-			ctx.config.cacheSize = size
+			tui.config.cacheSize = size
 		})
 
 	// Input field widget for cache retention duration
 	cacheRetentionDurationFieldWidget := tview.NewInputField().
 		SetLabel("⌛ Cache Retention Duration: ").
-		SetText(fmt.Sprintf("%d", ctx.config.cacheRetentionDuration)).
+		SetText(fmt.Sprintf("%d", tui.config.cacheRetentionDuration)).
 		SetFieldWidth(5).
 		SetChangedFunc(func(text string) {
 			if val, err := strconv.Atoi(text); err == nil {
-				ctx.config.cacheRetentionDuration = val
+				tui.config.cacheRetentionDuration = val
 			} else {
 				// TODO: Handle invalid input
-				ctx.config.cacheRetentionDuration = 0
+				tui.config.cacheRetentionDuration = 0
 			}
 		}).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Dropdown widget for cache retention unit
 	cacheRetentionUnitDropdownWidget := tview.NewDropDown().
 		SetOptions([]string{"Seconds", "Minutes", "Hours", "Days"}, func(option string, index int) {
-			ctx.config.cacheRetentionUnit = option
+			tui.config.cacheRetentionUnit = option
 			// Convert cache retention duration to seconds
-			switch ctx.config.cacheRetentionUnit {
+			switch tui.config.cacheRetentionUnit {
 			case "Seconds":
-				ctx.config.cacheRetentionDurationSec = ctx.config.cacheRetentionDuration
+				tui.config.cacheRetentionDurationSec = tui.config.cacheRetentionDuration
 			case "Minutes":
-				minutes := ctx.config.cacheRetentionDuration
-				ctx.config.cacheRetentionDurationSec = minutes * 60
+				minutes := tui.config.cacheRetentionDuration
+				tui.config.cacheRetentionDurationSec = minutes * 60
 			case "Hours":
-				hours := ctx.config.cacheRetentionDuration
-				ctx.config.cacheRetentionDurationSec = hours * 3600
+				hours := tui.config.cacheRetentionDuration
+				tui.config.cacheRetentionDurationSec = hours * 3600
 			case "Days":
-				days := ctx.config.cacheRetentionDuration
-				ctx.config.cacheRetentionDurationSec = days * 86400
+				days := tui.config.cacheRetentionDuration
+				tui.config.cacheRetentionDurationSec = days * 86400
 			}
 		}).
 		SetCurrentOption(3). // Default to Days
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 		// Dropdown widget for enabling/disabling cache cleanup on restart
@@ -829,13 +828,13 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 		SetLabel("🧹 Clear Cache On Start: ").
 		SetOptions([]string{" Enabled ", " Disabled "}, func(option string, index int) {
 			if option == " Enabled " {
-				ctx.config.clearCacheOnStart = true
+				tui.config.clearCacheOnStart = true
 			} else {
-				ctx.config.clearCacheOnStart = false
+				tui.config.clearCacheOnStart = false
 			}
 		}).SetCurrentOption(0).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
 	// Horizontal container to place retention duration and unit side by side
@@ -858,26 +857,26 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 	// Navigation buttons widget
 	navigationButtonsWidget := tview.NewForm()
 	navigationButtonsWidget.
-		AddButton(ctx.theme.navigationHomeLabel, func() {
-			ctx.pages.SwitchToPage("home")
+		AddButton(tui.theme.navigationHomeLabel, func() {
+			tui.pages.SwitchToPage("home")
 		}).
-		AddButton(ctx.theme.navigationFinishLabel, func() {
+		AddButton(tui.theme.navigationFinishLabel, func() {
 			// Check if caching is enabled and validate cache settings
-			if ctx.config.enableCaching {
+			if tui.config.enableCaching {
 				// Validate the cache location
-				if err := ctx.validateCachePath(); err != nil {
-					ctx.showErrorModal("Invalid cache location:\n"+err.Error(), func() {
-						ctx.pages.SwitchToPage("page5")
+				if err := tui.validateCachePath(); err != nil {
+					tui.showErrorModal("Invalid cache location:\n"+err.Error(), func() {
+						tui.pages.SwitchToPage("page5")
 					})
 					return
 				}
 
 				// Check available cache size
-				if err := ctx.getAvailableCacheSize(); err != nil {
-					ctx.showErrorModal(
+				if err := tui.getAvailableCacheSize(); err != nil {
+					tui.showErrorModal(
 						"Failed to check available cache size:\n"+err.Error(),
 						func() {
-							ctx.pages.SwitchToPage("page5")
+							tui.pages.SwitchToPage("page5")
 						},
 					)
 					return
@@ -885,68 +884,68 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 
 				cacheSizeText := fmt.Sprintf(
 					"Available Disk Space @ Cache Location: [darkred::b]%d GB[-::-]\n",
-					ctx.config.availableCacheSizeGB,
+					tui.config.availableCacheSizeGB,
 				) +
 					fmt.Sprintf(
 						"Cache Size Currently Set to: [darkred::b]%.0f GB (%s%%)[-::-]\n\n",
-						float64(ctx.config.currentCacheSizeGB),
-						ctx.config.cacheSize,
+						float64(tui.config.currentCacheSizeGB),
+						tui.config.cacheSize,
 					) +
 					"Would you like to proceed with this cache size?\n\n" +
 					"If not, hit [darkred::b]Return[-::-] to adjust cache size accordingly. Otherwise, hit [darkred::b]Finish[-::-] to complete the configuration."
 
-				ctx.showCacheConfirmationModal(cacheSizeText,
+				tui.showCacheConfirmationModal(cacheSizeText,
 					// Callback function if the user selects Finish
 					func() {
-						if err := ctx.createYAMLConfig(); err != nil {
-							ctx.showErrorModal(
+						if err := tui.createYAMLConfig(); err != nil {
+							tui.showErrorModal(
 								"Failed to create YAML config:\n"+err.Error(),
 								func() {
-									ctx.pages.SwitchToPage("page5")
+									tui.pages.SwitchToPage("page5")
 								},
 							)
 							return
 						}
-						ctx.showExitModal(func() {
-							ctx.app.Stop()
+						tui.showExitModal(func() {
+							tui.app.Stop()
 						})
 					},
 					// Callback function if the user selects Return
 					func() {
-						ctx.pages.SwitchToPage("page5")
+						tui.pages.SwitchToPage("page5")
 					})
 
 			} else {
 				// If caching is disabled, just finish the configuration
-				if err := ctx.createYAMLConfig(); err != nil {
-					ctx.showErrorModal("Failed to create YAML config:\n"+err.Error(), func() {
-						ctx.pages.SwitchToPage("page5")
+				if err := tui.createYAMLConfig(); err != nil {
+					tui.showErrorModal("Failed to create YAML config:\n"+err.Error(), func() {
+						tui.pages.SwitchToPage("page5")
 					})
 					return
 				}
-				ctx.showExitModal(func() {
-					ctx.app.Stop()
+				tui.showExitModal(func() {
+					tui.app.Stop()
 				})
 			}
 		}).
-		AddButton(ctx.theme.navigationBackLabel, func() {
-			if ctx.config.storageProtocol == "azstorage" {
-				ctx.pages.SwitchToPage("page3")
+		AddButton(tui.theme.navigationBackLabel, func() {
+			if tui.config.storageProtocol == "azstorage" {
+				tui.pages.SwitchToPage("page3")
 			} else {
-				page4 := ctx.buildBucketSelectionPage()
-				ctx.pages.AddPage("page4", page4, true, false)
-				ctx.pages.SwitchToPage("page4")
+				page4 := tui.buildBucketSelectionPage()
+				tui.pages.AddPage("page4", page4, true, false)
+				tui.pages.SwitchToPage("page4")
 			}
 		}).
-		AddButton(ctx.theme.navigationPreviewLabel, func() {
-			previewPage := ctx.buildPreviewPage("page5")
-			ctx.pages.AddPage("previewPage", previewPage, true, false)
-			ctx.pages.SwitchToPage("previewPage")
+		AddButton(tui.theme.navigationPreviewLabel, func() {
+			previewPage := tui.buildPreviewPage("page5")
+			tui.pages.AddPage("previewPage", previewPage, true, false)
+			tui.pages.SwitchToPage("previewPage")
 		}).
-		AddButton(ctx.theme.navigationQuitLabel, func() {
-			ctx.app.Stop()
+		AddButton(tui.theme.navigationQuitLabel, func() {
+			tui.app.Stop()
 		}).
-		SetButtonBackgroundColor(ctx.theme.navigationButtonColor).
+		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
 		SetButtonTextColor(colorBlack)
 
 		// Widget to enable/disable caching
@@ -955,23 +954,23 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 		SetLabel("💾 Caching: ").
 		SetOptions([]string{" Enabled ", " Disabled "}, func(option string, index int) {
 			if option == " Enabled " {
-				ctx.config.cacheMode = "file_cache"
-				ctx.config.enableCaching = true
+				tui.config.cacheMode = "file_cache"
+				tui.config.enableCaching = true
 				if !showCacheFields {
 					layout.RemoveItem(navigationButtonsWidget)
 					layout.RemoveItem(cacheFields)
 					layout.AddItem(cacheFields, 8, 0, false)
 					layout.AddItem(
 						navigationButtonsWidget,
-						ctx.theme.navigationWidgetHeight,
+						tui.theme.navigationWidgetHeight,
 						0,
 						false,
 					)
 					showCacheFields = true
 				}
 			} else {
-				ctx.config.cacheMode = "block_cache"
-				ctx.config.enableCaching = false
+				tui.config.cacheMode = "block_cache"
+				tui.config.enableCaching = false
 				if showCacheFields {
 					layout.RemoveItem(cacheFields)
 					showCacheFields = false
@@ -979,8 +978,8 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 			}
 		}).
 		SetCurrentOption(0).
-		SetLabelColor(ctx.theme.widgetLabelColor).
-		SetFieldBackgroundColor(ctx.theme.widgetFieldBackgroundColor).
+		SetLabelColor(tui.theme.widgetLabelColor).
+		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(tcell.ColorBlack)
 
 		// Assemble page layout
@@ -991,7 +990,7 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 		layout.AddItem(cacheFields, 8, 0, false)
 	}
 
-	layout.AddItem(navigationButtonsWidget, ctx.theme.navigationWidgetHeight, 0, false)
+	layout.AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false)
 	layout.AddItem(nil, 1, 0, false)
 	layout.SetBorder(true).SetBorderColor(colorGreen).SetBorderPadding(1, 1, 1, 1)
 
@@ -1003,30 +1002,30 @@ func (ctx *appContext) buildCachingPage() tview.Primitive {
 // Function to build the summary page that displays the configuration summary.
 // This function creates a text view with the summary information and a return button.
 // The preview page parameter allows switching back to the previous page when the user clicks "Return".
-func (ctx *appContext) buildPreviewPage(previewPage string) tview.Primitive {
+func (tui *appContext) buildPreviewPage(previewPage string) tview.Primitive {
 	summaryText :=
 		"[#6EBE49::b] CloudFuse Summary Configuration:[-]\n" +
 			"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n[-]" +
-			fmt.Sprintf(" Storage Provider: [#FFD700::b]%s[-]\n", ctx.config.storageProvider) +
-			fmt.Sprintf("     Endpoint URL: [#FFD700::b]%s[-]\n", ctx.config.endpointURL) +
-			fmt.Sprintf("      Bucket Name: [#FFD700::b]%s[-]\n", ctx.config.bucketName) +
-			fmt.Sprintf("       Cache Mode: [#FFD700::b]%s[-]\n", ctx.config.cacheMode) +
-			fmt.Sprintf("   Cache Location: [#FFD700::b]%s[-]\n", ctx.config.cacheLocation) +
+			fmt.Sprintf(" Storage Provider: [#FFD700::b]%s[-]\n", tui.config.storageProvider) +
+			fmt.Sprintf("     Endpoint URL: [#FFD700::b]%s[-]\n", tui.config.endpointURL) +
+			fmt.Sprintf("      Bucket Name: [#FFD700::b]%s[-]\n", tui.config.bucketName) +
+			fmt.Sprintf("       Cache Mode: [#FFD700::b]%s[-]\n", tui.config.cacheMode) +
+			fmt.Sprintf("   Cache Location: [#FFD700::b]%s[-]\n", tui.config.cacheLocation) +
 			fmt.Sprintf(
 				"       Cache Size: [#FFD700::b]%s%% (%d GB)[-]\n",
-				ctx.config.cacheSize,
-				ctx.config.currentCacheSizeGB,
+				tui.config.cacheSize,
+				tui.config.currentCacheSizeGB,
 			)
 
 	// Display cache retention duration in seconds and specified unit
-	if ctx.config.cacheRetentionUnit == "Seconds" {
+	if tui.config.cacheRetentionUnit == "Seconds" {
 		summaryText += fmt.Sprintf(
 			"  Cache Retention: [#FFD700::b]%d Seconds[-]\n\n",
-			ctx.config.cacheRetentionDurationSec,
+			tui.config.cacheRetentionDurationSec,
 		)
 	} else {
 		summaryText += fmt.Sprintf("  Cache Retention: [#FFD700::b]%d sec (%d %s)[-]\n\n",
-			ctx.config.cacheRetentionDurationSec, ctx.config.cacheRetentionDuration, ctx.config.cacheRetentionUnit)
+			tui.config.cacheRetentionDurationSec, tui.config.cacheRetentionDuration, tui.config.cacheRetentionUnit)
 	}
 
 	// Set a dynamic width and height for the summary widget
@@ -1041,7 +1040,7 @@ func (ctx *appContext) buildPreviewPage(previewPage string) tview.Primitive {
 
 	returnButton := tview.NewButton("[black]Return[-]").
 		SetSelectedFunc(func() {
-			ctx.pages.SwitchToPage(previewPage)
+			tui.pages.SwitchToPage(previewPage)
 		})
 	returnButton.SetBackgroundColor(colorGreen)
 	returnButton.SetBorder(true)
@@ -1071,12 +1070,12 @@ func (ctx *appContext) buildPreviewPage(previewPage string) tview.Primitive {
 // Function to show a modal dialog with a message and an "OK" button.
 // This function is used to display error messages or confirmations.
 // May specify a callback function to execute when the modal is closed.
-func (ctx *appContext) showErrorModal(message string, onClose func()) {
+func (tui *appContext) showErrorModal(message string, onClose func()) {
 	modal := tview.NewModal().
 		SetText(message).
 		AddButtons([]string{"OK"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			ctx.pages.RemovePage("modal")
+			tui.pages.RemovePage("modal")
 			onClose()
 		}).
 		SetBackgroundColor(colorGreen).
@@ -1085,12 +1084,12 @@ func (ctx *appContext) showErrorModal(message string, onClose func()) {
 	modal.SetBorderColor(colorYellow)
 	modal.SetButtonBackgroundColor(colorYellow)
 	modal.SetButtonTextColor(tcell.ColorBlack)
-	ctx.pages.AddPage("modal", modal, false, true)
+	tui.pages.AddPage("modal", modal, false, true)
 }
 
 // Function to show a confirmation modal dialog with "Finish" and "Return" buttons.
 // Used to confirm cache size before proceeding. Must specify two callback functions for the "Finish" and "Return" actions.
-func (ctx *appContext) showCacheConfirmationModal(
+func (tui *appContext) showCacheConfirmationModal(
 	message string,
 	onFinish func(),
 	onReturn func(),
@@ -1099,7 +1098,7 @@ func (ctx *appContext) showCacheConfirmationModal(
 		SetText(message).
 		AddButtons([]string{"Finish", "Return"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			ctx.pages.RemovePage("modal")
+			tui.pages.RemovePage("modal")
 			if buttonLabel == "Finish" {
 				onFinish()
 			} else {
@@ -1112,20 +1111,20 @@ func (ctx *appContext) showCacheConfirmationModal(
 	modal.SetBorderColor(colorYellow)
 	modal.SetButtonBackgroundColor(colorYellow)
 	modal.SetButtonTextColor(tcell.ColorBlack)
-	ctx.pages.AddPage("modal", modal, true, true)
+	tui.pages.AddPage("modal", modal, true, true)
 }
 
 // Function to show final exit modal when configuration is complete.
 // Informs the user that the configuration is complete and they can exit.
 // This function is called when the user clicks "Finish" on the caching page.
-func (ctx *appContext) showExitModal(onConfirm func()) {
+func (tui *appContext) showExitModal(onConfirm func()) {
 
 	processingEmojis := []string{"🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "✅"}
 
 	modal := tview.NewModal().
 		AddButtons([]string{"Exit"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			ctx.pages.RemovePage("modal")
+			tui.pages.RemovePage("modal")
 			if buttonLabel == "Exit" {
 				onConfirm()
 			}
@@ -1137,7 +1136,7 @@ func (ctx *appContext) showExitModal(onConfirm func()) {
 	modal.SetButtonBackgroundColor(colorYellow)
 	modal.SetButtonTextColor(tcell.ColorBlack)
 
-	ctx.pages.AddPage("modal", modal, true, true)
+	tui.pages.AddPage("modal", modal, true, true)
 
 	// Simulate processing with emoji animation
 	go func() {
@@ -1145,7 +1144,7 @@ func (ctx *appContext) showExitModal(onConfirm func()) {
 		for i := 0; i < len(processingEmojis); i++ {
 			currentEmoji := processingEmojis[i]
 			time.Sleep(100 * time.Millisecond)
-			ctx.app.QueueUpdateDraw(func() {
+			tui.app.QueueUpdateDraw(func() {
 				modal.SetText(
 					fmt.Sprintf(
 						"[#6EBE49::b]Creating configuration file...[-::-]\n\n%s",
@@ -1156,11 +1155,11 @@ func (ctx *appContext) showExitModal(onConfirm func()) {
 		}
 
 		// After animation, show final message
-		ctx.app.QueueUpdateDraw(func() {
+		tui.app.QueueUpdateDraw(func() {
 			modal.SetText(fmt.Sprintf("[#6EBE49::b]Configuration Complete![-::-]\n\n%s\n\n"+
 				"Your CloudFuse configuration file has been created at:\n\n[blue:white:b]%s[-:-:-]\n\n"+
 				"You can now exit the application.\n\n"+
-				"[black::i]Thank you for using CloudFuse Config![-::-]", processingEmojis[len(processingEmojis)-1], ctx.config.configFilePath))
+				"[black::i]Thank you for using CloudFuse Config![-::-]", processingEmojis[len(processingEmojis)-1], tui.config.configFilePath))
 		})
 	}()
 }
@@ -1247,21 +1246,21 @@ func getDefaultCachePath() string {
 }
 
 // Helper function to validate the entered cache path.
-func (ctx *appContext) validateCachePath() error {
+func (tui *appContext) validateCachePath() error {
 	// Validate that the path is not empty
-	if strings.TrimSpace(ctx.config.cacheLocation) == "" {
+	if strings.TrimSpace(tui.config.cacheLocation) == "" {
 		return fmt.Errorf("[red::b]ERROR: Cache location cannot be empty[-::-]")
 	}
 	// Make sure no invalid path characters are used
-	if strings.ContainsAny(ctx.config.cacheLocation, `<>:"|?*#%^&;'"`+"`"+`{}[]`) {
+	if strings.ContainsAny(tui.config.cacheLocation, `<>:"|?*#%^&;'"`+"`"+`{}[]`) {
 		return fmt.Errorf("[red::b]ERROR: Cache location contains invalid characters[-::-]")
 	}
 	// Validate that the cache path exists
-	if ctx.config.cacheLocation != getDefaultCachePath() && ctx.config.cacheMode == "file_cache" {
-		if _, err := os.Stat(ctx.config.cacheLocation); os.IsNotExist(err) {
+	if tui.config.cacheLocation != getDefaultCachePath() && tui.config.cacheMode == "file_cache" {
+		if _, err := os.Stat(tui.config.cacheLocation); os.IsNotExist(err) {
 			return fmt.Errorf(
 				"[red::b]ERROR: '%s': No such file or directory[-::-]",
-				ctx.config.cacheLocation,
+				tui.config.cacheLocation,
 			)
 		}
 	}
@@ -1270,16 +1269,16 @@ func (ctx *appContext) validateCachePath() error {
 
 // Helper function to get the available disk space at the cache location and calculates
 // the cache size in GB based on the user-defined cache size percentage.
-func (ctx *appContext) getAvailableCacheSize() error {
-	availableBlocks, _, err := common.GetAvailFree(ctx.config.cacheLocation)
+func (tui *appContext) getAvailableCacheSize() error {
+	availableBlocks, _, err := common.GetAvailFree(tui.config.cacheLocation)
 	if err != nil {
 		// If we fail to get the available cache size, we default to 80% of the available disk space
-		ctx.config.cacheSize = "80"
+		tui.config.cacheSize = "80"
 		returnMsg := fmt.Errorf(
 			"[red::b]WARNING: Failed to get available cache size at '%s': %v\n\n"+
 				"Defaulting cache size to 80%% of available disk space.\n\n"+
 				"Please manually verify you have enough disk space available for caching.[-::-]",
-			ctx.config.cacheLocation,
+			tui.config.cacheLocation,
 			err,
 		)
 		return returnMsg
@@ -1287,17 +1286,17 @@ func (ctx *appContext) getAvailableCacheSize() error {
 
 	const blockSize = 4096
 	availableCacheSizeBytes := availableBlocks * blockSize // Convert blocks to bytes
-	ctx.config.availableCacheSizeGB = int(
+	tui.config.availableCacheSizeGB = int(
 		availableCacheSizeBytes / (1024 * 1024 * 1024),
 	) // Convert to GB
-	cacheSizeInt, _ := strconv.Atoi(ctx.config.cacheSize)
-	ctx.config.currentCacheSizeGB = int(ctx.config.availableCacheSizeGB) * cacheSizeInt / 100
+	cacheSizeInt, _ := strconv.Atoi(tui.config.cacheSize)
+	tui.config.currentCacheSizeGB = int(tui.config.availableCacheSizeGB) * cacheSizeInt / 100
 
 	return nil
 }
 
 // Helper function to normalize and validate the user-defined endpoint URL.
-func (ctx *appContext) validateEndpointURL(rawURL string) error {
+func (tui *appContext) validateEndpointURL(rawURL string) error {
 	rawURL = strings.TrimSpace(rawURL)
 
 	// Check if the URL is empty
@@ -1307,7 +1306,7 @@ func (ctx *appContext) validateEndpointURL(rawURL string) error {
 
 	// Normalize the URL by adding "https://" if it doesn't start with "http://" or "https://"
 	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
-		ctx.config.endpointURL = "https://" + rawURL
+		tui.config.endpointURL = "https://" + rawURL
 		return fmt.Errorf("[red::b]Endpoint URL should start with 'http://' or 'https://'.\n" +
 			"Appending 'https://' to the URL...\n\nPlease verify the URL and try again.")
 	}
@@ -1322,26 +1321,26 @@ func (ctx *appContext) validateEndpointURL(rawURL string) error {
 // Function to create a temporary YAML configuration file based on user inputs.
 // Used for testing credentials and then removed after the check.
 // Called when the user clicks "Next" on the credentials page.
-func (ctx *appContext) createTmpConfigFile() error {
+func (tui *appContext) createTmpConfigFile() error {
 	config := configOptions{
 
-		Components: []string{ctx.config.storageProtocol},
+		Components: []string{tui.config.storageProtocol},
 	}
 
-	if ctx.config.storageProtocol == "azstorage" {
+	if tui.config.storageProtocol == "azstorage" {
 		config.AzStorage = azstorage.AzStorageOptions{
 			AccountType: "block",
-			AccountName: ctx.config.accountName,
-			AccountKey:  ctx.config.accountKey,
+			AccountName: tui.config.accountName,
+			AccountKey:  tui.config.accountKey,
 			AuthMode:    "key",
-			Container:   ctx.config.containerName,
+			Container:   tui.config.containerName,
 		}
 	} else {
 		config.S3Storage = s3StorageConfig{
-			BucketName:      ctx.config.bucketName,
-			KeyID:           ctx.config.accessKey,
-			SecretKey:       ctx.config.secretKey,
-			Endpoint:        ctx.config.endpointURL,
+			BucketName:      tui.config.bucketName,
+			KeyID:           tui.config.accessKey,
+			SecretKey:       tui.config.secretKey,
+			Endpoint:        tui.config.endpointURL,
 			EnableDirMarker: true,
 		}
 
@@ -1366,9 +1365,9 @@ func (ctx *appContext) createTmpConfigFile() error {
 // Attempts to connect to the storage backend and fetch the bucket list.
 // If successful, populates the global `bucketList` variable with the list of available buckets (for s3 providers only).
 // Called when the user clicks "Next" on the credentials page.
-func (ctx *appContext) checkCredentials() error {
+func (tui *appContext) checkCredentials() error {
 	// Create a temporary config file for testing credentials
-	if err := ctx.createTmpConfigFile(); err != nil {
+	if err := tui.createTmpConfigFile(); err != nil {
 		return fmt.Errorf("Failed to create temporary config file: %v", err)
 	}
 
@@ -1389,10 +1388,10 @@ func (ctx *appContext) checkCredentials() error {
 	// Try to fetch bucket list
 	var err error
 	if slices.Contains(options.Components, "azstorage") {
-		ctx.config.bucketList, err = getContainerListAzure()
+		tui.config.bucketList, err = getContainerListAzure()
 
 	} else if slices.Contains(options.Components, "s3storage") {
-		ctx.config.bucketList, err = getBucketListS3()
+		tui.config.bucketList, err = getBucketListS3()
 
 	} else {
 		err = fmt.Errorf("Unsupported storage backend")
@@ -1407,13 +1406,13 @@ func (ctx *appContext) checkCredentials() error {
 
 // Function to create the YAML configuration file based on user inputs once all forms are completed.
 // Called when the user clicks "Finish" on the caching page.
-func (ctx *appContext) createYAMLConfig() error {
+func (tui *appContext) createYAMLConfig() error {
 	config := configOptions{
 		Components: []string{
 			"libfuse",
-			ctx.config.cacheMode,
+			tui.config.cacheMode,
 			"attr_cache",
-			ctx.config.storageProtocol,
+			tui.config.storageProtocol,
 		},
 
 		Libfuse: libfuse.LibfuseOptions{
@@ -1425,36 +1424,36 @@ func (ctx *appContext) createYAMLConfig() error {
 		},
 	}
 
-	if ctx.config.cacheMode == "file_cache" {
+	if tui.config.cacheMode == "file_cache" {
 		config.FileCache = file_cache.FileCacheOptions{
-			TmpPath:       ctx.config.cacheLocation,
-			Timeout:       uint32(ctx.config.cacheRetentionDurationSec),
-			AllowNonEmpty: !ctx.config.clearCacheOnStart,
+			TmpPath:       tui.config.cacheLocation,
+			Timeout:       uint32(tui.config.cacheRetentionDurationSec),
+			AllowNonEmpty: !tui.config.clearCacheOnStart,
 			SyncToFlush:   true,
 		}
 		// If cache size is not set to 80%, convert currentCacheSizeGB to MB and set file_cache.max-size-mb to it
-		if ctx.config.cacheSize != "80" {
+		if tui.config.cacheSize != "80" {
 			config.FileCache.MaxSizeMB = float64(
-				ctx.config.currentCacheSizeGB * 1024,
+				tui.config.currentCacheSizeGB * 1024,
 			) // Convert GB to MB
 		}
 	}
 
-	if ctx.config.storageProtocol == "s3storage" {
+	if tui.config.storageProtocol == "s3storage" {
 		config.S3Storage = s3StorageConfig{
-			BucketName:      ctx.config.bucketName,
-			KeyID:           ctx.config.accessKey,
-			SecretKey:       ctx.config.secretKey,
-			Endpoint:        ctx.config.endpointURL,
+			BucketName:      tui.config.bucketName,
+			KeyID:           tui.config.accessKey,
+			SecretKey:       tui.config.secretKey,
+			Endpoint:        tui.config.endpointURL,
 			EnableDirMarker: true,
 		}
 	} else {
 		config.AzStorage = azstorage.AzStorageOptions{
 			AccountType: "block",
-			AccountName: ctx.config.accountName,
-			AccountKey:  ctx.config.accountKey,
+			AccountName: tui.config.accountName,
+			AccountKey:  tui.config.accountKey,
 			AuthMode:    "key",
-			Container:   ctx.config.containerName,
+			Container:   tui.config.containerName,
 		}
 	}
 
@@ -1475,7 +1474,7 @@ func (ctx *appContext) createYAMLConfig() error {
 		return fmt.Errorf("Error: %v", err)
 	}
 
-	ctx.config.configFilePath = filepath.Join(currDir, "config.yaml")
+	tui.config.configFilePath = filepath.Join(currDir, "config.yaml")
 
 	return nil
 }
