@@ -1318,17 +1318,18 @@ func (tui *appContext) validateEndpointURL(rawURL string) error {
 	return nil
 }
 
-// Function to create a temporary YAML configuration file based on user inputs.
-// Used for testing credentials and then removed after the check.
+// Function to check the credentials entered by the user.
+// Attempts to connect to the storage backend and fetch the bucket list.
+// If successful, populates the `bucketList` variable with the list of available buckets (for s3 providers only).
 // Called when the user clicks "Next" on the credentials page.
-func (tui *appContext) createTmpConfigFile() error {
-	config := configOptions{
-
+func (tui *appContext) checkCredentials() error {
+	// Create a temporary configOptions struct with only the storage component
+	tmpConfig := configOptions{
 		Components: []string{tui.config.storageProtocol},
 	}
 
 	if tui.config.storageProtocol == "azstorage" {
-		config.AzStorage = azstorage.AzStorageOptions{
+		tmpConfig.AzStorage = azstorage.AzStorageOptions{
 			AccountType: "block",
 			AccountName: tui.config.accountName,
 			AccountKey:  tui.config.accountKey,
@@ -1336,50 +1337,21 @@ func (tui *appContext) createTmpConfigFile() error {
 			Container:   tui.config.containerName,
 		}
 	} else {
-		config.S3Storage = s3StorageConfig{
+		tmpConfig.S3Storage = s3StorageConfig{
 			BucketName:      tui.config.bucketName,
 			KeyID:           tui.config.accessKey,
 			SecretKey:       tui.config.secretKey,
 			Endpoint:        tui.config.endpointURL,
 			EnableDirMarker: true,
 		}
-
 	}
 
-	yamlData, err := yaml.Marshal(&config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal YAML: %v", err)
-	}
+	// Marshal the temporary struct to YAML
+	tmpConfigData, _ := yaml.Marshal(&tmpConfig)
 
-	tmpFile := "config-tmp.yaml"
-	if err := os.WriteFile(tmpFile, yamlData, 0600); err != nil {
-		return fmt.Errorf("failed to write YAML to file: %v", err)
-	}
-
-	// Update options.ConfigFile to point to the temporary file
-	options.ConfigFile = "config-tmp.yaml"
-	return nil
-}
-
-// Function to check the credentials entered by the user.
-// Attempts to connect to the storage backend and fetch the bucket list.
-// If successful, populates the global `bucketList` variable with the list of available buckets (for s3 providers only).
-// Called when the user clicks "Next" on the credentials page.
-func (tui *appContext) checkCredentials() error {
-	// Create a temporary config file for testing credentials
-	if err := tui.createTmpConfigFile(); err != nil {
-		return fmt.Errorf("Failed to create temporary config file: %v", err)
-	}
-
-	// Delete the temporary config file regardless of success or failure of the credential check
-	defer func() {
-		_ = os.Remove("config-tmp.yaml")
-	}()
-
-	// Parse and unmarshal the temporary config file
-	if err := parseConfig(); err != nil {
-		return fmt.Errorf("Failed to parse config: %v", err)
-	}
+	// Write the temporary config data into the global options struct instead of a temporary file.
+	// This avoids the need to create and delete a temporary file on disk.
+	_ = config.ReadFromConfigBuffer(tmpConfigData)
 
 	if err := config.Unmarshal(&options); err != nil {
 		return fmt.Errorf("Failed to unmarshal config: %v", err)
