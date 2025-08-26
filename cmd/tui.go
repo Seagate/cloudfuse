@@ -41,6 +41,7 @@ import (
 	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/file_cache"
 	"github.com/Seagate/cloudfuse/component/libfuse"
+	"github.com/awnumar/memguard"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"gopkg.in/yaml.v3"
@@ -1346,12 +1347,14 @@ func (tui *appContext) checkCredentials() error {
 		}
 	}
 
-	// Marshal the temporary struct to YAML
+	// Marshal the temporary struct to YAML format
 	tmpConfigData, _ := yaml.Marshal(&tmpConfig)
 
 	// Write the temporary config data into the global options struct instead of a temporary file.
 	// This avoids the need to create and delete a temporary file on disk.
-	_ = config.ReadFromConfigBuffer(tmpConfigData)
+	if err := config.ReadFromConfigBuffer(tmpConfigData); err != nil {
+		return fmt.Errorf("Failed to read config from buffer: %v", err)
+	}
 
 	if err := config.Unmarshal(&options); err != nil {
 		return fmt.Errorf("Failed to unmarshal config: %v", err)
@@ -1429,24 +1432,31 @@ func (tui *appContext) createYAMLConfig() error {
 		}
 	}
 
-	// Marshal the struct to YAML (returns []byte and error)
-	yamlData, err := yaml.Marshal(&config)
+	// Marshal the struct to YAML format
+	configData, err := yaml.Marshal(&config)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal YAML: %v", err)
+		return fmt.Errorf("Failed to marshal configuration data to YAML: %v", err)
 	}
 
-	// Write the YAML to a file
-	if err := os.WriteFile("config.yaml", yamlData, 0600); err != nil {
-		return fmt.Errorf("Failed to write YAML to file: %v", err)
+	// Encrypt the YAML config data using the user-provided passphrase
+	encryptedPassphrase := memguard.NewEnclave([]byte(tui.config.configEncryptionPassphrase))
+	cipherText, err := common.EncryptData(configData, encryptedPassphrase)
+	if err != nil {
+		return fmt.Errorf("Failed to encrypt configuration data: %v", err)
 	}
 
-	// Update global configFilePath variable
+	// Write the encrypted YAML config data to a file
+	if err := os.WriteFile("config.aes", cipherText, 0600); err != nil {
+		return fmt.Errorf("Failed to create encrypted config.aes file: %v", err)
+	}
+
+	// Update configFilePath member to point to the created config file
 	currDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("Error: %v", err)
 	}
 
-	tui.config.configFilePath = filepath.Join(currDir, "config.yaml")
+	tui.config.configFilePath = filepath.Join(currDir, "config.aes")
 
 	return nil
 }
