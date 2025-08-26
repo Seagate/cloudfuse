@@ -100,7 +100,7 @@ file_cache:
   high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>
   low-threshold: <% disk space consumed which triggers eviction to stop when previously triggered by the high-threshold. Default - 60>
   create-empty-file: true|false <create an empty file on container when create call is received from kernel>
-  allow-non-empty-temp: true|false <allow non empty temp directory at startup. This should not be used in production.>
+  allow-non-empty-temp: true|false <allow non empty temp directory at startup. Set true to persist local cache across reboots.>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
   policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
   offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>
@@ -141,6 +141,7 @@ azstorage:
   clientid: <storage account client id for SPN>
   clientsecret: <storage account client secret for SPN>
   oauth-token-path: <path to file containing the OAuth token>
+  workload-identity-token: <service account token for workload identity>
   # Optional
   use-http: true|false <use http instead of https for storage connection>
   aadendpoint: <storage account custom aad endpoint>
