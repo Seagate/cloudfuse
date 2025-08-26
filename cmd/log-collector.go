@@ -60,7 +60,7 @@ var gatherLogsCmd = &cobra.Command{
 	Short:             "interface to gather and review cloudfuse logs",
 	Long:              "interface to gather and review cloudfuse logs",
 	SuggestFor:        []string{"gather", "gather-log", "gather-logs"},
-	Example:           "cloudfuse gather-logs ",
+	Example:           "cloudfuse gather-logs --output-path=/path/to/archive --config-file=/path/to/config.yaml",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := checkPath(gatherLogOps.outputPath)
