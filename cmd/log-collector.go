@@ -48,7 +48,7 @@ type gatherLogsParams struct {
 	logConfigFile string
 }
 
-var gatherLogOps gatherLogsParams
+var gatherLogOpts gatherLogsParams
 
 const (
 	windowsArchivePath = "cloudfuse_logs.zip"
@@ -63,20 +63,20 @@ var gatherLogsCmd = &cobra.Command{
 	Example:           "cloudfuse gather-logs --output-path=/path/to/archive --config-file=/path/to/config.yaml",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := checkPath(gatherLogOps.outputPath)
+		err := checkPath(gatherLogOpts.outputPath)
 		if err != nil {
 			return fmt.Errorf(
 				"could not use the output path %s, [%s]",
-				gatherLogOps.outputPath,
+				gatherLogOpts.outputPath,
 				err,
 			)
 		}
 
-		if gatherLogOps.logConfigFile, err = filepath.Abs(gatherLogOps.logConfigFile); err != nil {
+		if gatherLogOpts.logConfigFile, err = filepath.Abs(gatherLogOpts.logConfigFile); err != nil {
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
-		logType, logPath, err := getLogInfo(gatherLogOps.logConfigFile)
+		logType, logPath, err := getLogInfo(gatherLogOpts.logConfigFile)
 		if err != nil {
 			return fmt.Errorf("cannot use this config file [%s]", err.Error())
 		}
@@ -175,7 +175,7 @@ func checkPath(outPath string) error {
 	}
 
 	var err error
-	gatherLogOps.outputPath, err = filepath.Abs(gatherLogOps.outputPath)
+	gatherLogOpts.outputPath, err = filepath.Abs(gatherLogOpts.outputPath)
 	if err != nil {
 		return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
 	}
@@ -254,7 +254,7 @@ func createLinuxArchive(logPath string) error {
 		return err
 	}
 
-	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, linuxArchivePath))
+	outFile, err := os.Create(filepath.Join(gatherLogOpts.outputPath, linuxArchivePath))
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func createLinuxArchive(logPath string) error {
 // setupPreZip will create a temporary folder that will contain the logs and be the source path for creating the archive
 // This will only run on windows.
 func setupPreZip() (string, string, error) {
-	preArchPath, err := os.MkdirTemp(gatherLogOps.outputPath, "tmpPreZip*")
+	preArchPath, err := os.MkdirTemp(gatherLogOpts.outputPath, "tmpPreZip*")
 	if err != nil {
 		return "", "", fmt.Errorf(
 			"could not create temporary path, %s, to extract data",
@@ -376,7 +376,7 @@ func copyFiles(srcPath, dstPath string) error {
 }
 
 func createWindowsArchive(archPath string) error {
-	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, linuxArchivePath))
+	outFile, err := os.Create(filepath.Join(gatherLogOpts.outputPath, linuxArchivePath))
 	if err != nil {
 		return err
 	}
@@ -468,7 +468,7 @@ func init() {
 	rootCmd.AddCommand(gatherLogsCmd)
 	curDir, _ := os.Getwd()
 	gatherLogsCmd.Flags().
-		StringVar(&gatherLogOps.outputPath, "output-path", curDir, "Input archive creation path")
+		StringVar(&gatherLogOpts.outputPath, "output-path", curDir, "Input archive creation path")
 	gatherLogsCmd.Flags().
-		StringVar(&gatherLogOps.logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
+		StringVar(&gatherLogOpts.logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }
