@@ -39,8 +39,9 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 
-	"github.com/spf13/cobra"
 	"slices"
+
+	"github.com/spf13/cobra"
 )
 
 type GithubApiReleaseData struct {
@@ -110,13 +111,16 @@ func getRemoteVersion(req string) (string, error) {
 }
 
 // beginDetectNewVersion : Get latest release version and compare if user needs an upgrade or not
-func beginDetectNewVersion() chan any {
+func beginDetectNewVersion(testURL string) chan any {
 	completed := make(chan any)
 	stderr := os.Stderr
 	go func() {
 		defer close(completed)
 
 		latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
+		if testURL != "" {
+			latestVersionUrl = testURL
+		}
 		remoteVersion, err := getRemoteVersion(latestVersionUrl)
 		if err != nil {
 			log.Err("beginDetectNewVersion: error getting latest version [%s]", err.Error())
@@ -168,7 +172,7 @@ func beginDetectNewVersion() chan any {
 func VersionCheck() error {
 	select {
 	//either wait till this routine completes or timeout if it exceeds 8 secs
-	case <-beginDetectNewVersion():
+	case <-beginDetectNewVersion(""):
 	case <-time.After(8 * time.Second):
 		return fmt.Errorf(
 			"unable to obtain latest version information. please check your internet connection",

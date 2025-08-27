@@ -73,6 +73,9 @@ type lruPolicy struct {
 
 	// DU utility was found on the path or not
 	duPresent bool
+
+	// Tracks scheduled files to skip during eviction
+	schedule *FileCache
 }
 
 // LRUPolicySnapshot represents the *persisted state* of lruPolicy.
@@ -155,6 +158,11 @@ func (p *lruPolicy) ShutdownPolicy() error {
 	p.closeSignal <- 1
 	p.closeSignalValidate <- 1
 	return p.createSnapshot().writeToFile(p.tmpPath)
+}
+
+func (fc *FileCache) IsScheduled(objName string) bool {
+	_, inSchedule := fc.scheduleOps.Load(objName)
+	return inSchedule
 }
 
 func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
@@ -496,6 +504,14 @@ func (p *lruPolicy) deleteExpiredNodes() {
 	}
 
 	for ; node != nil && count < p.maxEviction; node = node.next {
+		objName := common.NormalizeObjectName(strings.TrimPrefix(node.name, p.tmpPath))
+		if objName[0] == '/' {
+			objName = objName[1:]
+		}
+		if p.schedule != nil && p.schedule.IsScheduled(objName) {
+			continue
+		}
+
 		delItems = append(delItems, node)
 		node.deleted.Store(true)
 		count++

@@ -36,7 +36,8 @@ type LockMapItem struct {
 	mtx          sync.RWMutex
 	downloadTime time.Time
 	// track if file is in lazy open state
-	LazyOpen bool
+	LazyOpen    bool
+	SyncPending bool
 }
 
 // Map holding locks for all the files

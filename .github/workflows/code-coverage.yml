@@ -16,7 +16,7 @@ jobs:
   BuildAndTest-Coverage:
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.25"]
         job_name: ["linux-fuse3", "linux-fuse2"]
 
         include:
@@ -39,6 +39,7 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
+      zig: 0.14.1
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -46,7 +47,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           persist-credentials: false
 
@@ -62,6 +63,28 @@ jobs:
           FUSELIB: ${{ matrix.fuselib }}
         run: |-
           sudo apt-get install fuse3 ${FUSELIB} -y
+
+      - name: Install Zig
+        env:
+          RUNNER_ARCH: ${{ runner.arch }}
+          ENV_ZIG: ${{ env.zig }}
+        run: |
+          if [[ "${RUNNER_ARCH}" == "X64" ]]; then
+            ZIG_ARCH="x86_64"
+          elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
+            ZIG_ARCH="aarch64"
+          else
+            echo "Unsupported architecture: ${RUNNER_ARCH}"
+            exit 1
+          fi
+
+          ZIG_DIR="zig-${ZIG_ARCH}-linux-${ENV_ZIG}"
+          ZIG_TARBALL="${ZIG_DIR}.tar.xz"
+          curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
+          mkdir -p $HOME/.local/bin
+          tar -xf zig.tar.xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin/${ZIG_DIR}" >> $GITHUB_PATH
+          rm zig.tar.xz
 
       - name: Create Directory Structure
         env:
@@ -1014,7 +1037,7 @@ jobs:
   BuildAndTest-Coverage-Windows:
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.25"]
         job_name: ["windows"]
 
         include:
@@ -1039,7 +1062,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           persist-credentials: false
 
@@ -1537,6 +1560,8 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
+          rm -rf ${BLOCK_TEMP_DIR}
+          mkdir -p ${BLOCK_TEMP_DIR}
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
@@ -1934,7 +1959,7 @@ jobs:
       - BuildAndTest-Coverage-Windows
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.25"]
         job_name: ["linux"]
 
         include:
@@ -1948,7 +1973,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           persist-credentials: false
 

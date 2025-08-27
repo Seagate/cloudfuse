@@ -538,61 +538,6 @@ func (s *blockBlobTestSuite) setupHierarchy(base string) (*list.List, *list.List
 	return a, ab, ac
 }
 
-func (s *blockBlobTestSuite) TestDeleteDirHierarchy() {
-	defer s.cleanupTest()
-	// Setup
-	base := generateDirectoryName()
-	a, ab, ac := s.setupHierarchy(base)
-
-	err := s.az.DeleteDir(internal.DeleteDirOptions{Name: base})
-
-	s.assert.NoError(err)
-
-	/// a paths should be deleted
-	for p := a.Front(); p != nil; p = p.Next() {
-		_, err = s.containerClient.NewBlobClient(p.Value.(string)).GetProperties(ctx, nil)
-		s.assert.Error(err)
-	}
-	ab.PushBackList(ac) // ab and ac paths should exist
-	for p := ab.Front(); p != nil; p = p.Next() {
-		_, err = s.containerClient.NewBlobClient(p.Value.(string)).GetProperties(ctx, nil)
-		s.assert.NoError(err)
-	}
-}
-
-func (s *blockBlobTestSuite) TestDeleteSubDirPrefixPath() {
-	defer s.cleanupTest()
-	// Setup
-	base := generateDirectoryName()
-	a, ab, ac := s.setupHierarchy(base)
-
-	s.az.storage.SetPrefixPath(base)
-
-	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: "c1"})
-	s.assert.NoError(err)
-	s.assert.NotNil(attr)
-	s.assert.True(attr.IsDir())
-
-	err = s.az.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
-	s.assert.NoError(err)
-
-	// a paths under c1 should be deleted
-	for p := a.Front(); p != nil; p = p.Next() {
-		path := p.Value.(string)
-		_, err = s.containerClient.NewBlobClient(path).GetProperties(ctx, nil)
-		if strings.HasPrefix(path, base+"/c1") {
-			s.assert.Error(err)
-		} else {
-			s.assert.NoError(err)
-		}
-	}
-	ab.PushBackList(ac) // ab and ac paths should exist
-	for p := ab.Front(); p != nil; p = p.Next() {
-		_, err = s.containerClient.NewBlobClient(p.Value.(string)).GetProperties(ctx, nil)
-		s.assert.NoError(err)
-	}
-}
-
 func (s *blockBlobTestSuite) TestDeleteDirError() {
 	defer s.cleanupTest()
 	// Setup
@@ -818,7 +763,7 @@ func (s *blockBlobTestSuite) TestStreamDirError() {
 
 	s.assert.NoError(
 		err,
-	) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	)
 	s.assert.Empty(entries)
 	// Directory should not be in the account
 	dir := s.containerClient.NewBlobClient(name)
@@ -1352,6 +1297,76 @@ func (s *blockBlobTestSuite) TestReadInBuffer() {
 	s.assert.NoError(err)
 	s.assert.Equal(5, len)
 	s.assert.EqualValues(testData[:5], output)
+}
+
+func (bbTestSuite *blockBlobTestSuite) TestReadInBufferWithETAG() {
+	defer bbTestSuite.cleanupTest()
+	// Setup
+	name := generateFileName()
+	handle, _ := bbTestSuite.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	bbTestSuite.az.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	handle, _ = bbTestSuite.az.OpenFile(internal.OpenFileOptions{Name: name})
+
+	output := make([]byte, 5)
+	var etag string
+	len, err := bbTestSuite.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output, Etag: &etag},
+	)
+	bbTestSuite.assert.NoError(err)
+	bbTestSuite.assert.NotEmpty(etag)
+	bbTestSuite.assert.Equal(5, len)
+	bbTestSuite.assert.EqualValues(testData[:5], output)
+	_ = bbTestSuite.az.CloseFile(internal.CloseFileOptions{Handle: handle})
+}
+
+func (bbTestSuite *blockBlobTestSuite) TestReadInBufferWithETAGMismatch() {
+	defer bbTestSuite.cleanupTest()
+	// Setup
+	name := generateFileName()
+	handle, _ := bbTestSuite.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data 12345678910"
+	data := []byte(testData)
+	bbTestSuite.az.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	_ = bbTestSuite.az.CloseFile(internal.CloseFileOptions{Handle: handle})
+
+	attr, err := bbTestSuite.az.GetAttr(internal.GetAttrOptions{Name: name})
+	bbTestSuite.assert.NoError(err)
+	bbTestSuite.assert.NotNil(attr)
+	bbTestSuite.assert.NotEmpty(attr.ETag)
+	bbTestSuite.assert.Equal(int64(len(data)), attr.Size)
+
+	output := make([]byte, 5)
+	var etag string
+
+	handle, _ = bbTestSuite.az.OpenFile(internal.OpenFileOptions{Name: name})
+	_, err = bbTestSuite.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output, Etag: &etag},
+	)
+	bbTestSuite.assert.NoError(err)
+	bbTestSuite.assert.NotEmpty(etag)
+	etag = strings.Trim(etag, `"`)
+	bbTestSuite.assert.Equal(etag, attr.ETag)
+
+	// Update the file in parallel using another handle
+	handle1, err := bbTestSuite.az.OpenFile(internal.OpenFileOptions{Name: name})
+	bbTestSuite.assert.NoError(err)
+	testData = "test data 12345678910 123123123123123123123"
+	data = []byte(testData)
+	bbTestSuite.az.WriteFile(internal.WriteFileOptions{Handle: handle1, Offset: 0, Data: data})
+	_ = bbTestSuite.az.CloseFile(internal.CloseFileOptions{Handle: handle1})
+
+	// Read data back using older handle
+	_, err = bbTestSuite.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: handle, Offset: 5, Data: output, Etag: &etag},
+	)
+	bbTestSuite.assert.NoError(err)
+	bbTestSuite.assert.NotEmpty(etag)
+	etag = strings.Trim(etag, `"`)
+	bbTestSuite.assert.NotEqual(etag, attr.ETag)
+
+	_ = bbTestSuite.az.CloseFile(internal.CloseFileOptions{Handle: handle})
 }
 
 func (s *blockBlobTestSuite) TestReadInBufferLargeBuffer() {
@@ -2857,6 +2872,7 @@ func (s *blockBlobTestSuite) TestFlushFileUpdateChunkedFile() {
 		int64(blockSize),
 		int64(blockSize),
 		h.CacheObj.BlockOffsetList.BlockList[1].Data,
+		nil,
 	)
 	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
 	h.CacheObj.BlockList[1].Flags.Set(common.DirtyBlock)
@@ -2909,6 +2925,7 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 		int64(blockSize),
 		int64(blockSize)/2,
 		h.CacheObj.BlockOffsetList.BlockList[1].Data,
+		nil,
 	)
 	h.CacheObj.BlockList[1].Flags.Set(common.DirtyBlock)
 
@@ -3925,7 +3942,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 // 	s.assert.EqualValues(data, fileData)
 
 // 	buf := make([]byte, len(data))
-// 	err = s.az.storage.ReadInBuffer(name, 0, int64(len(data)), buf)
+// 	err = s.az.storage.ReadInBuffer(name, 0, int64(len(data)), buf, nil)
 // 	s.assert.Nil(err)
 // 	s.assert.EqualValues(data, buf)
 
@@ -4053,6 +4070,105 @@ func (s *blockBlobTestSuite) TestTruncateNoBlockFileToLarger() {
 	s.UtilityFunctionTruncateFileToLarger(10*MB, 20*MB)
 }
 
+func (s *blockBlobTestSuite) TestBlobFilters() {
+	defer s.cleanupTest()
+	// Setup
+	var err error
+	name := generateDirectoryName()
+	err = s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/abcd1.txt"})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/abcd2.txt"})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/abcd3.txt"})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/abcd4.txt"})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/bcd1.txt"})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/cd1.txt"})
+	s.assert.NoError(err)
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: name + "/d1.txt"})
+	s.assert.NoError(err)
+	err = s.az.CreateDir(internal.CreateDirOptions{Name: name + "/subdir"})
+	s.assert.NoError(err)
+
+	var iteration = 0
+	var marker = ""
+	blobList := make([]*internal.ObjAttr, 0)
+
+	for {
+		new_list, new_marker, err := s.az.StreamDir(
+			internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+		)
+		s.assert.NoError(err)
+		blobList = append(blobList, new_list...)
+		marker = new_marker
+		iteration++
+
+		log.Debug(
+			"AzStorage::ReadDir : So far retrieved %d objects in %d iterations",
+			len(blobList),
+			iteration,
+		)
+		if new_marker == "" {
+			break
+		}
+	}
+	s.assert.Len(blobList, 8)
+	err = s.az.storage.(*BlockBlob).SetFilter("name=^abcd.*")
+	s.assert.NoError(err)
+
+	blobList = make([]*internal.ObjAttr, 0)
+	for {
+		new_list, new_marker, err := s.az.StreamDir(
+			internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+		)
+		s.assert.NoError(err)
+		blobList = append(blobList, new_list...)
+		marker = new_marker
+		iteration++
+
+		log.Debug(
+			"AzStorage::ReadDir : So far retrieved %d objects in %d iterations",
+			len(blobList),
+			iteration,
+		)
+		if new_marker == "" {
+			break
+		}
+	}
+	// Only 4 files matches the pattern but there is a directory as well and directories are not filtered by blobfilter
+	s.assert.Len(blobList, 5)
+	err = s.az.storage.(*BlockBlob).SetFilter("name=^bla.*")
+	s.assert.NoError(err)
+
+	blobList = make([]*internal.ObjAttr, 0)
+	for {
+		new_list, new_marker, err := s.az.StreamDir(
+			internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+		)
+		s.assert.NoError(err)
+		blobList = append(blobList, new_list...)
+		marker = new_marker
+		iteration++
+
+		log.Debug(
+			"AzStorage::ReadDir : So far retrieved %d objects in %d iterations",
+			len(blobList),
+			iteration,
+		)
+		if new_marker == "" {
+			break
+		}
+	}
+
+	s.assert.Len(blobList, 1)
+	err = s.az.storage.(*BlockBlob).SetFilter("")
+	s.assert.NoError(err)
+}
+
 func (s *blockBlobTestSuite) UtilityFunctionTestTruncateFileToSmaller(
 	size int,
 	truncatedLength int,
@@ -4140,6 +4256,53 @@ func (s *blockBlobTestSuite) UtilityFunctionTruncateFileToLarger(
 	output, _ := io.ReadAll(resp.Body)
 	s.assert.Equal(data, output[:size])
 
+}
+
+func (s *blockBlobTestSuite) TestList() {
+	defer s.cleanupTest()
+	// Setup
+	s.tearDownTestHelper(false) // Don't delete the generated container.
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.BlockKey,
+		s.container,
+	)
+	s.setupTestHelper(config, s.container, true)
+
+	base := generateDirectoryName()
+	s.setupHierarchy(base)
+
+	blobList, marker, err := s.az.storage.List("", nil, 0)
+	s.assert.NoError(err)
+	emptyString := ""
+	s.assert.Equal(&emptyString, marker)
+	s.assert.NotNil(blobList)
+	s.assert.Len(blobList, 3)
+
+	// Test listing with prefix
+	blobList, marker, err = s.az.storage.List(base+"b/", nil, 0)
+	s.assert.NoError(err)
+	s.assert.Equal(&emptyString, marker)
+	s.assert.NotNil(blobList)
+	s.assert.Len(blobList, 1)
+	s.assert.Equal("c1", blobList[0].Name)
+
+	// Test listing with marker
+	// TODO: Test is failing on Azurite.
+	// blobList, marker, err = s.az.storage.List(base, to.Ptr("invalid-marker"), 0)
+	// s.assert.Error(err)
+	// s.assert.Empty(blobList)
+	// s.assert.Nil(marker)
+
+	// Test listing with count
+	blobList, marker, err = s.az.storage.List("", nil, 1)
+	s.assert.NoError(err)
+	s.assert.NotNil(blobList)
+	s.assert.NotEmpty(marker)
+	s.assert.Len(blobList, 1)
+	s.assert.Equal(base, blobList[0].Path)
 }
 
 // In order for 'go test' to run this suite, we need to create

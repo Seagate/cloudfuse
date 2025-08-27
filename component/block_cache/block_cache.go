@@ -77,9 +77,10 @@ type BlockCache struct {
 	maxDiskUsageHit bool            // Flag to indicate if we have hit max disk usage
 	noPrefetch      bool            // Flag to indicate if prefetch is disabled
 	prefetchOnOpen  bool            // Start prefetching on file open call instead of waiting for first read
-	stream          *Stream
-	lazyWrite       bool           // Flag to indicate if lazy write is enabled
-	fileCloseOpt    sync.WaitGroup // Wait group to wait for all async close operations to complete
+	consistency     bool            // Flag to indicate if strong data consistency is enabled
+	// stream          *Stream // TODO: Replace when stream is deprecated
+	lazyWrite    bool           // Flag to indicate if lazy write is enabled
+	fileCloseOpt sync.WaitGroup // Wait group to wait for all async close operations to complete
 }
 
 // Structure defining your config parameters
@@ -92,6 +93,7 @@ type BlockCacheOptions struct {
 	PrefetchCount  uint32  `config:"prefetch"         yaml:"prefetch,omitempty"`
 	Workers        uint32  `config:"parallelism"      yaml:"parallelism,omitempty"`
 	PrefetchOnOpen bool    `config:"prefetch-on-open" yaml:"prefetch-on-open,omitempty"`
+	Consistency    bool    `config:"consistency"      yaml:"consistency,omitempty"`
 }
 
 const (
@@ -129,7 +131,20 @@ func (bc *BlockCache) SetNextComponent(nc internal.Component) {
 func (bc *BlockCache) Start(ctx context.Context) error {
 	log.Trace("BlockCache::Start : Starting component %s", bc.Name())
 
+	bc.blockPool = NewBlockPool(bc.blockSize, bc.memSize)
+	if bc.blockPool == nil {
+		log.Err("BlockCache::Start : failed to init block pool")
+		return fmt.Errorf("config error in %s [failed to init block pool]", bc.Name())
+	}
+
+	bc.threadPool = newThreadPool(bc.workers, bc.download, bc.upload)
+	if bc.threadPool == nil {
+		log.Err("BlockCache::Start : failed to init thread pool")
+		return fmt.Errorf("config error in %s [failed to init thread pool]", bc.Name())
+	}
+
 	// Start the thread pool and keep it ready for download
+	log.Debug("BlockCache::Start : Starting thread pool")
 	bc.threadPool.Start()
 
 	// If disk caching is enabled then start the disk eviction policy
@@ -200,13 +215,14 @@ func (bc *BlockCache) GenConfig() string {
 //	Return failure if any config is not valid to exit the process
 func (bc *BlockCache) Configure(_ bool) error {
 	log.Trace("BlockCache::Configure : %s", bc.Name())
-	if common.IsStream {
-		err := bc.stream.Configure(true)
-		if err != nil {
-			log.Err("BlockCache:Stream::Configure : config error [invalid config attributes]")
-			return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
-		}
-	}
+	// TODO: Replace when stream is deprecated
+	// if common.IsStream {
+	// 	err := bc.stream.Configure(true)
+	// 	if err != nil {
+	// 		log.Err("BlockCache:Stream::Configure : config error [invalid config attributes]")
+	// 		return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
+	// 	}
+	// }
 
 	conf := BlockCacheOptions{}
 	err := config.UnmarshalKey(bc.Name(), &conf)
@@ -230,6 +246,8 @@ func (bc *BlockCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".disk-timeout-sec") {
 		bc.diskTimeout = conf.DiskTimeout
 	}
+
+	bc.consistency = conf.Consistency
 
 	bc.prefetchOnOpen = conf.PrefetchOnOpen
 	bc.prefetch = uint32(math.Max((MIN_PREFETCH*2)+1, (float64)(2*runtime.NumCPU())))
@@ -297,18 +315,6 @@ func (bc *BlockCache) Configure(_ bool) error {
 			}
 		}
 
-		bavail, bsize, err := common.GetAvailFree(bc.tmpPath)
-		if err != nil {
-			log.Err(
-				"BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.",
-				bc.Name(),
-				err.Error(),
-			)
-			bc.diskSize = uint64(4192) * _1MB
-		} else {
-			bc.diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
-		}
-
 		if !common.IsDirectoryEmpty(bc.tmpPath) {
 			log.Err("BlockCache: config error %s directory is not empty", bc.tmpPath)
 			return fmt.Errorf("config error in %s [%s]", bc.Name(), "temp directory not empty")
@@ -330,18 +336,6 @@ func (bc *BlockCache) Configure(_ bool) error {
 		)
 	}
 
-	bc.blockPool = NewBlockPool(bc.blockSize, bc.memSize)
-	if bc.blockPool == nil {
-		log.Err("BlockCache::Configure : fail to init Block pool")
-		return fmt.Errorf("config error in %s [fail to init block pool]", bc.Name())
-	}
-
-	bc.threadPool = newThreadPool(bc.workers, bc.download, bc.upload)
-	if bc.threadPool == nil {
-		log.Err("BlockCache::Configure : fail to init thread pool")
-		return fmt.Errorf("config error in %s [fail to init thread pool]", bc.Name())
-	}
-
 	if bc.tmpPath != "" {
 		bc.diskPolicy, err = tlru.New(
 			uint32((bc.diskSize)/bc.blockSize),
@@ -357,7 +351,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"BlockCache::Configure : block size %v, mem size %v, worker %v, prefetch %v, disk path %v, max size %v, disk timeout %v, prefetch-on-open %t, maxDiskUsageHit %v, noPrefetch %v",
+		"BlockCache::Configure : block size %v, mem size %v, worker %v, prefetch %v, disk path %v, max size %v, disk timeout %v, prefetch-on-open %t, maxDiskUsageHit %v, noPrefetch %v, consistency %v",
 		bc.blockSize,
 		bc.memSize,
 		bc.workers,
@@ -368,6 +362,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 		bc.prefetchOnOpen,
 		bc.maxDiskUsageHit,
 		bc.noPrefetch,
+		bc.consistency,
 	)
 
 	return nil
@@ -375,7 +370,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 
 func (bc *BlockCache) getDefaultDiskSize(path string) uint64 {
 	diskSize := uint64(4192) * _1MB
-	bavail, bsize, err := common.GetAvailFree(path)
+	bavail, _, err := common.GetAvailFree(path)
 	if err != nil {
 		log.Err(
 			"BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.",
@@ -383,7 +378,7 @@ func (bc *BlockCache) getDefaultDiskSize(path string) uint64 {
 			err.Error(),
 		)
 	} else {
-		diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
+		diskSize = uint64(0.8 * float64(bavail) * float64(4096))
 	}
 
 	return diskSize
@@ -435,7 +430,7 @@ func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap
 // OpenFile: Create a handle for the file user has requested to open
 func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace(
-		"BlockCache::OpenFile : name=%s, flags=%d, mode=%s",
+		"BlockCache::OpenFile : name=%s, flags=%X, mode=%s",
 		options.Name,
 		options.Flags,
 		options.Mode,
@@ -455,6 +450,10 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 	handle.Mtime = attr.Mtime
 	handle.Size = attr.Size
 
+	if attr.ETag != "" {
+		handle.SetValue("ETAG", attr.ETag)
+	}
+
 	log.Debug("BlockCache::OpenFile : Size of file handle.Size %v", handle.Size)
 	bc.prepareHandleForBlockCache(handle)
 
@@ -463,6 +462,7 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		log.Debug("BlockCache::OpenFile : Truncate %v to 0", options.Name)
 		handle.Size = 0
 		handle.Flags.Set(handlemap.HandleFlagDirty)
+		handle.RemoveValue("ETAG")
 	} else if handle.Size != 0 && (options.Flags&os.O_RDWR != 0 || options.Flags&os.O_APPEND != 0) {
 		// File is not opened in read-only mode so we need to get the list of blocks and validate the size
 		// As there can be a potential write on this file, currently configured block size and block size of the file in container
@@ -477,6 +477,8 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		if !valid {
 			return nil, fmt.Errorf("block size mismatch for %s", options.Name)
 		}
+	} else if options.Flags&os.O_WRONLY != 0 {
+		handle.RemoveValue("ETAG")
 	}
 
 	if handle.Size > 0 {
@@ -1109,12 +1111,18 @@ func (bc *BlockCache) refreshBlock(handle *handlemap.Handle, index uint64, prefe
 
 // lineupDownload : Create a work item and schedule the download
 func (bc *BlockCache) lineupDownload(handle *handlemap.Handle, block *Block, prefetch bool) {
+	IEtag, found := handle.GetValue("ETAG")
+	Etag := ""
+	if found {
+		Etag = IEtag.(string)
+	}
 	item := &workItem{
 		handle:   handle,
 		block:    block,
 		prefetch: prefetch,
 		failCnt:  0,
 		upload:   false,
+		ETag:     Etag,
 	}
 
 	// Remove this block from free block list and add to in-process list
@@ -1151,6 +1159,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 		// Check local file exists for this offset and file combination or not
 		root, err := os.OpenRoot(bc.tmpPath)
+		localPath := filepath.Join(bc.tmpPath, fileName)
 		if err != nil {
 			// On any disk failure we do not fail the download flow
 			log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
@@ -1169,7 +1178,7 @@ func (bc *BlockCache) download(item *workItem) {
 				_ = root.Remove(fileName)
 			} else {
 				var successfulRead = true
-				n, err := f.Read(item.block.data)
+				numberOfBytes, err := f.Read(item.block.data)
 				if err != nil {
 					log.Err("BlockCache::download : Failed to read data from disk cache %s [%s]", fileName, err.Error())
 					successfulRead = false
@@ -1177,29 +1186,37 @@ func (bc *BlockCache) download(item *workItem) {
 					_ = root.Remove(fileName)
 				}
 
-				if n != int(bc.blockSize) && item.block.offset+uint64(n) != uint64(item.handle.Size) {
-					log.Err("BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v", bc.getBlockSize(uint64(item.handle.Size), item.block), n, item.handle.Size)
+				if numberOfBytes != int(bc.blockSize) && item.block.offset+uint64(numberOfBytes) != uint64(item.handle.Size) {
+					log.Err("BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v", bc.getBlockSize(uint64(item.handle.Size), item.block), numberOfBytes, item.handle.Size)
 					successfulRead = false
 					f.Close()
 					_ = root.Remove(fileName)
 				}
 
 				f.Close()
-				// We have read the data from disk so there is no need to go over network
-				// Just mark the block that download is complete
+
 				if successfulRead {
-					item.block.Ready(BlockStatusDownloaded)
-					return
+					// If user has enabled consistency check then compute the md5sum and match it in xattr
+					successfulRead = checkBlockConsistency(bc, item, numberOfBytes, localPath, fileName)
+
+					// We have read the data from disk so there is no need to go over network
+					// Just mark the block that download is complete
+					if successfulRead {
+						item.block.Ready(BlockStatusDownloaded)
+						return
+					}
 				}
 			}
 		}
 	}
 
+	var etag string
 	// If file does not exists then download the block from the container
 	n, err := bc.NextComponent().ReadInBuffer(internal.ReadInBufferOptions{
 		Handle: item.handle,
 		Offset: int64(item.block.offset),
 		Data:   item.block.data,
+		Etag:   &etag,
 	})
 
 	if item.failCnt > MAX_FAIL_CNT {
@@ -1216,7 +1233,7 @@ func (bc *BlockCache) download(item *workItem) {
 		return
 	}
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		// Fail to read the data so just reschedule this request
 		log.Err(
 			"BlockCache::download : Failed to read %v=>%s from offset %v [%s]",
@@ -1236,10 +1253,27 @@ func (bc *BlockCache) download(item *workItem) {
 		return
 	}
 
+	// Compare the ETAG value and fail download if blob has changed
+	if etag != "" {
+		if item.ETag != "" && item.ETag != etag {
+			log.Err(
+				"BlockCache::download : Blob has changed for %v=>%s (index %v, offset %v)",
+				item.handle.ID,
+				item.handle.Path,
+				item.block.id,
+				item.block.offset,
+			)
+			item.block.Failed()
+			item.block.Ready(BlockStatusDownloadFailed)
+			return
+		}
+	}
+
 	if bc.tmpPath != "" {
 		root, err := os.OpenRoot(bc.tmpPath)
+		localPath := filepath.Join(bc.tmpPath, fileName)
 		if err != nil {
-			err := os.Mkdir(bc.tmpPath, 0755)
+			err := os.MkdirAll(bc.tmpPath, 0755)
 			if err != nil {
 				log.Err(
 					"BlockCache::download : error creating directory structure for file %s [%s]",
@@ -1260,6 +1294,16 @@ func (bc *BlockCache) download(item *workItem) {
 		}
 		defer root.Close()
 
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::download : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
+
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
 		if err == nil {
@@ -1275,6 +1319,18 @@ func (bc *BlockCache) download(item *workItem) {
 
 			f.Close()
 			bc.diskPolicy.Refresh(diskNode.(*list.Element))
+
+			// If user has enabled consistency check then compute the md5sum and save it in xattr
+			if bc.consistency {
+				err = setBlockChecksum(localPath, item.block.data, n)
+				if err != nil {
+					log.Err(
+						"BlockCache::download : Failed to set md5sum for file %s [%v]",
+						localPath,
+						err.Error(),
+					)
+				}
+			}
 		}
 	}
 
@@ -1734,6 +1790,7 @@ func (bc *BlockCache) upload(item *workItem) {
 
 		// Check local file exists for this offset and file combination or not
 		root, err := os.OpenRoot(bc.tmpPath)
+		localPath := filepath.Join(bc.tmpPath, fileName)
 		if err != nil {
 			log.Err(
 				"BlockCache::upload : error opening directory structure for file %s [%s]",
@@ -1743,6 +1800,16 @@ func (bc *BlockCache) upload(item *workItem) {
 			goto return_safe
 		}
 		defer root.Close()
+
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::upload : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
 
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
@@ -1766,6 +1833,18 @@ func (bc *BlockCache) upload(item *workItem) {
 			} else {
 				bc.diskPolicy.Refresh(diskNode.(*list.Element))
 			}
+
+			// If user has enabled consistency check then compute the md5sum and save it in xattr
+			if bc.consistency {
+				err = setBlockChecksum(localPath, item.block.data, int(blockSize))
+				if err != nil {
+					log.Err(
+						"BlockCache::download : Failed to set md5sum for file %s [%v]",
+						localPath,
+						err.Error(),
+					)
+				}
+			}
 		}
 	}
 
@@ -1776,6 +1855,7 @@ return_safe:
 }
 
 // Stage the given number of blocks from this handle
+// handle lock must be taken before calling this function
 func (bc *BlockCache) commitBlocks(handle *handlemap.Handle) error {
 	log.Debug("BlockCache::commitBlocks : Staging blocks for %s", handle.Path)
 
@@ -1829,8 +1909,9 @@ func (bc *BlockCache) commitBlocks(handle *handlemap.Handle) error {
 	log.Debug("BlockCache::commitBlocks : Committing blocks for %s", handle.Path)
 
 	// Commit the block list now
+	var newEtag = ""
 	err = bc.NextComponent().
-		CommitData(internal.CommitDataOptions{Name: handle.Path, List: blockIDList, BlockSize: bc.blockSize})
+		CommitData(internal.CommitDataOptions{Name: handle.Path, List: blockIDList, BlockSize: bc.blockSize, NewETag: &newEtag})
 	if err != nil {
 		log.Err(
 			"BlockCache::commitBlocks : Failed to commit blocks for %s [%s]",
@@ -1838,6 +1919,11 @@ func (bc *BlockCache) commitBlocks(handle *handlemap.Handle) error {
 			err.Error(),
 		)
 		return err
+	}
+
+	// Lock was already acquired on the handle.
+	if newEtag != "" {
+		handle.SetValue("ETAG", newEtag)
 	}
 
 	// set all the blocks as committed
@@ -1992,6 +2078,17 @@ func (bc *BlockCache) diskEvict(node *list.Element) {
 
 	localPath := filepath.Join(bc.tmpPath, cacheKey)
 	_ = os.Remove(localPath)
+
+	// Remove empty parent directories up to tmpPath
+	dir := filepath.Dir(localPath)
+	for dir != bc.tmpPath && dir != "/" {
+		empty := common.IsDirectoryEmpty(dir)
+		if !empty {
+			break
+		}
+		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // checkDiskUsage : Callback to check usage of disk and decide whether eviction is needed
@@ -2026,6 +2123,17 @@ func (bc *BlockCache) invalidateDirectory(name string) {
 
 	localPath := filepath.Join(bc.tmpPath, name)
 	_ = os.RemoveAll(localPath)
+
+	// Remove empty parent directories up to tmpPath
+	dir := filepath.Dir(localPath)
+	for dir != bc.tmpPath && dir != "/" {
+		empty := common.IsDirectoryEmpty(dir)
+		if !empty {
+			break
+		}
+		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // DeleteDir: Recursively invalidate the directory and its children
@@ -2131,6 +2239,44 @@ func (bc *BlockCache) SyncFile(options internal.SyncFileOptions) error {
 	return nil
 }
 
+func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
+	var maxCacheSize uint64
+	if bc.diskSize > 0 {
+		maxCacheSize = bc.diskSize
+	} else {
+		maxCacheSize = bc.memSize
+	}
+
+	if maxCacheSize == 0 {
+		return nil, false, nil
+	}
+
+	usage, _ := common.GetUsage(bc.tmpPath)
+	usage = usage * float64(_1MB)
+
+	available := (float64)(maxCacheSize) - usage
+	_, free, err := common.GetAvailFree("/")
+	if err != nil {
+		log.Err("BlockCache::StatFs : failed to get available disk space %s", err.Error())
+		return nil, false, err
+	}
+
+	const blockSize = 4096
+
+	statfs := &common.Statfs_t{
+		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
+		Bavail:  uint64(max(0, available)) / uint64(blockSize),
+		Bfree:   free,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	return statfs, true, nil
+}
+
 // ------------------------- Factory -------------------------------------------
 // Pipeline will call this method to create your object, initialize your variables here
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
@@ -2201,4 +2347,11 @@ func init() {
 		"Start prefetching on open or wait for first read.",
 	)
 	config.BindPFlag(compName+".prefetch-on-open", blockCachePrefetchOnOpen)
+
+	strongConsistency := config.AddBoolFlag(
+		"block-cache-strong-consistency",
+		false,
+		"Enable strong data consistency for block cache.",
+	)
+	config.BindPFlag(compName+".consistency", strongConsistency)
 }
