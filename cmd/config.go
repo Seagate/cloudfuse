@@ -102,9 +102,9 @@ type uiTheme struct {
 
 // Global general purpose vars
 var (
-	colorYellow = tcell.GetColor("#FFD700")
-	colorGreen  = tcell.GetColor("#6EBE49")
-	colorBlack  = tcell.ColorBlack
+	colorYellow tcell.Color = tcell.GetColor("#FFD700")
+	colorGreen  tcell.Color = tcell.GetColor("#6EBE49")
+	colorBlack  tcell.Color = tcell.ColorBlack
 )
 
 // Struct to hold the final configuration data to be written to the YAML config file.
@@ -219,14 +219,16 @@ func (tui *appContext) buildTUI() {
 // Function to build the home page of the TUI application. Displays a
 // welcome banner, instructions, and buttons to start or quit the application.
 func (tui *appContext) buildHomePage() tview.Primitive {
-	bannerText := "[#6EBE49::b]" +
-		" █▀▀░█░░░█▀█░█░█░█▀▄░█▀▀░█░█░█▀▀░█▀▀\n" +
-		"░█░░░█░░░█░█░█░█░█░█░█▀▀░█░█░▀▀█░█▀▀\n" +
-		"░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀▀░░▀░░░▀▀▀░▀▀▀░▀▀▀[-]\n\n" +
-		"[white::b]Welcome to the CloudFuse Configuration Tool\n" +
-		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" +
-		"[#6EBE49::b]Cloud storage configuration made easy via terminal.[-]\n\n" +
-		"[::b]Press [#FFD700]Start[-] to begin or [red]Quit[-] to exit.\n"
+	bannerText := fmt.Sprintf(
+		"[%s::b]"+
+			" █▀▀░█░░░█▀█░█░█░█▀▄░█▀▀░█░█░█▀▀░█▀▀\n"+
+			"░█░░░█░░░█░█░█░█░█░█░█▀▀░█░█░▀▀█░█▀▀\n"+
+			"░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀▀░░▀░░░▀▀▀░▀▀▀░▀▀▀[-]\n\n"+
+			"[white::b]Welcome to the CloudFuse Configuration Tool\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n"+
+			"[%s::b]Cloud storage configuration made easy via terminal.[-]\n\n"+
+			"[::b]Press [%s]Start[-] to begin or [red]Quit[-] to exit.\n",
+		colorGreen, colorYellow, colorGreen, colorYellow)
 
 	// Banner text widget
 	bannerTextWidget := tview.NewTextView().
@@ -234,10 +236,12 @@ func (tui *appContext) buildHomePage() tview.Primitive {
 		SetDynamicColors(true).
 		SetWrap(true)
 
-	instructionsText := "[#FFD700::b]Instructions:[::-]\n" +
-		"[#6EBE49::b]•[-::-] [::]Use your mouse or arrow keys to navigate.[-::-]\n" +
-		"[#6EBE49::b]•[-::-] [::]Press Enter or left-click to select items.[-::-]\n" +
-		"[#6EBE49::b]•[-::-] [::]For the best experience, expand terminal window to full size.[-::-]\n"
+	instructionsText := fmt.Sprintf(
+		"[%s::b]Instructions:[::-]\n"+
+			"[%s::b] •[-::-] Use your mouse or arrow keys to navigate.\n"+
+			"[%s::b] •[-::-] Press Enter or left-click to select items.\n"+
+			"[%s::b] •[-::-] [::]For the best experience, expand terminal window to full size.\n",
+		colorYellow, colorGreen, colorGreen, colorGreen)
 
 	// Instructions text widget
 	instructionsTextWidget := tview.NewTextView().
@@ -256,12 +260,14 @@ func (tui *appContext) buildHomePage() tview.Primitive {
 		SetButtonBackgroundColor(tui.theme.navigationButtonColor).
 		SetButtonTextColor(tui.theme.navigationButtonTextColor)
 
-	aboutText := "[#FFD700::b]ABOUT[-::-]\n" +
-		"[white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n" +
-		"[grey::i]CloudFuse TUI Configuration Tool\n" +
-		"Seagate Technology, LLC\n" +
-		"cloudfuse@seagate.com\n" +
-		fmt.Sprintf("Version: %s", common.CloudfuseVersion)
+	aboutText := fmt.Sprintf(
+		"[%s::b]ABOUT[-::-]\n"+
+			"[white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n"+
+			"[grey::i]CloudFuse TUI Configuration Tool\n"+
+			"Seagate Technology, LLC\n"+
+			"cloudfuse@seagate.com\n"+
+			"Version: %s",
+		colorYellow, common.CloudfuseVersion)
 
 	// About text widget
 	aboutTextWidget := tview.NewTextView().
@@ -291,11 +297,13 @@ func (tui *appContext) buildHomePage() tview.Primitive {
 // Function to build the storage provider selection page. Allows users to select their cloud storage provider
 // from a dropdown list. The options are: LyveCloud, Microsoft, AWS, and Other S3.
 func (tui *appContext) buildStorageProviderPage() tview.Primitive {
-	instructionsText := "[#6EBE49::b] Select Your Cloud Storage Provider[-::-]\n" +
-		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" +
-		"[white::b] Choose your cloud storage provider from the dropdown below.[-::-]\n" +
-		"[grey::i] If your provider is not listed, choose [darkmagenta::b]Other (s3)[-::-][grey::i]. You’ll be\n" +
-		" prompted to enter the endpoint URL and region manually.[-::-]\n"
+	instructionsText := fmt.Sprintf(
+		"[%s::b] Select Your Cloud Storage Provider[-::-]\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n"+
+			"[white::b] Choose your cloud storage provider from the dropdown below.[-::-]\n"+
+			"[grey::i] If your provider is not listed, choose [darkmagenta::b]Other (s3)[-::-][grey::i]. You’ll be\n"+
+			" prompted to enter the endpoint URL and region manually.[-::-]\n",
+		colorGreen, colorYellow)
 
 	// Instructions text widget
 	instructionsTextWidget := tview.NewTextView().
@@ -352,8 +360,7 @@ func (tui *appContext) buildStorageProviderPage() tview.Primitive {
 		}).
 		AddButton(tui.theme.navigationPreviewLabel, func() {
 			previewPage := tui.buildPreviewPage("page1")
-			tui.pages.AddPage("previewPage", previewPage, true, false)
-			tui.pages.SwitchToPage("previewPage")
+			tui.pages.AddAndSwitchToPage("previewPage", previewPage, true)
 		}).
 		AddButton(tui.theme.navigationQuitLabel, func() {
 			tui.app.Stop()
@@ -404,9 +411,10 @@ func (tui *appContext) buildEndpointURLPage() tview.Primitive {
 			"[grey::i] *Refer to your provider’s documentation for valid formats.[-::-]"
 	}
 
-	instructionsText := fmt.Sprintf("[#6EBE49::b] Enter Endpoint URL for %s[-]\n"+
-		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
-		"[white]\n%s", tui.config.storageProvider, urlRegionHelpText)
+	instructionsText := fmt.Sprintf(
+		"[%s::b] Enter Endpoint URL for %s[-]\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
+			"[white]\n%s", colorGreen, tui.config.storageProvider, colorYellow, urlRegionHelpText)
 
 	instructionsTextWidget := tview.NewTextView().
 		SetText(instructionsText).
@@ -434,28 +442,23 @@ func (tui *appContext) buildEndpointURLPage() tview.Primitive {
 		AddButton(tui.theme.navigationNextLabel, func() {
 			if err := tui.validateEndpointURL(tui.config.endpointURL); err != nil {
 				tui.showErrorModal(
-					fmt.Sprintf("[red::b]ERROR: %s[-::-]", err.Error()),
+					fmt.Sprintf("[red::b]ERROR:[-::-] %s", err.Error()),
 					func() {
-						tui.pages.RemovePage("page2")
 						page2 := tui.buildEndpointURLPage()
-						tui.pages.AddPage("page2", page2, true, false)
-						tui.pages.SwitchToPage("page2")
+						tui.pages.AddAndSwitchToPage("page2", page2, true)
 					},
 				)
 				return
 			}
-			tui.pages.RemovePage("page3")
 			page3 := tui.buildCredentialsPage()
-			tui.pages.AddPage("page3", page3, true, false)
-			tui.pages.SwitchToPage("page3")
+			tui.pages.AddAndSwitchToPage("page3", page3, true)
 		}).
 		AddButton(tui.theme.navigationBackLabel, func() {
 			tui.pages.SwitchToPage("page1")
 		}).
 		AddButton(tui.theme.navigationPreviewLabel, func() {
 			previewPage := tui.buildPreviewPage("page2")
-			tui.pages.AddPage("previewPage", previewPage, true, false)
-			tui.pages.SwitchToPage("previewPage")
+			tui.pages.AddAndSwitchToPage("previewPage", previewPage, true)
 		}).
 		AddButton(tui.theme.navigationQuitLabel, func() {
 			tui.app.Stop()
@@ -484,8 +487,6 @@ func (tui *appContext) buildEndpointURLPage() tview.Primitive {
 // If the storage protocol is "s3", it provides input fields for access key, secret key.
 // If the storage protocol is "azure", it provides input fields for account name, account key, and container name.
 func (tui *appContext) buildCredentialsPage() tview.Primitive {
-	layout := tview.NewFlex()
-	layout.Clear()
 
 	// Determine labels for input fields based on storage protocol.
 	accessLabel := ""
@@ -499,27 +500,13 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 	}
 
 	instructionsText := fmt.Sprintf(
-		"[%s::b] Enter Your Cloud Storage Credentials[-]\n",
-		colorGreen,
-	) +
-		fmt.Sprintf(
-			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[::-]\n\n",
-			colorYellow,
-		) +
-		fmt.Sprintf(
-			"[%s::b] -%s[-::-] This is your unique identifier for accessing your cloud storage.\n",
-			colorYellow,
-			strings.Trim(accessLabel, "🔑 "),
-		) +
-		fmt.Sprintf(
+		"[%s::b] Enter Your Cloud Storage Credentials[-]\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[::-]\n\n"+
+			"[%s::b] -%s[-::-] This is your unique identifier for accessing your cloud storage.\n"+
 			"[%s::b] -%s[-::-] This is your secret password for accessing your cloud storage.\n",
-			colorYellow,
-			strings.Trim(secretLabel, "🔑 "),
-		) +
-		fmt.Sprintf(
-			"[%s::b] -Passphrase:[-::-] This is used to encrypt your configuration file.\n",
-			colorYellow,
-		)
+		colorGreen, colorYellow, colorYellow, strings.Trim(accessLabel, "🔑 "),
+		colorYellow, strings.Trim(secretLabel, "🔑 "),
+	)
 
 	if tui.config.storageProtocol == "azstorage" {
 		instructionsText += fmt.Sprintf(
@@ -528,7 +515,10 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 		)
 	}
 
-	instructionsText += "\n[darkmagenta::i]\t\t\t*Keep these credentials secure. Do not share.[-]"
+	instructionsText += fmt.Sprintf(
+		"[%s::b] -Passphrase:[-::-] This is used to encrypt your configuration file.\n"+
+			"\n[darkmagenta::i]\t\t\t*Keep these credentials secure. Do not share.[-]",
+		colorYellow)
 
 	// Instructions text widget
 	instructionsTextWidget := tview.NewTextView().
@@ -605,7 +595,7 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 				(tui.config.storageProtocol == "azstorage" && (len(tui.config.accountName) == 0 || len(tui.config.accountKey) == 0 || len(tui.config.containerName) == 0)) ||
 				len(tui.config.configEncryptionPassphrase) == 0 {
 				tui.showErrorModal(
-					"[red::b]ERROR: Credential fields cannot be empty.\nPlease try again.[-::-]",
+					"[red::b]ERROR:[-::-] Credential fields cannot be empty.\nPlease try again.",
 					func() {
 						tui.pages.SwitchToPage("page3")
 					},
@@ -622,9 +612,11 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 					tui.pages.RemovePage("loading")
 
 					if err != nil {
-						tui.showErrorModal(fmt.Sprintf("[red::b]ERROR: %s", err.Error()), func() {
-							tui.pages.SwitchToPage("page3")
-						})
+						tui.showErrorModal(fmt.Sprintf("[red::b]ERROR:[-::-] %s", err.Error()),
+							func() {
+								tui.pages.SwitchToPage("page3")
+							},
+						)
 						return
 					}
 					if tui.config.storageProtocol == "azstorage" {
@@ -661,7 +653,6 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 	credentialsWidget := tview.NewForm().
 		AddFormItem(accessKeyFieldWidget).
 		AddFormItem(secretKeyFieldWidget).
-		AddFormItem(passphraseFieldWidget).
 		SetFieldTextColor(tcell.ColorBlack).
 		SetLabelColor(tui.theme.widgetLabelColor).
 		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor)
@@ -671,13 +662,17 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 		credentialsWidget.AddFormItem(containerNameFieldWidget)
 	}
 
+	credentialsWidget.AddFormItem(passphraseFieldWidget)
+
 	// Assemble page layout
-	layout.SetDirection(tview.FlexRow)
-	layout.AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false)
-	layout.AddItem(nil, 1, 0, false)
-	layout.AddItem(credentialsWidget, credentialsWidget.GetFormItemCount()*2+1, 0, false)
-	layout.AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false)
-	layout.AddItem(nil, 1, 0, false)
+	layout := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false).
+		AddItem(nil, 1, 0, false).
+		AddItem(credentialsWidget, credentialsWidget.GetFormItemCount()*2+1, 0, false).
+		AddItem(navigationButtonsWidget, tui.theme.navigationWidgetHeight, 0, false).
+		AddItem(nil, 1, 0, false)
+
 	layout.SetBorder(true).SetBorderColor(colorGreen).SetBorderPadding(1, 1, 1, 1)
 
 	return layout
@@ -688,11 +683,13 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 // Function to build the bucket selection page. Allows users to select a bucket from a dropdown list
 // of retrieved buckets based on provided s3 credentials. For s3 storage users only. Azure storage users will skip this page.
 func (tui *appContext) buildBucketSelectionPage() tview.Primitive {
-	instructionsText := "[#6EBE49::b] Select Your Bucket Name[-::-]\n" +
-		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" +
-		"[white::b] Select the name of your storage bucket from the dropdown below.[-::-]\n\n" +
-		"[grey::i] The list of available buckets is retrieved from your cloud storage provider\n " +
-		"based on the credentials provided in the previous step.[-::-]"
+	instructionsText := fmt.Sprintf(
+		"[%s::b] Select Your Bucket Name[-::-]\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n"+
+			"[white::b] Select the name of your storage bucket from the dropdown below.[-::-]\n\n"+
+			"[grey::i] The list of available buckets is retrieved from your cloud storage provider\n "+
+			"based on the credentials provided in the previous step.[-::-]",
+		colorGreen, colorYellow)
 
 	// Instructions text widget
 	instructionsTextWidget := tview.NewTextView().
@@ -725,8 +722,7 @@ func (tui *appContext) buildBucketSelectionPage() tview.Primitive {
 		}).
 		AddButton(tui.theme.navigationPreviewLabel, func() {
 			previewPage := tui.buildPreviewPage("page4")
-			tui.pages.AddPage("previewPage", previewPage, true, false)
-			tui.pages.SwitchToPage("previewPage")
+			tui.pages.AddAndSwitchToPage("previewPage", previewPage, true)
 		}).
 		AddButton(tui.theme.navigationQuitLabel, func() {
 			tui.app.Stop()
@@ -756,11 +752,13 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 	// Main layout container. Must be instantiated first to allow nested items.
 	layout := tview.NewFlex().SetDirection(tview.FlexRow)
 
-	instructionsText := "[#6EBE49::b] Configure Caching Settings[-]\n" +
-		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-		"[white::b] CloudFuse can cache data locally. You control the location, size, and duration.[-::-]\n\n" +
-		"[#FFD700::b]  -[-::-] [#6EBE49::b]Enable[-::-] caching if you frequently re-read data and have ample disk space.\n" +
-		"[#FFD700::b]  -[-::-] [red::b]Disable[-::-] caching if you prefer faster initial access or have limited disk space.\n\n"
+	instructionsText := fmt.Sprintf(
+		"[%s::b] Configure Caching Settings[-]\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"+
+			"[white::b] CloudFuse can cache data locally. You control the location, size, and duration.[-::-]\n\n"+
+			"[%s::b]  -[-::-] [%s::b]Enable[-::-] caching if you frequently re-read data and have ample disk space.\n"+
+			"[%s::b]  -[-::-] [red::b]Disable[-::-] caching if you prefer faster initial access or have limited disk space.\n\n",
+		colorGreen, colorYellow, colorYellow, colorGreen, colorYellow)
 
 	// Instructions text widget
 	instructionsTextWidget := tview.NewTextView().
@@ -776,8 +774,8 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 		SetLabelColor(tui.theme.widgetLabelColor).
 		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack).
-		SetChangedFunc(func(text string) {
-			tui.config.cacheLocation = text
+		SetChangedFunc(func(location string) {
+			tui.config.cacheLocation = location
 		})
 
 		// Input field widget for cache size percentage
@@ -791,7 +789,7 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 		SetChangedFunc(func(size string) {
 			if size, err := strconv.Atoi(size); err != nil || size < 1 || size > 100 {
 				tui.showErrorModal(
-					"[red::b]ERROR: Cache size must be between 1 and 100.\nPlease try again.[-::-]",
+					"[red::b]ERROR:[-::-] Cache size must be between 1 and 100.\nPlease try again.",
 					func() {
 						tui.pages.SwitchToPage("page5")
 					},
@@ -806,8 +804,8 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 		SetLabel("⌛ Cache Retention Duration: ").
 		SetText(fmt.Sprintf("%d", tui.config.cacheRetentionDuration)).
 		SetFieldWidth(5).
-		SetChangedFunc(func(text string) {
-			if val, err := strconv.Atoi(text); err == nil {
+		SetChangedFunc(func(duration string) {
+			if val, err := strconv.Atoi(duration); err == nil {
 				tui.config.cacheRetentionDuration = val
 			} else {
 				// TODO: Handle invalid input
@@ -842,9 +840,9 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 		SetFieldBackgroundColor(tui.theme.widgetFieldBackgroundColor).
 		SetFieldTextColor(colorBlack)
 
-		// Dropdown widget for enabling/disabling cache cleanup on restart
-		// If enabled --> allow-non-empty-temp: false
-		// if disabled --> allow-non-empty-temp: true
+	// Dropdown widget for enabling/disabling cache cleanup on restart
+	// If enabled --> allow-non-empty-temp: false
+	// if disabled --> allow-non-empty-temp: true
 	clearCacheOnStartDropdownWidget := tview.NewDropDown().
 		SetLabel("🧹 Clear Cache On Start: ").
 		SetOptions([]string{" Enabled ", " Disabled "}, func(option string, index int) {
@@ -886,16 +884,19 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 			if tui.config.enableCaching {
 				// Validate the cache location
 				if err := tui.validateCachePath(); err != nil {
-					tui.showErrorModal("Invalid cache location:\n"+err.Error(), func() {
-						tui.pages.SwitchToPage("page5")
-					})
+					tui.showErrorModal(
+						"[red::b]ERROR:[-::-] Invalid cache location:\n"+err.Error(),
+						func() {
+							tui.pages.SwitchToPage("page5")
+						},
+					)
 					return
 				}
 
 				// Check available cache size
 				if err := tui.getAvailableCacheSize(); err != nil {
 					tui.showErrorModal(
-						"Failed to check available cache size:\n"+err.Error(),
+						"[red::b]ERROR:[-::-] Failed to fetch available cache size:\n"+err.Error(),
 						func() {
 							tui.pages.SwitchToPage("page5")
 						},
@@ -920,7 +921,7 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 					func() {
 						if err := tui.createYAMLConfig(); err != nil {
 							tui.showErrorModal(
-								"Failed to create YAML config:\n"+err.Error(),
+								"[red::b]ERROR:[-::-] Failed to create YAML config:\n"+err.Error(),
 								func() {
 									tui.pages.SwitchToPage("page5")
 								},
@@ -939,7 +940,7 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 			} else {
 				// If caching is disabled, just finish the configuration
 				if err := tui.createYAMLConfig(); err != nil {
-					tui.showErrorModal("Failed to create YAML config:\n"+err.Error(), func() {
+					tui.showErrorModal("[red::b]ERROR:[-::-] Failed to create YAML config:\n"+err.Error(), func() {
 						tui.pages.SwitchToPage("page5")
 					})
 					return
@@ -954,14 +955,12 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 				tui.pages.SwitchToPage("page3")
 			} else {
 				page4 := tui.buildBucketSelectionPage()
-				tui.pages.AddPage("page4", page4, true, false)
-				tui.pages.SwitchToPage("page4")
+				tui.pages.AddAndSwitchToPage("page4", page4, true)
 			}
 		}).
 		AddButton(tui.theme.navigationPreviewLabel, func() {
 			previewPage := tui.buildPreviewPage("page5")
-			tui.pages.AddPage("previewPage", previewPage, true, false)
-			tui.pages.SwitchToPage("previewPage")
+			tui.pages.AddAndSwitchToPage("previewPage", previewPage, true)
 		}).
 		AddButton(tui.theme.navigationQuitLabel, func() {
 			tui.app.Stop()
@@ -1024,29 +1023,33 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 // This function creates a text view with the summary information and a return button.
 // The preview page parameter allows switching back to the previous page when the user clicks "Return".
 func (tui *appContext) buildPreviewPage(previewPage string) tview.Primitive {
-	summaryText :=
-		"[#6EBE49::b] CloudFuse Summary Configuration:[-]\n" +
-			"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n[-]" +
-			fmt.Sprintf(" Storage Provider: [#FFD700::b]%s[-]\n", tui.config.storageProvider) +
-			fmt.Sprintf("     Endpoint URL: [#FFD700::b]%s[-]\n", tui.config.endpointURL) +
-			fmt.Sprintf("      Bucket Name: [#FFD700::b]%s[-]\n", tui.config.bucketName) +
-			fmt.Sprintf("       Cache Mode: [#FFD700::b]%s[-]\n", tui.config.cacheMode) +
-			fmt.Sprintf("   Cache Location: [#FFD700::b]%s[-]\n", tui.config.cacheLocation) +
-			fmt.Sprintf(
-				"       Cache Size: [#FFD700::b]%s%% (%d GB)[-]\n",
-				tui.config.cacheSize,
-				tui.config.currentCacheSizeGB,
-			)
+	summaryText := fmt.Sprintf(
+		"[%s::b] CloudFuse Summary Configuration:[-]\n"+
+			"[%s]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n[-]"+
+			" Storage Provider: [%s::b]%s[-]\n"+
+			"     Endpoint URL: [%s::b]%s[-]\n"+
+			"      Bucket Name: [%s::b]%s[-]\n"+
+			"       Cache Mode: [%s::b]%s[-]\n"+
+			"   Cache Location: [%s::b]%s[-]\n"+
+			"       Cache Size: [%s::b]%s%% (%d GB)[-]\n",
+		colorGreen, colorYellow,
+		colorYellow, tui.config.storageProvider,
+		colorYellow, tui.config.endpointURL,
+		colorYellow, tui.config.bucketName,
+		colorYellow, tui.config.cacheMode,
+		colorYellow, tui.config.cacheLocation,
+		colorYellow, tui.config.cacheSize, tui.config.currentCacheSizeGB,
+	)
 
 	// Display cache retention duration in seconds and specified unit
 	if tui.config.cacheRetentionUnit == "Seconds" {
 		summaryText += fmt.Sprintf(
-			"  Cache Retention: [#FFD700::b]%d Seconds[-]\n\n",
-			tui.config.cacheRetentionDurationSec,
+			"  Cache Retention: [%s::b]%d Seconds[-]\n\n",
+			colorYellow, tui.config.cacheRetentionDurationSec,
 		)
 	} else {
-		summaryText += fmt.Sprintf("  Cache Retention: [#FFD700::b]%d sec (%d %s)[-]\n\n",
-			tui.config.cacheRetentionDurationSec, tui.config.cacheRetentionDuration, tui.config.cacheRetentionUnit)
+		summaryText += fmt.Sprintf("  Cache Retention: [%s::b]%d sec (%d %s)[-]\n\n",
+			colorYellow, tui.config.cacheRetentionDurationSec, tui.config.cacheRetentionDuration, tui.config.cacheRetentionUnit)
 	}
 
 	// Set a dynamic width and height for the summary widget
@@ -1181,7 +1184,7 @@ func (tui *appContext) showExitModal(onConfirm func()) {
 			tui.app.QueueUpdateDraw(func() {
 				modal.SetText(
 					fmt.Sprintf(
-						"[#6EBE49::b]Creating configuration file...[-::-]\n\n%s",
+						"[black::b]Creating configuration file...[-::-]\n\n%s",
 						currentEmoji,
 					),
 				)
@@ -1190,8 +1193,8 @@ func (tui *appContext) showExitModal(onConfirm func()) {
 
 		// After animation, show final message
 		tui.app.QueueUpdateDraw(func() {
-			modal.SetText(fmt.Sprintf("[#6EBE49::b]Configuration Complete![-::-]\n\n%s\n\n"+
-				"Your CloudFuse configuration file has been created at:\n\n[blue:white:b]%s[-:-:-]\n\n"+
+			modal.SetText(fmt.Sprintf("[black::b]Configuration Complete![-::-]\n\n%s\n\n"+
+				"Your CloudFuse configuration file has been created at:\n\n[blue:white:b] %s [-:-:-]\n\n"+
 				"You can now exit the application.\n\n"+
 				"[black::i]Thank you for using CloudFuse Config![-::-]", processingEmojis[len(processingEmojis)-1], tui.config.configFilePath))
 		})
@@ -1259,7 +1262,7 @@ func getDefaultCachePath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Printf(
-			"[red::b]ERROR: Failed to get home directory: %v\nUsing fallback path for cache directory.\n",
+			"Failed to get home directory: %v\nUsing fallback path for cache directory.\n",
 			err,
 		)
 		return getFallbackCachePath()
@@ -1269,7 +1272,7 @@ func getDefaultCachePath() string {
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		if err := os.MkdirAll(cachePath, 0700); err != nil {
 			fmt.Printf(
-				"[red::b]ERROR: Failed to create cache directory: %v\nUsing fallback path for cache directory.\n",
+				"Failed to create cache directory: %v\nUsing fallback path for cache directory.\n",
 				err,
 			)
 			return getFallbackCachePath()
@@ -1283,19 +1286,16 @@ func getDefaultCachePath() string {
 func (tui *appContext) validateCachePath() error {
 	// Validate that the path is not empty
 	if strings.TrimSpace(tui.config.cacheLocation) == "" {
-		return fmt.Errorf("[red::b]ERROR: Cache location cannot be empty[-::-]")
+		return fmt.Errorf("Cache location cannot be empty.")
 	}
 	// Make sure no invalid path characters are used
 	if strings.ContainsAny(tui.config.cacheLocation, `<>:"|?*#%^&;'"`+"`"+`{}[]`) {
-		return fmt.Errorf("[red::b]ERROR: Cache location contains invalid characters[-::-]")
+		return fmt.Errorf("Cache location contains invalid characters.")
 	}
 	// Validate that the cache path exists
 	if tui.config.cacheLocation != getDefaultCachePath() && tui.config.cacheMode == "file_cache" {
 		if _, err := os.Stat(tui.config.cacheLocation); os.IsNotExist(err) {
-			return fmt.Errorf(
-				"[red::b]ERROR: '%s': No such file or directory[-::-]",
-				tui.config.cacheLocation,
-			)
+			return fmt.Errorf("'%s': No such file or directory.", tui.config.cacheLocation)
 		}
 	}
 	return nil
@@ -1309,12 +1309,10 @@ func (tui *appContext) getAvailableCacheSize() error {
 		// If we fail to get the available cache size, we default to 80% of the available disk space
 		tui.config.cacheSize = "80"
 		returnMsg := fmt.Errorf(
-			"[red::b]WARNING: Failed to get available cache size at '%s': %v\n\n"+
+			"Failed to get available cache size at '%s': %v\n\n"+
 				"Defaulting cache size to 80%% of available disk space.\n\n"+
-				"Please manually verify you have enough disk space available for caching.[-::-]",
-			tui.config.cacheLocation,
-			err,
-		)
+				"Please manually verify you have enough disk space available for caching.",
+			tui.config.cacheLocation, err)
 		return returnMsg
 	}
 
@@ -1335,18 +1333,21 @@ func (tui *appContext) validateEndpointURL(rawURL string) error {
 
 	// Check if the URL is empty
 	if strings.TrimSpace(rawURL) == "" {
-		return fmt.Errorf("[red::b]Endpoint URL cannot be empty[-::-]\nPlease try again.")
+		return fmt.Errorf("Endpoint URL cannot be empty.\nPlease try again.")
 	}
 
 	// Normalize the URL by adding "https://" if it doesn't start with "http://" or "https://"
 	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
 		tui.config.endpointURL = "https://" + rawURL
-		return fmt.Errorf("[red::b]Endpoint URL should start with 'http://' or 'https://'.\n" +
-			"Appending 'https://' to the URL...\n\nPlease verify the URL and try again.")
+		return fmt.Errorf(
+			"Endpoint URL should start with 'http://' or 'https://'.\n" +
+				"Appending 'https://' to the URL...\n\nPlease verify the URL and try again.",
+		)
 	}
 
 	if _, err := url.ParseRequestURI(rawURL); err != nil {
-		return fmt.Errorf("[red::b]Invalid URL format[-::-]\n%s\nPlease try again.", err.Error())
+		return fmt.Errorf(
+			"Invalid URL format.\n%s\nPlease try again.", err.Error())
 	}
 
 	return nil
@@ -1406,7 +1407,7 @@ func (tui *appContext) checkCredentials() error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("Failed to get bucket list: %v", err)
+		return fmt.Errorf("Failed to validate credentials: %v", err)
 	}
 
 	return nil
@@ -1468,7 +1469,8 @@ func (tui *appContext) createYAMLConfig() error {
 	// Marshal the struct to YAML format
 	configData, err := yaml.Marshal(&config)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal configuration data to YAML: %v", err)
+		return fmt.Errorf(
+			"Failed to marshal configuration data to YAML: %v", err)
 	}
 
 	// Encrypt the YAML config data using the user-provided passphrase
@@ -1486,7 +1488,7 @@ func (tui *appContext) createYAMLConfig() error {
 	// Update configFilePath member to point to the created config file
 	currDir, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("Error: %v", err)
+		return fmt.Errorf("Failed to get current working directory: %v", err)
 	}
 
 	tui.config.configFilePath = filepath.Join(currDir, "config.aes")
