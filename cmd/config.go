@@ -37,6 +37,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/component/attr_cache"
 	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/file_cache"
@@ -175,6 +176,9 @@ func init() {
 // Main function to run the TUI application.
 // Initializes the tview application, builds the TUI application, and runs it.
 func (tui *appContext) runTUI() error {
+	// Disable cloudfuse logging during TUI session to prevent log messages from interfering with the UI.
+	log.SetLogLevel(1)
+
 	tui.app.EnableMouse(true)
 	tui.app.EnablePaste(true)
 
@@ -381,31 +385,28 @@ func (tui *appContext) buildEndpointURLPage() tview.Primitive {
 	// Determine URL help text based on selected provider
 	switch tui.config.storageProvider {
 	case "LyveCloud":
-		urlRegionHelpText = "[::b]You selected LyveCloud as your storage provider.[::-]\n\n" +
-			"For LyveCloud, the endpoint URL format is generally:\n" +
-			"[darkmagenta::b]https://s3.<[darkcyan::b]region[darkmagenta::b]>.<[darkcyan::b]identifier[darkmagenta::b]>.lyve.seagate.com[-]\n\n" +
-			"Example:\n[darkmagenta::b]https://s3.us-east-1.sv15.lyve.seagate.com[-]\n\n" +
-			"[grey::i]Find more info in your LyveCloud portal.\nAvailable regions are listed below in the dropdown.[-::-]"
-		urlRegionHelpText = centerText(urlRegionHelpText, 65)
+		urlRegionHelpText = "[::b] You selected LyveCloud as your storage provider.[::-]\n\n" +
+			" For LyveCloud, the endpoint URL format is generally:\n" +
+			"[darkmagenta::b] https://s3.<[darkcyan::b]region[darkmagenta::b]>.<[darkcyan::b]identifier[darkmagenta::b]>.lyve.seagate.com[-]\n\n" +
+			"\t\t\t\t Example:\n [darkmagenta::b]https://s3.us-east-1.sv15.lyve.seagate.com[-]\n\n" +
+			"[grey::i] *Refer to your LyveCloud portal for valid formats.[-::-]"
 
 	case "AWS":
-		urlRegionHelpText = "[::b]You selected AWS as your storage provider.[::-]\n\n" +
-			"The endpoint URL format is generally:\n" +
-			"[darkmagenta::b]https://s3.<[darkcyan::b]region[darkmagenta::b]>.amazonaws.com[-]\n\n" +
-			"Example:\n[darkmagenta::b]https://s3.us-east-1.amazonaws.com[-]\n\n" +
-			"[grey::i]Refer to AWS documentation for valid formats and available regions.[-::-]"
-		urlRegionHelpText = centerText(urlRegionHelpText, 65)
+		urlRegionHelpText = "[::b] You selected AWS as your storage provider.[::-]\n\n" +
+			" The endpoint URL format is generally:\n" +
+			"[darkmagenta::b] https://s3.<[darkcyan::b]region[darkmagenta::b]>.amazonaws.com[-]\n\n" +
+			"\t\t\t Example:\n[darkmagenta::b] https://s3.us-east-1.amazonaws.com[-]\n\n" +
+			"[grey::i] *Refer to your AWS portal for valid formats.[-::-]"
 
 	case "Other":
-		urlRegionHelpText = "[::b]You selected a custom s3 provider.[::-]\n\n" +
-			"Enter the endpoint URL.\n" +
-			"[grey::i]Refer to your provider’s documentation for valid formats.[-::-]"
-		urlRegionHelpText = centerText(urlRegionHelpText, 65)
+		urlRegionHelpText = "[::b] You selected a custom s3 provider.[::-]\n\n" +
+			" Enter the endpoint URL.\n\n" +
+			"[grey::i] *Refer to your provider’s documentation for valid formats.[-::-]"
 	}
 
 	instructionsText := fmt.Sprintf("[#6EBE49::b] Enter Endpoint URL for %s[-]\n"+
 		"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
-		"[white]\n %s", tui.config.storageProvider, urlRegionHelpText)
+		"[white]\n%s", tui.config.storageProvider, urlRegionHelpText)
 
 	instructionsTextWidget := tview.NewTextView().
 		SetText(instructionsText).
@@ -417,7 +418,7 @@ func (tui *appContext) buildEndpointURLPage() tview.Primitive {
 		SetText(tui.config.endpointURL).
 		SetFieldWidth(50).
 		SetChangedFunc(func(url string) {
-			tui.config.endpointURL = url
+			tui.config.endpointURL = strings.TrimSpace(url)
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER URL HERE>").
 		SetPlaceholderTextColor(tcell.ColorGray).
@@ -541,8 +542,8 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 		SetText(tui.config.accessKey).
 		SetFieldWidth(50).
 		SetChangedFunc(func(key string) {
-			tui.config.accessKey = key
-			tui.config.accountName = key
+			tui.config.accessKey = strings.TrimSpace(key)
+			tui.config.accountName = strings.TrimSpace(key)
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER KEY HERE>").
 		SetLabelColor(tui.theme.widgetLabelColor).
@@ -555,8 +556,8 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 		SetText(string(tui.config.secretKey)).
 		SetFieldWidth(50).
 		SetChangedFunc(func(key string) {
-			tui.config.secretKey = key
-			tui.config.accountKey = key
+			tui.config.secretKey = strings.TrimSpace(key)
+			tui.config.accountKey = strings.TrimSpace(key)
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER KEY HERE>").
 		SetMaskCharacter('*').
@@ -570,8 +571,8 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 		SetText(tui.config.containerName).
 		SetPlaceholder("\t\t\t\t<ENTER NAME HERE>").
 		SetChangedFunc(func(name string) {
-			tui.config.containerName = name
-			tui.config.bucketName = name
+			tui.config.containerName = strings.TrimSpace(name)
+			tui.config.bucketName = strings.TrimSpace(name)
 		}).
 		SetFieldWidth(50).
 		SetLabelColor(tui.theme.widgetLabelColor).
@@ -611,42 +612,43 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 				)
 				return
 			}
-			// TODO: Fix bug here where calling listBuckets() in the checkCredentials() function
-			// causes the layout to shift upwards and the widgets to be misaligned if the user incorrectly
-			// enters credentials.
-			if err := tui.checkCredentials(); err != nil {
-				tui.showErrorModal(fmt.Sprintf("[red::b]ERROR: %s", err.Error()), func() {
-					tui.pages.RemovePage("page3")                  // Remove the current page
-					page3 := tui.buildCredentialsPage()            // Rebuild the page
-					tui.pages.AddPage("page3", page3, true, false) // Add the new page
-					tui.pages.SwitchToPage("page3")
-				})
-				return
-			}
+			// Show a quick loading modal while validating credentials by attempting to fetch list of buckets/containers
+			tui.showLoadingModal("Validating credentials...")
+			go func() {
+				err := tui.checkCredentials()
 
-			if tui.config.storageProtocol == "azstorage" {
-				tui.pages.RemovePage("page4") // Remove previous page if it exists
-				tui.pages.SwitchToPage("page5")
-			} else {
-				page4 := tui.buildBucketSelectionPage()
-				tui.pages.AddPage("page4", page4, true, false)
-				tui.pages.SwitchToPage("page4")
-			}
+				tui.app.QueueUpdateDraw(func() {
+					tui.pages.SwitchToPage("page3")
+					tui.pages.RemovePage("loading")
+
+					if err != nil {
+						tui.showErrorModal(fmt.Sprintf("[red::b]ERROR: %s", err.Error()), func() {
+							tui.pages.SwitchToPage("page3")
+						})
+						return
+					}
+					if tui.config.storageProtocol == "azstorage" {
+						tui.pages.RemovePage("page4")
+						tui.pages.SwitchToPage("page5")
+					} else {
+						page4 := tui.buildBucketSelectionPage()
+						tui.pages.AddAndSwitchToPage("page4", page4, true)
+					}
+				})
+			}()
 		}).
 		AddButton(tui.theme.navigationBackLabel, func() {
-			if tui.config.storageProvider == "Microsoft" || tui.config.storageProvider == "AWS" {
+			if tui.config.storageProvider == "Microsoft" {
 				tui.pages.RemovePage("page2")
 				tui.pages.SwitchToPage("page1")
 			} else {
 				page2 := tui.buildEndpointURLPage()
-				tui.pages.AddPage("page2", page2, true, false)
-				tui.pages.SwitchToPage("page2")
+				tui.pages.AddAndSwitchToPage("page2", page2, true)
 			}
 		}).
 		AddButton(tui.theme.navigationPreviewLabel, func() {
 			previewPage := tui.buildPreviewPage("page3")
-			tui.pages.AddPage("previewPage", previewPage, true, false)
-			tui.pages.SwitchToPage("previewPage")
+			tui.pages.AddAndSwitchToPage("previewPage", previewPage, true)
 		}).
 		AddButton(tui.theme.navigationQuitLabel, func() {
 			tui.app.Stop()
@@ -1104,6 +1106,19 @@ func (tui *appContext) showErrorModal(message string, onClose func()) {
 	modal.SetButtonBackgroundColor(colorYellow)
 	modal.SetButtonTextColor(tcell.ColorBlack)
 	tui.pages.AddPage("modal", modal, false, true)
+}
+
+// Function to show a loading modal dialog with a message.
+func (tui *appContext) showLoadingModal(loadingMessage string) {
+	modal := tview.NewModal().
+		SetText(loadingMessage).
+		SetBackgroundColor(colorGreen).
+		SetTextColor(tcell.ColorBlack)
+	modal.SetBorder(true)
+	modal.SetBorderColor(colorYellow)
+	modal.SetButtonBackgroundColor(colorYellow)
+	modal.SetButtonTextColor(tcell.ColorBlack)
+	tui.pages.AddPage("loading", modal, true, true)
 }
 
 // Function to show a confirmation modal dialog with "Finish" and "Return" buttons.
