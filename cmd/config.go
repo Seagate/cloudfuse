@@ -954,8 +954,7 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 			if tui.config.storageProtocol == "azstorage" {
 				tui.pages.SwitchToPage("page3")
 			} else {
-				page4 := tui.buildBucketSelectionPage()
-				tui.pages.AddAndSwitchToPage("page4", page4, true)
+				tui.pages.SwitchToPage("page4")
 			}
 		}).
 		AddButton(tui.theme.navigationPreviewLabel, func() {
