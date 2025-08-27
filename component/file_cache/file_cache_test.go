@@ -1482,7 +1482,7 @@ func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
   schedule:
     - name: "Test"
       cron: %s
-      duration: "1s"
+      duration: "30s"
 
 loopbackfs:
   path: %s`,

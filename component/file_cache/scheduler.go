@@ -245,7 +245,7 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 
 		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true, ImmediateUpload: true})
+		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true, AsyncUpload: true})
 		f.Close()
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Cause: %v", name, err)
