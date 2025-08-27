@@ -45,12 +45,12 @@ type Logger interface {
 
 	GetType() string
 	GetLogLevel() common.LogLevel
-	Debug(format string, args ...any)
-	Trace(format string, args ...any)
-	Info(format string, args ...any)
-	Warn(format string, args ...any)
-	Err(format string, args ...any)
-	Crit(format string, args ...any)
+	Debug(format string, args ...interface{})
+	Trace(format string, args ...interface{})
+	Info(format string, args ...interface{})
+	Warn(format string, args ...interface{})
+	Err(format string, args ...interface{})
+	Crit(format string, args ...interface{})
 	LogRotate() error
 }
 
@@ -143,32 +143,32 @@ func Destroy() error {
 // ------------------ Public methods for logging events ------------------
 
 // Debug : Debug message logging
-func Debug(msg string, args ...any) {
+func Debug(msg string, args ...interface{}) {
 	logObj.Debug(msg, args...)
 }
 
 // Trace : Trace message logging
-func Trace(msg string, args ...any) {
+func Trace(msg string, args ...interface{}) {
 	logObj.Trace(msg, args...)
 }
 
 // Info : Info message logging
-func Info(msg string, args ...any) {
+func Info(msg string, args ...interface{}) {
 	logObj.Info(msg, args...)
 }
 
 // Warn : Warning message logging
-func Warn(msg string, args ...any) {
+func Warn(msg string, args ...interface{}) {
 	logObj.Warn(msg, args...)
 }
 
 // Err : Error message logging
-func Err(msg string, args ...any) {
+func Err(msg string, args ...interface{}) {
 	logObj.Err(msg, args...)
 }
 
 // Crit : Critical message logging
-func Crit(msg string, args ...any) {
+func Crit(msg string, args ...interface{}) {
 	logObj.Crit(msg, args...)
 }
 

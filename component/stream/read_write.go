@@ -386,7 +386,7 @@ func (rw *ReadWriteCache) Stop() error {
 	log.Trace("Stream::Stop : stopping component : %s", rw.Name())
 	if !rw.StreamOnly {
 		handleMap := handlemap.GetHandles()
-		handleMap.Range(func(key, value any) bool {
+		handleMap.Range(func(key, value interface{}) bool {
 			handle := value.(*handlemap.Handle)
 			if handle.CacheObj != nil && !handle.CacheObj.StreamOnly {
 				err := rw.purge(handle, -1)

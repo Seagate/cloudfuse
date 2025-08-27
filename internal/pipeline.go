@@ -130,7 +130,7 @@ func (p *Pipeline) Start(ctx context.Context) (err error) {
 
 // Stop : Stop the pipeline by calling 'Stop' method of each component
 func (p *Pipeline) Stop() (err error) {
-	for i := range p.components {
+	for i := 0; i < len(p.components); i++ {
 		if err = p.components[i].Stop(); err != nil {
 			return err
 		}

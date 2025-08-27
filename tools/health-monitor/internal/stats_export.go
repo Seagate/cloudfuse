@@ -42,7 +42,7 @@ import (
 type ExportedStat struct {
 	Timestamp   string
 	MonitorName string
-	Stat        any
+	Stat        interface{}
 }
 
 type StatsExporter struct {
@@ -123,7 +123,7 @@ func (se *StatsExporter) Destroy() {
 	se.wg.Wait()
 }
 
-func (se *StatsExporter) AddMonitorStats(monName string, timestamp string, st any) {
+func (se *StatsExporter) AddMonitorStats(monName string, timestamp string, st interface{}) {
 	// check if the channel is full
 	if len(se.channel) == cap(se.channel) {
 		// remove the first element from the channel

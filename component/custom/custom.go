@@ -47,9 +47,9 @@ func initializePlugins() error {
 		return nil
 	}
 
-	pluginFiles := strings.SplitSeq(pluginFilesPath, ":")
+	pluginFiles := strings.Split(pluginFilesPath, ":")
 
-	for file := range pluginFiles {
+	for _, file := range pluginFiles {
 		if !strings.HasSuffix(file, ".so") {
 			log.Err("initializePlugins: Invalid plugin file extension: %s", file)
 			continue

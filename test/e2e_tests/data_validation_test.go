@@ -213,7 +213,7 @@ func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string,
 	buffer := make([]byte, 4*1024)
 	rand.Read(buffer)
 	blocks := size / bufferSize
-	for range blocks {
+	for i := 0; i < blocks; i++ {
 		bytesToWrite := min(bufferSize, size)
 		bytesWritten, err := fh.Write(buffer[0:bytesToWrite])
 		suite.NoError(err)
@@ -696,7 +696,7 @@ func (suite *dataValidationTestSuite) TestRandomWriteRaceCondition() {
 	lfh, rfh := createFileHandleInLocalAndRemote(suite, localFilePath, remoteFilePath)
 
 	offsetList := []int64{}
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		offsetList = append(offsetList, int64(i*16*int(_1MB)))
 	}
 	// at the end write back at block 0 at offset 1MB
@@ -755,7 +755,7 @@ func (suite *dataValidationTestSuite) TestPanicOnWritingToFile() {
 	suite.NoError(err)
 
 	//Make the cooking+cooked=prefetchCount
-	for i := range 3 {
+	for i := 0; i < 3; i++ {
 		offset := 4 * int64(i) * int64(_1MB)
 		bytes_read, err := rfh.ReadAt(buffer, offset)
 		suite.NoError(err)
@@ -788,7 +788,7 @@ func (suite *dataValidationTestSuite) TestPanicOnReadingFileInRandReadMode() {
 	suite.NoError(err)
 
 	//Make the file handle goto random read mode in block cache(This is causing panic)
-	for i := range 14 {
+	for i := 0; i < 14; i++ {
 		offset := int64(_1MB) * 6 * int64(i)
 		bytes_read, err := rfh.ReadAt(buffer, offset)
 		suite.NoError(err)

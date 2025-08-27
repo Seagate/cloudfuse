@@ -103,7 +103,7 @@ type azAuthBlobMSI struct {
 }
 
 // getServiceClient : returns MSI based service client for blob
-func (azmsi *azAuthBlobMSI) getServiceClient(stConfig *AzStorageConfig) (any, error) {
+func (azmsi *azAuthBlobMSI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azmsi.getTokenCredential()
 	if err != nil {
 		log.Err(
@@ -138,7 +138,7 @@ type azAuthDatalakeMSI struct {
 }
 
 // getServiceClient : returns MSI based service client for datalake
-func (azmsi *azAuthDatalakeMSI) getServiceClient(stConfig *AzStorageConfig) (any, error) {
+func (azmsi *azAuthDatalakeMSI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azmsi.getTokenCredential()
 	if err != nil {
 		log.Err(

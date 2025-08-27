@@ -49,7 +49,7 @@ func TestKeysTree(t *testing.T) {
 type parseVal struct {
 	val    string
 	toType reflect.Kind
-	result any
+	result interface{}
 }
 
 func (suite *keysTreeTestSuite) TestParseValue() {

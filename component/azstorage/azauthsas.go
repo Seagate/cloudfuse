@@ -71,7 +71,7 @@ type azAuthBlobSAS struct {
 }
 
 // getServiceClient : returns SAS based service client for blob
-func (azsas *azAuthBlobSAS) getServiceClient(stConfig *AzStorageConfig) (any, error) {
+func (azsas *azAuthBlobSAS) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	if azsas.config.SASKey == nil {
 		log.Err(
 			"azAuthBlobSAS::getServiceClient : SAS key for account is empty, cannot authenticate user",
@@ -104,7 +104,7 @@ type azAuthDatalakeSAS struct {
 }
 
 // getServiceClient : returns SAS based service client for datalake
-func (azsas *azAuthDatalakeSAS) getServiceClient(stConfig *AzStorageConfig) (any, error) {
+func (azsas *azAuthDatalakeSAS) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	if azsas.config.SASKey == nil {
 		log.Err(
 			"azAuthDatalakeSAS::getServiceClient : SAS key for account is empty, cannot authenticate user",

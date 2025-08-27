@@ -53,7 +53,7 @@ func (suite *blockpoolTestSuite) cleanupTest() {
 }
 
 func validateNullData(b *Block) bool {
-	for i := range b.data {
+	for i := 0; i < len(b.data); i++ {
 		if b.data[i] != 0 {
 			return false
 		}
@@ -174,7 +174,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	var blocks []*Block
-	for range 5 {
+	for i := 0; i < 5; i++ {
 		b := bp.MustGet()
 		suite.assert.NotNil(b)
 		blocks = append(blocks, b)
@@ -203,7 +203,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 // get n blocks
 func getBlocks(suite *blockpoolTestSuite, bp *BlockPool, n int) []*Block {
 	var blocks []*Block
-	for range n {
+	for i := 0; i < n; i++ {
 		b := bp.TryGet()
 		suite.assert.NotNil(b)
 

@@ -208,6 +208,8 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 			name:    fullPath,
 			next:    nil,
 			prev:    nil,
+			usage:   0,
+			deleted: false,
 		}
 		p.nodeMap.Store(fullPath, newNode)
 		// let markers stay in place

@@ -54,7 +54,6 @@ import (
 	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/datalakeerror"
-	"maps"
 )
 
 //    ----------- Helper to create pipeline options ---------------
@@ -393,7 +392,9 @@ func populateContentType(newSet string) error { //nolint
 	// We can simply append the new data to end of the map
 	// however there may be conflicting keys and hence we need to merge manually
 	//ContentTypeMap = append(ContentTypeMap, data)
-	maps.Copy(ContentTypes, data)
+	for k, v := range data {
+		ContentTypes[k] = v
+	}
 	return nil
 }
 

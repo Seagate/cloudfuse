@@ -873,7 +873,7 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 		azStatsCollector.PushEvents(
 			downloadProgress,
 			name,
-			map[string]any{bytesTfrd: bytesTransferred, size: count},
+			map[string]interface{}{bytesTfrd: bytesTransferred, size: count},
 		)
 	}
 }
@@ -1125,7 +1125,7 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 		azStatsCollector.PushEvents(
 			uploadProgress,
 			name,
-			map[string]any{bytesTfrd: bytesTransferred, size: count},
+			map[string]interface{}{bytesTfrd: bytesTransferred, size: count},
 		)
 	}
 }

@@ -57,7 +57,7 @@ func (r *ReadCache) Configure(conf StreamOptions) error {
 func (r *ReadCache) Stop() error {
 	log.Trace("Stopping component : %s", r.Name())
 	handleMap := handlemap.GetHandles()
-	handleMap.Range(func(key, value any) bool {
+	handleMap.Range(func(key, value interface{}) bool {
 		handle := value.(*handlemap.Handle)
 		if handle.CacheObj != nil {
 			handle.CacheObj.Lock()
