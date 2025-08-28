@@ -162,7 +162,7 @@ var configCmd = &cobra.Command{
 	Long:  "Starts an interactive terminal-based UI to generate your Cloudfuse configuration file.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tui := newAppContext()
-		if err := tui.runTUI(); err != nil {
+		if err := tui.run(); err != nil {
 			return fmt.Errorf("Failed to run TUI: %v", err)
 		}
 		return nil
@@ -175,14 +175,14 @@ func init() {
 
 // Main function to run the TUI application.
 // Initializes the tview application, builds the TUI application, and runs it.
-func (tui *appContext) runTUI() error {
+func (tui *appContext) run() error {
 	// Disable cloudfuse logging during TUI session to prevent log messages from interfering with the UI.
-	log.SetLogLevel(1)
+	log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_OFF()})
 
 	tui.app.EnableMouse(true)
 	tui.app.EnablePaste(true)
 
-	tui.buildTUI()
+	tui.build()
 
 	// Run the application
 	if err := tui.app.Run(); err != nil {
@@ -193,7 +193,7 @@ func (tui *appContext) runTUI() error {
 }
 
 // Function to build the TUI application. Initializes the pages and adds them to the page stack.
-func (tui *appContext) buildTUI() {
+func (tui *appContext) build() {
 
 	// Initialize the pages
 	homePage := tui.buildHomePage()         // --- Home Page ---
