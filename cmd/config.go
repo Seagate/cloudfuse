@@ -177,11 +177,13 @@ func init() {
 // Initializes the tview application, builds the TUI application, and runs it.
 func (tui *appContext) run() error {
 	// Disable cloudfuse logging during TUI session to prevent log messages from interfering with the UI.
-	log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_OFF()})
+	if err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_OFF()}); err != nil {
+		// If setting silent logger fails, this fallback is sufficient.
+		log.SetLogLevel(1)
+	}
 
 	tui.app.EnableMouse(true)
 	tui.app.EnablePaste(true)
-
 	tui.build()
 
 	// Run the application
