@@ -1025,7 +1025,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
 			return nil, syscall.ENOENT
 		} else {
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return value.attr, nil
 		}
 	}

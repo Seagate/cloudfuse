@@ -27,6 +27,8 @@ package cache_policy
 
 import (
 	"container/list"
+	"iter"
+	"maps"
 	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -103,7 +105,7 @@ func (cache *LRUCache) Put(key int64, value *common.Block) bool {
 }
 
 func (cache *LRUCache) Print() {
-	for _, value := range cache.Elements {
+	for value := range maps.Values(cache.Elements) {
 		log.Debug(
 			"Key:%+v,Value:%+v\n",
 			getKeyPair(value).value.StartIndex,
@@ -113,12 +115,8 @@ func (cache *LRUCache) Print() {
 }
 
 // Keys: returns all the keys present in LRUCache
-func (cache *LRUCache) Keys() []int64 {
-	var keys []int64
-	for k := range cache.Elements {
-		keys = append(keys, k)
-	}
-	return keys
+func (cache *LRUCache) Keys() iter.Seq[int64] {
+	return maps.Keys(cache.Elements)
 }
 
 func (cache *LRUCache) RecentlyUsed() *common.Block {
@@ -147,7 +145,7 @@ func (cache *LRUCache) Remove(key int64) {
 
 // Purge: clears LRUCache
 func (cache *LRUCache) Purge() {
-	for _, bk := range cache.Keys() {
+	for bk := range cache.Keys() {
 		cache.Remove(bk)
 	}
 	cache.Capacity = 0
@@ -162,18 +160,12 @@ func getKeyPair(node *list.Element) KeyPair {
 
 // return true if eviction happened, return false otherwise
 func (cache *LRUCache) evict() bool {
-	node := cache.List.Back()
-	pair := getKeyPair(node)
-	for i := 0; i < cache.List.Len(); i++ {
+	for node := cache.List.Back(); node != nil; node = node.Prev() {
+		pair := getKeyPair(node)
 		if !pair.value.Dirty() {
 			cache.Remove(pair.key)
 			return true
 		}
-		node = node.Prev()
-		if node == nil {
-			return false
-		}
-		pair = getKeyPair(node)
 	}
 	return false
 }

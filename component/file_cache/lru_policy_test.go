@@ -193,7 +193,7 @@ func (suite *lruPolicyTestSuite) TestCacheValid() {
 	suite.assert.NotNil(n)
 	node := n.(*lruNode)
 	suite.assert.Equal("temp", node.name)
-	suite.assert.Equal(1, node.usage)
+	suite.assert.Equal(int64(1), node.usage.Load())
 }
 
 func (suite *lruPolicyTestSuite) TestCachePurge() {

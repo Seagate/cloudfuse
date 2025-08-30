@@ -78,3 +78,12 @@ func (fc *FileCache) getAvailableSize() (uint64, error) {
 
 	return avail, nil
 }
+
+func (fc *FileCache) syncFile(f *os.File, path string) error {
+	err := f.Sync()
+	if err != nil {
+		log.Err("FileCache::FlushFile : error [unable to sync file] %s", path)
+		return syscall.EIO
+	}
+	return nil
+}

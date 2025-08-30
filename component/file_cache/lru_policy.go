@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -42,8 +43,8 @@ type lruNode struct {
 	sync.RWMutex
 	next    *lruNode
 	prev    *lruNode
-	usage   int
-	deleted bool
+	usage   atomic.Int64
+	deleted atomic.Bool
 	name    string
 }
 
@@ -100,14 +101,14 @@ func NewLRUPolicy(cfg cachePolicyConfig) cachePolicy {
 		head:              nil,
 		currMarker: &lruNode{
 			name:  "__",
-			usage: -1,
 		},
 		lastMarker: &lruNode{
 			name:  "##",
-			usage: -1,
 		},
 		duPresent: false,
 	}
+	obj.currMarker.usage.Store(-1)
+	obj.lastMarker.usage.Store(-1)
 
 	return obj
 }
@@ -321,8 +322,9 @@ func (p *lruPolicy) IsCached(name string) bool {
 		node := val.(*lruNode)
 		node.RLock()
 		defer node.RUnlock()
-		log.Debug("lruPolicy::IsCached : %s, deleted:%t", name, node.deleted)
-		if !node.deleted {
+		deleted := node.deleted.Load()
+		log.Debug("lruPolicy::IsCached : %s, deleted:%t", name, deleted)
+		if !deleted {
 			return true
 		}
 	}
@@ -361,16 +363,12 @@ func (p *lruPolicy) cacheValidate(name string) {
 		name:    name,
 		next:    nil,
 		prev:    nil,
-		usage:   0,
-		deleted: false,
 	})
 	node := val.(*lruNode)
 
 	// protect node data
-	node.Lock()
-	node.deleted = false
-	node.usage++
-	node.Unlock()
+	node.deleted.Store(false)
+	node.usage.Add(1)
 
 	// protect the LRU
 	p.Lock()
@@ -447,9 +445,7 @@ func (p *lruPolicy) removeNode(name string) {
 	defer p.Unlock()
 
 	node = val.(*lruNode)
-	node.Lock()
-	node.deleted = true
-	node.Unlock()
+	node.deleted.Store(true)
 
 	p.extractNode(node)
 }
@@ -460,11 +456,7 @@ func (p *lruPolicy) updateMarker() {
 	p.Lock()
 	p.extractNode(p.lastMarker)
 	p.setHead(p.lastMarker)
-	// swap lastMarker with currMarker
-	swap := p.lastMarker
-	p.lastMarker = p.currMarker
-	p.currMarker = swap
-
+	p.lastMarker, p.currMarker = p.currMarker, p.lastMarker
 	p.Unlock()
 }
 
@@ -502,7 +494,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 		return
 	}
 
-	delItems := make([]*lruNode, 0)
+	delItems := make([]*lruNode, 0, p.maxEviction)
 	count := uint32(0)
 
 	p.Lock()
@@ -523,9 +515,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 		}
 
 		delItems = append(delItems, node)
-		node.Lock()
-		node.deleted = true
-		node.Unlock()
+		node.deleted.Store(true)
 		count++
 	}
 
@@ -542,13 +532,11 @@ func (p *lruPolicy) deleteExpiredNodes() {
 	log.Debug("lruPolicy::deleteExpiredNodes : List generated %d items", count)
 
 	for _, item := range delItems {
-		item.RLock()
-		restored := !item.deleted
-		item.RUnlock()
-		if !restored {
-			p.removeNode(item.name)
-			p.deleteItem(item.name)
-		}
+		item.Lock()
+		item.deleted.Store(true)
+		p.nodeMap.Delete(item.name)
+		p.deleteItem(item.name)
+		item.Unlock()
 	}
 
 	log.Debug("lruPolicy::deleteExpiredNodes : Ends")
