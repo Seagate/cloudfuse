@@ -19,20 +19,26 @@ jobs:
     name: Build and Test on Linux
     strategy:
       matrix:
-        go: ["1.24"]
-        job_name: ["linux-fuse3", "linux-fuse2"]
+        job_name: ["linux-fuse3", "linux-fuse2", "linux-fuse3-arm", "linux-fuse2-arm"]
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
-            containerName: "test-cnt-ubn"
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
             os: ubuntu-latest
+            fuselib: libfuse-dev
+          - job_name: linux-fuse3-arm
+            os: ubuntu-24.04-arm
+            fuselib: libfuse3-dev
+          - job_name: linux-fuse2-arm
+            os: ubuntu-24.04-arm
             fuselib: libfuse-dev
 
     runs-on: ${{ matrix.os }}
     env:
       cgo: "1"
+      go: "1.25"
+      zig: 0.14.1
       containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
@@ -54,7 +60,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ env.go }}
           check-latest: true
       - run: go version
 
@@ -62,6 +68,28 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.10"
+
+      - name: Install Zig
+        env:
+          RUNNER_ARCH: ${{ runner.arch }}
+          ENV_ZIG: ${{ env.zig }}
+        run: |
+          if [[ "${RUNNER_ARCH}" == "X64" ]]; then
+            ZIG_ARCH="x86_64"
+          elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
+            ZIG_ARCH="aarch64"
+          else
+            echo "Unsupported architecture: ${RUNNER_ARCH}"
+            exit 1
+          fi
+
+          ZIG_DIR="zig-${ZIG_ARCH}-linux-${ENV_ZIG}"
+          ZIG_TARBALL="${ZIG_DIR}.tar.xz"
+          curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
+          mkdir -p $HOME/.local/bin
+          tar -xf zig.tar.xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin/${ZIG_DIR}" >> $GITHUB_PATH
+          rm zig.tar.xz
 
       - name: Set CGO
         env:
@@ -75,13 +103,13 @@ jobs:
         env:
           FUSELIB: ${{ matrix.fuselib }}
         run: |
-          sudo apt-get install fuse3 ${FUSELIB}
+          sudo apt-get update && sudo apt-get install -y pkg-config fuse3 ${FUSELIB}
 
       - name: Build
         env:
           JOB_NAME: ${{ matrix.job_name }}
         run: |
-          if [[ "${JOB_NAME}" == "linux-fuse2" ]]; then
+          if [[ "${JOB_NAME}" == "linux-fuse2" || "${JOB_NAME}" == "linux-fuse2-arm" ]]; then
             ./build.sh fuse2;
           else
             ./build.sh;
@@ -149,8 +177,25 @@ jobs:
       - name: Run unit tests
         env:
           JOB_NAME: ${{ matrix.job_name }}
+          RUNNER_ARCH: ${{ runner.arch }}
         run: |
-          if [ "${JOB_NAME}" == "linux-fuse2" ]; then
+          if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            # Set Zig as the C/C++ compiler for CGO during tests
+            if [[ "${RUNNER_ARCH}" == "X64" ]]; then
+              ZIG_TARGET="x86_64-linux-gnu"
+              LIBDIR="/usr/lib/x86_64-linux-gnu"
+            elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
+              ZIG_TARGET="aarch64-linux-gnu"
+              LIBDIR="/usr/lib/aarch64-linux-gnu"
+            fi
+            export CC="zig cc -target $ZIG_TARGET"
+            export CXX="zig c++ -target $ZIG_TARGET"
+            echo "CC=zig cc -target $ZIG_TARGET" >> $GITHUB_ENV
+            echo "CXX=zig c++ -target $ZIG_TARGET" >> $GITHUB_ENV
+            export CGO_LDFLAGS="-L$LIBDIR"
+          fi
+
+          if [[ "${JOB_NAME}" == "linux-fuse2" || "${JOB_NAME}" == "linux-fuse2-arm" ]]; then
             go test -v -timeout=1h ./... --tags=unittest,azurite
           else
             go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
@@ -158,9 +203,13 @@ jobs:
 
   test:
     name: Build and Test on Windows
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: ["windows-latest", "windows-11-arm"]
+    
+    runs-on: ${{ matrix.os }}
     env:
-      go: "1.24"
+      go: "1.25"
       cgo: "0"
       containerName: "test-cnt-win"
 
@@ -194,7 +243,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: "1.24"
+      go: "1.25"
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4

@@ -949,6 +949,73 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	suite.assert.NoError(err)
 }
 
+func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresence() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	fileName := "test123"
+	options := internal.CreateFileOptions{Name: fileName, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+
+	// Write some data
+	data := []byte("testdata")
+	n, err := tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, len(data))
+	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+
+	// Check file exists in disk_cache_path
+	diskCachePath := filepath.Join(tobj.disk_cache_path, fileName+"_0")
+	_, err = os.Stat(diskCachePath)
+	suite.assert.NoError(err)
+
+	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+}
+
+func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresenceInDir() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	dirName := "testdir"
+	fileName := "testfile"
+	fullPath := dirName + "/" + fileName
+
+	// Create the directory first
+	err = tobj.blockCache.CreateDir(internal.CreateDirOptions{Name: dirName, Mode: 0777})
+	suite.assert.NoError(err)
+
+	options := internal.CreateFileOptions{Name: fullPath, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+
+	// Write some data
+	data := []byte("testdata")
+	n, err := tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, len(data))
+	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+
+	// Check file exists in disk_cache_path
+	diskCachePath := filepath.Join(tobj.disk_cache_path, dirName, fileName+"_0")
+	_, err = os.Stat(diskCachePath)
+	suite.assert.NoError(err)
+
+	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+}
+
 func (suite *blockCacheTestSuite) TestWriteFileSimple() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
