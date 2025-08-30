@@ -1749,7 +1749,10 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			// Use Sync since Dup is not supported on Windows
 			err := f.Sync()
 			if err != nil {
-				log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
+				log.Err(
+					"FileCache::FlushFile : error [unable to sync file] %s",
+					options.Handle.Path,
+				)
 				return syscall.EIO
 			}
 		}
