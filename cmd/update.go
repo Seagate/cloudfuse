@@ -26,15 +26,18 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	_ "embed"
+	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -263,13 +266,49 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 	return installFile.Name(), nil
 }
 
-func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
-	url := "https://api.github.com/repos/Seagate/cloudfuse/releases/latest"
+func readCachedRelease(version string) (*releaseInfo, error) {
+	cachePath := common.ReleaseInfoCachePath + "Latest"
 	if version != "" {
-		url = fmt.Sprintf(
-			"https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s",
-			version,
-		)
+		cachePath = common.ReleaseInfoCachePath + version
+	}
+	// try to read cached release info first
+	fInfo, err := os.Stat(cachePath)
+	if err != nil {
+		return nil, err
+	}
+	if time.Since(fInfo.ModTime()) > 2*time.Minute {
+		return nil, fmt.Errorf("Cached release info file %s is expired", cachePath)
+	}
+	relInfoData, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil, err
+	}
+	var relInfo releaseInfo
+	dec := gob.NewDecoder(bytes.NewReader(relInfoData))
+	err = dec.Decode(&relInfo)
+	if err != nil {
+		return nil, err
+	}
+	u, err := url.Parse(relInfo.AssetURL)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse cached release info asset URL. %w", err)
+	}
+	if u.Host != "github.com" || !strings.HasPrefix(u.Path, "/Seagate/cloudfuse") {
+		return nil, fmt.Errorf("Invalid cached release asset URL: %s", relInfo.AssetURL)
+	}
+	return &relInfo, nil
+}
+
+func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
+	// check cache first
+	relInfo, err := readCachedRelease(version)
+	if err == nil {
+		return relInfo, nil
+	}
+
+	url := common.CloudfuseReleaseURL + "/latest"
+	if version != "" {
+		url = fmt.Sprintf(common.CloudfuseReleaseURL+"/tags/v%s", version)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -308,12 +347,33 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 		return nil, err
 	}
 
-	return &releaseInfo{
+	relInfo = &releaseInfo{
 		Version:   strings.TrimPrefix(rel.TagName, "v"),
 		AssetURL:  asset.BrowserDownloadURL,
 		AssetName: asset.Name,
 		HashURL:   hashAsset.BrowserDownloadURL,
-	}, nil
+	}
+	if version == "" {
+		relInfo.writeToFile(common.ReleaseInfoCachePath + "Latest")
+	}
+	relInfo.writeToFile(common.ReleaseInfoCachePath + relInfo.Version)
+
+	return relInfo, nil
+}
+
+func (ri *releaseInfo) writeToFile(outPath string) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(ri)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(outPath, buf.Bytes(), 0600)
+	if err != nil {
+		os.Remove(outPath)
+		return err
+	}
+	return nil
 }
 
 func selectPackageAsset(assets []asset, ext string) (*asset, error) {

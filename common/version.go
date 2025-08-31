@@ -27,11 +27,15 @@ package common
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 const CloudfuseReleaseURL = "https://api.github.com/repos/Seagate/cloudfuse/releases"
+
+var ReleaseInfoCachePath = filepath.Join(os.TempDir(), "cloudfuseReleaseInfo")
 
 type Version struct {
 	segments []int64
