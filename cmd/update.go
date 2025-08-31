@@ -354,9 +354,9 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 		HashURL:   hashAsset.BrowserDownloadURL,
 	}
 	if version == "" {
-		relInfo.writeToFile(common.ReleaseInfoCachePath + "Latest")
+		_ = relInfo.writeToFile(common.ReleaseInfoCachePath + "Latest")
 	}
-	relInfo.writeToFile(common.ReleaseInfoCachePath + relInfo.Version)
+	_ = relInfo.writeToFile(common.ReleaseInfoCachePath + relInfo.Version)
 
 	return relInfo, nil
 }
