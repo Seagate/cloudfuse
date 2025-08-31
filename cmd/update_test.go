@@ -28,8 +28,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -61,19 +64,47 @@ func (suite *updateTestSuite) cleanupTest() {
 
 func (suite *updateTestSuite) TestGetRelease() {
 	defer suite.cleanupTest()
-	ctx := context.Background()
 
-	validVersion := "1.8.0"
-	resultVer, err := getRelease(ctx, validVersion)
+	// setup
+	ctx := context.Background()
+	const validVersion = "1.8.0"
+	// GitHub has a rate limit of 60 requests per hour for unauthenticated requests.
+	// So we'll use a mock server to simulate the GitHub API response.
+	releasePath := strings.TrimPrefix(common.CloudfuseReleaseURL, "https://api.github.com")
+	validVersionPath := releasePath + "/tags/v" + validVersion
+	latestVersionPath := releasePath + "/latest"
+	const serverVersion = "1.12.0"
+	const assetBaseName = serverVersion + "_" + runtime.GOOS + "_" + runtime.GOARCH
+	const assetsJson = `"assets": [{"name": "checksums_sha256.txt"},{"name": "cloudfuse_` + assetBaseName + `.exe"},{"name": "cloudfuse_` + assetBaseName + `.tar.gz"}]`
+	const respJson = `{"tag_name": "v1.12.0","name": "v1.12.0",` + assetsJson + "}"
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case latestVersionPath:
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintln(w, respJson)
+		case validVersionPath:
+			w.Header().Set("Content-Type", "application/json")
+			responseJson := strings.ReplaceAll(respJson, serverVersion, validVersion)
+			fmt.Fprintln(w, responseJson)
+		default:
+			http.NotFound(w, r)
+			return
+		}
+	}))
+	defer testServer.Close()
+	testReleaseUrl := testServer.URL + releasePath
+
+	// test
+	resultVer, err := getRelease(ctx, validVersion, testReleaseUrl)
 	suite.assert.NoError(err)
 	suite.assert.Equal(validVersion, resultVer.Version)
 
 	// When no version is passed, should get the latest version
-	resultVer, err = getRelease(ctx, "")
+	resultVer, err = getRelease(ctx, "", testReleaseUrl)
 	suite.assert.NoError(err)
 
 	invalidVersion := "1.1.10"
-	resultVer, err = getRelease(ctx, invalidVersion)
+	resultVer, err = getRelease(ctx, invalidVersion, testReleaseUrl)
 	suite.assert.Error(err)
 }
 

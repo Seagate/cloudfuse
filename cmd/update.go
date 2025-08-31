@@ -123,7 +123,7 @@ var updateCmd = &cobra.Command{
 
 // installUpdate performs the self-update
 func installUpdate(ctx context.Context, opt *Options) error {
-	relInfo, err := getRelease(ctx, opt.Version)
+	relInfo, err := getRelease(ctx, opt.Version, "")
 	if err != nil {
 		return fmt.Errorf("unable to detect new version: %w", err)
 	}
@@ -263,13 +263,17 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 	return installFile.Name(), nil
 }
 
-func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
-	url := "https://api.github.com/repos/Seagate/cloudfuse/releases/latest"
+func getRelease(ctx context.Context, version string, testURL string) (*releaseInfo, error) {
+	// use a dummy server when testing
+	releaseUrl := common.CloudfuseReleaseURL
+	if testURL != "" {
+		releaseUrl = testURL
+	}
+
+	// use a specific version when provided
+	url := releaseUrl + "/latest"
 	if version != "" {
-		url = fmt.Sprintf(
-			"https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s",
-			version,
-		)
+		url = fmt.Sprintf("%s/tags/v%s", releaseUrl, version)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
