@@ -60,6 +60,10 @@ func (suite *updateTestSuite) cleanupTest() {
 }
 
 func (suite *updateTestSuite) TestGetRelease() {
+	// Skip until we have Windows ARM builds
+	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
+		suite.T().Skip("Skipping test on Windows ARM")
+	}
 	defer suite.cleanupTest()
 	ctx := context.Background()
 
@@ -191,6 +195,10 @@ func (suite *updateTestSuite) TestUpdateWithOutputZipWindows() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	// Skip until we have Windows ARM builds
+	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
+		suite.T().Skip("Skipping test on Windows ARM")
+	}
 	defer suite.cleanupTest()
 
 	outputFile, err := os.CreateTemp("", "update-file*")
@@ -210,6 +218,10 @@ func (suite *updateTestSuite) TestUpdateWithOutputZipWindows() {
 func (suite *updateTestSuite) TestUpdateWithOutputExeWindows() {
 	if runtime.GOOS != "windows" {
 		return
+	}
+	// Skip until we have Windows ARM builds
+	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
+		suite.T().Skip("Skipping test on Windows ARM")
 	}
 	defer suite.cleanupTest()
 
