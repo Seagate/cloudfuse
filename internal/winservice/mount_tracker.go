@@ -70,6 +70,11 @@ func getMountTrackerFile(useSystem bool) (string, error) {
 		return "", err
 	}
 
+	// Ensure the AppData folder exists
+	if err := os.MkdirAll(appDataPath, 0755); err != nil {
+		return "", err
+	}
+
 	// Check local file exists for this offset and file combination or not
 	root, err := os.OpenRoot(appDataPath)
 	if err != nil {
