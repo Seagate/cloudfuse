@@ -100,10 +100,10 @@ func NewLRUPolicy(cfg cachePolicyConfig) cachePolicy {
 		cachePolicyConfig: cfg,
 		head:              nil,
 		currMarker: &lruNode{
-			name:  "__",
+			name: "__",
 		},
 		lastMarker: &lruNode{
-			name:  "##",
+			name: "##",
 		},
 		duPresent: false,
 	}
@@ -208,8 +208,8 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 			name:    fullPath,
 			next:    nil,
 			prev:    nil,
-			usage:   0,
-			deleted: false,
+			usage:   atomic.Int64{},
+			deleted: atomic.Bool{},
 		}
 		p.nodeMap.Store(fullPath, newNode)
 		// let markers stay in place
@@ -360,9 +360,9 @@ func (p *lruPolicy) cacheValidate(name string) {
 	// get existing entry, or if it doesn't exist then
 	//  write a new one and return it
 	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
-		name:    name,
-		next:    nil,
-		prev:    nil,
+		name: name,
+		next: nil,
+		prev: nil,
 	})
 	node := val.(*lruNode)
 
