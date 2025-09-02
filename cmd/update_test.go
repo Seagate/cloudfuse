@@ -83,9 +83,9 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {
 	}
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "update")
+	_, err := executeCommandC(rootCmd, "update", "--version=1.8.0")
 	suite.assert.Error(err)
-	suite.assert.Equal(".deb and .rpm requires elevated privileges", err.Error())
+	suite.assert.Equal("error: .deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
@@ -94,9 +94,9 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
 	}
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "update", "--package=deb")
+	_, err := executeCommandC(rootCmd, "update", "--package=deb", "--version=1.8.0")
 	suite.assert.Error(err)
-	suite.assert.Equal(".deb and .rpm requires elevated privileges", err.Error())
+	suite.assert.Equal("error: .deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateWithOutputDebLinux() {
@@ -160,7 +160,7 @@ func (suite *updateTestSuite) TestUpdateWithOutputTarLinux() {
 }
 
 func (suite *updateTestSuite) TestInvalidOptionsLinux() {
-	if runtime.GOOS != "Linux" {
+	if runtime.GOOS != "linux" {
 		return
 	}
 	defer suite.cleanupTest()
@@ -171,7 +171,7 @@ func (suite *updateTestSuite) TestInvalidOptionsLinux() {
 	_, err = executeCommandC(
 		rootCmd,
 		"update",
-		"--package=ede",
+		"--package=exe",
 		fmt.Sprintf("--output=%s", outputFile.Name()),
 	)
 	suite.assert.Error(err)
