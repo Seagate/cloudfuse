@@ -83,7 +83,6 @@ func (l *LockMapItem) RUnlock() {
 	l.mtx.RUnlock()
 }
 
-
 // Increment the handle count
 func (l *LockMapItem) Inc() {
 	l.handleCount++
