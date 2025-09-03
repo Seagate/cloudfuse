@@ -26,7 +26,6 @@
 package cmd
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -109,11 +108,6 @@ func validateGenConfigOptions() error {
 				"provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
 			)
 		}
-	}
-
-	_, err := base64.StdEncoding.DecodeString(string(optsGenCfg.passphrase))
-	if err != nil {
-		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 	}
 
 	encryptedPassphrase = memguard.NewEnclave([]byte(optsGenCfg.passphrase))

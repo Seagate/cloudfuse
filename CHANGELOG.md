@@ -1,5 +1,19 @@
 # Cloudfuse Changelog #
 
+## **1.12.2** ##
+
+August 22nd 2025
+This version is based on [blobfuse2 2.4.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.1) (upstream).
+
+### Features ###
+
+- [#527](https://github.com/Seagate/cloudfuse/pull/527) Bump blobfuse version to 2.4.1
+
+### Bug Fixes ###
+
+- [#642](https://github.com/Seagate/cloudfuse/pull/642) Fix issue with files in directory not being cached when using block_cache
+- [#648](https://github.com/Seagate/cloudfuse/pull/648) Stop linking against development dependencies of fuse libraries
+
 ## **1.12.1** ##
 
 July 18th 2025

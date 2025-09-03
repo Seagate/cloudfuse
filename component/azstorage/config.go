@@ -190,12 +190,6 @@ type AzStorageOptions struct {
 	PreserveACL             bool   `config:"preserve-acl"                  yaml:"preserve-acl"`
 	Filter                  string `config:"filter"                        yaml:"filter"`
 	UserAssertion           string `config:"user-assertion"                yaml:"user-assertions"`
-
-	// v1 support
-	UseAdls        bool   `config:"use-adls"         yaml:"-"`
-	UseHTTPS       bool   `config:"use-https"        yaml:"-"`
-	SetContentType bool   `config:"set-content-type" yaml:"-"`
-	CaCertFile     string `config:"ca-cert-file"     yaml:"-"`
 }
 
 // RegisterEnvVariables : Register environment variables
@@ -311,27 +305,19 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		opt.AccountType = "block"
 	}
 
-	if config.IsSet(compName + ".use-adls") {
-		if opt.UseAdls {
-			az.stConfig.authConfig.AccountType = az.stConfig.authConfig.AccountType.ADLS()
-		} else {
-			az.stConfig.authConfig.AccountType = az.stConfig.authConfig.AccountType.BLOCK()
-		}
-	} else {
-		var accountType AccountType
-		err := accountType.Parse(opt.AccountType)
-		if err != nil {
-			log.Err("ParseAndValidateConfig : Failed to parse account type %s", opt.AccountType)
-			return errors.New("invalid account type")
-		}
-
-		if accountType == EAccountType.INVALID_ACC() {
-			log.Err("ParseAndValidateConfig : Invalid account type %s", opt.AccountType)
-			return errors.New("invalid account type")
-		}
-
-		az.stConfig.authConfig.AccountType = accountType
+	var accountType AccountType
+	err := accountType.Parse(opt.AccountType)
+	if err != nil {
+		log.Err("ParseAndValidateConfig : Failed to parse account type %s", opt.AccountType)
+		return errors.New("invalid account type")
 	}
+
+	if accountType == EAccountType.INVALID_ACC() {
+		log.Err("ParseAndValidateConfig : Invalid account type %s", opt.AccountType)
+		return errors.New("invalid account type")
+	}
+
+	az.stConfig.authConfig.AccountType = accountType
 
 	if opt.BlockSize != 0 {
 		if opt.BlockSize > blockblob.MaxStageBlockBytes {
@@ -345,7 +331,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	// Validate container name is present or not
-	err := config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
+	err = config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
 	if err != nil {
 		log.Err("ParseAndValidateConfig : Failed to detect mount-all-container")
 	}
@@ -355,10 +341,6 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	az.stConfig.container = opt.Container
-
-	if config.IsSet(compName + ".use-https") {
-		opt.UseHTTP = !opt.UseHTTPS
-	}
 
 	az.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 

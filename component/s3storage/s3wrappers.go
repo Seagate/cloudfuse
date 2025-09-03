@@ -88,13 +88,13 @@ const maxResultsPerListCall = 1000
 func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
-	downloader := manager.NewDownloader(cl.awsS3Client, func(u *manager.Downloader) {
+	downloader := manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
 		u.PartSize = cl.Config.partSize
 		u.Concurrency = cl.Config.concurrency
 	})
 
 	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
 		Key:    aws.String(key),
 	}
 
@@ -133,7 +133,7 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 	}
 
 	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String(rangeString),
 	}
@@ -142,7 +142,7 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
 	}
 
-	result, err := cl.awsS3Client.GetObject(context.Background(), getObjectInput)
+	result, err := cl.AwsS3Client.GetObject(context.Background(), getObjectInput)
 
 	// check for errors
 	if err != nil {
@@ -164,7 +164,7 @@ func (cl *Client) putObject(options putObjectOptions) error {
 	var err error
 
 	putObjectInput := &s3.PutObjectInput{
-		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
 		Key:         aws.String(key),
 		Body:        options.objectData,
 		ContentType: aws.String(getContentType(key)),
@@ -177,9 +177,9 @@ func (cl *Client) putObject(options putObjectOptions) error {
 	// If the object is small, just do a normal put object.
 	// If not, then use a multipart upload
 	if options.size < cl.Config.uploadCutoff {
-		_, err = cl.awsS3Client.PutObject(ctx, putObjectInput)
+		_, err = cl.AwsS3Client.PutObject(ctx, putObjectInput)
 	} else {
-		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
+		uploader := manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
 			u.PartSize = cl.Config.partSize
 			u.Concurrency = cl.Config.concurrency
 		})
@@ -197,8 +197,8 @@ func (cl *Client) deleteObject(name string, isSymLink bool, isDir bool) error {
 	key := cl.getKey(name, isSymLink, isDir)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
-	_, err := cl.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
+	_, err := cl.AwsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
 		Key:    aws.String(key),
 	})
 
@@ -222,8 +222,8 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		}
 	}
 	// send keyList for deletion
-	result, err := cl.awsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
-		Bucket: &cl.Config.authConfig.BucketName,
+	result, err := cl.AwsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
+		Bucket: &cl.Config.AuthConfig.BucketName,
 		Delete: &types.Delete{
 			Objects: keyList,
 			Quiet:   aws.Bool(true),
@@ -255,8 +255,8 @@ func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal
 	key := cl.getKey(name, isSymlink, isDir)
 	log.Trace("Client::headObject : object %s", key)
 
-	result, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
+	result, err := cl.AwsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
+		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -278,7 +278,7 @@ func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal
 
 // Wrapper for awsS3Client.HeadBucket
 func (cl *Client) headBucket(bucketName string) (*s3.HeadBucketOutput, error) {
-	headBucketOutput, err := cl.awsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+	headBucketOutput, err := cl.AwsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	})
 	return headBucketOutput, parseS3Err(err, "HeadBucket "+bucketName)
@@ -291,9 +291,9 @@ func (cl *Client) copyObject(options copyObjectOptions) error {
 	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
 
 	copyObjectInput := &s3.CopyObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
 		CopySource: aws.String(
-			fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey)),
+			fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, url.PathEscape(sourceKey)),
 		),
 		Key: aws.String(targetKey),
 	}
@@ -302,7 +302,7 @@ func (cl *Client) copyObject(options copyObjectOptions) error {
 		copyObjectInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
 	}
 
-	_, err := cl.awsS3Client.CopyObject(context.Background(), copyObjectInput)
+	_, err := cl.AwsS3Client.CopyObject(context.Background(), copyObjectInput)
 	// check for errors on copy
 	if err != nil {
 		attemptedAction := fmt.Sprintf("copy %s to %s", sourceKey, targetKey)
@@ -342,10 +342,10 @@ func (cl *Client) renameObject(options renameObjectOptions) error {
 
 // abortMultipartUpload stops a multipart upload and verifys that the parts are deleted.
 func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
-	_, abortErr := cl.awsS3Client.AbortMultipartUpload(
+	_, abortErr := cl.AwsS3Client.AbortMultipartUpload(
 		context.Background(),
 		&s3.AbortMultipartUploadInput{
-			Bucket:   aws.String(cl.Config.authConfig.BucketName),
+			Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
 			Key:      aws.String(key),
 			UploadId: &uploadID,
 		},
@@ -355,8 +355,8 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 	}
 
 	// AWS states you need to call listparts to verify that multipart upload was properly aborted
-	resp, listErr := cl.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
-		Bucket:   aws.String(cl.Config.authConfig.BucketName),
+	resp, listErr := cl.AwsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
+		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
 	})
@@ -384,7 +384,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 
 	cntList := make([]string, 0)
 
-	result, err := cl.awsS3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
+	result, err := cl.AwsS3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
 
 	if err != nil {
 		log.Err("Client::ListBuckets : Failed to list buckets. Here's why: %v", err)
@@ -418,7 +418,7 @@ func (cl *Client) List(
 	}(marker), count)
 
 	// prepare parameters
-	bucketName := cl.Config.authConfig.BucketName
+	bucketName := cl.Config.AuthConfig.BucketName
 	if count == 0 {
 		count = maxResultsPerListCall
 	}
@@ -460,7 +460,7 @@ func (cl *Client) List(
 		Delimiter:         aws.String("/"), // delimiter limits results and provides CommonPrefixes
 		ContinuationToken: token,
 	}
-	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
+	paginator := s3.NewListObjectsV2Paginator(cl.AwsS3Client, params)
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process a single result page
