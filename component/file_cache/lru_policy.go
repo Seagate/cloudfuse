@@ -533,9 +533,11 @@ func (p *lruPolicy) deleteExpiredNodes() {
 
 	for _, item := range delItems {
 		item.Lock()
-		item.deleted.Store(true)
-		p.nodeMap.Delete(item.name)
-		p.deleteItem(item.name)
+		restored := !item.deleted.Load()
+		if !restored {
+			p.nodeMap.Delete(item.name)
+			p.deleteItem(item.name)
+		}
 		item.Unlock()
 	}
 
