@@ -90,27 +90,6 @@ func (s *configTestSuite) TestInvalidAccountType() {
 	assert.Contains(err.Error(), "invalid account type")
 }
 
-func (s *configTestSuite) TestUseADLSFlag() {
-	defer config.ResetConfig()
-	assert := assert.New(s.T())
-	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.AccountType = "abcd"
-
-	config.SetBool(compName+".use-adls", true)
-	opt.UseAdls = true
-	err := ParseAndValidateConfig(az, opt)
-	assert.Error(err)
-	assert.Equal(az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AccountType.ADLS())
-
-	config.SetBool(compName+".use-adls", true)
-	opt.UseAdls = false
-	err = ParseAndValidateConfig(az, opt)
-	assert.Error(err)
-	assert.Equal(az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AccountType.BLOCK())
-}
-
 func (s *configTestSuite) TestBlockSize() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
@@ -137,18 +116,14 @@ func (s *configTestSuite) TestProtoType() {
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 
-	config.SetBool(compName+".use-https", true)
-	opt.UseHTTPS = true
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
 	assert.False(az.stConfig.authConfig.UseHTTP)
 
-	config.SetBool(compName+".use-https", false)
-	opt.UseHTTPS = false
 	opt.AccountType = "adls"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.True(az.stConfig.authConfig.UseHTTP)
+	assert.False(az.stConfig.authConfig.UseHTTP)
 }
 
 func (s *configTestSuite) TestProxyConfig() {
@@ -160,15 +135,13 @@ func (s *configTestSuite) TestProxyConfig() {
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 
-	config.SetBool(compName+".use-https", false)
-	opt.UseHTTPS = false
-
 	opt.HttpsProxyAddress = "127.0.0.1"
+	opt.UseHTTP = true
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "https://128.0.0.1:8080/"
@@ -176,7 +149,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "http://129.0.0.1:8080/"
@@ -184,7 +157,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpProxyAddress = "130.0.0.1"
@@ -192,7 +165,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpProxyAddress = "http://131.0.0.1:8080/"
@@ -200,12 +173,11 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpProxyAddress, opt.UseHTTP),
 	)
 
-	config.SetBool(compName+".use-https", true)
-	opt.UseHTTPS = true
 	opt.HttpsProxyAddress = ""
+	opt.UseHTTP = false
 
 	opt.HttpProxyAddress = "132.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
@@ -217,7 +189,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "http://134.0.0.1:8080/"
@@ -225,7 +197,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "https://135.0.0.1:8080/"
@@ -233,7 +205,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 }
 

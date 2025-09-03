@@ -30,7 +30,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -53,6 +52,7 @@ import (
 
 // Sector size of disk
 const SectorSize = 4096
+const uint16Size = 2
 
 var RootMount bool
 var ForegroundMount bool
@@ -244,35 +244,28 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
-	if key == nil {
-		return nil, errors.New("provided passphrase key is empty")
+func EncryptData(plainData []byte, password *memguard.Enclave) ([]byte, error) {
+	if password == nil {
+		return nil, errors.New("provided password is empty")
 	}
 
-	secretKey, err := key.Open()
+	secretKey, err := password.Open()
 	if err != nil || secretKey == nil {
-		return nil, errors.New("unable to decrypt passphrase key")
+		return nil, errors.New("unable to decrypt password")
 	}
 	defer secretKey.Destroy()
 
-	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
-	if len(secretKey.Bytes()) > 44 {
-		return nil, errors.New("provided decoded base64 key is longer than 32 bytes. Decoded key " +
-			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length")
+	salt := make([]byte, SaltLength)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, fmt.Errorf("unable to generate random salt with error: %w", err)
 	}
+	key := deriveKey(secretKey.Bytes(), salt)
 
-	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
-	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
-
-	block, err := aes.NewCipher(decodedKey)
-	if err != nil {
-		return nil, err
-	}
-	clear(decodedKey)
+	clear(key)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -284,48 +277,62 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 		return nil, err
 	}
 
-	ciphertext := gcm.Seal(nonce, nonce, plainData, nil)
-	return ciphertext, nil
+	ciphertext := gcm.Seal(nil, nonce, plainData, nil)
+
+	// Write out encrypted file with length of salt, salt, length of nonce, nonce, and the ciphertext
+	outputBuffer := new(bytes.Buffer)
+
+	err = binary.Write(outputBuffer, binary.LittleEndian, SaltLength)
+	if err != nil {
+		return nil, err
+	}
+	outputBuffer.Write(salt)
+
+	err = binary.Write(outputBuffer, binary.LittleEndian, uint16(gcm.NonceSize()))
+	if err != nil {
+		return nil, err
+	}
+	outputBuffer.Write(nonce)
+
+	outputBuffer.Write(ciphertext)
+
+	return outputBuffer.Bytes(), nil
 }
 
-// Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
-	if key == nil {
-		return nil, errors.New("provided passphrase key is empty")
+// DecryptData decrypts the given data using the provided key.
+func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) {
+	if password == nil {
+		return nil, errors.New("provided password is empty")
 	}
 
-	secretKey, err := key.Open()
+	secretKey, err := password.Open()
 	if err != nil || secretKey == nil {
-		return nil, errors.New("unable to decrypt passphrase key")
+		return nil, errors.New("unable to decrypt password")
 	}
 	defer secretKey.Destroy()
 
-	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
-	if len(secretKey.Bytes()) > 44 {
-		return nil, errors.New("provided decoded base64 key is longer than 32 bytes. Decoded key " +
-			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length")
-	}
-
-	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
-	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
+	salt, err := extractSalt(cipherData)
 	if err != nil {
 		return nil, err
 	}
-	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
 
-	block, err := aes.NewCipher(decodedKey)
+	key := deriveKey(secretKey.Bytes(), salt)
+	defer clear(key)
+
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := cipherData[:gcm.NonceSize()]
-	ciphertext := cipherData[gcm.NonceSize():]
+	nonce, ciphertext, err := extractNonceAndCiphertext(cipherData)
+	if err != nil {
+		return nil, err
+	}
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
@@ -333,6 +340,31 @@ func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 
 	return plaintext, nil
+}
+
+func extractSalt(cipherData []byte) ([]byte, error) {
+	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
+	if len(cipherData) < int(uint16Size+saltLength) {
+		return nil, errors.New("invalid data length")
+	}
+	return cipherData[uint16Size : uint16Size+saltLength], nil
+}
+
+func extractNonceAndCiphertext(cipherData []byte) ([]byte, []byte, error) {
+	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
+	offset := uint16Size + saltLength
+
+	nonceLength := binary.LittleEndian.Uint16(cipherData[offset : offset+uint16Size])
+	offset += uint16Size
+
+	if len(cipherData) < int(offset+nonceLength) {
+		return nil, nil, errors.New("invalid data length")
+	}
+
+	nonce := cipherData[offset : offset+nonceLength]
+	ciphertext := cipherData[offset+nonceLength:]
+
+	return nonce, ciphertext, nil
 }
 
 func GetCurrentDistro() string {
@@ -468,4 +500,28 @@ func GetCRC64(data []byte, length int) []byte {
 	binary.BigEndian.PutUint64(checksumBytes, checksum)
 
 	return checksumBytes
+}
+
+func SanitizeName(name string) string {
+	replacer := strings.NewReplacer(
+		"\\",
+		"_",
+		"/",
+		"_",
+		":",
+		"_",
+		"*",
+		"_",
+		"?",
+		"_",
+		"\"",
+		"_",
+		"<",
+		"_",
+		">",
+		"_",
+		"|",
+		"_",
+	)
+	return replacer.Replace(name)
 }
