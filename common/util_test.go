@@ -364,6 +364,16 @@ func (suite *utilTestSuite) TestExpandPath() {
 	path = ""
 	expandedPath = ExpandPath(path)
 	suite.assert.Equal(expandedPath, path)
+
+	path = "$HOME/.cloudfuse/config_$web.yaml"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(path, "$web")
+
+	path = "$HOME/.cloudfuse/$web"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(path, "$web")
 }
 
 func (suite *utilTestSuite) TestExpandPathDriveLetter() {

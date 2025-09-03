@@ -134,6 +134,10 @@ func createDaemon(
 	} else { // execute in parent only
 		defer os.Remove(fname)
 
+		childDone := make(chan struct{})
+
+		go monitorChild(child.Pid, childDone)
+
 		select {
 		case <-sigusr2:
 			log.Info("mount: Child [%v] mounted successfully at %s", child.Pid, options.MountPath)
@@ -146,11 +150,8 @@ func createDaemon(
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
-			} else if len(buff) > 0 {
-				return Destroy(string(buff))
 			} else {
-				// Nothing was logged, so mount succeeded
-				return nil
+				return Destroy(string(buff))
 			}
 
 		case <-time.After(options.WaitForMount):
@@ -315,4 +316,27 @@ func startService(serviceName string) error {
 // stub for compilation
 func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, error) {
 	return "", nil
+}
+
+func monitorChild(pid int, done chan struct{}) {
+	// Monitor the child process and if child terminates then exit
+	var wstatus unix.WaitStatus
+
+	for {
+		// Wait for a signal from child
+		wpid, err := unix.Wait4(pid, &wstatus, 0, nil)
+		if err != nil {
+			log.Err("Error retrieving child status [%s]", err.Error())
+			break
+		}
+
+		if wpid == pid {
+			// Exit only if child has exited
+			// Signal can be received on a state change of child as well
+			if wstatus.Exited() || wstatus.Signaled() || wstatus.Stopped() {
+				close(done)
+				return
+			}
+		}
+	}
 }

@@ -355,3 +355,9 @@ func init() {
 	DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
 	StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 }
+
+var azureSpecialContainers = map[string]bool{
+	"web":        true,
+	"logs":       true,
+	"changefeed": true,
+}

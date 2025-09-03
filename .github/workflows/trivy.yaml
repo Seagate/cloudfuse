@@ -7,6 +7,13 @@ name: trivy
 permissions: {}
 
 on:
+  workflow_dispatch: 
+    inputs:
+      run:
+        description: 'Run the workflow'
+        required: true
+        default: true
+        type: boolean 
   push:
     branches:
       - main

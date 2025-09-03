@@ -850,5 +850,9 @@ func init() {
 
 func Destroy(message string) error {
 	_ = log.Destroy()
-	return fmt.Errorf("%s", message)
+	if message != "" {
+		return fmt.Errorf("%s", message)
+	}
+
+	return nil
 }

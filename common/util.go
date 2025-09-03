@@ -437,7 +437,13 @@ func ExpandPath(path string) string {
 		return path
 	}
 
-	path = os.ExpandEnv(path)
+	path = os.Expand(path, func(key string) string {
+		if azureSpecialContainers[key] {
+			return "$" + key // Keep it as is
+		}
+		return os.Getenv(key) // Expand normally
+	})
+
 	path, _ = filepath.Abs(path)
 	path = JoinUnixFilepath(path)
 	return path
