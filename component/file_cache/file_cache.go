@@ -84,6 +84,7 @@ type FileCache struct {
 	alwaysOn           bool
 	activeWindows      int
 	activeWindowsMutex *sync.Mutex
+	closeWindowCh      chan struct{}
 }
 
 // Structure defining your config parameters
@@ -187,6 +188,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
 
+	fc.uploadNotifyCh = make(chan struct{}, 1)
 	err = fc.SetupScheduler()
 	if err != nil {
 		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
@@ -1372,7 +1374,7 @@ func (fc *FileCache) isDownloadRequired(
 
 	// check if the file is due for a refresh from cloud storage
 	refreshTimerExpired := fc.refreshSec != 0 &&
-		time.Since(flock.DownloadTime()).Seconds() > float64(fc.refreshSec)
+		time.Since(flock.DownloadTime()) > time.Duration(fc.refreshSec)*time.Second
 
 	// get cloud attributes
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
@@ -1459,10 +1461,7 @@ func (fc *FileCache) closeFileInternal(
 	if !noCachedHandle {
 		// flock is already locked, as required by flushFileInternal
 		err := fc.flushFileInternal(
-			internal.FlushFileOptions{
-				Handle:          options.Handle,
-				CloseInProgress: true,
-			},
+			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
 		) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -1684,7 +1683,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
-
 	if options.Handle.Dirty() {
 		if fc.lazyWrite && !options.CloseInProgress {
 			// As lazy-write is enable, upload will be scheduled when file is closed.
@@ -1706,10 +1704,16 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 
 		// Flush all data to disk that has been buffered by the kernel.
-		err := fc.syncFile(f, options.Handle.Path)
-		if err != nil {
-			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
-			return syscall.EIO
+		// for scheduled uploads, we use a read-only file handle
+		if !options.AsyncUpload {
+			err := fc.syncFile(f, options.Handle.Path)
+			if err != nil {
+				log.Err(
+					"FileCache::FlushFile : error [unable to sync file] %s",
+					options.Handle.Path,
+				)
+				return syscall.EIO
+			}
 		}
 
 		// Write to storage
@@ -1721,7 +1725,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			options.Handle.Path,
 		)
 		// Figure out if we should upload immediately or append to pending OPS
-		if options.ImmediateUpload || !notInCloud || fc.alwaysOn {
+		if options.AsyncUpload || !notInCloud || fc.alwaysOn {
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -1822,6 +1826,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			}
 		}
 	}
+
 	return nil
 }
 
