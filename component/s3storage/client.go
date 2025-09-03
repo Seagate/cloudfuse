@@ -277,12 +277,12 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Create downloader and uploader to be reused for multipart downloads
-	cl.downloader = manager.NewDownloader(cl.awsS3Client, func(u *manager.Downloader) {
+	cl.downloader = manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
 		u.PartSize = cl.Config.partSize
 		u.Concurrency = cl.Config.concurrency
 	})
 
-	cl.uploader = manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
+	cl.uploader = manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
 		u.PartSize = cl.Config.partSize
 		u.Concurrency = cl.Config.concurrency
 	})

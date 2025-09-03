@@ -175,6 +175,7 @@ func (cl *Client) putObject(options putObjectOptions) error {
 		_, err = cl.AwsS3Client.PutObject(ctx, putObjectInput)
 	} else {
 		_, err = cl.uploader.Upload(ctx, putObjectInput)
+	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
 	return parseS3Err(err, attemptedAction)
