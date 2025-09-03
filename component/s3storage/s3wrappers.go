@@ -45,7 +45,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -88,10 +87,6 @@ const maxResultsPerListCall = 1000
 func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
-	downloader := manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
-	})
 
 	getObjectInput := &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
@@ -102,7 +97,7 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
 	}
 
-	_, err := downloader.Download(context.Background(), fi, getObjectInput)
+	_, err := cl.downloader.Download(context.Background(), fi, getObjectInput)
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
@@ -179,12 +174,7 @@ func (cl *Client) putObject(options putObjectOptions) error {
 	if options.size < cl.Config.uploadCutoff {
 		_, err = cl.AwsS3Client.PutObject(ctx, putObjectInput)
 	} else {
-		uploader := manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
-			u.PartSize = cl.Config.partSize
-			u.Concurrency = cl.Config.concurrency
-		})
-
-		_, err = uploader.Upload(ctx, putObjectInput)
+		_, err = cl.uploader.Upload(ctx, putObjectInput)
 	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)

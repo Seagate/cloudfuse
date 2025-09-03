@@ -33,8 +33,7 @@ import (
 // Lock item for each file
 type LockMapItem struct {
 	handleCount  uint32
-	exLocked     bool
-	mtx          sync.Mutex
+	mtx          sync.RWMutex
 	downloadTime time.Time
 	// track if file is in lazy open state
 	LazyOpen    bool
@@ -54,7 +53,7 @@ func NewLockMap() *LockMap {
 
 // Get the lock item based on file name, if item does not exists create it
 func (l *LockMap) Get(name string) *LockMapItem {
-	lockIntf, _ := l.locks.LoadOrStore(name, &LockMapItem{handleCount: 0, exLocked: false})
+	lockIntf, _ := l.locks.LoadOrStore(name, &LockMapItem{handleCount: 0})
 	item := lockIntf.(*LockMapItem)
 	return item
 }
@@ -64,28 +63,24 @@ func (l *LockMap) Delete(name string) {
 	l.locks.Delete(name)
 }
 
-// Check if this file is already exLocked or not
-func (l *LockMap) Locked(name string) bool {
-	lockIntf, ok := l.locks.Load(name)
-	if ok {
-		item := lockIntf.(*LockMapItem)
-		return item.exLocked
-	}
-
-	return false
-}
-
 // Lock Item level operation
 // Lock this file exclusively
 func (l *LockMapItem) Lock() {
 	l.mtx.Lock()
-	l.exLocked = true
 }
 
 // UnLock this file exclusively
 func (l *LockMapItem) Unlock() {
-	l.exLocked = false
 	l.mtx.Unlock()
+}
+
+func (l *LockMapItem) RLock() {
+	l.mtx.RLock()
+}
+
+// UnLock this file exclusively
+func (l *LockMapItem) RUnlock() {
+	l.mtx.RUnlock()
 }
 
 // Increment the handle count

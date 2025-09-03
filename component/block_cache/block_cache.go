@@ -2068,12 +2068,6 @@ func (bc *BlockCache) stageZeroBlock(handle *handlemap.Handle, tryCnt int) (stri
 func (bc *BlockCache) diskEvict(node *list.Element) {
 	cacheKey := node.Value.(string)
 
-	// If this block is already locked then return otherwise Lock() will hung up
-	if bc.fileLocks.Locked(cacheKey) {
-		log.Info("BlockCache::diskEvict : File %s is locked so skipping eviction", cacheKey)
-		return
-	}
-
 	// Lock the file name so that its not downloaded when deletion is going on
 	flock := bc.fileLocks.Get(cacheKey)
 	flock.Lock()
