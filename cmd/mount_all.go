@@ -28,7 +28,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -168,11 +167,6 @@ func processCommand() error {
 				return errors.New(
 					"no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
 				)
-			}
-
-			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
-			if err != nil {
-				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 			}
 		}
 

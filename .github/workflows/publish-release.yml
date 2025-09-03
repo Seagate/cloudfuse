@@ -68,7 +68,6 @@ jobs:
   create-installer:
     # Run Inno Setup to create the Windows app installer, then write it to actions/cache
     name: Create Windows Installer
-    needs: compile-gui
     runs-on: windows-latest
     env:
       go: "1.25"
@@ -131,16 +130,6 @@ jobs:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
 
-      - name: Fetch cached compiled GUI
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
-        with:
-          enableCrossOsArchive: true
-          path: gui/dist/cloudfuseGUI_${{ runner.os }}
-          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-          fail-on-cache-miss: true
-        # don't continue if we fail get the compiled GUI for the Windows installer
-        continue-on-error: false
-
       - name: Set Version
         id: get_version
         shell: bash
@@ -161,31 +150,12 @@ jobs:
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
-      - name: Run Inno Setup for No Gui
-        working-directory: ./build
-        shell: bash
-        # Inno Setup is pre-installed on GitHub's windows-latest image
-        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
-        run: |
-          "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build_no_gui.iss
-
-      - name: Rename installer No Gui
-        run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-
       - name: Cache windows installer
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
-
-      - name: Cache windows installer No GUi
-        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
-        with:
-          enableCrossOsArchive: true
-          path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-          key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
 
   release:
     # Use GoReleaser to package and publish Linux releases along with the Windows installer
@@ -194,7 +164,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: "1.25"
-      zig: 0.14.1
+      zig: 0.15.1
     permissions:
       contents: write
       id-token: write
@@ -247,35 +217,6 @@ jobs:
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
 
-        # Get cached intermediate build products
-      - name: Restore cached Windows installer No Gui
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
-        with:
-          enableCrossOsArchive: true
-          path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-          key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Restore Linux compiled GUI
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
-        with:
-          path: gui/dist/cloudfuseGUI_Linux
-          key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-          fail-on-cache-miss: true
-        continue-on-error: false
-
-      - name: Restore Windows compiled GUI
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
-        with:
-          enableCrossOsArchive: true
-          path: gui/dist/cloudfuseGUI_Windows
-          key: Windows-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-          # the hash value comes out different on Linux vs Windows
-          # so we need to use restore-keys to match the Windows compiled GUI
-          # see documentation: https://github.com/actions/cache/blob/main/restore/README.md#inputs
-          restore-keys: Windows-compiled-gui-
-        continue-on-error: false
-
         # Run GoReleaser (see .goreleaser.yaml)
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
@@ -283,3 +224,92 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-package-repos:
+    name: Update APT & RPM Repositories
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y createrepo-c
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: gh-pages
+          path: gh-pages
+          persist-credentials: true
+
+      - name: Download .deb and .rpm packages from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir ./packages
+          gh release download $TAG --dir ./packages -p "*.deb"
+          gh release download $TAG --dir ./packages -p "*.rpm"
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Update APT repository
+        working-directory: ./gh-pages
+        run: |
+          # Move new .deb files into the repository
+          find ../packages -name "*_amd64.deb" -exec mv {} dists/stable/main/binary-amd64/ \;
+          find ../packages -name "*_arm64.deb" -exec mv {} dists/stable/main/binary-arm64/ \;
+          # Generate Packages metadata
+          apt-ftparchive packages dists/stable/main/binary-amd64 > dists/stable/main/binary-amd64/Packages
+          gzip -k -f dists/stable/main/binary-amd64/Packages
+          apt-ftparchive packages dists/stable/main/binary-arm64 > dists/stable/main/binary-arm64/Packages
+          gzip -k -f dists/stable/main/binary-arm64/Packages
+          # Generate and sign the Release file
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="Seagate Technology" \
+            -o APT::FTPArchive::Release::Label="cloudfuse" \
+            -o APT::FTPArchive::Release::Suite="stable" \
+            -o APT::FTPArchive::Release::Codename="stable" \
+            -o APT::FTPArchive::Release::Architectures="amd64 arm64" \
+            -o APT::FTPArchive::Release::Components="main" \
+            -o APT::FTPArchive::Release::Description="APT repository for cloudfuse" \
+            release dists/stable > dists/stable/Release
+          gpg --clearsign -u "${STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT}" --batch --pinentry-mode loopback --passphrase "${SECRET_GPG_PASSPHRASE}" -o dists/stable/InRelease dists/stable/Release
+          gpg -u "${STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT}" --batch --pinentry-mode loopback --passphrase "${SECRET_GPG_PASSPHRASE}" -abs -o dists/stable/Release.gpg dists/stable/Release
+        env:
+          STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          SECRET_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Update RPM repository
+        working-directory: ./gh-pages
+        run: |
+          # Move new .rpm files
+          find ../packages -name "*.rpm" -exec mv {} rpm-repo/ \;
+          # Create/update repository metadata
+          createrepo_c --database rpm-repo/
+          # Sign the repository metadata
+          gpg --detach-sign --armor -u "${STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT}" --batch --pinentry-mode loopback --passphrase "${SECRET_GPG_PASSPHRASE}" rpm/repodata/repomd.xml
+        env:
+          STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          SECRET_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Commit and push repository updates
+        working-directory: ./gh-pages
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update APT & RPM repositories for release ${GITHUB_REF_NAME}"
+            git push
+          fi

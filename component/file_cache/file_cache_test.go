@@ -1609,7 +1609,7 @@ loopbackfs:
 	)
 
 	suite.setupTestHelper(configContent)
-	suite.Zero(len(suite.fileCache.schedule), "Should have no schedule entries")
+	suite.assert.Empty(suite.fileCache.schedule, "Should have no schedule entries")
 
 	file := "no_schedule_test.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})

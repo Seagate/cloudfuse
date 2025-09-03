@@ -51,10 +51,6 @@ package block_cache
 // 	CachedObjLimit uint64 `config:"max-buffers"    yaml:"max-buffers,omitempty"`
 // 	FileCaching    bool   `config:"file-caching"   yaml:"file-caching,omitempty"`
 // 	readOnly       bool   `config:"read-only"      yaml:"-"`
-
-// 	// v1 support
-// 	StreamCacheMb    uint64 `config:"stream-cache-mb"     yaml:"-"`
-// 	MaxBlocksPerFile uint64 `config:"max-blocks-per-file" yaml:"-"`
 // }
 
 // const (

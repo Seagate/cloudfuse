@@ -46,7 +46,7 @@ import (
 // S3Storage Wrapper type around aws-sdk-go-v2/service/s3
 type S3Storage struct {
 	internal.BaseComponent
-	storage  S3Connection
+	Storage  S3Connection
 	stConfig Config
 }
 
@@ -148,7 +148,7 @@ func (s3 *S3Storage) OnConfigChange() {
 		return
 	}
 
-	err = s3.storage.UpdateConfig(s3.stConfig)
+	err = s3.Storage.UpdateConfig(s3.stConfig)
 	if err != nil {
 		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig", err.Error())
 		return
@@ -157,7 +157,7 @@ func (s3 *S3Storage) OnConfigChange() {
 
 func (s3 *S3Storage) configureAndTest(isParent bool) error {
 	var err error
-	s3.storage, err = NewConnection(s3.stConfig)
+	s3.Storage, err = NewConnection(s3.stConfig)
 	return err
 }
 
@@ -180,11 +180,11 @@ func (s3 *S3Storage) Stop() error {
 
 // ------------------------- Bucket listing -------------------------------------------
 func (s3 *S3Storage) ListBuckets() ([]string, error) {
-	return s3.storage.ListBuckets()
+	return s3.Storage.ListBuckets()
 }
 
 func (s3 *S3Storage) ListAuthorizedBuckets() ([]string, error) {
-	return s3.storage.ListAuthorizedBuckets()
+	return s3.Storage.ListAuthorizedBuckets()
 }
 
 // ------------------------- Core Operations -------------------------------------------
@@ -193,7 +193,7 @@ func (s3 *S3Storage) ListAuthorizedBuckets() ([]string, error) {
 func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("S3Storage::CreateDir : %s", options.Name)
 
-	err := s3.storage.CreateDirectory(internal.TruncateDirName(options.Name))
+	err := s3.Storage.CreateDirectory(internal.TruncateDirName(options.Name))
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -210,7 +210,7 @@ func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 func (s3 *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("S3Storage::DeleteDir : %s", options.Name)
 
-	err := s3.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
+	err := s3.Storage.DeleteDirectory(internal.TruncateDirName(options.Name))
 
 	if err == nil {
 		s3StatsCollector.PushEvents(deleteDir, options.Name, nil)
@@ -234,7 +234,7 @@ func formatListDirName(path string) string {
 func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
 	// List up to two objects, since one could be the directory with a trailing slash
-	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 2)
+	list, _, err := s3.Storage.List(formatListDirName(options.Name), nil, 2)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -263,7 +263,7 @@ func (s3 *S3Storage) StreamDir(
 		entriesRemaining = maxResultsPerListCall
 	}
 	for entriesRemaining > 0 {
-		newList, nextMarker, err := s3.storage.List(path, marker, entriesRemaining)
+		newList, nextMarker, err := s3.Storage.List(path, marker, entriesRemaining)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
@@ -312,7 +312,7 @@ func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 	options.Src = internal.TruncateDirName(options.Src)
 	options.Dst = internal.TruncateDirName(options.Dst)
 
-	err := s3.storage.RenameDirectory(options.Src, options.Dst)
+	err := s3.Storage.RenameDirectory(options.Src, options.Dst)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -337,7 +337,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := s3.storage.CreateFile(options.Name, options.Mode)
+	err := s3.Storage.CreateFile(options.Name, options.Mode)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("S3Storage::OpenFile : %s", options.Name)
 
-	attr, err := s3.storage.GetAttr(options.Name)
+	attr, err := s3.Storage.GetAttr(options.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +391,7 @@ func (s3 *S3Storage) CloseFile(options internal.CloseFileOptions) error {
 func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("S3Storage::DeleteFile : %s", options.Name)
 
-	err := s3.storage.DeleteFile(options.Name)
+	err := s3.Storage.DeleteFile(options.Name)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(deleteFile, options.Name, nil)
@@ -404,7 +404,7 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := s3.storage.RenameFile(options.Src, options.Dst, false)
+	err := s3.Storage.RenameFile(options.Src, options.Dst, false)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -434,7 +434,7 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 		return 0, nil
 	}
 
-	err := s3.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
+	err := s3.Storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
 	if err != nil {
 		log.Err(
 			"S3Storage::ReadInBuffer : Failed to read %s [%s]",
@@ -448,20 +448,20 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 }
 
 func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
-	err := s3.storage.Write(options)
+	err := s3.Storage.Write(options)
 	return len(options.Data), err
 }
 
 func (s3 *S3Storage) GetFileBlockOffsets(
 	options internal.GetFileBlockOffsetsOptions,
 ) (*common.BlockOffsetList, error) {
-	return s3.storage.GetFileBlockOffsets(options.Name)
+	return s3.Storage.GetFileBlockOffsets(options.Name)
 
 }
 
 func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := s3.storage.TruncateFile(options.Name, options.Size)
+	err := s3.Storage.TruncateFile(options.Name, options.Size)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -476,12 +476,12 @@ func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 
 func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("S3Storage::CopyToFile : Read file %s", options.Name)
-	return s3.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	return s3.Storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
 }
 
 func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
-	return s3.storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	return s3.Storage.WriteFromFile(options.Name, options.Metadata, options.File)
 }
 
 // Symlink operations
@@ -495,7 +495,7 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 		return syscall.ENOTSUP
 	}
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := s3.storage.CreateLink(options.Name, options.Target, true)
+	err := s3.Storage.CreateLink(options.Name, options.Target, true)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -516,7 +516,7 @@ func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 	}
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 
-	data, err := s3.storage.ReadBuffer(options.Name, 0, 0, true)
+	data, err := s3.Storage.ReadBuffer(options.Name, 0, 0, true)
 
 	if err != nil {
 		s3StatsCollector.PushEvents(readLink, options.Name, nil)
@@ -529,7 +529,7 @@ func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 // Attribute operations
 func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	//log.Trace("S3Storage::GetAttr : Get attributes of file %s", name)
-	return s3.storage.GetAttr(options.Name)
+	return s3.Storage.GetAttr(options.Name)
 }
 
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
@@ -557,19 +557,19 @@ func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
-	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+	return s3.Storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
 func (s3 *S3Storage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	return s3.storage.GetCommittedBlockList(name)
+	return s3.Storage.GetCommittedBlockList(name)
 }
 
 func (s3 *S3Storage) StageData(opt internal.StageDataOptions) error {
-	return s3.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+	return s3.Storage.StageBlock(opt.Name, opt.Data, opt.Id)
 }
 
 func (s3 *S3Storage) CommitData(opt internal.CommitDataOptions) error {
-	return s3.storage.CommitBlocks(opt.Name, opt.List)
+	return s3.Storage.CommitBlocks(opt.Name, opt.List)
 }
 
 const blockSize = 4096
@@ -584,7 +584,7 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
 	// if cache size is set to 0 then we have the root mount usage
-	sizeUsed, err := s3.storage.GetUsedSize()
+	sizeUsed, err := s3.Storage.GetUsedSize()
 	if err != nil {
 		// TODO: will returning EIO break any applications that depend on StatFs?
 		return nil, true, err
