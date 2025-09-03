@@ -26,7 +26,6 @@
 package cmd
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -125,11 +124,6 @@ func validateOptions() error {
 				"provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
 			)
 		}
-	}
-
-	_, err := base64.StdEncoding.DecodeString(string(secOpts.PassPhrase))
-	if err != nil {
-		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 	}
 
 	encryptedPassphrase = memguard.NewEnclave([]byte(secOpts.PassPhrase))
@@ -237,7 +231,7 @@ func init() {
 		"Configuration file to be encrypted / decrypted")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
-		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",
 		"Path and name for the output file")

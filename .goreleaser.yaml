@@ -73,7 +73,7 @@ builds:
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
 
-  - id: linux-amd64
+  - id: linux-amd64-fuse3
     goos:
       - linux
     goarch:
@@ -86,7 +86,24 @@ builds:
     flags:
       - -trimpath
       - -buildmode=pie
-      # - -tags=fuse3
+      - -tags=fuse3
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
+
+  - id: linux-amd64-fuse2
+    goos:
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/usr/lib/x86_64-linux-gnu
+      - CC=zig cc -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
+    flags:
+      - -trimpath
+      - -buildmode=pie
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
@@ -107,7 +124,7 @@ builds:
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
 
-  - id: linux-arm64
+  - id: linux-arm64-fuse3
     goos:
       - linux
     goarch:
@@ -120,7 +137,24 @@ builds:
     flags:
       - -trimpath
       - -buildmode=pie
-      # - -tags=fuse3
+      - -tags=fuse3
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
+
+  - id: linux-arm64-fuse2
+    goos:
+      - linux
+    goarch:
+      - arm64
+    env:
+      - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/usr/lib/aarch64-linux-gnu
+      - CC=zig cc -target aarch64-linux-gnu -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target aarch64-linux-gnu  -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
+    flags:
+      - -trimpath
+      - -buildmode=pie
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
@@ -146,28 +180,12 @@ checksum:
   algorithm: sha256
 
 archives:
-  - id: linux-amd64
+  - id: linux-amd64-fuse3
     ids:
-      - linux-amd64
+      - linux-amd64-fuse3
       - linux-amd64-health-monitor
     formats: ["tar.gz"]
-    files:
-      - LICENSE
-      - README.md
-      - NOTICE
-      - src: ./gui/dist/cloudfuseGUI_Linux/*
-        dst: ./
-      - src: setup/baseConfig.yaml
-        dst: ./samples/baseConfig.yaml
-      - src: sample_configs/*
-        dst: ./samples/
-
-  - id: linux-amd64_no_gui
-    ids:
-      - linux-amd64
-      - linux-amd64-health-monitor
-    formats: ["tar.gz"]
-    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_fuse3_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -177,12 +195,42 @@ archives:
       - src: sample_configs/*
         dst: ./samples/
 
-  - id: linux-arm64_no_gui
+  - id: linux-arm64-fuse3
     ids:
-      - linux-arm64
+      - linux-arm64-fuse3
       - linux-arm64-health-monitor
     formats: ["tar.gz"]
-    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_fuse3_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
+
+  - id: linux-amd64-fuse2
+    ids:
+      - linux-amd64-fuse2
+      - linux-amd64-health-monitor
+    formats: ["tar.gz"]
+    name_template: "{{ .ProjectName }}_fuse2_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
+
+  - id: linux-arm64-fuse2
+    ids:
+      - linux-arm64-fuse2
+      - linux-arm64-health-monitor
+    formats: ["tar.gz"]
+    name_template: "{{ .ProjectName }}_fuse2_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -203,25 +251,6 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
-      - src: ./gui/dist/cloudfuseGUI_Windows/*
-        dst: ./
-      - src: setup/baseConfig.yaml
-        dst: ./samples/baseConfig.yaml
-      - src: sample_configs/*
-        dst: ./samples/
-
-  - id: windows_no_gui
-    ids:
-      - windows
-      - windows-startup
-      - windows-health-monitor
-      - windows-service
-    formats: ["zip"]
-    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - LICENSE
-      - README.md
-      - NOTICE
       - src: setup/baseConfig.yaml
         dst: ./samples/baseConfig.yaml
       - src: sample_configs/*
@@ -230,13 +259,14 @@ archives:
 release:
   extra_files:
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
-    - glob: ./build/Output/cloudfuse_no_gui_{{.Version}}_windows_amd64.exe
 
 nfpms:
-  - id: linux
+  - id: linux-fuse3
     package_name: cloudfuse
     ids:
-      - linux-amd64
+      - linux-amd64-fuse3
+      - linux-arm64-fuse3
+    file_name_template: "{{ .ProjectName }}_fuse3_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
     maintainer: Seagate Technology <cloudfuse@seagate.com>
@@ -295,13 +325,12 @@ nfpms:
           - fuse3
           - glibc >= 2.24
 
-  - id: linux_no_gui
+  - id: linux-fuse2
     package_name: cloudfuse
     ids:
-      - linux-amd64
-      - linux-arm64
-    file_name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-
+      - linux-amd64-fuse2
+      - linux-arm64-fuse2
+    file_name_template: "{{ .ProjectName }}_fuse2_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
     maintainer: Seagate Technology <cloudfuse@seagate.com>
@@ -316,6 +345,9 @@ nfpms:
       - deb
       - rpm
     section: utils
+
+    # Contents to add to the package.
+    # GoReleaser will automatically add the binaries.
     contents:
       - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}_{{ .Arm64 }}{{ end }}/cfusemon'
         dst: /usr/bin/cfusemon
@@ -327,10 +359,6 @@ nfpms:
           mode: 0644
       - src: LICENSE
         dst: /usr/share/doc/cloudfuse/LICENSE
-        file_info:
-          mode: 0644
-      - src: README.md
-        dst: /usr/share/doc/cloudfuse/README
         file_info:
           mode: 0644
       - src: copyright
@@ -353,12 +381,12 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - fuse3
+          - fuse
           - libc6 (>= 2.24)
 
       rpm:
         dependencies:
-          - fuse3
+          - fuse
           - glibc >= 2.24
 
 signs:

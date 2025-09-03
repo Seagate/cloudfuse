@@ -208,11 +208,4 @@ func NewEntryCacheComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, NewEntryCacheComponent)
-
-	entryTimeout := config.AddUint32Flag(
-		"list-cache-timeout",
-		defaultEntryCacheTimeout,
-		"list entry timeout",
-	)
-	config.BindPFlag(compName+".timeout-sec", entryTimeout)
 }

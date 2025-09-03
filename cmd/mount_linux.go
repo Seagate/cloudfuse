@@ -30,10 +30,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"os"
+	"os/exec"
 	"os/signal"
+	"os/user"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common/config"
@@ -43,6 +48,12 @@ import (
 	"github.com/sevlyar/go-daemon"
 	"golang.org/x/sys/unix"
 )
+
+type serviceOptions struct {
+	ConfigFile  string
+	MountPath   string
+	ServiceUser string
+}
 
 func createDaemon(
 	pipeline *internal.Pipeline,
@@ -167,6 +178,137 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 
 // stub for compilation
 func createMountInstance(bool, bool) error {
+	return nil
+}
+
+func newService(mountPath string, configPath string, serviceUser string) (string, error) {
+	serviceTemplate := `
+[Unit]
+Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+# User service will run as.
+User={{.ServiceUser}}
+
+# Under the hood
+Type=forking
+ExecStart=/usr/bin/cloudfuse mount {{.MountPath}} --config-file={{.ConfigFile}} -o allow_other
+ExecStop=/usr/bin/fusermount -u {{.MountPath}} -z
+
+[Install]
+WantedBy=multi-user.target
+`
+	config := serviceOptions{
+		ConfigFile:  configPath,
+		MountPath:   mountPath,
+		ServiceUser: serviceUser,
+	}
+
+	tmpl, err := template.New("service").Parse(serviceTemplate)
+	if err != nil {
+		return "", fmt.Errorf("could not create a new service file: [%s]", err.Error())
+	}
+	serviceName, serviceFilePath := getService(mountPath)
+	err = os.Remove(serviceFilePath)
+	if err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to replace the service file [%s]", err.Error())
+	}
+
+	var newFile *os.File
+	newFile, err = os.Create(serviceFilePath)
+	if err != nil {
+		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
+	}
+
+	err = tmpl.Execute(newFile, config)
+	if err != nil {
+		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
+	}
+	return serviceName, nil
+}
+
+func setUser(serviceUser string, mountPath string, configPath string) error {
+	_, err := user.Lookup(serviceUser)
+	if err != nil {
+		if strings.Contains(err.Error(), "unknown user") {
+			// create the user
+			userAddCmd := exec.Command("useradd", "-m", serviceUser)
+			err = userAddCmd.Run()
+			if err != nil {
+				return fmt.Errorf("failed to create user [%s]", err.Error())
+			}
+			fmt.Println("user " + serviceUser + " has been created")
+		}
+	}
+	// advise on required permissions
+	fmt.Println(
+		"ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read",
+	)
+	return nil
+}
+
+func getService(mountPath string) (string, string) {
+	serviceName := strings.ReplaceAll(mountPath, "/", "-")
+	serviceFile := "cloudfuse" + serviceName + ".service"
+	serviceFilePath := "/etc/systemd/system/" + serviceFile
+	return serviceName, serviceFilePath
+}
+
+func installRemountService(
+	serviceUser string,
+	mountPath string,
+	configPath string,
+) (string, error) {
+	//create the new user and set permissions
+	mountPath, err := filepath.Abs(mountPath)
+	if err != nil {
+		return "", fmt.Errorf("installService: Failed to get absolute mount path")
+	}
+
+	configPath, err = filepath.Abs(configPath)
+	if err != nil {
+		return "", fmt.Errorf("installService: Failed to get absolute mount path")
+	}
+
+	err = setUser(serviceUser, mountPath, configPath)
+	if err != nil {
+		fmt.Println("could not set up service user ", err)
+		return "", err
+	}
+
+	serviceName, err := newService(mountPath, configPath, serviceUser)
+	if err != nil {
+		return "", fmt.Errorf("unable to create service file: [%s]", err.Error())
+	}
+	// run systemctl daemon-reload
+	systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
+	err = systemctlDaemonReloadCmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("failed to run 'systemctl daemon-reload' command [%s]", err.Error())
+	}
+	// Enable the service to start at system boot
+	systemctlEnableCmd := exec.Command("systemctl", "enable", serviceName)
+	err = systemctlEnableCmd.Run()
+	if err != nil {
+		return "", fmt.Errorf(
+			"failed to run 'systemctl daemon-reload' command due to following [%s]",
+			err.Error(),
+		)
+	}
+	return serviceName, nil
+}
+
+func startService(serviceName string) error {
+	systemctlEnableCmd := exec.Command("systemctl", "start", serviceName)
+	err := systemctlEnableCmd.Run()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to run 'systemctl daemon-reload' command due to following [%s]",
+			err.Error(),
+		)
+	}
 	return nil
 }
 

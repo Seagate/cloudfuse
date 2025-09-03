@@ -67,8 +67,18 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 			return errors.New("unable to decrypt passphrase key")
 		}
 
-		// Encode back to base64 when sending passphrase to cloudfuse
-		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), buff.String()))
+		_, err = winFspCommand(
+			writeCommandToUtf16(
+				startCmd,
+				SvcName,
+				instanceName,
+				mountPath,
+				configFile,
+				fmt.Sprint(userId),
+				fmt.Sprint(groupId),
+				buff.String(),
+			),
+		)
 		defer buff.Destroy()
 	} else {
 		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
@@ -154,7 +164,9 @@ func getMountList() ([]string, error) {
 	// Everything in the list is a name of a service using WinFsp, like cloudfuse and then
 	// the name of the mount which is the mount path
 	if len(list)%2 != 0 {
-		return emptyList, errors.New("unable to get list from Winfsp because received odd number of elements")
+		return emptyList, errors.New(
+			"unable to get list from Winfsp because received odd number of elements",
+		)
 	}
 
 	return list, nil
