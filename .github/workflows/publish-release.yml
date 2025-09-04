@@ -5,6 +5,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - fix-apt-rpm-release
 
 jobs:
   create-installer:
@@ -169,7 +171,7 @@ jobs:
 
   update-package-repos:
     name: Update APT & RPM Repositories
-    needs: release
+    # needs: release
     runs-on: ubuntu-latest
     permissions:
       contents: write
