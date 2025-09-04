@@ -26,7 +26,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -57,28 +56,6 @@ func (suite *updateTestSuite) SetupTest() {
 func (suite *updateTestSuite) cleanupTest() {
 	resetCLIFlags(*updateCmd)
 	resetCLIFlags(*rootCmd)
-}
-
-func (suite *updateTestSuite) TestGetRelease() {
-	// Skip until we have Windows ARM builds
-	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
-		suite.T().Skip("Skipping test on Windows ARM")
-	}
-	defer suite.cleanupTest()
-	ctx := context.Background()
-
-	validVersion := "1.8.0"
-	resultVer, err := getRelease(ctx, validVersion)
-	suite.assert.NoError(err)
-	suite.assert.Equal(validVersion, resultVer.Version)
-
-	// When no version is passed, should get the latest version
-	resultVer, err = getRelease(ctx, "")
-	suite.assert.NoError(err)
-
-	invalidVersion := "1.1.10"
-	resultVer, err = getRelease(ctx, invalidVersion)
-	suite.assert.Error(err)
 }
 
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {

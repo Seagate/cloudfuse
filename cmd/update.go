@@ -30,7 +30,6 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -58,18 +57,6 @@ var opt = Options{}
 type asset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-type release struct {
-	TagName string  `json:"tag_name"`
-	Assets  []asset `json:"assets"`
-}
-
-type releaseInfo struct {
-	Version   string
-	AssetURL  string
-	AssetName string
-	HashURL   string
 }
 
 var updateCmd = &cobra.Command{
@@ -241,6 +228,11 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 	if err != nil {
 		return "", err
 	}
+	// Add Authorization header to raise rate limit
+	githubApiToken := os.Getenv("GH_API_TOKEN")
+	if githubApiToken != "" {
+		req.Header.Set("Authorization", "token "+githubApiToken)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -271,89 +263,6 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 	return installFile.Name(), nil
 }
 
-func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
-	url := "https://api.github.com/repos/Seagate/cloudfuse/releases/latest"
-	if version != "" {
-		url = fmt.Sprintf(
-			"https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s",
-			version,
-		)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get release info: %s", resp.Status)
-	}
-
-	var rel release
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return nil, err
-	}
-
-	asset, err := selectPackageAsset(rel.Assets, opt.Package)
-	if err != nil {
-		return nil, err
-	}
-
-	hashAsset, err := downloadHashAsset(rel.Assets)
-	// Only report an error if package is not exe since goreleaser does not provide a hash
-	// for those releases.
-	if err != nil && opt.Package != "exe" {
-		return nil, err
-	}
-
-	return &releaseInfo{
-		Version:   strings.TrimPrefix(rel.TagName, "v"),
-		AssetURL:  asset.BrowserDownloadURL,
-		AssetName: asset.Name,
-		HashURL:   hashAsset.BrowserDownloadURL,
-	}, nil
-}
-
-func selectPackageAsset(assets []asset, ext string) (*asset, error) {
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
-
-	if ext == "tar" {
-		ext = "tar.gz"
-	}
-
-	for _, asset := range assets {
-		if strings.HasPrefix(asset.Name, "cloudfuse") &&
-			strings.Contains(asset.Name, osName) &&
-			strings.Contains(asset.Name, arch) &&
-			strings.HasSuffix(asset.Name, ext) {
-			return &asset, nil
-		}
-	}
-
-	return nil, errors.New("no suitable version of cloudfuse found for the current platform")
-}
-
-func downloadHashAsset(assets []asset) (*asset, error) {
-	for _, asset := range assets {
-		if strings.Contains(asset.Name, "checksums_sha256") {
-			return &asset, nil
-		}
-	}
-
-	return nil, errors.New("no checksums found")
-}
-
 func findChecksum(packageName string, checksumTable string) (string, error) {
 	lines := strings.Split(checksumTable, "\n")
 	for _, line := range lines {
@@ -372,6 +281,11 @@ func verifyHash(ctx context.Context, fileName, packageName, hashURL string) erro
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, hashURL, nil)
 	if err != nil {
 		return fmt.Errorf("unable to download checksum file: %w", err)
+	}
+	// Add Authorization header to raise rate limit
+	githubApiToken := os.Getenv("GH_API_TOKEN")
+	if githubApiToken != "" {
+		req.Header.Set("Authorization", "token "+githubApiToken)
 	}
 
 	client := &http.Client{}
