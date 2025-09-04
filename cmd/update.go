@@ -272,12 +272,9 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 }
 
 func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
-	url := "https://api.github.com/repos/Seagate/cloudfuse/releases/latest"
+	url := common.CloudfuseReleaseURL + "/latest"
 	if version != "" {
-		url = fmt.Sprintf(
-			"https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s",
-			version,
-		)
+		url = fmt.Sprintf(common.CloudfuseReleaseURL+"/tags/v%s", version)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
