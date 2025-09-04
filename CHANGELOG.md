@@ -1,5 +1,51 @@
 # Cloudfuse Changelog #
 
+## **2.0.0** ##
+
+September 4th 2025
+This version is based on [blobfuse2 2.4.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.2) (upstream).
+
+### Highlights
+
+- New terminal-based configuration UI (TUI): `cloudfuse config`
+- New `update` command so cloudfuse can update itself
+- New `gather-logs` command to easily collect all cloudfuse logs and generate a zip file
+- Support for FUSE3 on Linux bringing faster directory listing and other performance improvements
+- Faster file cache performance on Linux
+- APT and RPM repositories
+
+### Breaking changes
+
+- GUI removed from this repo  
+  The GUI is no longer bundled. Install it separately: <https://github.com/Seagate/cloudfuse-gui>  
+  Use the new TUI with `cloudfuse config` for in-terminal setup.
+
+- CLI cleanup and removals  
+  Some v1 command-line options were removed. All removed options can still be configured in the `config.yaml`.  
+  Refer to the docs for the current CLI options.
+
+- Passphrase handling simplified  
+  Base64 encoding of the passphrase is no longer required. Existing base64-encoded values continue to work.
+
+### Features ###
+
+- [#481](https://github.com/Seagate/cloudfuse/pull/481) Add update command
+- [#599](https://github.com/Seagate/cloudfuse/pull/599) Add log collector
+- [#641](https://github.com/Seagate/cloudfuse/pull/641) Add TUI interface
+- [#657](https://github.com/Seagate/cloudfuse/pull/657) Improve file_cache performance on linux
+- [#631](https://github.com/Seagate/cloudfuse/pull/631) Bump blobfuse version to 2.4.2
+- [#500](https://github.com/Seagate/cloudfuse/pull/500) Add builds for fuse3
+- [#591](https://github.com/Seagate/cloudfuse/pull/591) Add rpm and apt repository
+- [#499](https://github.com/Seagate/cloudfuse/pull/499) Remove GUI
+- [#624](https://github.com/Seagate/cloudfuse/pull/624) Remove V1 Command Line Options
+- [#650](https://github.com/Seagate/cloudfuse/pull/650) Remove requirement for base64 encoded passphrase
+- [#633](https://github.com/Seagate/cloudfuse/pull/633) Add sync command for size_tracker
+
+### Bug Fixes ###
+
+- [#661](https://github.com/Seagate/cloudfuse/pull/661) Don't mount if enable remount is set and mount failed
+- [#642](https://github.com/Seagate/cloudfuse/pull/642) Fix issue with block cache caching files in directories
+
 ## **1.12.2** ##
 
 August 22nd 2025
