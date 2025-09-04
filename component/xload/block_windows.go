@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -35,7 +37,11 @@ package xload
 
 import (
 	"fmt"
-	"syscall"
+	"unsafe"
+
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"golang.org/x/sys/windows"
 )
 
 // Block is a memory mapped buffer with its state to hold data
@@ -53,12 +59,28 @@ func AllocateBlock(size uint64) (*Block, error) {
 		return nil, fmt.Errorf("invalid size")
 	}
 
-	prot, flags := syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_ANON|syscall.MAP_PRIVATE
-	addr, err := syscall.Mmap(-1, 0, int(size), prot, flags)
-
+	freeRam, err := common.GetFreeRam()
 	if err != nil {
-		return nil, fmt.Errorf("mmap error: %v", err)
+		log.Warn("could not get free RAM: %v", err)
+	} else {
+		if freeRam < size {
+			// Not enough free RAM to allocate the requested size
+			return nil, fmt.Errorf("insufficient memory available: requested %d bytes, available %d bytes", size, freeRam)
+		}
 	}
+
+	// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
+	ptr, err := windows.VirtualAlloc(
+		0,
+		uintptr(size),
+		windows.MEM_COMMIT|windows.MEM_RESERVE,
+		windows.PAGE_READWRITE,
+	)
+	if err != nil || ptr == 0 {
+		return nil, fmt.Errorf("create virtual mapping error: %v", err)
+	}
+
+	addr := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), size)
 
 	block := &Block{
 		Data: addr,
@@ -73,11 +95,17 @@ func (b *Block) Delete() error {
 		return fmt.Errorf("invalid buffer")
 	}
 
-	err := syscall.Munmap(b.Data)
+	addr := uintptr(unsafe.Pointer(unsafe.SliceData(b.Data)))
+
+	err := windows.VirtualFree(
+		uintptr(addr),
+		0,
+		windows.MEM_RELEASE,
+	)
 	b.Data = nil
+
 	if err != nil {
-		// if we get here, there is likely memory corruption.
-		return fmt.Errorf("munmap error: %v", err)
+		return fmt.Errorf("cannot unmap memory mapped file: %w", err)
 	}
 
 	return nil
