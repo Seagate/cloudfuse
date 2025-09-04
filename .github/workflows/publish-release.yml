@@ -5,8 +5,6 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - fix-apt-rpm-release
 
 jobs:
   create-installer:
@@ -171,7 +169,7 @@ jobs:
 
   update-package-repos:
     name: Update APT & RPM Repositories
-    # needs: release
+    needs: release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -193,8 +191,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           mkdir ./packages
-          gh release download "v2.0.0" --repo "${{ github.repository }}" --dir ./packages -p "*.deb"
-          gh release download "v2.0.0" --repo "${{ github.repository }}" --dir ./packages -p "*.rpm"
+          gh release download "$TAG" --repo "${{ github.repository }}" --dir ./packages -p "*.deb"
+          gh release download "$TAG" --repo "${{ github.repository }}" --dir ./packages -p "*.rpm"
 
       - name: Import GPG key
         id: import_gpg
