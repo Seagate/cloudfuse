@@ -1684,7 +1684,7 @@ loopbackfs:
 	// Confirm cloud storage copy is updated
 	fInfo, err := os.Stat(filepath.Join(suite.fake_storage_path, originalFile))
 	suite.NoError(err)
-	suite.assert.Len(modifiedContent, fInfo.Size())
+	suite.assert.Len(modifiedContent, int(fInfo.Size()))
 }
 
 func (suite *fileCacheTestSuite) TestCreateFileAndRename() {
