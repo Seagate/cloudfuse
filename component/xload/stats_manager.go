@@ -43,8 +43,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 type StatsManager struct {
@@ -96,11 +96,17 @@ func NewStatsManager(count uint32, isExportEnabled bool, pool *BlockPool) (*Stat
 	var err error
 	if isExportEnabled {
 		pid := fmt.Sprintf("%v", os.Getpid())
-		path := common.ExpandPath(filepath.Join(common.DefaultWorkDir, strings.ReplaceAll(JSON_FILE_NAME, "{PID}", pid)))
+		path := common.ExpandPath(
+			filepath.Join(common.DefaultWorkDir, strings.ReplaceAll(JSON_FILE_NAME, "{PID}", pid)),
+		)
 		log.Crit("statsManager::NewStatsManager : creating json file %v", path)
 		fh, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 		if err != nil {
-			log.Err("statsManager::NewStatsManager : failed to create json file %v [%v]", path, err.Error())
+			log.Err(
+				"statsManager::NewStatsManager : failed to create json file %v [%v]",
+				path,
+				err.Error(),
+			)
 			return nil, err
 		}
 	}
@@ -116,7 +122,10 @@ func NewStatsManager(count uint32, isExportEnabled bool, pool *BlockPool) (*Stat
 func (sm *StatsManager) Start() {
 	sm.waitGroup.Add(1)
 	sm.startTime = time.Now().UTC()
-	log.Debug("statsManager::start : start stats manager at time %v", sm.startTime.Format(time.RFC1123))
+	log.Debug(
+		"statsManager::start : start stats manager at time %v",
+		sm.startTime.Format(time.RFC1123),
+	)
 	_ = sm.writeToJSON([]byte("[\n"), false)
 	_ = sm.marshalStatsData(&statsJSONData{Timestamp: sm.startTime.Format(time.RFC1123)}, false)
 	_ = sm.writeToJSON([]byte("\n]"), false)
@@ -129,7 +138,9 @@ func (sm *StatsManager) Start() {
 func (sm *StatsManager) Stop() {
 	log.Debug("statsManager::stop : stop stats manager")
 	sm.done <- true // close the stats exporter thread
-	close(sm.done)  // TODO::xload : check if closing the done channel here will lead to closing the stats exporter thread
+	close(
+		sm.done,
+	) // TODO::xload : check if closing the done channel here will lead to closing the stats exporter thread
 	close(sm.items)
 	sm.waitGroup.Wait()
 
@@ -212,7 +223,10 @@ func (sm *StatsManager) statsExporter() {
 
 func (sm *StatsManager) calculateBandwidth() {
 	if sm.totalFiles == 0 {
-		log.Debug("statsManager::calculateBandwidth : skipping as total files listed so far is %v", sm.totalFiles)
+		log.Debug(
+			"statsManager::calculateBandwidth : skipping as total files listed so far is %v",
+			sm.totalFiles,
+		)
 		return
 	}
 
@@ -252,7 +266,10 @@ func (sm *StatsManager) calculateBandwidth() {
 			BandwidthMbps:    RoundFloat(bandwidthMbps, 2),
 		}, true)
 		if err != nil {
-			log.Err("statsManager::calculateBandwidth : failed to write to json file [%v]", err.Error())
+			log.Err(
+				"statsManager::calculateBandwidth : failed to write to json file [%v]",
+				err.Error(),
+			)
 		}
 	}
 

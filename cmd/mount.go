@@ -274,7 +274,6 @@ var mountCmd = &cobra.Command{
 		options.MountPath = common.ExpandPath(args[0])
 		common.MountPath = options.MountPath
 
-		configFileExists := true
 		directIO := false
 
 		if options.ConfigFile == "" {
@@ -356,12 +355,12 @@ var mountCmd = &cobra.Command{
 		}
 
 		// either passed in CLI or in config file
-		if options.BlockCache || common.ComponentInPipeline(options.Components, "block_cache") {
+		if common.ComponentInPipeline(options.Components, "block_cache") {
 			// CLI overriding the pipeline to inject block-cache
 			options.Components = common.UpdatePipeline(options.Components, "block_cache")
 		}
 
-		if options.Preload || common.ComponentInPipeline(options.Components, "xload") {
+		if common.ComponentInPipeline(options.Components, "xload") {
 			// CLI overriding the pipeline to inject xload
 			options.Components = common.UpdatePipeline(options.Components, "xload")
 			config.Set("read-only", "true") // preload is only supported in read-only mode
@@ -705,6 +704,56 @@ func startMonitor(pid int) {
 			log.Err("Mount::startMonitor : [%s]", err.Error())
 		}
 	}
+}
+
+// cleanupCachePath is a helper function to clean up cache directory for a component that is present in the pipeline.
+// componentName: the name of the component (e.g., "file_cache", "block_cache")
+func (opt *mountOptions) tempCacheCleanup() error {
+	// Check for global cleanup-on-start flag from cli.
+	var cleanupOnStart bool
+	_ = config.UnmarshalKey("cleanup-on-start", &cleanupOnStart)
+
+	components := []string{"file_cache", "block_cache", "xload"}
+
+	for _, component := range components {
+		if common.ComponentInPipeline(options.Components, component) {
+			err := cleanupCachePath(component, cleanupOnStart)
+			if err != nil {
+				return fmt.Errorf("failed to clean up  cache for %s: %v", component, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func cleanupCachePath(componentName string, globalCleanupFlag bool) error {
+	// Get the path for the component
+	var cachePath string
+	_ = config.UnmarshalKey(componentName+".path", &cachePath)
+
+	if cachePath == "" {
+		// No path configured for this component
+		return nil
+	}
+
+	// Check for component-specific cleanup flag
+	var componentCleanupFlag bool
+	_ = config.UnmarshalKey(componentName+".cleanup-on-start", &componentCleanupFlag)
+
+	// Clean up if either global or component-specific flag is set
+	if globalCleanupFlag || componentCleanupFlag {
+		if err := common.TempCacheCleanup(cachePath); err != nil {
+			return fmt.Errorf(
+				"failed to cleanup temp cache path: %s for %s component: %v",
+				cachePath,
+				componentName,
+				err,
+			)
+		}
+	}
+
+	return nil
 }
 
 func setGOConfig() {

@@ -161,13 +161,15 @@ func (suite *libfuseTestSuite) TestConfigDisableKernelCache() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
 	config := "read-only: true\ndisable-kernel-cache: true\n\n"
-	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
+	suite.setupTestHelper(
+		config,
+	) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
-	suite.assert.Equal(suite.libfuse.Name(), "libfuse")
+	suite.assert.Equal("libfuse", suite.libfuse.Name())
 	suite.assert.Empty(suite.libfuse.mountPath)
-	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(0))
-	suite.assert.Equal(suite.libfuse.attributeExpiration, uint32(0))
-	suite.assert.Equal(suite.libfuse.negativeTimeout, uint32(0))
+	suite.assert.Equal(uint32(0), suite.libfuse.entryExpiration)
+	suite.assert.Equal(uint32(0), suite.libfuse.attributeExpiration)
+	suite.assert.Equal(uint32(0), suite.libfuse.negativeTimeout)
 	suite.assert.True(suite.libfuse.directIO)
 }
 
@@ -179,11 +181,13 @@ func (suite *libfuseTestSuite) TestConfigFuseTraceEnable() {
 	// Foreground mount option is global config option which is exported to others using a global variable.
 	// Hence setting the option before starting the test.
 	common.ForegroundMount = true
-	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
+	suite.setupTestHelper(
+		config,
+	) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
-	suite.assert.Equal(suite.libfuse.Name(), "libfuse")
+	suite.assert.Equal("libfuse", suite.libfuse.Name())
 	suite.assert.Empty(suite.libfuse.mountPath)
-	// Fuse trace should work as we are mouting using foregroud option.
+	// Fuse trace should work as we are mouting using foreground option.
 	suite.assert.True(suite.libfuse.traceEnable)
 	common.ForegroundMount = false
 }

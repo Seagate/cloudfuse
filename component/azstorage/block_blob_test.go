@@ -424,7 +424,7 @@ func (s *blockBlobTestSuite) TestContainerNotFound() {
 	s.setupTestHelper(config, "foo", false)
 
 	err := s.az.storage.TestPipeline()
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.Contains(err.Error(), "ContainerNotFound")
 }
 
@@ -1344,21 +1344,21 @@ func (s *blockBlobTestSuite) TestReadInBufferWithoutHandle() {
 	// Setup
 	name := generateFileName()
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 
 	testData := "test data"
 	data := []byte(testData)
 	n, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	s.assert.Equal(n, len(data))
+	s.assert.NoError(err)
+	s.assert.Len(data, n)
 
 	output := make([]byte, 5)
 	len, err := s.az.ReadInBuffer(
 		internal.ReadInBufferOptions{Offset: 0, Data: output, Path: name, Size: (int64)(len(data))},
 	)
-	s.assert.Nil(err)
-	s.assert.EqualValues(5, len)
+	s.assert.NoError(err)
+	s.assert.Equal(5, len)
 	s.assert.EqualValues(testData[:5], output)
 }
 
@@ -1367,9 +1367,9 @@ func (s *blockBlobTestSuite) TestReadInBufferEmptyPath() {
 
 	output := make([]byte, 5)
 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Offset: 0, Data: output, Size: 5})
-	s.assert.NotNil(err)
-	s.assert.EqualValues(0, len)
-	s.assert.Equal(err.Error(), "path not given for download")
+	s.assert.Error(err)
+	s.assert.Equal(0, len)
+	s.assert.Equal("path not given for download", err.Error())
 }
 
 func (bbTestSuite *blockBlobTestSuite) TestReadInBufferWithETAG() {

@@ -36,8 +36,8 @@ package xload
 import (
 	"context"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 )
 
 type XComponent interface {

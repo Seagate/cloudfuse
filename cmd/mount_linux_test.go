@@ -35,6 +35,7 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/viper"
@@ -376,7 +377,7 @@ func (suite *mountTestSuite) TestDirectIODisableKernelCacheCombo() {
 	defer suite.cleanupTest()
 
 	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	defer os.RemoveAll(mntDir)
 
 	tempLogDir := "/tmp/templogs_" + randomString(6)
@@ -390,7 +391,7 @@ func (suite *mountTestSuite) TestDirectIODisableKernelCacheCombo() {
 		"direct_io",
 		"--disable-kernel-cache",
 	)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "direct-io and disable-kernel-cache cannot be enabled together")
 }
 
@@ -666,15 +667,15 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 		// Create some test files
 		testFile := filepath.Join(testPath, "testfile")
 		err := os.WriteFile(testFile, []byte("test"), 0644)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 
 		testFile2 := filepath.Join(testPath2, "testfile")
 		err = os.WriteFile(testFile2, []byte("test"), 0644)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 
 		testFile3 := filepath.Join(testPath3, "testfile")
 		err = os.WriteFile(testFile3, []byte("test"), 0644)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 	}
 
 	comps := []string{"file_cache", "block_cache", "xload"}
@@ -697,7 +698,7 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 		config.Set(testComponent+".cleanup-on-start", "false")
 
 		err := options.tempCacheCleanup()
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.True(common.IsDirectoryEmpty(cachedirs[i]))
 		// This should not delete the other cache dirs of other components.
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+1)%3]))
@@ -709,7 +710,7 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 		config.Set("cleanup-on-start", "false")
 
 		err = options.tempCacheCleanup()
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.True(common.IsDirectoryEmpty(cachedirs[i]))
 		// This should not delete the other cache dirs of other components.
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+1)%3]))
@@ -720,7 +721,7 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 		config.Set(testComponent+".cleanup-on-start", "false")
 		config.Set("cleanup-on-start", "false")
 		err = options.tempCacheCleanup()
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[i]))
 		// This should not delete the other cache dirs of other components.
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+1)%3]))

@@ -39,8 +39,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -54,27 +54,27 @@ func (suite *statsMgrTestSuite) SetupSuite() {
 	suite.assert = assert.New(suite.T())
 
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }
 
 func (suite *statsMgrTestSuite) TestNewStatsManager() {
 	sm, err := NewStatsManager(5, false, nil)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(sm)
 	suite.assert.Nil(sm.fileHandle)
 
 	sm, err = NewStatsManager(5, true, nil)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(sm)
 	suite.assert.NotNil(sm.fileHandle)
 
 	err = os.Remove(sm.fileHandle.Name())
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }
 
 func (suite *statsMgrTestSuite) TestStatsManagerStartStop() {
 	sm, err := NewStatsManager(10, true, nil)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(sm)
 	suite.assert.NotNil(sm.fileHandle)
 
@@ -83,12 +83,14 @@ func (suite *statsMgrTestSuite) TestStatsManagerStartStop() {
 
 	defer func() {
 		err = os.Remove(sm.fileHandle.Name())
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 	}()
 
 	// push lister stats
 	sm.AddStats(&StatsItem{Component: LISTER, Name: "", ListerCount: uint64(10)})
-	sm.AddStats(&StatsItem{Component: LISTER, Name: "dirName", Dir: true, Success: true, Download: true})
+	sm.AddStats(
+		&StatsItem{Component: LISTER, Name: "dirName", Dir: true, Success: true, Download: true},
+	)
 
 	// export stats
 	sm.AddStats(&StatsItem{Component: STATS_MANAGER})
@@ -103,7 +105,15 @@ func (suite *statsMgrTestSuite) TestStatsManagerStartStop() {
 		if i%2 == 0 {
 			download = true
 		}
-		sm.AddStats(&StatsItem{Component: DATA_MANAGER, Name: fileName, Success: true, Download: download, BytesTransferred: uint64(1024 * i)})
+		sm.AddStats(
+			&StatsItem{
+				Component:        DATA_MANAGER,
+				Name:             fileName,
+				Success:          true,
+				Download:         download,
+				BytesTransferred: uint64(1024 * i),
+			},
+		)
 	}
 
 	// add sleep for exporting stats
@@ -116,7 +126,9 @@ func (suite *statsMgrTestSuite) TestStatsManagerStartStop() {
 		if i%2 == 0 {
 			success = true
 		}
-		sm.AddStats(&StatsItem{Component: SPLITTER, Name: fileName, Success: success, Download: true})
+		sm.AddStats(
+			&StatsItem{Component: SPLITTER, Name: fileName, Success: success, Download: true},
+		)
 	}
 
 	time.Sleep(10 * time.Second)
@@ -124,10 +136,10 @@ func (suite *statsMgrTestSuite) TestStatsManagerStartStop() {
 	// stop the stats manager
 	sm.Stop()
 
-	suite.assert.Equal(sm.dirs, uint64(1))
+	suite.assert.Equal(uint64(1), sm.dirs)
 	suite.assert.Equal(sm.totalFiles, sm.success+sm.failed)
-	suite.assert.Greater(sm.bytesDownloaded, uint64(0))
-	suite.assert.Greater(sm.bytesUploaded, uint64(0))
+	suite.assert.Positive(sm.bytesDownloaded)
+	suite.assert.Positive(sm.bytesUploaded)
 }
 
 func TestStatsMgrSuite(t *testing.T) {

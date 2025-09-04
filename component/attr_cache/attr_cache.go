@@ -380,8 +380,9 @@ func (ac *AttrCache) backgroundCleanup() {
 func (ac *AttrCache) cleanupExpiredEntries() {
 	// First pass: collect keys to delete under read lock to minimize write lock duration
 	var keysToDelete []string
+
 	ac.cacheLock.RLock()
-	for path, item := range ac.cacheMap {
+	for path, item := range ac.cache.cacheMap {
 		// Check if entry has exceeded the cache timeout
 		if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 			keysToDelete = append(keysToDelete, path)
@@ -394,9 +395,9 @@ func (ac *AttrCache) cleanupExpiredEntries() {
 		ac.cacheLock.Lock()
 		for _, path := range keysToDelete {
 			// Re-check if entry still exists and is still expired
-			if item, exists := ac.cacheMap[path]; exists {
+			if item, exists := ac.cache.cacheMap[path]; exists {
 				if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
-					delete(ac.cacheMap, path)
+					delete(ac.cache.cacheMap, path)
 				}
 			}
 		}

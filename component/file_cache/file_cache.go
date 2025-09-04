@@ -168,7 +168,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", fc.Name())
 
 	if fc.policy == nil {
-		return fmt.Errorf("config error in %s error [cache policy missing]", c.Name())
+		return fmt.Errorf("config error in %s error [cache policy missing]", fc.Name())
 	}
 
 	err := fc.policy.StartPolicy()
@@ -262,17 +262,13 @@ func (fc *FileCache) Configure(_ bool) error {
 		log.Crit("FileCache::Configure : Direct IO mode enabled, cache timeout is set to 0")
 	}
 
-	if config.IsSet(compName + ".empty-dir-check") {
-		c.allowNonEmpty = !conf.EmptyDirCheck
-	} else {
-		c.allowNonEmpty = conf.AllowNonEmpty
-	}
-	c.policyTrace = conf.EnablePolicyTrace
-	c.offloadIO = conf.OffloadIO
-	c.syncToFlush = conf.SyncToFlush
-	c.syncToDelete = !conf.SyncNoOp
-	c.refreshSec = conf.RefreshSec
-	c.hardLimit = conf.HardLimit
+	fc.allowNonEmpty = conf.AllowNonEmpty
+	fc.policyTrace = conf.EnablePolicyTrace
+	fc.offloadIO = conf.OffloadIO
+	fc.syncToFlush = conf.SyncToFlush
+	fc.syncToDelete = !conf.SyncNoOp
+	fc.refreshSec = conf.RefreshSec
+	fc.hardLimit = conf.HardLimit
 
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
@@ -405,8 +401,28 @@ func (fc *FileCache) Configure(_ bool) error {
 		}
 	}
 
-	log.Crit("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
-		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit, conf.Policy, c.allowNonEmpty, conf.CleanupOnStart, c.policyTrace, c.offloadIO, c.syncToFlush, c.syncToDelete, c.defaultPermission, c.diskHighWaterMark, c.maxCacheSize, c.mountPath,
+	log.Crit(
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		fc.createEmptyFile,
+		int(fc.cacheTimeout),
+		fc.tmpPath,
+		int(cacheConfig.maxSizeMB),
+		int(cacheConfig.highThreshold),
+		int(cacheConfig.lowThreshold),
+		fc.refreshSec,
+		cacheConfig.maxEviction,
+		fc.hardLimit,
+		conf.Policy,
+		fc.allowNonEmpty,
+		conf.CleanupOnStart,
+		fc.policyTrace,
+		fc.offloadIO,
+		fc.syncToFlush,
+		fc.syncToDelete,
+		fc.defaultPermission,
+		fc.diskHighWaterMark,
+		fc.maxCacheSize,
+		fc.mountPath,
 		len(fc.schedule),
 	)
 
@@ -651,7 +667,11 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	// return the result.
 	cleanup, err := fc.deleteEmptyDirs(internal.DeleteDirOptions(options))
 	if err != nil {
-		log.Debug("FileCache::IsDirEmpty : %s failed to delete empty directories [%s]", options.Name, err.Error())
+		log.Debug(
+			"FileCache::IsDirEmpty : %s failed to delete empty directories [%s]",
+			options.Name,
+			err.Error(),
+		)
 		return false
 	}
 
@@ -673,7 +693,11 @@ func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 			return true, nil
 		}
 
-		log.Debug("FileCache::DeleteEmptyDirs : Unable to read directory %s [%s]", localPath, err.Error())
+		log.Debug(
+			"FileCache::DeleteEmptyDirs : Unable to read directory %s [%s]",
+			localPath,
+			err.Error(),
+		)
 		return false, err
 	}
 
@@ -683,7 +707,11 @@ func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 				Name: filepath.Join(localPath, entry.Name()),
 			})
 			if err != nil {
-				log.Err("FileCache::deleteEmptyDirs : Unable to delete directory %s [%s]", localPath, err.Error())
+				log.Err(
+					"FileCache::deleteEmptyDirs : Unable to delete directory %s [%s]",
+					localPath,
+					err.Error(),
+				)
 				return val, err
 			}
 		} else {
