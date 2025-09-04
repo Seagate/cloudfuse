@@ -82,7 +82,6 @@ type mountOptions struct {
 	MonitorOpt          monitorOptions `config:"health_monitor"`
 	WaitForMount        time.Duration  `config:"wait-for-mount"`
 	LazyWrite           bool           `config:"lazy-write"`
-	disableKernelCache  bool           `config:"disable-kernel-cache"`
 	EntryCacheTimeout   int            `config:"list-cache-timeout"`
 	EnableRemountUser   bool
 	EnableRemountSystem bool
