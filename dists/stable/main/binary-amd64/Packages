@@ -28,11 +28,11 @@ Maintainer: Seagate Technology <cloudfuse@seagate.com>
 Installed-Size: 35562
 Depends: fuse, libc6 (>= 2.24)
 Filename: dists/stable/main/binary-amd64/cloudfuse_fuse2_2.0.0_linux_amd64.deb
-Size: 11759778
-MD5sum: c5902f8a162e18e54be77f0b734f6aa3
-SHA1: 99981a1e42ea8efd426b3916e6bc464f4001a625
-SHA256: fe8b1584fe4cd67cf4ef7ef3ccdcac8b277da044b4d6c32a9fc8ffc3dd98c94e
-SHA512: 750d51c5af8006e406a93c187726f5d5aedc3a8cdaa976c82079a8de8501c7337d47094fce7a00cad45314c2ba59bc93723acb45f3466a8d936752ec234bb845
+Size: 11760000
+MD5sum: c7cd59989f6a7c3df9e89c47ef09e47a
+SHA1: 5e42d1490faac676da32523c97df3c836b9e3e6a
+SHA256: 42b149f789c5cd7866193a6e42570adf5fbc3e5cfa1f0a4923f313e5a6786d9e
+SHA512: 52d1116d880197cb0ebb51eee9d1c01537356e7c40d6c0d6f087edb89aa158dec1d3ebf4951e0cf57582718b2e974bf415209c2b46e0ed6e0c9b2c3027c48906
 Homepage: https://github.com/Seagate/cloudfuse
 Description: FUSE file system for interacting with S3 and Azure storage
  Cloudfuse provides the ability to mount a cloud bucket in your local file
@@ -46,14 +46,14 @@ Version: 2.0.0
 Priority: optional
 Section: utils
 Maintainer: Seagate Technology <cloudfuse@seagate.com>
-Installed-Size: 35564
+Installed-Size: 35565
 Depends: fuse3, libc6 (>= 2.24)
 Filename: dists/stable/main/binary-amd64/cloudfuse_fuse3_2.0.0_linux_amd64.deb
-Size: 11761734
-MD5sum: 6538fb1fdbda3950ab7014a9b6a5441b
-SHA1: b7d4be6fdb2034f6a0c99d113a9ac4ce6ac35e82
-SHA256: 8c363b64b6fc0003e15e7400595b224148b126bdc5c504f28bf9e9c1f24f8aeb
-SHA512: 591b86e985fb5c4bd2a95da746acd53ffb5a1ecb97e533605a0bba4c64353aa5eaaf97510d7156ef3faddf568cef28229d76298946863fc9065bc20004ec6aeb
+Size: 11761760
+MD5sum: db14e5db2fdf7532e8a7d9ebe89a2577
+SHA1: e63d5612017e3a96a810fd154a0af329bd95084a
+SHA256: f52395d2f5fb248762e7654a307659e3b170c64bd349aba16d6f34336522eb01
+SHA512: 097ad4854760f4209d50a549dbb061ba2cd5c9ddaa921b54d85c87cbcd2e66bb841dcfda6a8592c2b25875082aa21cddf58fc2f43ec6ec3119585f43cf5bb847
 Homepage: https://github.com/Seagate/cloudfuse
 Description: FUSE file system for interacting with S3 and Azure storage
  Cloudfuse provides the ability to mount a cloud bucket in your local file
