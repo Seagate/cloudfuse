@@ -187,12 +187,13 @@ jobs:
 
       - name: Download .deb and .rpm packages from release
         env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           mkdir ./packages
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir ./packages -p "*.deb"
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir ./packages -p "*.rpm"
+          gh release download "$TAG" --repo "$GH_REPO" --dir ./packages -p "*.deb"
+          gh release download "$TAG" --repo "$GH_REPO" --dir ./packages -p "*.rpm"
 
       - name: Import GPG key
         id: import_gpg
