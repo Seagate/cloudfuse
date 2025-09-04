@@ -146,6 +146,10 @@ func getDummyVersion() string {
 }
 
 func (suite *rootCmdSuite) TestDetectNewVersionCurrentOlder() {
+	// Skip until we have Windows ARM builds
+	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
+		suite.T().Skip("Skipping test on Windows ARM")
+	}
 	defer suite.cleanupTest()
 	common.CloudfuseVersion = getDummyVersion()
 	msg := <-beginDetectNewVersion(ctx)
@@ -154,6 +158,10 @@ func (suite *rootCmdSuite) TestDetectNewVersionCurrentOlder() {
 }
 
 func (suite *rootCmdSuite) TestDetectNewVersionCurrentSame() {
+	// Skip until we have Windows ARM builds
+	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
+		suite.T().Skip("Skipping test on Windows ARM")
+	}
 	defer suite.cleanupTest()
 	common.CloudfuseVersion = common.CloudfuseVersion_()
 	msg := <-beginDetectNewVersion(ctx)
