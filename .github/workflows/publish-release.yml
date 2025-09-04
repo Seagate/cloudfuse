@@ -193,8 +193,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           mkdir ./packages
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir ./packages -p "*.deb"
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir ./packages -p "*.rpm"
+          gh release download "v2.0.0" --repo "${{ github.repository }}" --dir ./packages -p "*.deb"
+          gh release download "v2.0.0" --repo "${{ github.repository }}" --dir ./packages -p "*.rpm"
 
       - name: Import GPG key
         id: import_gpg
