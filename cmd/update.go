@@ -287,6 +287,14 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	// explicitly request the response format we need (best practice)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	// Add Authorization header to raise rate limit
+	githubApiToken := os.Getenv("GH_API_TOKEN")
+	if githubApiToken != "" {
+		req.Header.Set("Authorization", "token "+githubApiToken)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
