@@ -26,11 +26,9 @@
 package azstorage
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -141,6 +139,11 @@ func getAzDatalakeServiceClientOptions(conf *AzStorageConfig) (*serviceBfs.Clien
 
 // getLogOptions : to configure the SDK logging policy
 func getSDKLogOptions() policy.LogOptions {
+	// If BLOBFUSE_DISABLE_SDK_LOG env var is set to true, then disable the SDK logging
+	if os.Getenv("BLOBFUSE_DISABLE_SDK_LOG") == "true" {
+		return policy.LogOptions{}
+	}
+
 	if log.GetType() == "silent" || log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
 		return policy.LogOptions{}
 	} else {
@@ -157,7 +160,7 @@ func getSDKLogOptions() policy.LogOptions {
 //   - logging type is silent
 //   - logging level is less than debug
 func setSDKLogListener() {
-	if log.GetType() == "silent" || log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
+	if os.Getenv("BLOBFUSE_DISABLE_SDK_LOG") == "true" || log.GetType() == "silent" || log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
 		// reset listener
 		azlog.SetListener(nil)
 	} else {
@@ -554,17 +557,6 @@ func sanitizeSASKey(key string) *memguard.Enclave {
 	}
 
 	return memguard.NewEnclave([]byte(key))
-}
-
-func getMD5(fi *os.File) ([]byte, error) {
-	hasher := md5.New()
-	_, err := io.Copy(hasher, fi)
-
-	if err != nil {
-		return nil, errors.New("failed to generate md5")
-	}
-
-	return hasher.Sum(nil), nil
 }
 
 func autoDetectAuthMode(opt AzStorageOptions) string {

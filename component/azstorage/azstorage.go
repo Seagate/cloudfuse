@@ -448,7 +448,21 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
-	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
+	var size int64
+	var path string
+	if options.Handle != nil {
+		size = atomic.LoadInt64(&options.Handle.Size)
+		path = options.Handle.Path
+	} else {
+		size = options.Size
+		path = options.Path
+		if len(path) == 0 {
+			log.Err("AzStorage::ReadInBuffer : Path not given for download")
+			return 0, fmt.Errorf("path not given for download")
+		}
+	}
+
+	if options.Offset > size {
 		return 0, syscall.ERANGE
 	}
 
@@ -461,23 +475,13 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, nil
 	}
 
-	err = az.storage.ReadInBuffer(
-		options.Handle.Path,
-		options.Offset,
-		dataLen,
-		options.Data,
-		options.Etag,
-	)
-
+	length = int(dataLen)
+	err = az.storage.ReadInBuffer(path, options.Offset, dataLen, options.Data, options.Etag)
 	if err != nil {
-		log.Err(
-			"AzStorage::ReadInBuffer : Failed to read %s [%s]",
-			options.Handle.Path,
-			err.Error(),
-		)
+		log.Err("AzStorage::ReadInBuffer : Failed to read %s [%s]", path, err.Error())
+		length = 0
 	}
 
-	length = int(dataLen)
 	return
 }
 
