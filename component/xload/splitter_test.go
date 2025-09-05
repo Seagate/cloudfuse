@@ -204,17 +204,17 @@ func (suite *splitterTestSuite) TestProcessFilePresent() {
 
 	fileName := "file_4"
 	src := filepath.Join(remote_path, fileName)
-    dst := filepath.Join(ts.path, fileName)
+	dst := filepath.Join(ts.path, fileName)
 
-    in, err := os.Open(src)
-    suite.assert.NoError(err)
+	in, err := os.Open(src)
+	suite.assert.NoError(err)
 
-    out, err := os.Create(dst)
-    suite.assert.NoError(err)
-    _, err = io.Copy(out, in)
-    suite.assert.NoError(err)
-    err = out.Close()
-    suite.assert.NoError(err)
+	out, err := os.Create(dst)
+	suite.assert.NoError(err)
+	_, err = io.Copy(out, in)
+	suite.assert.NoError(err)
+	err = out.Close()
+	suite.assert.NoError(err)
 	err = in.Close()
 	suite.assert.NoError(err)
 

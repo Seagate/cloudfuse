@@ -378,39 +378,39 @@ func (ac *AttrCache) backgroundCleanup() {
 // cleanupExpiredEntries: removes expired entries from the cache map
 // This runs in a background goroutine to prevent memory leaks
 func (ac *AttrCache) cleanupExpiredEntries() {
-    // First pass: collect keys to delete under read lock to minimize write lock duration
-    var keysToDelete []string
+	// First pass: collect keys to delete under read lock to minimize write lock duration
+	var keysToDelete []string
 
-    ac.cacheLock.RLock()
-    for path, item := range ac.cache.cacheMap {
-        // Never delete the root entry
-        if path == "" {
-            continue
-        }
-        // Check if entry has exceeded the cache timeout
-        if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
-            keysToDelete = append(keysToDelete, path)
-        }
-    }
-    ac.cacheLock.RUnlock()
+	ac.cacheLock.RLock()
+	for path, item := range ac.cache.cacheMap {
+		// Never delete the root entry
+		if path == "" {
+			continue
+		}
+		// Check if entry has exceeded the cache timeout
+		if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+			keysToDelete = append(keysToDelete, path)
+		}
+	}
+	ac.cacheLock.RUnlock()
 
-    // Second pass: delete expired entries under write lock, re-checking expiration
-    if len(keysToDelete) > 0 {
-        ac.cacheLock.Lock()
-        for _, path := range keysToDelete {
-            // Never delete the root entry
-            if path == "" {
-                continue
-            }
-            // Re-check if entry still exists and is still expired
-            if item, exists := ac.cache.cacheMap[path]; exists {
-                if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
-                    delete(ac.cache.cacheMap, path)
-                }
-            }
-        }
-        ac.cacheLock.Unlock()
-    }
+	// Second pass: delete expired entries under write lock, re-checking expiration
+	if len(keysToDelete) > 0 {
+		ac.cacheLock.Lock()
+		for _, path := range keysToDelete {
+			// Never delete the root entry
+			if path == "" {
+				continue
+			}
+			// Re-check if entry still exists and is still expired
+			if item, exists := ac.cache.cacheMap[path]; exists {
+				if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+					delete(ac.cache.cacheMap, path)
+				}
+			}
+		}
+		ac.cacheLock.Unlock()
+	}
 }
 
 // ------------------------- Methods implemented by this component -------------------------------------------
