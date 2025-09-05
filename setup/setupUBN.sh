@@ -46,4 +46,6 @@ blobfuse2 --version
 
 # Calling the setup script for AzSecPack setup
 echo "Calling the setup script for AzSecPack setup"
-setup/vmSetupAzSecPack.sh
+bash "$(dirname "$0")/vmSetupAzSecPack.sh"
+
+

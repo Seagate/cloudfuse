@@ -61,6 +61,7 @@ const (
 	TbToBytes         = 1024 * 1024 * 1024 * 1024
 	DefaultCapacityMb = 1024 * TbToBytes / MbToBytes // 1 PB
 	CfuseStats        = "cloudfuse_stats"
+	BlockIDLength     = 16
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 
@@ -343,6 +344,11 @@ func NewUUID() (u uuid) {
 		u[6] = (u[6] & 0xF) | (version << 4) // u.setVersion(4)
 	}
 	return
+}
+
+// returns block id of given length
+func GetBlockID(length int64) string {
+	return base64.StdEncoding.EncodeToString(NewUUIDWithLength(length))
 }
 
 func GetIdLength(id string) int64 {

@@ -1,0 +1,97 @@
+/*
+   Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE
+*/
+
+package xload
+
+import (
+	"context"
+	"testing"
+
+	"github.com/Seagate/cloudfuse/component/loopback"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+)
+
+type dataManagerTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
+}
+
+func (suite *dataManagerTestSuite) SetupSuite() {
+	suite.assert = assert.New(suite.T())
+}
+
+func (suite *dataManagerTestSuite) TestNewRemoteDataManager() {
+	rdm, err := newRemoteDataManager(nil)
+	suite.assert.Error(err)
+	suite.assert.Nil(rdm)
+	suite.assert.Contains(err.Error(), "invalid parameters sent to create remote data manager")
+
+	rdm, err = newRemoteDataManager(&remoteDataManagerOptions{})
+	suite.assert.Error(err)
+	suite.assert.Nil(rdm)
+	suite.assert.Contains(err.Error(), "invalid parameters sent to create remote data manager")
+
+	remote := loopback.NewLoopbackFSComponent()
+	statsMgr, err := NewStatsManager(1, false, nil)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(statsMgr)
+
+	rdm, err = newRemoteDataManager(&remoteDataManagerOptions{
+		workerCount: 4,
+		remote:      remote,
+		statsMgr:    statsMgr,
+	})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(rdm)
+}
+
+func (suite *dataManagerTestSuite) TestProcessErrors() {
+	rdm := &remoteDataManager{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	item := &WorkItem{
+		CompName: DATA_MANAGER,
+		Path:     "test",
+		Block:    &Block{},
+		Download: false,
+		Ctx:      ctx,
+	}
+
+	dataLength, err := rdm.Process(item)
+	suite.assert.Error(err)
+	suite.assert.Equal(0, dataLength)
+
+	// cancel the context
+	cancel()
+
+	dataLength, err = rdm.Process(item)
+	suite.assert.Error(err)
+	suite.assert.Equal(0, dataLength)
+}
+
+func TestDatamanagerSuite(t *testing.T) {
+	suite.Run(t, new(dataManagerTestSuite))
+}

@@ -28,7 +28,6 @@ package block_cache
 import (
 	"container/list"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"math"
@@ -93,6 +92,7 @@ type BlockCacheOptions struct {
 	Workers        uint32  `config:"parallelism"      yaml:"parallelism,omitempty"`
 	PrefetchOnOpen bool    `config:"prefetch-on-open" yaml:"prefetch-on-open,omitempty"`
 	Consistency    bool    `config:"consistency"      yaml:"consistency,omitempty"`
+	CleanupOnStart bool    `config:"cleanup-on-start" yaml:"cleanup-on-start,omitempty"`
 }
 
 const (
@@ -350,7 +350,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"BlockCache::Configure : block size %v, mem size %v, worker %v, prefetch %v, disk path %v, max size %v, disk timeout %v, prefetch-on-open %t, maxDiskUsageHit %v, noPrefetch %v, consistency %v",
+		"BlockCache::Configure : block size %v, mem size %v, worker %v, prefetch %v, disk path %v, max size %v, disk timeout %v, prefetch-on-open %t, maxDiskUsageHit %v, noPrefetch %v, consistency %v, cleanup-on-start %t",
 		bc.blockSize,
 		bc.memSize,
 		bc.workers,
@@ -362,6 +362,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 		bc.maxDiskUsageHit,
 		bc.noPrefetch,
 		bc.consistency,
+		conf.CleanupOnStart,
 	)
 
 	return nil
@@ -775,7 +776,12 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 
 			if readoffset >= uint64(prop.Size) {
 				//create a null block and return
-				block := bc.blockPool.MustGet()
+				block, err := bc.blockPool.MustGet()
+				if err != nil {
+					log.Err("BlockCache::getBlock : Unable to allocate block %v=>%s (index %v) %v", handle.ID, handle.Path, index, err)
+					return nil, err
+				}
+
 				block.offset = readoffset
 				// block.flags.Set(BlockFlagSynced)
 				log.Debug("BlockCache::getBlock : Returning a null block %v for %v=>%s (read offset %v)", index, handle.ID, handle.Path, readoffset)
@@ -1068,16 +1074,17 @@ func (bc *BlockCache) refreshBlock(handle *handlemap.Handle, index uint64, prefe
 	if nodeList.Len() == 0 && !prefetch {
 		// User needs a block now but there is no free block available right now
 		// this might happen when all blocks are under download and no first reader is hit for any of them
-		block := bc.blockPool.MustGet()
-		if block == nil {
+		block, err := bc.blockPool.MustGet()
+		if err != nil {
 			log.Err(
-				"BlockCache::refreshBlock : Unable to allocate block %v=>%s (index %v, prefetch %v)",
+				"BlockCache::refreshBlock : Unable to allocate block %v=>%s (index %v, prefetch %v) %v",
 				handle.ID,
 				handle.Path,
 				index,
 				prefetch,
+				err,
 			)
-			return fmt.Errorf("unable to allocate block")
+			return err
 		}
 
 		block.node = handle.Buffers.Cooked.PushFront(block)
@@ -1424,15 +1431,16 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 		}
 
 		// Either the block is not fetched yet or offset goes beyond the file size
-		block = bc.blockPool.MustGet()
-		if block == nil {
+		block, err = bc.blockPool.MustGet()
+		if err != nil {
 			log.Err(
-				"BlockCache::getOrCreateBlock : Unable to allocate block %v=>%s (index %v)",
+				"BlockCache::getOrCreateBlock : Unable to allocate block %v=>%s (index %v) %v",
 				handle.ID,
 				handle.Path,
 				index,
+				err,
 			)
-			return nil, fmt.Errorf("unable to allocate block")
+			return nil, err
 		}
 
 		block.node = nil
@@ -1656,8 +1664,7 @@ func (bc *BlockCache) lineupUpload(
 	block *Block,
 	listMap map[int64]*blockInfo,
 ) {
-
-	id := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+	id := common.GetBlockID(common.BlockIDLength)
 	listMap[block.id] = &blockInfo{
 		id:        id,
 		committed: false,
@@ -2013,7 +2020,7 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, []stri
 				// Now we have written data beyond that point and its no longer the last block
 				// In such case we need to fill the gap with zero blocks
 				// For simplicity we will fill the gap with a new block and later merge both these blocks in one block
-				id := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+				id := common.GetBlockID(common.BlockIDLength)
 				fillerSize := (bc.blockSize - listMap[offsets[i]].size)
 				fillerOffset := uint64(offsets[i]*int64(bc.blockSize)) + listMap[offsets[i]].size
 
@@ -2116,7 +2123,7 @@ func (bc *BlockCache) stageZeroBlock(handle *handlemap.Handle, tryCnt int) (stri
 		)
 	}
 
-	id := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+	id := common.GetBlockID(common.BlockIDLength)
 
 	log.Debug(
 		"BlockCache::stageZeroBlock : Staging zero block for %v=>%v, try = %v",

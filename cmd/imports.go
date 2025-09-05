@@ -35,4 +35,5 @@ import (
 	_ "github.com/Seagate/cloudfuse/component/s3storage"
 	_ "github.com/Seagate/cloudfuse/component/size_tracker"
 	_ "github.com/Seagate/cloudfuse/component/stream"
+	_ "github.com/Seagate/cloudfuse/component/xload"
 )

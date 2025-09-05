@@ -71,13 +71,11 @@ func createDaemon(
 	}
 
 	// Signal handlers for parent and child to communicate success or failures in mount
-	var sigusr2, sigchild chan os.Signal
+	var sigusr2 chan os.Signal
 	if !daemon.WasReborn() { // execute in parent only
 		sigusr2 = make(chan os.Signal, 1)
 		signal.Notify(sigusr2, unix.SIGUSR2)
 
-		sigchild = make(chan os.Signal, 1)
-		signal.Notify(sigchild, unix.SIGCHLD)
 	} else { // execute in child only
 		daemon.SetSigHandler(sigusrHandler(pipeline, ctx), unix.SIGUSR1, unix.SIGUSR2)
 		go func() {
@@ -85,19 +83,23 @@ func createDaemon(
 		}()
 	}
 
+retry:
+	// If the .pid file is locked and there no blobfuse process owning it then we need to try
+	// a cleanup of the .pid file. If cleanup goes through then retry the daemonization.
 	child, err := dmnCtx.Reborn()
 	if err != nil {
-		log.Err("mount : failed to daemonize application [%v]", err)
-		return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
+		log.Err("mount : failed to daemonize application [%s], trying auto cleanup", err.Error())
+		rmErr := os.Remove(pidFileName)
+		if rmErr != nil {
+			log.Err("mount : auto cleanup failed [%v]", rmErr.Error())
+			return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
+		}
+		goto retry
 	}
 
 	log.Debug("mount: foreground disabled, child = %v", daemon.WasReborn())
 	if child == nil { // execute in child only
-		defer func() {
-			if err := dmnCtx.Release(); err != nil {
-				log.Err("Unable to release pid-file: %s", err.Error())
-			}
-		}()
+		defer dmnCtx.Release() // nolint
 
 		if options.CPUProfile != "" {
 			os.Remove(options.CPUProfile)
@@ -142,7 +144,7 @@ func createDaemon(
 		case <-sigusr2:
 			log.Info("mount: Child [%v] mounted successfully at %s", child.Pid, options.MountPath)
 
-		case <-sigchild:
+		case <-childDone:
 			// Get error string from the child, stderr or child was redirected to a file
 			log.Info("mount: Child [%v] terminated from %s", child.Pid, options.MountPath)
 
@@ -157,7 +159,6 @@ func createDaemon(
 		case <-time.After(options.WaitForMount):
 			log.Info("mount: Child [%v : %s] status check timeout", child.Pid, options.MountPath)
 		}
-
 		_ = log.Destroy()
 	}
 	return nil

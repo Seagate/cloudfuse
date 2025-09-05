@@ -3,7 +3,6 @@
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal

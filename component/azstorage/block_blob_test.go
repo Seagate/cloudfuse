@@ -424,7 +424,7 @@ func (s *blockBlobTestSuite) TestContainerNotFound() {
 	s.setupTestHelper(config, "foo", false)
 
 	err := s.az.storage.TestPipeline()
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.Contains(err.Error(), "ContainerNotFound")
 }
 
@@ -1337,6 +1337,39 @@ func (s *blockBlobTestSuite) TestReadInBuffer() {
 	s.assert.NoError(err)
 	s.assert.Equal(5, len)
 	s.assert.EqualValues(testData[:5], output)
+}
+
+func (s *blockBlobTestSuite) TestReadInBufferWithoutHandle() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
+	s.assert.NotNil(h)
+
+	testData := "test data"
+	data := []byte(testData)
+	n, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
+	s.assert.Len(data, n)
+
+	output := make([]byte, 5)
+	len, err := s.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Offset: 0, Data: output, Path: name, Size: (int64)(len(data))},
+	)
+	s.assert.NoError(err)
+	s.assert.Equal(5, len)
+	s.assert.EqualValues(testData[:5], output)
+}
+
+func (s *blockBlobTestSuite) TestReadInBufferEmptyPath() {
+	defer s.cleanupTest()
+
+	output := make([]byte, 5)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Offset: 0, Data: output, Size: 5})
+	s.assert.Error(err)
+	s.assert.Equal(0, len)
+	s.assert.Equal("path not given for download", err.Error())
 }
 
 func (bbTestSuite *blockBlobTestSuite) TestReadInBufferWithETAG() {
@@ -3464,7 +3497,7 @@ func (s *blockBlobTestSuite) TestMD5SetOnUpload() {
 			s.assert.NotEmpty(prop.MD5)
 
 			_, _ = f.Seek(0, 0)
-			localMD5, err := getMD5(f)
+			localMD5, err := common.GetMD5(f)
 			s.assert.NoError(err)
 			s.assert.Equal(localMD5, prop.MD5)
 
@@ -3585,7 +3618,7 @@ func (s *blockBlobTestSuite) TestMD5AutoSetOnUpload() {
 			s.assert.NotEmpty(prop.MD5)
 
 			_, _ = f.Seek(0, 0)
-			localMD5, err := getMD5(f)
+			localMD5, err := common.GetMD5(f)
 			s.assert.NoError(err)
 			s.assert.Equal(localMD5, prop.MD5)
 
@@ -3655,7 +3688,7 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 			s.assert.NotEmpty(prop.MD5)
 
 			_, _ = f.Seek(0, 0)
-			localMD5, err := getMD5(f)
+			localMD5, err := common.GetMD5(f)
 			s.assert.NoError(err)
 			s.assert.NotEqual(localMD5, prop.MD5)
 

@@ -62,8 +62,9 @@ type LogOptions struct {
 }
 
 type mountOptions struct {
-	MountPath  string
-	ConfigFile string
+	MountPath      string
+	inputMountPath string
+	ConfigFile     string
 
 	DryRun              bool
 	Logging             LogOptions     `config:"logging"`
@@ -107,36 +108,19 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		}
 	} else {
 		if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
-			return fmt.Errorf("mount directory does not exists")
-		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
-			return fmt.Errorf("mount directory is not empty")
-		}
-
-		if common.IsDirectoryMounted(opt.MountPath) {
+			return fmt.Errorf("mount directory does not exist")
+		} else if common.IsDirectoryMounted(opt.MountPath) {
 			// Try to cleanup the stale mount
 			log.Info("Mount::validate : Mount directory is already mounted, trying to cleanup")
-			active, err := common.IsMountActive(opt.MountPath)
+			active, err := common.IsMountActive(opt.inputMountPath)
 			if active || err != nil {
 				// Previous mount is still active so we need to fail this mount
 				return fmt.Errorf("directory is already mounted")
 			} else {
 				// Previous mount is in stale state so lets cleanup the state
 				log.Info("Mount::validate : Cleaning up stale mount")
-				if err = unmountCloudfuse(opt.MountPath, true); err != nil {
+				if err = unmountCloudfuse(opt.MountPath, true, true); err != nil {
 					return fmt.Errorf("directory is already mounted, unmount manually before remount [%v]", err.Error())
-				}
-
-				// Clean up the file-cache temp directory if any
-				var tempCachePath string
-				_ = config.UnmarshalKey("file_cache.path", &tempCachePath)
-
-				var cleanupOnStart bool
-				_ = config.UnmarshalKey("file_cache.cleanup-on-start", &cleanupOnStart)
-
-				if tempCachePath != "" && cleanupOnStart {
-					if err = common.TempCacheCleanup(tempCachePath); err != nil {
-						return fmt.Errorf("failed to cleanup file cache [%s]", err.Error())
-					}
 				}
 			}
 		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
@@ -287,8 +271,11 @@ var mountCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
+		options.inputMountPath = args[0]
 		options.MountPath = common.ExpandPath(args[0])
 		common.MountPath = options.MountPath
+
+		directIO := false
 
 		if options.ConfigFile == "" {
 			// Config file is not set in cli parameters
@@ -362,6 +349,24 @@ var mountCmd = &cobra.Command{
 				append([]string{"entry_cache"}, options.Components[1:]...)...)
 		}
 
+		if err = common.ValidatePipeline(options.Components); err != nil {
+			// file-cache, block-cache and xload are mutually exclusive
+			log.Err("mount: invalid pipeline components [%s]", err.Error())
+			return fmt.Errorf("invalid pipeline components [%s]", err.Error())
+		}
+
+		// either passed in CLI or in config file
+		if common.ComponentInPipeline(options.Components, "block_cache") {
+			// CLI overriding the pipeline to inject block-cache
+			options.Components = common.UpdatePipeline(options.Components, "block_cache")
+		}
+
+		if common.ComponentInPipeline(options.Components, "xload") {
+			// CLI overriding the pipeline to inject xload
+			options.Components = common.UpdatePipeline(options.Components, "xload")
+			config.Set("read-only", "true") // preload is only supported in read-only mode
+		}
+
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {
 				parameter := strings.Split(v, "=")
@@ -411,10 +416,24 @@ var mountCmd = &cobra.Command{
 				} else if v == "direct_io" || v == "direct_io=true" {
 					config.Set("lfuse.direct-io", "true")
 					config.Set("direct-io", "true")
+					directIO = true
 				} else {
 					return errors.New(common.FuseAllowedFlags)
 				}
 			}
+		}
+
+		// Check if direct-io is enabled in the config file.
+		if !directIO {
+			_ = config.UnmarshalKey("libfuse.direct-io", &directIO)
+			if directIO {
+				config.Set("direct-io", "true")
+			}
+		}
+
+		if config.IsSet("disable-kernel-cache") && directIO {
+			// Both flag shall not be enable together
+			return fmt.Errorf("direct-io and disable-kernel-cache cannot be enabled together")
 		}
 
 		if !config.IsSet("logging.file-path") {
@@ -478,10 +497,8 @@ var mountCmd = &cobra.Command{
 		log.Crit("Logging level set to : %s", logLevel.String())
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
-		directIO := false
-		_ = config.UnmarshalKey("direct-io", &directIO)
 		if directIO {
-			// Directio is enabled, so remove the attr-cache from the pipeline
+			// Direct IO is enabled, so remove the attr-cache from the pipeline
 			for i, name := range options.Components {
 				if name == "attr_cache" {
 					options.Components = append(options.Components[:i], options.Components[i+1:]...)
@@ -492,6 +509,15 @@ var mountCmd = &cobra.Command{
 				}
 			}
 		}
+
+		// Clean up any cache directory if cleanup-on-start is set from the cli parameter or specified in parameter in
+		// config file for a specific component for file-cache, block-cache, xload.
+		err = options.tempCacheCleanup()
+		if err != nil {
+			return err
+		}
+
+		common.ForegroundMount = options.Foreground
 
 		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
@@ -526,8 +552,6 @@ var mountCmd = &cobra.Command{
 			log.Trace("Dry-run complete")
 			return nil
 		}
-
-		common.ForegroundMount = options.Foreground
 
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
 		// handle background mount on Linux
@@ -683,6 +707,56 @@ func startMonitor(pid int) {
 	}
 }
 
+// cleanupCachePath is a helper function to clean up cache directory for a component that is present in the pipeline.
+// componentName: the name of the component (e.g., "file_cache", "block_cache")
+func (opt *mountOptions) tempCacheCleanup() error {
+	// Check for global cleanup-on-start flag from cli.
+	var cleanupOnStart bool
+	_ = config.UnmarshalKey("cleanup-on-start", &cleanupOnStart)
+
+	components := []string{"file_cache", "block_cache", "xload"}
+
+	for _, component := range components {
+		if common.ComponentInPipeline(options.Components, component) {
+			err := cleanupCachePath(component, cleanupOnStart)
+			if err != nil {
+				return fmt.Errorf("failed to clean up  cache for %s: %v", component, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func cleanupCachePath(componentName string, globalCleanupFlag bool) error {
+	// Get the path for the component
+	var cachePath string
+	_ = config.UnmarshalKey(componentName+".path", &cachePath)
+
+	if cachePath == "" {
+		// No path configured for this component
+		return nil
+	}
+
+	// Check for component-specific cleanup flag
+	var componentCleanupFlag bool
+	_ = config.UnmarshalKey(componentName+".cleanup-on-start", &componentCleanupFlag)
+
+	// Clean up if either global or component-specific flag is set
+	if globalCleanupFlag || componentCleanupFlag {
+		if err := common.TempCacheCleanup(cachePath); err != nil {
+			return fmt.Errorf(
+				"failed to cleanup temp cache path: %s for %s component: %v",
+				cachePath,
+				componentName,
+				err,
+			)
+		}
+	}
+
+	return nil
+}
+
 func setGOConfig() {
 	// Ensure we always have more than 1 OS thread running goroutines, since there are issues with having just 1.
 	isOnlyOne := runtime.GOMAXPROCS(0) == 1
@@ -753,6 +827,11 @@ func init() {
 			return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
+
+	// Add a generic cleanup-on-start flag that applies to all cache components
+	mountCmd.PersistentFlags().
+		Bool("cleanup-on-start", false, "Clear cache directory on startup if not empty for file_cache, block_cache, xload components.")
+	config.BindPFlag("cleanup-on-start", mountCmd.PersistentFlags().Lookup("cleanup-on-start"))
 
 	mountCmd.PersistentFlags().String("log-level", "LOG_WARNING",
 		"Enables logs written to syslog. Set to LOG_WARNING by default. Allowed values are LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG")
@@ -842,6 +921,13 @@ func init() {
 
 	mountCmd.PersistentFlags().
 		DurationVar(&options.WaitForMount, "wait-for-mount", 5*time.Second, "Let parent process wait for given timeout before exit")
+
+	mountCmd.PersistentFlags().
+		Bool("disable-kernel-cache", false, "Disable kerneel cache, but keep blobfuse cache. Default value false.")
+	config.BindPFlag(
+		"disable-kernel-cache",
+		mountCmd.PersistentFlags().Lookup("disable-kernel-cache"),
+	)
 
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)
