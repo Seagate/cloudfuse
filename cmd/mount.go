@@ -123,6 +123,8 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 					return fmt.Errorf("directory is already mounted, unmount manually before remount [%v]", err.Error())
 				}
 			}
+		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
+			return fmt.Errorf("mount directory is not empty")
 		}
 	}
 

@@ -93,7 +93,7 @@ func (suite *libfuseTestSuite) TestConfigDirectIO() {
 	suite.assert.Equal("libfuse", suite.libfuse.Name())
 	suite.assert.Empty(suite.libfuse.mountPath)
 	suite.assert.True(suite.libfuse.readOnly)
-	suite.assert.True(suite.libfuse.traceEnable)
+	suite.assert.False(suite.libfuse.traceEnable)
 	suite.assert.True(suite.libfuse.disableWritebackCache)
 	suite.assert.False(suite.libfuse.ignoreOpenFlags)
 	suite.assert.True(suite.libfuse.allowOther)

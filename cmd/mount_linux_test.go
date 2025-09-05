@@ -108,6 +108,23 @@ components:
   - azstorage
 `
 
+var configDisableKernelCacheTest string = `
+disable-kernel-cache: true
+libfuse:
+  direct-io: true
+azstorage:
+  account-name: myAccountName
+  account-key: myAccountKey
+  mode: key
+  endpoint: myEndpoint
+  container: myContainer
+  max-retries: 1
+components:
+  - libfuse
+  - attr_cache
+  - azstorage
+`
+
 var confFileMntTest, confFilePriorityTest string
 
 type mountTestSuite struct {
@@ -145,7 +162,7 @@ func (suite *mountTestSuite) TestMountDirNotExists() {
 		fmt.Sprintf("--config-file=%s", confFileMntTest),
 	)
 	suite.assert.Error(err)
-	suite.assert.Contains(op, "mount directory does not exists")
+	suite.assert.Contains(op, "mount directory does not exist")
 
 	op, err = executeCommandC(
 		rootCmd,
@@ -155,7 +172,7 @@ func (suite *mountTestSuite) TestMountDirNotExists() {
 		fmt.Sprintf("--config-file=%s", confFileMntTest),
 	)
 	suite.assert.Error(err)
-	suite.assert.Contains(op, "mount directory does not exists")
+	suite.assert.Contains(op, "mount directory does not exist")
 }
 
 // mount failure test where the mount directory is not empty
@@ -383,13 +400,20 @@ func (suite *mountTestSuite) TestDirectIODisableKernelCacheCombo() {
 	tempLogDir := "/tmp/templogs_" + randomString(6)
 	defer os.RemoveAll(tempLogDir)
 
+	confFile, err := os.CreateTemp("", "conf*.yaml")
+	suite.assert.NoError(err)
+	confFileName := confFile.Name()
+	defer os.Remove(confFileName)
+
+	_, err = confFile.WriteString(configDisableKernelCacheTest)
+	suite.assert.NoError(err)
+	confFile.Close()
+
 	op, err := executeCommandC(
 		rootCmd,
 		"mount",
 		mntDir,
-		"-o",
-		"direct_io",
-		"--disable-kernel-cache",
+		fmt.Sprintf("--config-file=%s", confFile.Name()),
 	)
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "direct-io and disable-kernel-cache cannot be enabled together")
