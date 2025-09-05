@@ -100,7 +100,7 @@ func NewStatsManager(count uint32, isExportEnabled bool, pool *BlockPool) (*Stat
 			filepath.Join(common.DefaultWorkDir, strings.ReplaceAll(JSON_FILE_NAME, "{PID}", pid)),
 		)
 		log.Crit("statsManager::NewStatsManager : creating json file %v", path)
-		fh, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+		fh, err = common.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 		if err != nil {
 			log.Err(
 				"statsManager::NewStatsManager : failed to create json file %v [%v]",

@@ -482,7 +482,7 @@ func (xl *Xload) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, 
 		log.Debug("Xload::OpenFile : %s will be served from local path", options.Name)
 	}
 
-	fh, err := os.OpenFile(localPath, options.Flags, options.Mode)
+	fh, err := common.OpenFile(localPath, options.Flags, options.Mode)
 	if err != nil {
 		log.Err("Xload::OpenFile : error opening cached file %s [%s]", options.Name, err.Error())
 		return nil, err

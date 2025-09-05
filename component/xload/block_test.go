@@ -34,6 +34,7 @@
 package xload
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,7 +82,12 @@ func (suite *blockTestSuite) TestBlockAllocateHuge() {
 	b, err := AllocateBlock(50 * 1024 * 1024 * 1024)
 	suite.assert.Nil(b)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "mmap error")
+	suite.assert.Error(err)
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(err.Error(), "insufficient memory available:")
+	} else {
+		suite.assert.Contains(err.Error(), "mmap error")
+	}
 }
 
 func (suite *blockTestSuite) TestBlockFreeNilData() {
@@ -107,7 +113,11 @@ func (suite *blockTestSuite) TestBlockFreeInvalidData() {
 
 	err = b.Delete()
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "invalid argument")
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(err.Error(), "invalid address")
+	} else {
+		suite.assert.Contains(err.Error(), "invalid argument")
+	}
 }
 
 func (suite *blockTestSuite) TestBlockResuse() {

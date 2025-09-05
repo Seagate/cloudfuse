@@ -39,7 +39,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -204,8 +203,19 @@ func (suite *splitterTestSuite) TestProcessFilePresent() {
 	suite.assert.Equal(n, -1)
 
 	fileName := "file_4"
-	cpCmd := exec.Command("cp", filepath.Join(remote_path, fileName), ts.path)
-	_, err = cpCmd.Output()
+	src := filepath.Join(remote_path, fileName)
+    dst := filepath.Join(ts.path, fileName)
+
+    in, err := os.Open(src)
+    suite.assert.NoError(err)
+
+    out, err := os.Create(dst)
+    suite.assert.NoError(err)
+    _, err = io.Copy(out, in)
+    suite.assert.NoError(err)
+    err = out.Close()
+    suite.assert.NoError(err)
+	err = in.Close()
 	suite.assert.NoError(err)
 
 	n, err = ds.Process(&WorkItem{Path: fileName, DataLen: uint64(36)})
@@ -349,6 +359,7 @@ func computeMD5(filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer fh.Close()
 
 	hash := md5.New()
 	if _, err := io.Copy(hash, fh); err != nil {

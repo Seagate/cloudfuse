@@ -86,8 +86,11 @@ func (suite *xloadTestSuite) SetupTest() {
 		panic("Unable to set silent logger as default.")
 	}
 	rand := randomString(8)
-	suite.local_path = filepath.Join("/tmp/", "xload_"+rand)
-	suite.fake_storage_path = filepath.Join("/tmp/", "fake_storage_"+rand)
+
+	base := os.TempDir()
+	suite.local_path = common.JoinUnixFilepath(base, "xload_"+rand)
+	suite.fake_storage_path = common.JoinUnixFilepath(base, "fake_storage_"+rand)
+
 	defaultConfig := fmt.Sprintf(
 		"xload:\n  path: %s\n\nloopbackfs:\n  path: %s\n\nread-only: true",
 		suite.local_path,
@@ -664,7 +667,8 @@ func (suite *xloadTestSuite) validateMD5WithOpenFile(localPath string, remotePat
 		if entry.IsDir() {
 			suite.validateMD5WithOpenFile(localFilePath, remoteFilePath)
 		} else {
-			relPath := strings.TrimPrefix(localFilePath, suite.local_path+"/")
+			relPath, err := filepath.Rel(suite.local_path, localFilePath)
+			suite.assert.NoError(err)
 			fh, err := suite.xload.OpenFile(internal.OpenFileOptions{Name: relPath, Flags: os.O_RDONLY, Mode: common.DefaultFilePermissionBits})
 			suite.assert.NoError(err)
 			suite.assert.NotNil(fh)
