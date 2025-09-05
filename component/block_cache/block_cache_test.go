@@ -763,7 +763,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(
 			&internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data},

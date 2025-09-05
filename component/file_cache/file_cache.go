@@ -362,7 +362,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".schedule") {
-		var rawSchedule []map[string]interface{}
+		var rawSchedule []map[string]any
 		err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
 		if err != nil {
 			log.Err(

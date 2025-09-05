@@ -103,7 +103,7 @@ func (suite *fileTestSuite) waitForCondition(
 	timeout time.Duration,
 	interval time.Duration,
 	condition func() (bool, error),
-	msgAndArgs ...interface{},
+	msgAndArgs ...any,
 ) {
 	startTime := time.Now()
 	var lastErr error

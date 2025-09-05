@@ -669,7 +669,7 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	err := suite.fileCache.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0777})
 	suite.assert.NoError(err)
 	path := src + "/file"
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		handle, err := suite.fileCache.CreateFile(
 			internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777},
 		)
