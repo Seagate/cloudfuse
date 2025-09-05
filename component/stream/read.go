@@ -142,7 +142,7 @@ func (r *ReadCache) getBlock(handle *handlemap.Handle, offset int64) (*common.Bl
 			Offset: block.StartIndex,
 			Data:   block.Data,
 		}
-		_, err := r.NextComponent().ReadInBuffer(options)
+		_, err := r.NextComponent().ReadInBuffer(&options)
 		if err != nil && err != io.EOF {
 			return nil, false, err
 		}
@@ -187,7 +187,7 @@ func (r *ReadCache) copyCachedBlock(
 	return dataRead, nil
 }
 
-func (r *ReadCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (r *ReadCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// if we're only streaming then avoid using the cache
 	if r.StreamOnly || options.Handle.CacheObj.StreamOnly {
 		data, err := r.NextComponent().ReadInBuffer(options)
@@ -224,7 +224,7 @@ func (r *ReadCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr,
 	return r.NextComponent().GetAttr(options)
 }
 
-func (r *ReadCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (r *ReadCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	return 0, syscall.ENOTSUP
 }
 

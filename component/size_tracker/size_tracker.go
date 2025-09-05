@@ -178,7 +178,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})

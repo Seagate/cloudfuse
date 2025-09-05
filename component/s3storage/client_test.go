@@ -1390,7 +1390,9 @@ func (s *clientTestSuite) TestWrite() {
 	offset := rand.IntN(bodyLen-1) + 1 // minimum offset of 1
 	newData := []byte(randomString(bodyLen - offset))
 	h := handlemap.NewHandle(name)
-	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
+	err = s.client.Write(
+		&internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData},
+	)
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{

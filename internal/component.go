@@ -94,9 +94,9 @@ type Component interface {
 
 	RenameFile(RenameFileOptions) error
 
-	ReadInBuffer(ReadInBufferOptions) (int, error)
+	ReadInBuffer(*ReadInBufferOptions) (int, error)
 
-	WriteFile(WriteFileOptions) (int, error)
+	WriteFile(*WriteFileOptions) (int, error)
 	TruncateFile(TruncateFileOptions) error
 
 	CopyToFile(CopyToFileOptions) error

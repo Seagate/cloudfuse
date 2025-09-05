@@ -1392,7 +1392,7 @@ func (suite *attrCacheTestSuite) TestWriteFileError() {
 		Return(&internal.ObjAttr{Path: path}, nil)
 	suite.mock.EXPECT().WriteFile(options).Return(0, errors.New("Failed to write a file"))
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.Error(err)
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
@@ -1414,7 +1414,7 @@ func (suite *attrCacheTestSuite) TestWriteFileDoesNotExist() {
 		Return(&internal.ObjAttr{Path: path}, nil)
 	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.NoError(err)
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
@@ -1432,9 +1432,9 @@ func (suite *attrCacheTestSuite) TestWriteFileExists() {
 	options := internal.WriteFileOptions{Handle: &handle, Metadata: nil}
 	// Entry Already Exists
 	suite.addPathToCache(path, true)
-	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
+	suite.mock.EXPECT().WriteFile(&options).Return(0, nil)
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.NoError(err)
 	suite.assertExists(path)
 }

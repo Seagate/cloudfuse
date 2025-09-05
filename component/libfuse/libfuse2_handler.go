@@ -714,7 +714,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
 	} else {
 		bytesRead, err = fuseFS.NextComponent().ReadInBuffer(
-			internal.ReadInBufferOptions{
+			&internal.ReadInBufferOptions{
 				Handle: handle,
 				Offset: int64(offset),
 				Data:   buff,
@@ -749,7 +749,7 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 	}
 
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
-		internal.WriteFileOptions{
+		&internal.WriteFileOptions{
 			Handle:   handle,
 			Offset:   ofst,
 			Data:     buff,

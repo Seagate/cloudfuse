@@ -179,8 +179,7 @@ func (suite *fileCacheTestSuite) TestEmpty() {
 	suite.assert.Equal(suite.fileCache.tmpPath, suite.cache_path)
 	suite.assert.Equal("lru", suite.fileCache.policy.Name())
 
-	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxSizeMB, 0)
-	suite.assert.EqualValues(defaultMaxEviction, suite.fileCache.policy.(*lruPolicy).maxEviction)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxEviction, defaultMaxEviction)
 	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).highThreshold, defaultMaxThreshold)
 	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, defaultMinThreshold)
 
@@ -743,7 +742,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	suite.assert.FileExists(suite.cache_path + "/" + case3src)
 	// write and flush to cloud
 	initialData := []byte("initialData")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle3,
 		Data:   initialData,
 	})
@@ -788,7 +787,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	//
 	// Case 1
 	// write to file handle
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle1,
 		Data:   data,
 	})
@@ -799,7 +798,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, case1dst))
 	//
 	// Case 2
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle2,
 		Data:   data,
 	})
@@ -807,7 +806,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	suite.assert.Equal(len(data), n)
 	//
 	// Case 3
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle3,
 		Data:   data,
 		Offset: int64(len(initialData)),
@@ -1056,7 +1055,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	testData := "test data"
 	data := []byte(testData)
 
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	handle, loaded := handlemap.Load(handle.ID)
 	suite.assert.True(loaded)
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
@@ -1070,7 +1069,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	handle, err = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	suite.assert.NoError(err)
 	_, err = suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.True(handle.Dirty())
@@ -1151,7 +1150,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.loopback.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.loopback.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	handle, err := suite.fileCache.OpenFile(
@@ -1175,7 +1174,7 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	// Download is required
@@ -1316,7 +1315,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
 
 	data := make([]byte, 0)
 	length, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(0, length)
@@ -1330,13 +1329,13 @@ func (suite *fileCacheTestSuite) TestReadInBufferNoFlush() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, output)
@@ -1350,14 +1349,14 @@ func (suite *fileCacheTestSuite) TestReadInBuffer() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, output)
@@ -1369,7 +1368,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferErrorBadFd() {
 	// Setup
 	file := "file18"
 	handle := handlemap.NewHandle(file)
-	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle})
+	length, err := suite.fileCache.ReadInBuffer(&internal.ReadInBufferOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
 	suite.assert.Equal(0, length)
@@ -1387,7 +1386,7 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 	testData := "test data"
 	data := []byte(testData)
 	length, err := suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 
 	suite.assert.NoError(err)
@@ -1403,7 +1402,7 @@ func (suite *fileCacheTestSuite) TestWriteFileErrorBadFd() {
 	// Setup
 	file := "file20"
 	handle := handlemap.NewHandle(file)
-	len, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle})
+	len, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
 	suite.assert.Equal(0, len)
@@ -1434,7 +1433,7 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
@@ -1493,7 +1492,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	data := []byte("simple scheduled upload test data")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1553,7 +1552,7 @@ loopbackfs:
 	handle1, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.assert.NoError(err)
 	data1 := []byte("file created during scheduler ON window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle1, Data: data1})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle1, Data: data1})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle1})
 	suite.assert.NoError(err)
@@ -1576,7 +1575,7 @@ loopbackfs:
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.assert.NoError(err)
 	data2 := []byte("file created during scheduler OFF window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle2, Data: data2})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle2, Data: data2})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
@@ -1609,7 +1608,7 @@ loopbackfs:
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
 	data := []byte("testing default scheduler behavior")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -1674,7 +1673,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 	// Write new content to the file
 	modifiedContent := []byte("modified cloud file content")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   modifiedContent,
 		Offset: 0,
@@ -1718,7 +1717,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	data := []byte("file to be renamed while in scheduler OFF state")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1794,7 +1793,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	data := []byte("file to be deleted while in scheduler OFF state")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1906,7 +1905,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	_, err = suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Data: initialContent},
+		&internal.WriteFileOptions{Handle: handle, Data: initialContent},
 	)
 	suite.assert.NoError(err)
 
@@ -1931,7 +1930,7 @@ loopbackfs:
 	)
 	suite.assert.NoError(err)
 
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: newContent})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: newContent})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -2031,7 +2030,7 @@ loopbackfs:
 	handle1, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.assert.NoError(err)
 	data1 := []byte("file created during first window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle1, Data: data1})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle1, Data: data1})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle1})
 	suite.assert.NoError(err)
@@ -2046,7 +2045,7 @@ loopbackfs:
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.assert.NoError(err)
 	data2 := []byte("file created during second window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle2, Data: data2})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle2, Data: data2})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
@@ -2063,7 +2062,7 @@ loopbackfs:
 	})
 	suite.assert.NoError(err)
 	updatedData := []byte(" - updated in second window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle1,
 		Data:   updatedData,
 		Offset: int64(len(data1)),
@@ -2150,7 +2149,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	data := make([]byte, size)
 
 	written, err := suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(size, written)
@@ -2316,7 +2315,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase1() {
 
 	// write to file handle
 	data := []byte("newdata")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   data,
 	})
@@ -2362,7 +2361,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase2() {
 
 	// write to file handle
 	data := []byte("newdata")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   data,
 	})
@@ -2397,7 +2396,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase3() {
 	suite.assert.FileExists(suite.cache_path + "/" + src)
 	// write to file handle
 	initialData := []byte("initialData")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   initialData,
 	})
@@ -2418,7 +2417,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase3() {
 	suite.assert.NoError(err)
 	// write to file handle
 	newData := []byte("newData")
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   newData,
 		Offset: int64(len(initialData)),
@@ -2548,14 +2547,14 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
 	output := make([]byte, 9)
 	n, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
@@ -2590,7 +2589,7 @@ func (suite *fileCacheTestSuite) TestZZZZLazyWrite() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	data := make([]byte, 10*1024*1024)
 	_, _ = suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	_ = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
@@ -2629,7 +2628,7 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 	file := "file41"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	data := make([]byte, 1024*1024)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	stat, ret, err := suite.fileCache.StatFs()
 	suite.assert.True(ret)
@@ -2666,7 +2665,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(byteArr), n)
@@ -2681,7 +2680,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
@@ -2697,7 +2696,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(15, n)
@@ -2757,7 +2756,9 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	f, err := suite.fileCache.CreateFile(options1)
 	suite.assert.NoError(err)
 	data = make([]byte, 1*MB)
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
+	n, err := suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: f, Offset: 0, Data: data},
+	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(1*MB, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
@@ -2768,7 +2769,7 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	f, err = suite.fileCache.CreateFile(options1)
 	suite.assert.NoError(err)
 	data = make([]byte, 3*MB)
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.Error(err)
 	suite.assert.Equal(0, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
@@ -2799,7 +2800,7 @@ func (suite *fileCacheTestSuite) TestHandleDataChange() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	handle, loaded := handlemap.Load(handle.ID)
 	suite.assert.True(loaded)
@@ -2958,6 +2959,40 @@ func (suite *fileCacheTestSuite) createRemoteDirectoryStructure() {
 
 	err = os.MkdirAll(filepath.Join(suite.fake_storage_path, "h", "l", "m", "n"), 0777)
 	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) TestHardLimit() {
+	defer suite.cleanupTest()
+	cacheTimeout := 0
+	maxSizeMb := 2
+	config := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  max-size-mb: %d\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		maxSizeMb,
+		cacheTimeout,
+		suite.fake_storage_path,
+	)
+	os.Mkdir(suite.cache_path, 0777)
+	suite.setupTestHelper(
+		config,
+	) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	file := "file96"
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	data := make([]byte, 1024*1024)
+	for i := range int64(5) {
+		suite.fileCache.WriteFile(
+			&internal.WriteFileOptions{Handle: handle, Offset: i * 1024 * 1024, Data: data},
+		)
+	}
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	time.Sleep(1)
+
+	// Now try to open the file and validate we get an error due to hard limit
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.assert.NotNil(err)
+	suite.assert.Nil(handle)
+	suite.assert.Equal(err, syscall.ENOSPC)
 }
 
 // In order for 'go test' to run this suite, we need to create

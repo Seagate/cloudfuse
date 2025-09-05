@@ -70,7 +70,7 @@ type Stats struct {
 
 type ChannelMsg struct {
 	IsEvent bool
-	CompMsg interface{}
+	CompMsg any
 }
 
 type statsManagerOpt struct {

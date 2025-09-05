@@ -114,7 +114,7 @@ func (rw *ReadWriteCache) OpenFile(options internal.OpenFileOptions) (*handlemap
 	return handle, err
 }
 
-func (rw *ReadWriteCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (rw *ReadWriteCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// log.Trace("Stream::ReadInBuffer : name=%s, handle=%d, offset=%d", options.Handle.Path, options.Handle.ID, options.Offset)
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createHandleCache(options.Handle)
@@ -154,7 +154,7 @@ func (rw *ReadWriteCache) ReadInBuffer(options internal.ReadInBufferOptions) (in
 	return read, err
 }
 
-func (rw *ReadWriteCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (rw *ReadWriteCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	// log.Trace("Stream::WriteFile : name=%s, handle=%d, offset=%d", options.Handle.Path, options.Handle.ID, options.Offset)
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createHandleCache(options.Handle)
@@ -500,7 +500,7 @@ func (rw *ReadWriteCache) getBlock(
 		}
 		// check if its a create operation
 		if len(block.Data) != 0 {
-			_, err = rw.NextComponent().ReadInBuffer(options)
+			_, err = rw.NextComponent().ReadInBuffer(&options)
 			if err != nil && err != io.EOF {
 				return nil, false, err
 			}

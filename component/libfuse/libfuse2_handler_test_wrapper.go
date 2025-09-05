@@ -422,6 +422,14 @@ func testTruncateError(suite *libfuseTestSuite) {
 	suite.assert.Equal(-fuse.EIO, err)
 }
 
+// This test is no-op in libfuse2.
+func testFTruncate(suite *libfuseTestSuite) {
+}
+
+// This test is no-op in libfuse2.
+func testFTruncateError(suite *libfuseTestSuite) {
+}
+
 func testUnlink(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"

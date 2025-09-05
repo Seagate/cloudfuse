@@ -418,7 +418,7 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 }
 
 // Read file data into the buffer given in options.Data.
-func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (s3 *S3Storage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
@@ -447,7 +447,7 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	return length, err
 }
 
-func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (s3 *S3Storage) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	err := s3.Storage.Write(options)
 	return len(options.Data), err
 }

@@ -970,7 +970,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 }
 
 // Write : write data at given offset to an object
-func (cl *Client) Write(options internal.WriteFileOptions) error {
+func (cl *Client) Write(options *internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	data := options.Data

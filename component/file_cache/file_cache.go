@@ -268,7 +268,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	fc.refreshSec = conf.RefreshSec
-	fc.hardLimit = conf.HardLimit
+	fc.hardLimit = true
 
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
@@ -352,9 +352,12 @@ func (fc *FileCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
 	}
+	if config.IsSet(compName + ".hard-limit") {
+		fc.hardLimit = conf.HardLimit
+	}
 
 	fc.diskHighWaterMark = 0
-	if conf.HardLimit && conf.MaxSizeMB != 0 {
+	if fc.hardLimit && conf.MaxSizeMB != 0 {
 		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
@@ -1177,7 +1180,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					err.Error(),
 				)
 				_ = f.Close()
-				_ = os.Remove(localPath)
+				err = os.Remove(localPath)
+				if err != nil {
+					log.Err(
+						"FileCache::OpenFile : Failed to remove file %s [%s]",
+						localPath,
+						err.Error(),
+					)
+				}
 				return err
 			}
 		}
@@ -1489,7 +1499,7 @@ func (fc *FileCache) closeFileInternal(
 }
 
 // ReadInBuffer: Read the local file into a buffer
-func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::ReadInBuffer")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
@@ -1535,7 +1545,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 }
 
 // WriteFile: Write to the local file
-func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::WriteFile")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)

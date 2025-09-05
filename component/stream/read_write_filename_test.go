@@ -310,7 +310,7 @@ func (suite *streamTestSuite) TestFilenameReadInBuffer() {
 	suite.mock.EXPECT().
 		ReadInBuffer(readInBufferOptions).
 		Return(len(readInBufferOptions.Data), syscall.ENOENT)
-	_, err := suite.stream.ReadInBuffer(readInBufferOptions)
+	_, err := suite.stream.ReadInBuffer(&readInBufferOptions)
 	suite.assert.Error(err)
 }
 
@@ -398,7 +398,7 @@ func (suite *streamTestSuite) TestFilenameStreamOnly() {
 		Data:   make([]byte, 1*MB),
 	}
 	suite.mock.EXPECT().WriteFile(writeFileOptions).Return(0, syscall.ENOENT)
-	_, err = suite.stream.WriteFile(writeFileOptions)
+	_, err = suite.stream.WriteFile(&writeFileOptions)
 	suite.assert.Error(err)
 }
 
@@ -448,7 +448,7 @@ func (suite *streamTestSuite) TestFilenameReadLargeFileBlocks() {
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
 
-	_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
+	_, _ = suite.stream.ReadInBuffer(&readInBufferOptions)
 
 	assertBlockCached(suite, 0, handle1)
 	assertBlockCached(suite, 1*MB, handle1)
@@ -532,7 +532,7 @@ func (suite *streamTestSuite) TestFilenameWriteToSmallFileEviction() {
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB),
 	}
-	_, _ = suite.stream.WriteFile(writeFileOptions)
+	_, _ = suite.stream.WriteFile(&writeFileOptions)
 
 	assertBlockNotCached(suite, 0, handle)
 	assertBlockCached(suite, 1*MB, handle)
@@ -573,7 +573,7 @@ func (suite *streamTestSuite) TestFilenameLargeFileEviction() {
 	_, _ = suite.stream.OpenFile(openFileOptions)
 
 	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(len(readInBufferOptions.Data), nil)
-	_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
+	_, _ = suite.stream.ReadInBuffer(&readInBufferOptions)
 
 	assertBlockCached(suite, 0, handle)
 	assertNumberOfCachedFileBlocks(suite, 1, handle)
@@ -586,7 +586,7 @@ func (suite *streamTestSuite) TestFilenameLargeFileEviction() {
 	}
 
 	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(len(readInBufferOptions.Data), nil)
-	_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
+	_, _ = suite.stream.ReadInBuffer(&readInBufferOptions)
 
 	assertBlockCached(suite, 1*MB, handle)
 	assertNumberOfCachedFileBlocks(suite, 2, handle)
@@ -597,11 +597,11 @@ func (suite *streamTestSuite) TestFilenameLargeFileEviction() {
 		Offset: 1*MB + 2,
 		Data:   make([]byte, 2),
 	}
-	_, _ = suite.stream.WriteFile(writeFileOptions)
+	_, _ = suite.stream.WriteFile(&writeFileOptions)
 
 	// write to first block
 	writeFileOptions.Offset = 2
-	_, _ = suite.stream.WriteFile(writeFileOptions)
+	_, _ = suite.stream.WriteFile(&writeFileOptions)
 
 	// append to file
 	writeFileOptions.Offset = 2*MB + 4
@@ -617,7 +617,7 @@ func (suite *streamTestSuite) TestFilenameLargeFileEviction() {
 		Do(callbackFunc).
 		Return(nil)
 
-	_, _ = suite.stream.WriteFile(writeFileOptions)
+	_, _ = suite.stream.WriteFile(&writeFileOptions)
 
 	assertBlockCached(suite, 0, handle)
 	assertBlockCached(suite, 2*MB, handle)
@@ -688,7 +688,7 @@ func (suite *streamTestSuite) TestFilenameStreamOnly2() {
 		Handle: handle2,
 		Offset: 0,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
-	_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
+	_, _ = suite.stream.ReadInBuffer(&readInBufferOptions)
 
 	assertBlockCached(suite, 0, handle2)
 	assertNumberOfCachedFileBlocks(suite, 1, handle2)

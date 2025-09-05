@@ -34,7 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -654,7 +654,7 @@ func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
 }
 
 // ReadInBuffer: Read the file into a buffer
-func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	if options.Offset >= options.Handle.Size {
 		// EOF reached so early exit
 		return 0, io.EOF
@@ -1234,7 +1234,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 	var etag string
 	// If file does not exists then download the block from the container
-	n, err := bc.NextComponent().ReadInBuffer(internal.ReadInBufferOptions{
+	n, err := bc.NextComponent().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: item.handle,
 		Offset: int64(item.block.offset),
 		Data:   item.block.data,
@@ -1361,7 +1361,7 @@ func (bc *BlockCache) download(item *workItem) {
 }
 
 // WriteFile: Write to the local file
-func (bc *BlockCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (bc *BlockCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	// log.Debug("BlockCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	options.Handle.Lock()
@@ -2004,7 +2004,7 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, []stri
 	for k := range listMap {
 		offsets = append(offsets, k)
 	}
-	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
+	slices.Sort(offsets)
 
 	zeroBlockStaged := false
 	zeroBlockID := ""

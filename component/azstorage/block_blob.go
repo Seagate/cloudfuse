@@ -189,11 +189,20 @@ func (bb *BlockBlob) TestPipeline() error {
 		return nil
 	}
 
+	includeFields := bb.listDetails
+	if bb.listDetails.Permissions {
+		// This flag is set to true if user has explicitly asked to mount a HNS account
+		// Validate account is indeed HNS checking permissions field
+		// If the account is FNS, the call will fail with InvalidQueryParameterValue and such mount shall fail
+		includeFields.Permissions = true
+	}
+
 	listBlobPager := bb.Container.NewListBlobsHierarchyPager(
 		"/",
 		&container.ListBlobsHierarchyOptions{
 			MaxResults: to.Ptr((int32)(2)),
 			Prefix:     &bb.Config.prefixPath,
+			Include:    includeFields,
 		},
 	)
 
@@ -207,6 +216,12 @@ func (bb *BlockBlob) TestPipeline() error {
 		var respErr *azcore.ResponseError
 		errors.As(err, &respErr)
 		if respErr != nil {
+			if respErr.ErrorCode == "InvalidQueryParameterValue" {
+				// User explicitly mounting FNS account as HNS which is not supported
+				return fmt.Errorf(
+					"BlockBlob::TestPipeline : Detected FNS account being mounted as HNS",
+				)
+			}
 			return fmt.Errorf("BlockBlob::TestPipeline : [%s]", respErr.ErrorCode)
 		}
 		return err
@@ -920,7 +935,7 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 		azStatsCollector.PushEvents(
 			downloadProgress,
 			name,
-			map[string]interface{}{bytesTfrd: bytesTransferred, size: count},
+			map[string]any{bytesTfrd: bytesTransferred, size: count},
 		)
 	}
 }
@@ -1172,7 +1187,7 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 		azStatsCollector.PushEvents(
 			uploadProgress,
 			name,
-			map[string]interface{}{bytesTfrd: bytesTransferred, size: count},
+			map[string]any{bytesTfrd: bytesTransferred, size: count},
 		)
 	}
 }
@@ -1556,7 +1571,7 @@ func (bb *BlockBlob) HandleSmallFile(name string, size int64, originalSize int64
 }
 
 // Write : write data at given offset to a blob
-func (bb *BlockBlob) Write(options internal.WriteFileOptions) error {
+func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	defer log.TimeTrack(time.Now(), "BlockBlob::Write", options.Handle.Path)

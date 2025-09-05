@@ -121,7 +121,7 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 		WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
 		Return(len(data), nil)
 	_, err = suite.sizeTracker.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 
@@ -178,7 +178,7 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 		WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
 		Return(len(data), nil)
 	_, err = suite.sizeTracker.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 
