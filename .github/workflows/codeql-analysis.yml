@@ -58,9 +58,14 @@ jobs:
           go-version: "1.25"
           check-latest: true
 
-      - name: Go Version
-        if: matrix.language == 'go'
-        run: go version
+      - name: Cache Go build cache
+        if: matrix.language == 'go' && runner.os == 'Linux'
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-codeql-go-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-codeql-go-build-
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
