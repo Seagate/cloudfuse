@@ -219,11 +219,14 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 			// if not already done, record the fact that the directory has been deleted
 			if !found {
 				log.Info("AttrCache::deleteDirectory : %s recording directory as deleted", path)
-				ac.cache.insert(insertOptions{
-					attr:     internal.CreateObjAttrDir(path),
-					exists:   false,
-					cachedAt: deletedAt,
-				})
+				// Don't add more items if we are full
+				if len(ac.cache.cacheMap) > ac.maxFiles {
+					ac.cache.insert(insertOptions{
+						attr:     internal.CreateObjAttrDir(path),
+						exists:   false,
+						cachedAt: deletedAt,
+					})
+				}
 			}
 			return nil
 		}
@@ -333,11 +336,14 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 		if !found || !dirCacheItem.exists() {
 			log.Warn("AttrCache::markAncestorsInCloud : Adding parent directory %s", dirPath)
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
-			dirCacheItem = ac.cache.insert(insertOptions{
-				attr:     dirObjAttr,
-				exists:   true,
-				cachedAt: time,
-			})
+			// Don't add more items if we are full
+			if len(ac.cache.cacheMap) > ac.maxFiles {
+				dirCacheItem = ac.cache.insert(insertOptions{
+					attr:     dirObjAttr,
+					exists:   true,
+					cachedAt: time,
+				})
+			}
 		} else if dirCacheItem.isInCloud() {
 			// flag is already updated - no need to continue
 			return
@@ -434,16 +440,19 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		if found {
 			oldDirAttrCacheItem.invalidate()
 		}
-		// add (or replace) the directory entry
-		newDirAttr := internal.CreateObjAttrDir(options.Name)
-		newDirAttrCacheItem := ac.cache.insert(insertOptions{
-			attr:     newDirAttr,
-			exists:   true,
-			cachedAt: time.Now(),
-		})
-		// update flags for tracking directory existence
-		if ac.cacheDirs {
-			newDirAttrCacheItem.markInCloud(false)
+		// Don't add more items if we are full
+		if len(ac.cache.cacheMap) > ac.maxFiles {
+			// add (or replace) the directory entry
+			newDirAttr := internal.CreateObjAttrDir(options.Name)
+			newDirAttrCacheItem := ac.cache.insert(insertOptions{
+				attr:     newDirAttr,
+				exists:   true,
+				cachedAt: time.Now(),
+			})
+			// update flags for tracking directory existence
+			if ac.cacheDirs {
+				newDirAttrCacheItem.markInCloud(false)
+			}
 		}
 	}
 	return err
@@ -622,6 +631,11 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath s
 		ac.markAncestorsInCloud(listDirPath, currTime)
 	}
 	for _, attr := range pathList {
+		// Don't add more items if we are full
+		if len(ac.cache.cacheMap) > ac.maxFiles {
+			break
+		}
+
 		ac.cache.insert(insertOptions{
 			attr:        attr,
 			exists:      true,
@@ -787,14 +801,17 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			// record that the parent directory tree contains at least one object
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
-		// add new entry
-		newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
-		newFileEntry := ac.cache.insert(insertOptions{
-			attr:     newFileAttr,
-			exists:   true,
-			cachedAt: currentTime,
-		})
-		newFileEntry.setMode(options.Mode)
+		// Don't add more items if we are full
+		if len(ac.cache.cacheMap) < ac.maxFiles {
+			// add new entry
+			newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
+			newFileEntry := ac.cache.insert(insertOptions{
+				attr:     newFileAttr,
+				exists:   true,
+				cachedAt: currentTime,
+			})
+			newFileEntry.setMode(options.Mode)
+		}
 	}
 
 	return h, err
@@ -838,13 +855,16 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 				"AttrCache::DeleteFile : %s no valid entry found. Adding entry...",
 				options.Name,
 			)
-			// add deleted file entry
-			attr := internal.CreateObjAttr(options.Name, 0, deletionTime)
-			toBeDeleted = ac.cache.insert(insertOptions{
-				attr:     attr,
-				exists:   true,
-				cachedAt: deletionTime,
-			})
+			// Don't add more items if we are full
+			if len(ac.cache.cacheMap) > ac.maxFiles {
+				// add deleted file entry
+				attr := internal.CreateObjAttr(options.Name, 0, deletionTime)
+				toBeDeleted = ac.cache.insert(insertOptions{
+					attr:     attr,
+					exists:   true,
+					cachedAt: deletionTime,
+				})
+			}
 		}
 		toBeDeleted.markDeleted(deletionTime)
 		if ac.cacheDirs {
@@ -863,12 +883,15 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		ancestorCacheItem, found := ac.cache.get(dirPath)
 		if !found || !ancestorCacheItem.exists() {
 			log.Warn("AttrCache::updateAncestorsInCloud : Adding directory entry %s", dirPath)
-			ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
-			ancestorCacheItem = ac.cache.insert(insertOptions{
-				attr:     ancestorObjAttr,
-				exists:   true,
-				cachedAt: time,
-			})
+			// Don't add more items if we are full
+			if len(ac.cache.cacheMap) > ac.maxFiles {
+				ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
+				ancestorCacheItem = ac.cache.insert(insertOptions{
+					attr:     ancestorObjAttr,
+					exists:   true,
+					cachedAt: time,
+				})
+			}
 		}
 		var anyChildrenInCloud bool
 
@@ -946,13 +969,16 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		modifiedEntry, found := ac.cache.get(options.Handle.Path)
 		if !found || !modifiedEntry.exists() {
 			log.Warn("AttrCache::WriteFile : %s replacing missing cache entry", options.Handle.Path)
-			// replace the missing entry
-			modifiedAttr := internal.CreateObjAttr(options.Handle.Path, newSize, modifyTime)
-			modifiedEntry = ac.cache.insert(insertOptions{
-				attr:     modifiedAttr,
-				exists:   true,
-				cachedAt: modifyTime,
-			})
+			// Don't add more items if we are full
+			if len(ac.cache.cacheMap) > ac.maxFiles {
+				// replace the missing entry
+				modifiedAttr := internal.CreateObjAttr(options.Handle.Path, newSize, modifyTime)
+				modifiedEntry = ac.cache.insert(insertOptions{
+					attr:     modifiedAttr,
+					exists:   true,
+					cachedAt: modifyTime,
+				})
+			}
 		}
 		modifiedEntry.setSize(newSize, modifyTime)
 		modifiedEntry.attr.Metadata = options.Metadata
@@ -974,13 +1000,16 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		truncatedItem, found := ac.cache.get(options.Name)
 		if !found || !truncatedItem.exists() {
 			log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
-			// replace the missing entry
-			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, modifyTime)
-			truncatedItem = ac.cache.insert(insertOptions{
-				attr:     truncatedAttr,
-				exists:   true,
-				cachedAt: modifyTime,
-			})
+			// Don't add more items if we are full
+			if len(ac.cache.cacheMap) > ac.maxFiles {
+				// replace the missing entry
+				truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, modifyTime)
+				truncatedItem = ac.cache.insert(insertOptions{
+					attr:     truncatedAttr,
+					exists:   true,
+					cachedAt: modifyTime,
+				})
+			}
 		}
 		truncatedItem.setSize(options.Size, modifyTime)
 	}
@@ -1047,14 +1076,17 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 				entry.invalidate()
 			}
 		} else {
-			// replace entry
-			attr := internal.CreateObjAttr(options.Name, fileStat.Size(), fileStat.ModTime())
-			entry := ac.cache.insert(insertOptions{
-				attr:     attr,
-				exists:   true,
-				cachedAt: uploadTime,
-			})
-			entry.setMode(fileStat.Mode())
+			// Don't add more items if we are full
+			if len(ac.cache.cacheMap) > ac.maxFiles {
+				// replace entry
+				attr := internal.CreateObjAttr(options.Name, fileStat.Size(), fileStat.ModTime())
+				entry := ac.cache.insert(insertOptions{
+					attr:     attr,
+					exists:   true,
+					cachedAt: uploadTime,
+				})
+				entry.setMode(fileStat.Mode())
+			}
 		}
 	}
 	return err
@@ -1116,21 +1148,27 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	switch err {
 	case nil:
 		// Retrieved attributes so cache them
-		ac.cache.insert(insertOptions{
-			attr:     pathAttr,
-			exists:   true,
-			cachedAt: time.Now(),
-		})
+		// Don't add more items if we are full
+		if len(ac.cache.cacheMap) > ac.maxFiles {
+			ac.cache.insert(insertOptions{
+				attr:     pathAttr,
+				exists:   true,
+				cachedAt: time.Now(),
+			})
+		}
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	case syscall.ENOENT:
 		// cache this entity not existing
-		ac.cache.insert(insertOptions{
-			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
-			exists:   false,
-			cachedAt: time.Now(),
-		})
+		// Don't add more items if we are full
+		if len(ac.cache.cacheMap) > ac.maxFiles {
+			ac.cache.insert(insertOptions{
+				attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
+				exists:   false,
+				cachedAt: time.Now(),
+			})
+		}
 	}
 	return pathAttr, err
 }
@@ -1145,17 +1183,20 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		currentTime := time.Now()
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
-		linkAttr := internal.CreateObjAttr(
-			options.Name,
-			int64(len([]byte(options.Target))),
-			currentTime,
-		)
-		linkAttr.Flags.Set(internal.PropFlagSymlink)
-		ac.cache.insert(insertOptions{
-			attr:     linkAttr,
-			exists:   true,
-			cachedAt: currentTime,
-		})
+		// Don't add more items if we are full
+		if len(ac.cache.cacheMap) > ac.maxFiles {
+			linkAttr := internal.CreateObjAttr(
+				options.Name,
+				int64(len([]byte(options.Target))),
+				currentTime,
+			)
+			linkAttr.Flags.Set(internal.PropFlagSymlink)
+			ac.cache.insert(insertOptions{
+				attr:     linkAttr,
+				exists:   true,
+				cachedAt: currentTime,
+			})
+		}
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
