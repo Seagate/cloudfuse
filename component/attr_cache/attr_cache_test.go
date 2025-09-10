@@ -1812,10 +1812,31 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	_, err = suite.attrCache.GetAttr(options2)
 	suite.assert.NoError(err)
 
-	// Verify both items are in cache (plus root)
-	suite.assert.Len(suite.attrCache.cache.cacheMap, 3)
+	// Add a nested directory with a child (both old/expired)
+	parentDir := "parentdir"
+	childFile := parentDir + "/childfile"
+	parentOptions := internal.GetAttrOptions{Name: parentDir}
+	childOptions := internal.GetAttrOptions{Name: childFile}
+
+	// Expect GetAttr calls for the directory and its child
+	suite.mock.EXPECT().GetAttr(parentOptions).Return(getDirPathAttr(parentDir), nil)
+	suite.mock.EXPECT().
+		GetAttr(childOptions).
+		Return(getPathAttr(childFile, defaultSize, fs.FileMode(defaultMode), true), nil)
+
+	_, err = suite.attrCache.GetAttr(parentOptions)
+	suite.assert.NoError(err)
+	_, err = suite.attrCache.GetAttr(childOptions)
+	suite.assert.NoError(err)
+
+	// Verify items are in cache (plus root)
+	suite.assert.Len(
+		suite.attrCache.cache.cacheMap,
+		5,
+	) // root + file1 + file2 + parentdir + parentdir/childfile
 	suite.assertUntouched(path1)
 	suite.assertUntouched(path2)
+	suite.assertUntouched(childFile)
 
 	// Wait for cache timeout to expire, plus additional time for background cleanup to run
 	time.Sleep(time.Second * time.Duration(cacheTimeout+1))
@@ -1843,6 +1864,8 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	suite.assert.Len(suite.attrCache.cache.cacheMap, 1)
 	suite.assert.NotContains(suite.attrCache.cache.cacheMap, path1)
 	suite.assert.NotContains(suite.attrCache.cache.cacheMap, path2)
+	suite.assert.NotContains(suite.attrCache.cache.cacheMap, parentDir)
+	suite.assert.NotContains(suite.attrCache.cache.cacheMap, childFile)
 	suite.assert.Contains(suite.attrCache.cache.cacheMap, "")
 }
 
