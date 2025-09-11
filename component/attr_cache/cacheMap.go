@@ -64,7 +64,7 @@ type attrCacheItem struct {
 type cacheTreeMap struct {
 	cacheMap  map[string]*attrCacheItem
 	cacheTree *attrCacheItem
-	maxFiles int
+	maxFiles  int
 }
 
 // type passed to insert
@@ -88,7 +88,7 @@ func newCacheTreeMap(maxFiles int) *cacheTreeMap {
 	return &cacheTreeMap{
 		cacheMap:  cacheMap,
 		cacheTree: rootNode,
-		maxFiles: maxFiles,
+		maxFiles:  maxFiles,
 	}
 }
 
