@@ -16,13 +16,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.0
 	github.com/aws/smithy-go v1.23.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/gdamore/tcell/v2 v2.8.1
+	github.com/gdamore/tcell/v2 v2.9.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/golang/mock v1.6.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
-	github.com/rivo/tview v0.0.0-20250625164341-a4a78f1e05cb
+	github.com/rivo/tview v0.42.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sevlyar/go-daemon v0.1.7-0.20240723083326-c2a11b2b57fc
 	github.com/shirou/gopsutil/v4 v4.25.8
