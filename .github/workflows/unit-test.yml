@@ -178,6 +178,7 @@ jobs:
         env:
           JOB_NAME: ${{ matrix.job_name }}
           RUNNER_ARCH: ${{ runner.arch }}
+          GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
           if [[ "$OSTYPE" == "linux-gnu"* ]]; then
             # Set Zig as the C/C++ compiler for CGO during tests
@@ -206,7 +207,7 @@ jobs:
     strategy:
       matrix:
         os: ["windows-latest", "windows-11-arm"]
-    
+
     runs-on: ${{ matrix.os }}
     env:
       go: "1.25"
@@ -237,6 +238,8 @@ jobs:
           ./build.sh
 
       - name: Run unit tests
+        env:
+          GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: go test -v -timeout=1h ./... --tags=unittest,authtest
 
   lint:
