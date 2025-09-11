@@ -414,7 +414,9 @@ func (ac *AttrCache) cleanupExpiredEntries() {
 				if len(item.children) == 0 &&
 					time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 					if item.parent != nil {
-						item.parent.listCache = nil
+						if item.exists() {
+							item.parent.listCache = nil
+						}
 						delete(item.parent.children, item.attr.Name)
 					}
 					delete(ac.cache.cacheMap, path)
