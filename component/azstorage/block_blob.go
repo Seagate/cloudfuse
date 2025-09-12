@@ -28,7 +28,6 @@ package azstorage
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -831,7 +830,9 @@ func (bb *BlockBlob) processBlobPrefixes(
 				// marker file not found in current iteration, so we need to manually check attributes via REST
 				_, err := bb.getAttrUsingRest(*blobInfo.Name)
 				// marker file also not found via manual check, safe to add to list
-				if err == syscall.ENOENT {
+				// For HNS accounts mounted as FNS we used to list directories and files in blobfusev1,
+				// in blobfusev2 to replicate this behaviour the below check of blobInfo.Properties != nil is added.
+				if err == syscall.ENOENT || blobInfo.Properties != nil {
 					attr := bb.createDirAttr(*blobInfo.Name)
 					*blobList = append(*blobList, attr)
 				}
@@ -966,7 +967,7 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 
 	if bb.Config.validateMD5 {
 		// Compute md5 of local file
-		fileMD5, err := getMD5(fi)
+		fileMD5, err := common.GetMD5(fi)
 		if err != nil {
 			log.Warn("BlockBlob::ReadToFile : Failed to generate MD5 Sum for %s", name)
 		} else {
@@ -1212,7 +1213,7 @@ func (bb *BlockBlob) WriteFromFile(
 	// hence we take cost of calculating md5 only for files which are bigger in size and which will be converted to blocks.
 	md5sum := []byte{}
 	if bb.Config.updateMD5 && stat.Size() >= blockblob.MaxUploadBlobBytes {
-		md5sum, err = getMD5(fi)
+		md5sum, err = common.GetMD5(fi)
 		if err != nil {
 			// Md5 sum generation failed so set nil while uploading
 			log.Warn("BlockBlob::WriteFromFile : Failed to generate md5 of %s", name)
@@ -1336,7 +1337,7 @@ func (bb *BlockBlob) GetFileBlockOffsets(name string) (*common.BlockOffsetList, 
 }
 
 func (bb *BlockBlob) createBlock(blockIdLength, startIndex, size int64) *common.Block {
-	newBlockId := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(blockIdLength))
+	newBlockId := common.GetBlockID(blockIdLength)
 	newBlock := &common.Block{
 		Id:         newBlockId,
 		StartIndex: startIndex,
@@ -1435,14 +1436,14 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 			blobClient := bb.Container.NewBlockBlobClient(blobName)
 
 			blkList := make([]string, 0)
-			id := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+			id := common.GetBlockID(common.BlockIDLength)
 
 			for i := 0; size > 0; i++ {
 				if i == 0 || size < blkSize {
 					// Only first and last block we upload and rest all we replicate with the first block itself
 					if size < blkSize {
 						blkSize = size
-						id = base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+						id = common.GetBlockID(common.BlockIDLength)
 					}
 					data := make([]byte, blkSize)
 

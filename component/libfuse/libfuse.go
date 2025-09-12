@@ -75,6 +75,7 @@ type Libfuse struct {
 	umask                 uint32
 	displayCapacityMb     uint64
 	windowsSDDL           string
+	disableKernelCache    bool
 }
 
 // To support pagination in readdir calls this structure holds a block of items for a given directory
@@ -206,6 +207,12 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.ownerUID = opt.Uid
 	lf.umask = opt.Umask
 	lf.windowsSDDL = opt.WindowsSSDL
+
+	if lf.disableKernelCache {
+		opt.DirectIO = true
+		lf.directIO = true
+		log.Crit("Libfuse::Validate : Kernel cache disabled, setting direct-io mode in fuse")
+	}
 
 	if opt.allowOther {
 		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)
@@ -348,10 +355,20 @@ func (lf *Libfuse) Configure(_ bool) error {
 		return err
 	}
 
+	_ = config.UnmarshalKey("disable-kernel-cache", &lf.disableKernelCache)
+
 	err = lf.Validate(&conf)
 	if err != nil {
 		log.Err("Libfuse::Configure : config error [invalid config settings]")
 		return fmt.Errorf("%s config error %s", lf.Name(), err.Error())
+	}
+
+	// Disable libfuse logs if the mount is not running in foreground.
+	// Currently as of 01-05-2025, we emit the libfuse logs only to the stdout.
+	if !common.ForegroundMount {
+		if lf.traceEnable {
+			lf.traceEnable = false
+		}
 	}
 
 	log.Crit(

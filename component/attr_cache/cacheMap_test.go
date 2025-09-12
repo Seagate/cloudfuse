@@ -46,7 +46,7 @@ type cacheMapTestSuite struct {
 // what is every test going to need to test with?
 func (suite *cacheMapTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
-	suite.cache = *newCacheTreeMap()
+	suite.cache = *newCacheTreeMap(5000)
 	// set up nested Dir tree
 	nestedDir, nestedFiles := generateFSTree("a")
 	// directories

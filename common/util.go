@@ -29,6 +29,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -104,11 +105,12 @@ func IsMountActive(path string) (bool, error) {
 	// out contains the list of pids of the processes that are running
 	pidString := strings.ReplaceAll(out.String(), "\n", " ")
 	pids := strings.Split(pidString, " ")
+	myPid := strconv.Itoa(os.Getpid())
 	for _, pid := range pids {
 		// Get the mount path for this pid
 		// For this we need to check the command line arguments given to this command
 		// If the path is same then we need to return true
-		if pid == "" {
+		if pid == "" || pid == myPid {
 			continue
 		}
 
@@ -530,4 +532,71 @@ func SanitizeName(name string) string {
 		"_",
 	)
 	return replacer.Replace(name)
+}
+
+func GetMD5(fi *os.File) ([]byte, error) {
+	hasher := md5.New()
+	_, err := io.Copy(hasher, fi)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate md5 [%s]", err.Error())
+	}
+
+	return hasher.Sum(nil), nil
+}
+
+func ComponentInPipeline(pipeline []string, component string) bool {
+	for _, comp := range pipeline {
+		if comp == component {
+			return true
+		}
+	}
+
+	return false
+}
+
+func ValidatePipeline(pipeline []string) error {
+	// file-cache, block-cache and xload are mutually exclusive
+	if ComponentInPipeline(pipeline, "file_cache") &&
+		ComponentInPipeline(pipeline, "block_cache") {
+		return fmt.Errorf("mount: file-cache and block-cache cannot be used together")
+	}
+
+	if ComponentInPipeline(pipeline, "file_cache") &&
+		ComponentInPipeline(pipeline, "xload") {
+		return fmt.Errorf("mount: file-cache and xload cannot be used together")
+	}
+
+	if ComponentInPipeline(pipeline, "block_cache") &&
+		ComponentInPipeline(pipeline, "xload") {
+		return fmt.Errorf("mount: block-cache and xload cannot be used together")
+	}
+
+	return nil
+}
+
+func UpdatePipeline(pipeline []string, component string) []string {
+	if ComponentInPipeline(pipeline, component) {
+		return pipeline
+	}
+
+	if component == "xload" {
+		for i, comp := range pipeline {
+			if comp == "file_cache" || comp == "block_cache" {
+				pipeline[i] = component
+				return pipeline
+			}
+		}
+	}
+
+	if component == "block_cache" {
+		for i, comp := range pipeline {
+			if comp == "file_cache" || comp == "xload" {
+				pipeline[i] = component
+				return pipeline
+			}
+		}
+	}
+
+	return pipeline
 }
