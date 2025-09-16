@@ -400,7 +400,9 @@ func restoreIgnored() smithyMiddleware.FinalizeMiddleware {
 // where GCS rejects the x-id URL parameter that SDKv2 inserts.
 func removeXIDParameter(o *s3.Options) {
 	o.APIOptions = append(o.APIOptions, func(stack *smithyMiddleware.Stack) error {
-		if err := stack.Finalize.Insert(removeXIDFinalize(), "Signing", smithyMiddleware.After); err != nil {
+		// Insert a finalize middleware before signing to remove x-id so the
+		// signature is calculated without the x-id query parameter.
+		if err := stack.Finalize.Insert(removeXIDFinalize(), "Signing", smithyMiddleware.Before); err != nil {
 			return err
 		}
 		return nil
