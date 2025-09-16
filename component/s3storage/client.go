@@ -226,6 +226,8 @@ func (cl *Client) Configure(cfg Config) error {
 
 			// GCS also has issues with trailing checksums in UploadPart and PutObject operations
 			disableTrailingChecksumForGCS(o)
+
+			// Enable per-call content-md5 override via withContentMD5 (applied per request)
 		}
 	})
 
@@ -459,6 +461,20 @@ func disableTrailingChecksumForGCS(o *s3.Options) {
 				return next.HandleInitialize(ctx, in)
 			},
 		), smithyMiddleware.Before)
+	})
+}
+
+// withContentMD5 removes all flexible checksum procedures from an operation,
+// instead computing an MD5 checksum for the request payload.
+func withContentMD5(o *s3.Options) {
+	o.APIOptions = append(o.APIOptions, func(stack *smithyMiddleware.Stack) error {
+		// remove SDK checksum middleware that might interfere
+		stack.Initialize.Remove("AWSChecksum:SetupInputContext")
+		stack.Build.Remove("AWSChecksum:RequestMetricsTracking")
+		stack.Finalize.Remove("AWSChecksum:ComputeInputPayloadChecksum")
+		stack.Finalize.Remove("addInputChecksumTrailer")
+		// AddContentChecksumMiddleware from transport/http will configure content-md5
+		return smithyHttp.AddContentChecksumMiddleware(stack)
 	})
 }
 

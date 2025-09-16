@@ -212,13 +212,18 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		}
 	}
 	// send keyList for deletion
+	// GCS S3 endpoint requires Content-MD5 for this request. Inject a Content-MD5 header
+	// containing the base64(md5(body)) so GCS accepts the DeleteObjects call. We add the
+	// middleware via per-call APIOptions so it runs before the signer.
+	// Only add Content-MD5 middleware for Google Cloud Storage endpoints
+
 	result, err := cl.AwsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
 		Bucket: &cl.Config.AuthConfig.BucketName,
 		Delete: &types.Delete{
 			Objects: keyList,
 			Quiet:   aws.Bool(true),
 		},
-	})
+	}, withContentMD5)
 	if err != nil {
 		log.Err(
 			"Client::DeleteDirectory : Failed to delete %d files. Here's why: %v",
