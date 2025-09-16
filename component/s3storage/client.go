@@ -218,6 +218,12 @@ func (cl *Client) Configure(cfg Config) error {
 		if strings.Contains(cl.Config.AuthConfig.Endpoint, "storage.googleapis.com") {
 			// GCS alters the Accept-Encoding header which breaks the request signature
 			ignoreSigningHeaders(o, []string{"Accept-Encoding"})
+			// GCS sees x-id as an invalid parameter the SDKv2 inserts.
+			// Remove the x-id query parameter after signing so the SDK can still
+			// include it when computing the signature but the final request sent
+			// to GCS does not include it which GCS rejects.
+			removeXIDParameter(o)
+
 			// GCS also has issues with trailing checksums in UploadPart and PutObject operations
 			disableTrailingChecksumForGCS(o)
 		}
@@ -382,6 +388,41 @@ func restoreIgnored() smithyMiddleware.FinalizeMiddleware {
 			ignored, _ := smithyMiddleware.GetStackValue(ctx, ignoredHeadersKey{}).(map[string]string)
 			for k, v := range ignored {
 				req.Header.Set(k, v)
+			}
+
+			return next.HandleFinalize(ctx, in)
+		},
+	)
+}
+
+// removeXIDParameter removes the "x-id" query parameter from the outgoing
+// request after the SDK has signed it. This mirrors the workaround in rclone
+// where GCS rejects the x-id URL parameter that SDKv2 inserts.
+func removeXIDParameter(o *s3.Options) {
+	o.APIOptions = append(o.APIOptions, func(stack *smithyMiddleware.Stack) error {
+		if err := stack.Finalize.Insert(removeXIDFinalize(), "Signing", smithyMiddleware.After); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func removeXIDFinalize() smithyMiddleware.FinalizeMiddleware {
+	return smithyMiddleware.FinalizeMiddlewareFunc(
+		"RemoveXID",
+		func(ctx context.Context, in smithyMiddleware.FinalizeInput, next smithyMiddleware.FinalizeHandler) (out smithyMiddleware.FinalizeOutput, metadata smithyMiddleware.Metadata, err error) {
+			req, ok := in.Request.(*smithyHttp.Request)
+			if !ok {
+				return out, metadata, &v4.SigningError{
+					Err: fmt.Errorf("(removeXIDFinalize) unexpected request type %T", in.Request),
+				}
+			}
+
+			// Remove the "x-id" query parameter if present.
+			if q := req.URL.Query(); q.Has("x-id") {
+				q.Del("x-id")
+				// Re-encode the query back into the RawQuery string
+				req.URL.RawQuery = q.Encode()
 			}
 
 			return next.HandleFinalize(ctx, in)
