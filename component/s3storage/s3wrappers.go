@@ -225,12 +225,14 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 			len(objects),
 			err,
 		)
-		for i := 0; i < len(result.Errors); i++ {
-			log.Err(
-				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
-				result.Errors[i].Key,
-				result.Errors[i].Message,
-			)
+		if result != nil {
+			for i := 0; i < len(result.Errors); i++ {
+				log.Err(
+					"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
+					result.Errors[i].Key,
+					result.Errors[i].Message,
+				)
+			}
 		}
 	}
 
