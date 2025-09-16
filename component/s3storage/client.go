@@ -58,6 +58,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/logging"
 	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
@@ -156,12 +157,25 @@ func (cl *Client) Configure(cfg Config) error {
 		)
 	}
 
+	logPath := "/home/jfan/code/cloudfuse/s3_aws_sdk.log"
+    f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+    _, _ = f.WriteString("\n===== SDK LOG START " + time.Now().Format(time.RFC3339) + " =====\n")
+
+
 	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.AuthConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithAppID(UserAgent()),
 		config.WithRegion(cl.Config.AuthConfig.Region),
+		config.WithLogger(logging.NewStandardLogger(f)),
+
+        // Turn on request/response logging including bodies
+        config.WithClientLogMode(
+            aws.LogRequest|aws.LogResponse|
+                aws.LogRequestWithBody|aws.LogResponseWithBody|
+                aws.LogSigning|aws.LogRetries,
+        ),
 	)
 
 	if err != nil {
@@ -188,11 +202,17 @@ func (cl *Client) Configure(cfg Config) error {
 			o.UsePathStyle = true
 			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
 			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+			o.DisableLogOutputChecksumValidationSkipped = true
+			o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+			o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 		})
 	} else {
 		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
 			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+			o.DisableLogOutputChecksumValidationSkipped = true
+			o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+			o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 		})
 	}
 

@@ -141,7 +141,6 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			Key:               aws.String(key),
 			Body:              body,
 			ContentType:       aws.String(getContentType(key)),
-			ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
 		})
 		return err
 	}
@@ -154,7 +153,6 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 		Bucket:            aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:               aws.String(key),
 		ContentType:       aws.String(getContentType(key)),
-		ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
 	})
 	if err != nil {
 		return err
@@ -191,7 +189,6 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 				int64(partNumber-1)*partSizeBytes,
 				endSize,
 			),
-			ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
 		})
 
 		checksumCRC32 = partResp.ChecksumCRC32
@@ -326,7 +323,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 	}
 	s.bucket = bucket
 	storageTestConfigurationParameters.EnableDirMarker = true
-	storageTestConfigurationParameters.EnableChecksum = true
+	storageTestConfigurationParameters.EnableChecksum = false
 	if configuration == "" {
 		configuration = generateConfigYaml(storageTestConfigurationParameters)
 	}
@@ -468,7 +465,6 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 					s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName,
 				),
 				Key:          aws.String(key),
-				ChecksumMode: types.ChecksumModeEnabled,
 			})
 			s.assert.NoError(err)
 			s.assert.NotNil(result)
@@ -501,7 +497,6 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 					s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName,
 				),
 				Key:          aws.String(key),
-				ChecksumMode: types.ChecksumModeEnabled,
 			})
 			s.assert.NoError(err)
 			err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: obj_path})
@@ -517,7 +512,6 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 					s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName,
 				),
 				Key:          aws.String(key),
-				ChecksumMode: types.ChecksumModeEnabled,
 			})
 			s.assert.Error(err)
 
@@ -1072,7 +1066,6 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	s.assert.NotNil(result)
@@ -1104,7 +1097,6 @@ func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	s.assert.NotNil(result)
@@ -1194,7 +1186,6 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 
 	s.assert.Error(err)
@@ -1241,7 +1232,6 @@ func (s *s3StorageTestSuite) TestDeleteFileError() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 }
@@ -1271,7 +1261,6 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1314,7 +1303,6 @@ func (s *s3StorageTestSuite) TestCopyFromFileWindowsNameConvert() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1450,7 +1438,6 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1483,7 +1470,6 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1532,7 +1518,6 @@ func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1564,7 +1549,6 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1605,7 +1589,6 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1637,7 +1620,6 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1669,7 +1651,6 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1701,7 +1682,6 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1733,7 +1713,6 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1760,7 +1739,6 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -1793,7 +1771,6 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
 		Range:        aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -2406,7 +2383,6 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(srcKey),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 	// Dst should be in the account
@@ -2414,7 +2390,6 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(dstKey),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 }
@@ -2449,7 +2424,6 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(srcKey),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 	// Dst should be in the account
@@ -2457,7 +2431,6 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(dstKey),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 }
@@ -2477,14 +2450,12 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(srcKey),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(dstKey),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 }
@@ -2932,7 +2903,6 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 			common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name),
 		),
 		Body:              bytes.NewReader(data),
-		ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
 	})
 	s.assert.NoError(err)
 
@@ -3672,7 +3642,6 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
@@ -3710,7 +3679,6 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 		Key:          aws.String(key),
-		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.NoError(err)
 	defer result.Body.Close()
