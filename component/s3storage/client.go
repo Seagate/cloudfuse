@@ -36,6 +36,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -51,6 +53,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/middleware"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -58,6 +61,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/logging"
+	smithyMiddleware "github.com/aws/smithy-go/middleware"
 	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
@@ -156,12 +161,32 @@ func (cl *Client) Configure(cfg Config) error {
 		)
 	}
 
+	logPath := filepath.Join(
+		common.GetDefaultWorkDir(),
+		"cloudfuse",
+		time.Now().Format("Jan-2_15-04-05")+"_s3_aws_sdk.log",
+	)
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		log.Err("Client::Configure : Failed to open SDK debug log. %w", err)
+		return err
+	}
+	_, _ = f.WriteString("\n===== SDK LOG START " + time.Now().Format(time.RFC3339) + " =====\n")
+
 	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.AuthConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithAppID(UserAgent()),
 		config.WithRegion(cl.Config.AuthConfig.Region),
+		config.WithLogger(logging.NewStandardLogger(f)),
+
+		// Turn on request/response logging including bodies
+		config.WithClientLogMode(
+			aws.LogRequest|aws.LogResponse|
+				aws.LogRequestWithBody|aws.LogResponseWithBody|
+				aws.LogSigning|aws.LogRetries,
+		),
 	)
 
 	if err != nil {
@@ -183,18 +208,20 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Create an Amazon S3 service client
-	if cl.Config.usePathStyle {
-		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-			o.UsePathStyle = true
-			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
-			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-		})
-	} else {
-		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
-			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-		})
-	}
+	cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+		o.UsePathStyle = cl.Config.usePathStyle
+		o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
+		o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+		// Apply workaround if using Google Cloud Storage (GCS) endpoint
+		// This fixes signature issues with AWS SDK v2 when using GCS
+		// See: https://github.com/aws/aws-sdk-go-v2/issues/1816#issuecomment-1927281540
+		if strings.Contains(cl.Config.AuthConfig.Endpoint, "storage.googleapis.com") {
+			// GCS alters the Accept-Encoding header which breaks the request signature
+			ignoreSigningHeaders(o, []string{"Accept-Encoding"})
+			// GCS also has issues with trailing checksums in UploadPart and PutObject operations
+			disableTrailingChecksumForGCS(o)
+		}
+	})
 
 	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets()
@@ -288,6 +315,108 @@ func (cl *Client) Configure(cfg Config) error {
 	})
 
 	return nil
+}
+
+// GCS workaround middleware functions to fix signature issues
+// See: https://github.com/aws/aws-sdk-go-v2/issues/1816#issuecomment-1927281540
+
+type ignoredHeadersKey struct{}
+
+// ignoreSigningHeaders excludes the listed headers from the request signature
+// because some providers (like GCS) may alter them, causing signature mismatches.
+func ignoreSigningHeaders(o *s3.Options, headers []string) {
+	o.APIOptions = append(o.APIOptions, func(stack *smithyMiddleware.Stack) error {
+		if err := stack.Finalize.Insert(ignoreHeaders(headers), "Signing", smithyMiddleware.Before); err != nil {
+			return err
+		}
+
+		if err := stack.Finalize.Insert(restoreIgnored(), "Signing", smithyMiddleware.After); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func ignoreHeaders(headers []string) smithyMiddleware.FinalizeMiddleware {
+	return smithyMiddleware.FinalizeMiddlewareFunc(
+		"IgnoreHeaders",
+		func(ctx context.Context, in smithyMiddleware.FinalizeInput, next smithyMiddleware.FinalizeHandler) (out smithyMiddleware.FinalizeOutput, metadata smithyMiddleware.Metadata, err error) {
+			req, ok := in.Request.(*smithyHttp.Request)
+			if !ok {
+				return out, metadata, &v4.SigningError{
+					Err: fmt.Errorf(
+						"(ignoreHeaders) unexpected request smithyMiddleware type %T",
+						in.Request,
+					),
+				}
+			}
+
+			ignored := make(map[string]string, len(headers))
+			for _, h := range headers {
+				ignored[h] = req.Header.Get(h)
+				req.Header.Del(h)
+			}
+
+			ctx = smithyMiddleware.WithStackValue(ctx, ignoredHeadersKey{}, ignored)
+
+			return next.HandleFinalize(ctx, in)
+		},
+	)
+}
+
+func restoreIgnored() smithyMiddleware.FinalizeMiddleware {
+	return smithyMiddleware.FinalizeMiddlewareFunc(
+		"RestoreIgnored",
+		func(ctx context.Context, in smithyMiddleware.FinalizeInput, next smithyMiddleware.FinalizeHandler) (out smithyMiddleware.FinalizeOutput, metadata smithyMiddleware.Metadata, err error) {
+			req, ok := in.Request.(*smithyHttp.Request)
+			if !ok {
+				return out, metadata, &v4.SigningError{
+					Err: fmt.Errorf(
+						"(restoreIgnored) unexpected request smithyMiddleware type %T",
+						in.Request,
+					),
+				}
+			}
+
+			ignored, _ := smithyMiddleware.GetStackValue(ctx, ignoredHeadersKey{}).(map[string]string)
+			for k, v := range ignored {
+				req.Header.Set(k, v)
+			}
+
+			return next.HandleFinalize(ctx, in)
+		},
+	)
+}
+
+// disableTrailingChecksumForGCS disables trailing checksums for UploadPart and PutObject operations using reflection
+// This is part of the GCS compatibility workaround as GCS doesn't support trailing checksums
+func disableTrailingChecksumForGCS(o *s3.Options) {
+	o.APIOptions = append(o.APIOptions, func(stack *smithyMiddleware.Stack) error {
+		return stack.Initialize.Add(smithyMiddleware.InitializeMiddlewareFunc(
+			"DisableTrailingChecksum",
+			func(ctx context.Context, in smithyMiddleware.InitializeInput, next smithyMiddleware.InitializeHandler) (out smithyMiddleware.InitializeOutput, metadata smithyMiddleware.Metadata, err error) {
+				// Check if this is an UploadPart or PutObject operation
+				if opName := smithyMiddleware.GetOperationName(ctx); opName == "UploadPart" ||
+					opName == "PutObject" {
+					// Use reflection to disable trailing checksums in the checksum smithyMiddleware
+					// This is a hack, but it's the only way to disable trailing checksums currently
+					if checksumMiddleware, ok := stack.Finalize.Get("AWSChecksum:ComputeInputPayloadChecksum"); ok {
+						if v := reflect.ValueOf(checksumMiddleware).Elem(); v.IsValid() {
+							if field := v.FieldByName("EnableTrailingChecksum"); field.IsValid() &&
+								field.CanSet() &&
+								field.Kind() == reflect.Bool {
+								field.SetBool(false)
+							}
+						}
+					}
+					// Remove the trailing checksum smithyMiddleware entirely
+					_, _ = stack.Finalize.Remove("addInputChecksumTrailer")
+				}
+				return next.HandleInitialize(ctx, in)
+			},
+		), smithyMiddleware.Before)
+	})
 }
 
 // Use ListBuckets and filterAuthorizedBuckets to get a list of buckets that the user has access to
@@ -1165,6 +1294,10 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
 	}
 
+	if strings.Contains(cl.Config.AuthConfig.Endpoint, "storage.googleapis.com") {
+		createMultipartUploadInput.ChecksumAlgorithm = types.ChecksumAlgorithmCrc32c
+	}
+
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
@@ -1218,6 +1351,10 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 			if cl.Config.enableChecksum {
 				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+			}
+
+			if strings.Contains(cl.Config.AuthConfig.Endpoint, "storage.googleapis.com") {
+				createMultipartUploadInput.ChecksumAlgorithm = types.ChecksumAlgorithmCrc32c
 			}
 
 			var partResp *s3.UploadPartOutput
