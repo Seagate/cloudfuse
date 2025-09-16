@@ -126,11 +126,18 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 		endRange := options.offset + options.count - 1
 		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
-
-	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		Key:    aws.String(key),
-		Range:  aws.String(rangeString),
+	var getObjectInput *s3.GetObjectInput
+	if rangeString != "" {
+		getObjectInput = &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+			Key:    aws.String(key),
+			Range:  aws.String(rangeString),
+		}
+	} else {
+		getObjectInput = &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+			Key:    aws.String(key),
+		}
 	}
 
 	if cl.Config.enableChecksum {
@@ -225,12 +232,14 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 			len(objects),
 			err,
 		)
-		for i := 0; i < len(result.Errors); i++ {
-			log.Err(
-				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
-				result.Errors[i].Key,
-				result.Errors[i].Message,
-			)
+		if result != nil {
+			for i := 0; i < len(result.Errors); i++ {
+				log.Err(
+					"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
+					result.Errors[i].Key,
+					result.Errors[i].Message,
+				)
+			}
 		}
 	}
 
