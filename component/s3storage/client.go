@@ -1418,17 +1418,19 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 			var partResp *s3.UploadPartOutput
 			partResp, err = cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
-			eTag = partResp.ETag
-			blk.Flags.Clear(common.DirtyBlock)
+			if err != nil {
+				eTag = partResp.ETag
+				blk.Flags.Clear(common.DirtyBlock)
 
-			// Collect the checksums
-			// It is easier to just collect all checksums and then upload them together
-			// as ones that are not used will just be nil and an object can only ever
-			// have one valid checksum
-			checksumCRC32 = partResp.ChecksumCRC32
-			checksumCRC32C = partResp.ChecksumCRC32C
-			checksumSHA1 = partResp.ChecksumSHA1
-			checksumSHA256 = partResp.ChecksumSHA256
+				// Collect the checksums
+				// It is easier to just collect all checksums and then upload them together
+				// as ones that are not used will just be nil and an object can only ever
+				// have one valid checksum
+				checksumCRC32 = partResp.ChecksumCRC32
+				checksumCRC32C = partResp.ChecksumCRC32C
+				checksumSHA1 = partResp.ChecksumSHA1
+				checksumSHA256 = partResp.ChecksumSHA256
+			}
 		} else {
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
@@ -1440,16 +1442,18 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 				PartNumber:      &partNumber,
 				UploadId:        &uploadID,
 			})
-			eTag = partResp.CopyPartResult.ETag
+			if err != nil {
+				eTag = partResp.CopyPartResult.ETag
 
-			// Collect the checksums
-			// It is easier to just collect all checksums and then upload them together
-			// as ones that are not used will just be nil and an object can only ever
-			// have one valid checksum
-			checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
-			checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
-			checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
-			checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
+				// Collect the checksums
+				// It is easier to just collect all checksums and then upload them together
+				// as ones that are not used will just be nil and an object can only ever
+				// have one valid checksum
+				checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
+				checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
+				checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
+				checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
+			}
 		}
 
 		if err != nil {
