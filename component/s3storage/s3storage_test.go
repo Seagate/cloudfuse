@@ -675,9 +675,8 @@ func (s *s3StorageTestSuite) TestDeleteDirError() {
 
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: name})
 
-	// we have no way of indicating empty folders in the bucket
-	// so deleting a non-existent directory should not cause an error
-	s.assert.NoError(err)
+	// deleting a non-existent directory may return no error, or ENOENT (GCS)
+	s.assert.True(err == nil || os.IsNotExist(err))
 	// Directory should not be in the account
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.Error(err)
