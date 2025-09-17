@@ -359,10 +359,10 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 	})
 	if listErr != nil {
 		log.Err(
-			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ",
+			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: %w",
 			key,
 			uploadID,
-			abortErr.Error(),
+			abortErr,
 		)
 	}
 	if resp != nil && len(resp.Parts) != 0 {
