@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -58,6 +59,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/logging"
 	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
@@ -156,12 +158,31 @@ func (cl *Client) Configure(cfg Config) error {
 		)
 	}
 
+	logPath := filepath.Join(
+		common.GetDefaultWorkDir(),
+		time.Now().Format("Jan-2_15-04-05")+"_s3_aws_sdk.log",
+	)
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		log.Err("Client::Configure : Failed to open SDK debug log. %w", err)
+		return err
+	}
+	_, _ = f.WriteString("\n===== SDK LOG START " + time.Now().Format(time.RFC3339) + " =====\n")
+
 	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.AuthConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithAppID(UserAgent()),
 		config.WithRegion(cl.Config.AuthConfig.Region),
+		config.WithLogger(logging.NewStandardLogger(f)),
+
+		// Turn on request/response logging including bodies
+		config.WithClientLogMode(
+			aws.LogRequest|aws.LogResponse|
+				aws.LogRequestWithBody|aws.LogResponseWithBody|
+				aws.LogSigning|aws.LogRetries,
+		),
 	)
 
 	if err != nil {
