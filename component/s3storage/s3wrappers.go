@@ -357,19 +357,19 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 		Key:      aws.String(key),
 		UploadId: &uploadID,
 	})
-	if len(resp.Parts) != 0 {
-		log.Err(
-			"Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ",
-			key,
-			uploadID,
-		)
-	}
 	if listErr != nil {
 		log.Err(
 			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ",
 			key,
 			uploadID,
 			abortErr.Error(),
+		)
+	}
+	if resp != nil && len(resp.Parts) != 0 {
+		log.Err(
+			"Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ",
+			key,
+			uploadID,
 		)
 	}
 	return errors.Join(abortErr, listErr)
