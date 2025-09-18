@@ -127,10 +127,18 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		Key:    aws.String(key),
-		Range:  aws.String(rangeString),
+	getObjectInput := &s3.GetObjectInput{}
+	if rangeString != "" {
+		getObjectInput = &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+			Key:    aws.String(key),
+			Range:  aws.String(rangeString),
+		}
+	} else {
+		getObjectInput = &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+			Key:    aws.String(key),
+		}
 	}
 
 	if cl.Config.enableChecksum {
