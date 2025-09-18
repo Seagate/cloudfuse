@@ -355,7 +355,7 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("invalid pipeline components [%s]", err.Error())
 		}
 
-		// either passed in CLI or in config file
+		// Passed in config file
 		if common.ComponentInPipeline(options.Components, "block_cache") {
 			// CLI overriding the pipeline to inject block-cache
 			options.Components = common.UpdatePipeline(options.Components, "block_cache")
