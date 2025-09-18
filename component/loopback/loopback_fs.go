@@ -53,7 +53,8 @@ const compName = "loopbackfs"
 type LoopbackFS struct {
 	internal.BaseComponent
 
-	path string // uses os.Separator (filepath.Join)
+	path        string // uses os.Separator (filepath.Join)
+	consistency bool
 }
 
 var _ internal.Component = &LoopbackFS{}
@@ -80,6 +81,10 @@ func (lfs *LoopbackFS) Configure(_ bool) error {
 		lfs.path = conf.Path
 	}
 	return nil
+}
+
+func (lfs *LoopbackFS) SetConsistency(consistency bool) {
+	lfs.consistency = consistency
 }
 
 func (lfs *LoopbackFS) Name() string {
@@ -141,12 +146,20 @@ func (lfs *LoopbackFS) StreamDir(
 
 	for _, file := range files {
 		info, _ := file.Info()
+		var md5 []byte
+		if lfs.consistency && !file.IsDir() {
+			md5, err = computeMD5(filepath.Join(path, file.Name()))
+			if err != nil {
+				log.Err("LoopbackFS::StreamDir : failed to compute md5sum [%s]", err)
+			}
+		}
 		attr := &internal.ObjAttr{
 			Path:  common.JoinUnixFilepath(options.Name, file.Name()),
 			Name:  file.Name(),
 			Size:  info.Size(),
 			Mode:  info.Mode(),
 			Mtime: info.ModTime(),
+			MD5:   md5,
 		}
 		attr.Flags.Set(internal.PropFlagModeDefault)
 
@@ -157,6 +170,17 @@ func (lfs *LoopbackFS) StreamDir(
 		attrList = append(attrList, attr)
 	}
 	return attrList, "", nil
+}
+
+func computeMD5(path string) ([]byte, error) {
+	fh, err := os.Open(path)
+	if err != nil {
+		log.Err("LoopbackFS::computeMD5 : failed to compute md5sum [%s]", err)
+		return nil, err
+	}
+	defer fh.Close()
+
+	return common.GetMD5(fh)
 }
 
 func (lfs *LoopbackFS) RenameDir(options internal.RenameDirOptions) error {
@@ -261,6 +285,12 @@ func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error
 }
 
 func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+	// if handle is nil, create a new handle
+	// added because after changes in xload, path and size can be passed in ReadInBufferOptions, where handle can be nil
+	if options.Handle == nil {
+		options.Handle = handlemap.NewHandle(options.Path)
+		options.Handle.Size = options.Size
+	}
 	log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 	f := options.Handle.GetFileObject()
 
@@ -272,13 +302,20 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 
 		n, err := f1.ReadAt(options.Data, options.Offset)
 		f1.Close()
+		if err == io.EOF {
+			err = nil
+		}
 		return n, err
 	}
 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()
 
-	return f.ReadAt(options.Data, options.Offset)
+	n, err := f.ReadAt(options.Data, options.Offset)
+	if err == io.EOF {
+		err = nil
+	}
+	return n, err
 }
 
 func (lfs *LoopbackFS) WriteFile(options internal.WriteFileOptions) (int, error) {

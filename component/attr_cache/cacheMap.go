@@ -64,6 +64,7 @@ type attrCacheItem struct {
 type cacheTreeMap struct {
 	cacheMap  map[string]*attrCacheItem
 	cacheTree *attrCacheItem
+	maxFiles  int
 }
 
 // type passed to insert
@@ -75,7 +76,7 @@ type insertOptions struct {
 }
 
 // initialize the cache data structure
-func newCacheTreeMap() *cacheTreeMap {
+func newCacheTreeMap(maxFiles int) *cacheTreeMap {
 	// initialize map
 	cacheMap := make(map[string]*attrCacheItem)
 	// create tree root node
@@ -87,6 +88,7 @@ func newCacheTreeMap() *cacheTreeMap {
 	return &cacheTreeMap{
 		cacheMap:  cacheMap,
 		cacheTree: rootNode,
+		maxFiles:  maxFiles,
 	}
 }
 
@@ -113,6 +115,10 @@ func (ctm *cacheTreeMap) get(path string) (item *attrCacheItem, found bool) {
 
 // insert a new attrCacheItem and return a handle to it
 func (ctm *cacheTreeMap) insert(options insertOptions) *attrCacheItem {
+	if len(ctm.cacheMap) >= ctm.maxFiles {
+		// cache is full
+		return nil
+	}
 	if options.attr == nil {
 		return nil
 	}
