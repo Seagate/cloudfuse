@@ -108,8 +108,8 @@ jobs:
       go: "1.25"
       zig: 0.15.1
     permissions:
-      contents: write
-      id-token: write
+      contents: write # to create the GitHub release
+      id-token: write # for sigstore/cosign-installer
 
     steps:
       # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
@@ -172,7 +172,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # to update the gh-pages branch
 
     steps:
       - name: Install dependencies

@@ -37,9 +37,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read # for actions/checkout
+      contents: read # for actions/checkout
+      security-events: write # to upload results
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}

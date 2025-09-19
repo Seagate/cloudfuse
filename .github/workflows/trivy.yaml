@@ -27,7 +27,7 @@ jobs:
     name: Build
     runs-on: "ubuntu-latest"
     permissions:
-      security-events: write
+      security-events: write # to upload results
 
     steps:
       - name: Checkout code

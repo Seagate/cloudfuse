@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   BuildAndTest-Coverage:
+    name: Build And Test Coverage Linux
     strategy:
       matrix:
         go: ["1.25"]
@@ -1035,6 +1036,7 @@ jobs:
         run: "./test/scripts/coveragecheck.sh file"
 
   BuildAndTest-Coverage-Windows:
+    name: Build And Test Coverage Windows
     strategy:
       matrix:
         go: ["1.25"]
@@ -1954,6 +1956,7 @@ jobs:
         run: "./test/scripts/coveragecheck.sh file"
 
   AccountCleanup-Cleanup:
+    name: Account Cleanup
     needs:
       - BuildAndTest-Coverage
       - BuildAndTest-Coverage-Windows
