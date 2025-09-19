@@ -422,6 +422,38 @@ func testTruncateError(suite *libfuseTestSuite) {
 	suite.assert.Equal(-fuse.EIO, err)
 }
 
+func testFTruncate(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	size := int64(1024)
+
+	handle := handlemap.NewHandle(name)
+	fh := handlemap.Add(handle)
+
+	options := internal.TruncateFileOptions{Handle: handle, Name: name, Size: size}
+	suite.mock.EXPECT().TruncateFile(options).Return(nil)
+
+	err := cfuseFS.Truncate(path, size, uint64(fh))
+	suite.assert.Equal(0, err)
+}
+
+func testFTruncateError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	size := int64(1024)
+
+	handle := handlemap.NewHandle(name)
+	fh := handlemap.Add(handle)
+
+	options := internal.TruncateFileOptions{Handle: handle, Name: name, Size: size}
+	suite.mock.EXPECT().TruncateFile(options).Return(errors.New("failed to truncate file"))
+
+	err := cfuseFS.Truncate(path, size, uint64(fh))
+	suite.assert.Equal(-fuse.EIO, err)
+}
+
 func testUnlink(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"

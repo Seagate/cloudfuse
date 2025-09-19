@@ -812,8 +812,10 @@ func (cf *CgofuseFS) Truncate(path string, size int64, fh uint64) int {
 	name = common.NormalizeObjectName(name)
 
 	log.Trace("Libfuse::Truncate : %s size %d", name, size)
+	handle, _ := handlemap.Load(handlemap.HandleID(fh))
 
-	err := fuseFS.NextComponent().TruncateFile(internal.TruncateFileOptions{Name: name, Size: size})
+	err := fuseFS.NextComponent().
+		TruncateFile(internal.TruncateFileOptions{Name: name, Size: size, Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Truncate : error truncating file %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {

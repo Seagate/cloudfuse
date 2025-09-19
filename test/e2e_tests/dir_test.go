@@ -521,7 +521,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	err = os.Mkdir(filepath.Join(dirName, "tmp"), 0777)
 	suite.NoError(err)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0777)
 		suite.NoError(err)

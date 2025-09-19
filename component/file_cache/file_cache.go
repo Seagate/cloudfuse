@@ -268,7 +268,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	fc.refreshSec = conf.RefreshSec
-	fc.hardLimit = conf.HardLimit
+	fc.hardLimit = true
 
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
@@ -351,6 +351,9 @@ func (fc *FileCache) Configure(_ bool) error {
 
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
+	}
+	if config.IsSet(compName + ".hard-limit") {
+		fc.hardLimit = conf.HardLimit
 	}
 
 	fc.diskHighWaterMark = 0
@@ -468,7 +471,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
 		cacheTimeout:  uint32(fc.cacheTimeout),
-		maxSizeMB:     conf.MaxSizeMB,
+		maxSizeMB:     fc.maxCacheSize,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 	}
@@ -1177,7 +1180,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					err.Error(),
 				)
 				_ = f.Close()
-				_ = os.Remove(localPath)
+				err = os.Remove(localPath)
+				if err != nil {
+					log.Err(
+						"FileCache::openFileInternal : Failed to remove file %s [%s]",
+						localPath,
+						err.Error(),
+					)
+				}
 				return err
 			}
 		}

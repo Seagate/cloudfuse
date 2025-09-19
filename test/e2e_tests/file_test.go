@@ -533,7 +533,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 	fileName := filepath.Join(dirName, "multi")
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
