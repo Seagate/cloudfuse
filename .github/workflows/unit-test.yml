@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - improve-ci-cd
   pull_request:
   workflow_dispatch:
     inputs:
