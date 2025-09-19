@@ -775,7 +775,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	// create link for all file names with prefix name
 	var sources [5]string
 	var targets [5]string
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		sources[i] = generateFileName()
 		targets[i] = generateFileName()
 

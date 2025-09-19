@@ -222,7 +222,7 @@ func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 		azStatsCollector.PushEvents(
 			createDir,
 			options.Name,
-			map[string]interface{}{mode: options.Mode.String()},
+			map[string]any{mode: options.Mode.String()},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 	}
@@ -327,7 +327,7 @@ func (az *AzStorage) StreamDir(
 	if len(path) == 0 {
 		path = "/"
 	}
-	azStatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(new_list)})
+	azStatsCollector.PushEvents(streamDir, path, map[string]any{count: len(new_list)})
 
 	// increment streamdir call count
 	azStatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
@@ -346,7 +346,7 @@ func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
 		azStatsCollector.PushEvents(
 			renameDir,
 			options.Src,
-			map[string]interface{}{src: options.Src, dest: options.Dst},
+			map[string]any{src: options.Src, dest: options.Dst},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 	}
@@ -374,7 +374,7 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	azStatsCollector.PushEvents(
 		createFile,
 		options.Name,
-		map[string]interface{}{mode: options.Mode.String()},
+		map[string]any{mode: options.Mode.String()},
 	)
 
 	// increment open file handles count
@@ -438,7 +438,7 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 		azStatsCollector.PushEvents(
 			renameFile,
 			options.Src,
-			map[string]interface{}{src: options.Src, dest: options.Dst},
+			map[string]any{src: options.Src, dest: options.Dst},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 	}
@@ -502,11 +502,7 @@ func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 	err := az.storage.TruncateFile(options.Name, options.Size)
 
 	if err == nil {
-		azStatsCollector.PushEvents(
-			truncateFile,
-			options.Name,
-			map[string]interface{}{size: options.Size},
-		)
+		azStatsCollector.PushEvents(truncateFile, options.Name, map[string]any{size: options.Size})
 		azStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
 	return err
@@ -539,7 +535,7 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 		azStatsCollector.PushEvents(
 			createLink,
 			options.Name,
-			map[string]interface{}{target: options.Target},
+			map[string]any{target: options.Target},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 	}
@@ -577,7 +573,7 @@ func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 		azStatsCollector.PushEvents(
 			chmod,
 			options.Name,
-			map[string]interface{}{mode: options.Mode.String()},
+			map[string]any{mode: options.Mode.String()},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 	}

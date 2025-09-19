@@ -199,7 +199,7 @@ func (fc *FileCache) servicePendingOps() {
 
 	// Process pending operations
 	numFilesProcessed := 0
-	fc.scheduleOps.Range(func(key, value interface{}) bool {
+	fc.scheduleOps.Range(func(key, value any) bool {
 		numFilesProcessed++
 		select {
 		case <-fc.stopAsyncUpload:
