@@ -39,3 +39,7 @@ dist/
 manpages/
 changelog.yml
 component/azstorage/logfile.txt
+# Ignore all log files
+logfile.txt
+**/logfile.txt
+**/logfile.txt.*

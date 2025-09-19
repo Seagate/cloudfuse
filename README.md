@@ -1,4 +1,3 @@
-
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 
 [![License][license-badge]][license-url]
@@ -47,6 +46,19 @@ Download and run the .exe installer from our latest release [here](https://githu
 
 ### Linux
 
+> Note: Packages from our APT/DNF repositories are built for FUSE 3 only. If your system only supports FUSE 2, install Cloudfuse manually from GitHub Releases.
+
+#### FUSE Compatibility
+
+- FUSE 3:
+  - Ubuntu 20.04 and newer
+  - Debian 11 (Bullseye) and newer
+  - RHEL 8 and newer
+- FUSE 2:
+  - Ubuntu 18.04 or older
+  - Debian 10 (Buster) or older
+  - RHEL 7 or older
+
 #### Debian /Ubuntu
 
 ##### Using Release on GitHub
@@ -78,6 +90,8 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
     sudo apt-get install cloudfuse
     ```
 
+> Note: The Cloudfuse APT repository provides only the FUSE 3 build.
+
 #### Fedora / RHEL
 
 ##### Using Release on GitHub
@@ -104,12 +118,10 @@ Download the .rpm file from our latest release [here](https://github.com/Seagate
 2. **Install `cloudfuse`:**
 
     ```bash
-    # For Fedora, RHEL 8+
     sudo dnf install cloudfuse
-
-    # For RHEL 7
-    sudo yum install cloudfuse
     ```
+
+> Note: The Cloudfuse DNF repository provides only the FUSE 3 build.
 
 #### Enable Running With Systemd
 
@@ -127,11 +139,103 @@ manually install Cloudfuse.
 
 ## Basic Use
 
-## Health Monitor
+## Basic Use
 
-Cloudfuse also supports a health monitor.
-The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
-Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
+The following describes how to use the Cloudfuse CLI. If you would like to use a GUI checkout the Cloudfuse GUI repo at <https://github.com/Seagate/cloudfuse-gui>.
+
+1. Create a basic configuration file (TUI):
+  If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
+  
+   ```bash
+   cloudfuse config
+   ```
+
+   The interactive TUI prompts for:
+   - Cloud type (S3 / Azure)
+   - Bucket / container name
+   - Credentials
+   - Caching or streaming mode
+
+   It writes an encrypted config file (default: ./config.aes) and asks you for a passphrase. Keep this passphrase safe.
+
+2. Mount using an encrypted (TUI) config:
+   You must provide the same passphrase you used when creating the config, either:
+   - Passphrase flag:
+
+     ```bash
+     cloudfuse mount <mount-path> --config-file /path/to/config.aes --passphrase "your-passphrase"
+     ```
+
+   - Environment variable (preferred for scripts/systemd):
+
+     ```bash
+     export CLOUDFUSE_SECURE_CONFIG_PASSPHRASE="your-passphrase"
+     cloudfuse mount <mount-path> --config-file /path/to/config.aes
+     ```
+
+3. Prepare a mount point:
+   - Linux: directory must already exist.
+
+     ```bash
+     mkdir -p /mnt/mybucket
+     ```
+
+   - Windows: the mount directory must NOT already exist; it will be created.
+
+4. Mount examples:
+   Encrypted (env variable):
+
+   ```bash
+   export CLOUDFUSE_SECURE_CONFIG_PASSPHRASE="your-passphrase"
+   cloudfuse mount /mnt/mybucket --config-file /path/to/config.aes
+   ```
+
+   Encrypted (flag):
+
+   ```bash
+   cloudfuse mount /mnt/mybucket --config-file /path/to/config.aes --passphrase "your-passphrase"
+   ```
+
+   Unencrypted:
+
+   ```bash
+   cloudfuse mount /mnt/mybucket --config-file /path/to/config.yaml
+   ```
+
+   Common flags:
+   - --foreground  (stay in foreground)
+   - --read-only   (prevent writes)
+   - --lazy-write  (defer writes until handle close)
+
+5. Verify:
+
+   ```bash
+   cloudfuse mount list
+   ```
+
+   Or list files:
+
+   ```bash
+   ls /mnt/mybucket
+   ```
+
+6. Unmount:
+
+   ```bash
+   cloudfuse unmount /mnt/mybucket
+   ```
+
+   If busy:
+
+   ```bash
+   cloudfuse unmount --lazy /mnt/mybucket
+   ```
+
+Notes:
+
+- Losing the passphrase makes the encrypted config unusable.
+- Prefer CLOUDFUSE_SECURE_CONFIG_PASSPHRASE over putting the passphrase directly in scripts.
+- Windows persistent remount requires service commands (see later section).
 
 ## Command Line Interface
 
@@ -142,6 +246,7 @@ The general format of the Cloudfuse Linux commands is:
 Available commands:
 
 - `help [command]` - Displays general help, or help for the specified command
+- `config` - Displays a TUI to easily configure cloudfuse
 - `mount` - Mounts a cloud storage container as a filesystem
   Example: `cloudfuse mount <mount path> --config-file=<config file>`
   Supported container types:
@@ -192,6 +297,12 @@ suer https://token.actions.githubusercontent.com
 ```
 
 This command should then print out "Verified OK" is the checksum file is valid. You can then use these checksums to verify that the cloudfuse version downloaded matches the expected checksum.
+
+### Health Monitor
+
+Cloudfuse also supports a health monitor.
+The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
+Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
 
 ## Limitations
 

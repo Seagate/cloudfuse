@@ -60,7 +60,7 @@ var umntAllCmd = &cobra.Command{
 				disableRemountSystem, _ := cmd.Flags().GetBool("disable-remount-system")
 				err = unmountCloudfuseWindows(mntPath, disableRemountUser, disableRemountSystem)
 			} else {
-				err = unmountCloudfuse(mntPath, lazy)
+				err = unmountCloudfuse(mntPath, lazy, false)
 			}
 			if err == nil {
 				unmounted += 1
