@@ -46,11 +46,7 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
         ports:
           - 4566:4566
-        options: >-
-          --health-cmd "curl -s http://localhost:4566/_localstack/health | grep '\"ready\": true'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
+
       azurite:
         image: mcr.microsoft.com/azure-storage/azurite:latest
         ports:
