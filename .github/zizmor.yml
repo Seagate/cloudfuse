@@ -2,3 +2,7 @@ rules:
   excessive-permissions:
     ignore:
       - scorecard.yml:18
+  unpinned-images:
+    ignore:
+      - unit-test.yml:42
+      - unit-test.yml:50

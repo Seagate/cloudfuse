@@ -198,7 +198,7 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.NotNil(b.state)
 	suite.assert.Nil(b.node)
 	suite.assert.Zero(b.offset)
-	suite.assert.Equal(b.id, int64(-1))
+	suite.assert.Equal(int64(-1), b.id)
 	suite.assert.False(b.IsDirty())
 
 	b.Ready(BlockStatusDownloaded)
