@@ -195,6 +195,7 @@ jobs:
         env:
           JOB_NAME: ${{ matrix.job_name }}
           RUNNER_ARCH: ${{ runner.arch }}
+          GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: |
           if [[ "$OSTYPE" == "linux-gnu"* ]]; then
             # Set Zig as the C/C++ compiler for CGO during tests
@@ -253,6 +254,8 @@ jobs:
           ./build.sh
 
       - name: Run unit tests
+        env:
+          GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
         run: go test -v -timeout=1h ./... --tags=unittest,authtest
 
   lint:
