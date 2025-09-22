@@ -192,7 +192,7 @@ func (suite *splitterTestSuite) TestProcessFilePresent() {
 	n, err := ds.Process(&WorkItem{})
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "is a directory")
-	suite.assert.Equal(n, -1)
+	suite.assert.Equal(-1, n)
 
 	fileName := "file_4"
 	src := filepath.Join(remote_path, fileName)
