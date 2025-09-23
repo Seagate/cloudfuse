@@ -163,7 +163,7 @@ func testStatFsError(suite *libfuseTestSuite) {
 	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("error"))
 	buf := &fuse.Statfs_t{}
 	ret := cfuseFS.Statfs(path, buf)
-	suite.assert.Equal(ret, -fuse.EIO)
+	suite.assert.Equal(-fuse.EIO, ret)
 }
 
 func testMkDirError(suite *libfuseTestSuite) {

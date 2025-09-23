@@ -26,13 +26,14 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -44,8 +45,16 @@ import (
 )
 
 type GithubApiReleaseData struct {
-	TagName string `json:"tag_name"`
-	Name    string `json:"name"`
+	TagName string  `json:"tag_name"`
+	Name    string  `json:"name"`
+	Assets  []asset `json:"assets"`
+}
+
+type releaseInfo struct {
+	Version   string
+	AssetURL  string
+	AssetName string
+	HashURL   string
 }
 
 type Blob struct {
@@ -75,52 +84,102 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// getRemoteVersion : From public release get the latest cloudfuse version
-func getRemoteVersion(req string) (string, error) {
-	resp, err := http.Get(req)
-	if err != nil {
-		log.Err("getRemoteVersion: error getting release version from Github: [%s]", err.Error())
-		return "", err
-	}
-	if resp.StatusCode != 200 {
-		log.Err("getRemoteVersion: [got status %d from URL %s]", resp.StatusCode, req)
-		return "", fmt.Errorf(
-			"unable to get latest version: GET %s failed with status %d",
-			req,
-			resp.StatusCode,
-		)
+func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
+	url := common.CloudfuseReleaseURL + "/latest"
+	if version != "" {
+		url = fmt.Sprintf(common.CloudfuseReleaseURL+"/tags/v%s", version)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		log.Err("getRemoteVersion: error reading body of response [%s]", err.Error())
-		return "", err
+		return nil, err
+	}
+	// explicitly request the response format we need (best practice)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	// Add Authorization header to raise rate limit
+	githubApiToken := os.Getenv("GH_API_TOKEN")
+	if githubApiToken != "" {
+		req.Header.Set("Authorization", "token "+githubApiToken)
 	}
 
-	var releaseData GithubApiReleaseData
-	err = json.Unmarshal(body, &releaseData)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
-		log.Err("getRemoteVersion: error parsing json response [%s]", err.Error())
-		return "", err
+		return nil, err
 	}
 
-	// trim the leading "v"
-	versionNumber := strings.TrimPrefix(releaseData.Name, "v")
-	return versionNumber, nil
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get release info: %s", resp.Status)
+	}
+
+	var rel GithubApiReleaseData
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return nil, err
+	}
+
+	packageAsset, err := selectPackageAsset(rel.Assets, opt.Package)
+	if err != nil {
+		return nil, err
+	}
+
+	hashAsset, err := selectHashAsset(rel.Assets)
+	// Only report an error if package is not exe since goreleaser does not provide a hash
+	// for those releases.
+	if err != nil && opt.Package != "exe" {
+		return nil, err
+	}
+
+	return &releaseInfo{
+		Version:   strings.TrimPrefix(rel.TagName, "v"),
+		AssetURL:  packageAsset.BrowserDownloadURL,
+		AssetName: packageAsset.Name,
+		HashURL:   hashAsset.BrowserDownloadURL,
+	}, nil
+}
+
+func selectPackageAsset(assets []asset, ext string) (*asset, error) {
+	osName := runtime.GOOS
+	arch := runtime.GOARCH
+
+	if ext == "tar" {
+		ext = "tar.gz"
+	}
+
+	for _, asset := range assets {
+		if strings.HasPrefix(asset.Name, "cloudfuse") &&
+			strings.Contains(asset.Name, osName) &&
+			strings.Contains(asset.Name, arch) &&
+			strings.HasSuffix(asset.Name, ext) {
+			return &asset, nil
+		}
+	}
+
+	return nil, errors.New("no suitable version of cloudfuse found for the current platform")
+}
+
+func selectHashAsset(assets []asset) (*asset, error) {
+	for _, asset := range assets {
+		if strings.Contains(asset.Name, "checksums_sha256") {
+			return &asset, nil
+		}
+	}
+
+	return nil, errors.New("no checksums found")
 }
 
 // beginDetectNewVersion : Get latest release version and compare if user needs an upgrade or not
-func beginDetectNewVersion(testURL string) chan any {
+func beginDetectNewVersion(ctx context.Context) chan any {
 	completed := make(chan any)
 	stderr := os.Stderr
 	go func() {
 		defer close(completed)
 
-		latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
-		if testURL != "" {
-			latestVersionUrl = testURL
-		}
-		remoteVersion, err := getRemoteVersion(latestVersionUrl)
+		latestRelease, err := getRelease(ctx, "")
 		if err != nil {
 			log.Err("beginDetectNewVersion: error getting latest version [%s]", err.Error())
 			if strings.Contains(err.Error(), "no such host") {
@@ -137,7 +196,7 @@ func beginDetectNewVersion(testURL string) chan any {
 			return
 		}
 
-		remote, err := common.ParseVersion(remoteVersion)
+		remote, err := common.ParseVersion(latestRelease.Version)
 		if err != nil {
 			log.Err("beginDetectNewVersion: error parsing remoteVersion [%s]", err.Error())
 			completed <- err.Error()
@@ -150,16 +209,16 @@ func beginDetectNewVersion(testURL string) chan any {
 			log.Info(
 				"beginDetectNewVersion: A new version of Cloudfuse is available. Current Version=%s, Latest Version=%s",
 				common.CloudfuseVersion,
-				remoteVersion,
+				latestRelease.Version,
 			)
 			fmt.Fprintf(
 				stderr,
 				"*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n",
-				remoteVersion,
+				latestRelease.Version,
 			)
 			log.Info(
 				"*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n",
-				remoteVersion,
+				latestRelease.Version,
 			)
 			completed <- "A new version of Cloudfuse is available"
 		}
@@ -169,15 +228,19 @@ func beginDetectNewVersion(testURL string) chan any {
 
 // VersionCheck : Start version check and wait for 8 seconds to complete otherwise just timeout and move on
 func VersionCheck() error {
+	// set an 8 second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	completed := beginDetectNewVersion(ctx)
 	select {
 	//either wait till this routine completes or timeout if it exceeds 8 secs
-	case <-beginDetectNewVersion(""):
-	case <-time.After(8 * time.Second):
+	case <-completed:
+		return nil
+	case <-ctx.Done():
 		return fmt.Errorf(
 			"unable to obtain latest version information. please check your internet connection",
 		)
 	}
-	return nil
 }
 
 // ignoreCommand : There are command implicitly added by cobra itself, while parsing we need to ignore these commands
