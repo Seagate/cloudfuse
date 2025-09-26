@@ -95,10 +95,17 @@ func (suite *sizeTrackerMockTestSuite) TestDefault() {
 	suite.assert.Equal(uint64(0), suite.sizeTracker.mountSize.GetSize())
 }
 
-func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold() {
+func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabled() {
+	suite.cleanupTest()
+	fallbackConfig := fmt.Sprintf(
+		"libfuse:\n  display-capacity-mb: %d\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: %d",
+		10,
+		journal_test_name,
+		10*1024*1024,
+	)
+	suite.setupTestHelper(fallbackConfig)
 	defer suite.cleanupTest()
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
-	suite.sizeTracker.totalBucketCapacity = 10 * 1024 * 1024
 
 	// Create File
 	file := generateFileName()
@@ -131,7 +138,47 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
-	// Call Statfs
+	// Call Statfs and have the bucket report 10% full
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
+		Blocks:  1 * 1024 * 1024 / 4096,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   4096,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  4096,
+		Namemax: 255,
+	}, true, nil)
+	stat, ret, err := suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	suite.assert.Equal(uint64(1*1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	// Call Statfs and have the bucket report 80% full
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
+		Blocks:  8 * 1024 * 1024 / 4096,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   4096,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  4096,
+		Namemax: 255,
+	}, true, nil)
+	stat, ret, err = suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	suite.assert.Equal(uint64(8.875*1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	// Call Statfs again, but this time it reports the bucket is at the eviction threshold
 	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
 		Blocks:  9 * 1024 * 1024 / 4096,
 		Bavail:  0,
@@ -142,20 +189,48 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 		Frsize:  4096,
 		Namemax: 255,
 	}, true, nil)
-	stat, ret, err := suite.sizeTracker.StatFs()
+	stat, ret, err = suite.sizeTracker.StatFs()
 	suite.assert.True(ret)
 	suite.assert.NoError(err)
 	suite.assert.NotEqual(&common.Statfs_t{}, stat)
-	suite.assert.Equal(uint64(1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(uint64(9*1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	// Call Statfs again, but this time it reports the bucket is over the eviction threshold (it's at 100%)
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
+		Blocks:  10 * 1024 * 1024 / 4096,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   4096,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  4096,
+		Namemax: 255,
+	}, true, nil)
+	stat, ret, err = suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	expectedReportedSizeMiB := 9.1
+	suite.assert.Equal(uint64(expectedReportedSizeMiB*1024*1024/4096), stat.Blocks)
 	suite.assert.Equal(int64(4096), stat.Bsize)
 	suite.assert.Equal(int64(4096), stat.Frsize)
 	suite.assert.Equal(uint64(255), stat.Namemax)
 }
 
-func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() {
+func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledMultiTenant() {
+	suite.cleanupTest()
+	fallbackConfig := fmt.Sprintf(
+		"libfuse:\n  display-capacity-mb: %d\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: %d",
+		5,
+		journal_test_name,
+		10*1024*1024,
+	)
+	suite.setupTestHelper(fallbackConfig)
 	defer suite.cleanupTest()
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
-	suite.sizeTracker.totalBucketCapacity = 10 * 1024 * 1024
 
 	// Create File
 	file := generateFileName()
@@ -188,9 +263,9 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
-	// Call Statfs
+	// Call Statfs - check that size is never reduced (offset is never negative)
 	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
-		Blocks:  10 * 1024 * 1024 / 4096,
+		Blocks:  1 * 1024 * 1024 / 4096,
 		Bavail:  0,
 		Bfree:   0,
 		Bsize:   4096,
@@ -203,7 +278,48 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 	suite.assert.True(ret)
 	suite.assert.NoError(err)
 	suite.assert.NotEqual(&common.Statfs_t{}, stat)
-	suite.assert.Equal(uint64(10*1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(uint64(1*1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	// Call Statfs again, but this time it reports the bucket is at the eviction threshold
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
+		Blocks:  9 * 1024 * 1024 / 4096,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   4096,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  4096,
+		Namemax: 255,
+	}, true, nil)
+	stat, ret, err = suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	suite.assert.Equal(uint64(4.5*1024*1024/4096), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	// Call Statfs again, but this time it reports the bucket is over the eviction threshold (it's at 100%)
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
+		Blocks:  10 * 1024 * 1024 / 4096,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   4096,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  4096,
+		Namemax: 255,
+	}, true, nil)
+	stat, ret, err = suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	expectedReportedSizeMiB := 4.6
+	suite.assert.Equal(uint64(expectedReportedSizeMiB*1024*1024/4096), stat.Blocks)
 	suite.assert.Equal(int64(4096), stat.Bsize)
 	suite.assert.Equal(int64(4096), stat.Frsize)
 	suite.assert.Equal(uint64(255), stat.Namemax)
