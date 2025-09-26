@@ -31,7 +31,7 @@
 config-version: 1.0.0
 
 # Daemon configuration
-foreground: true|false <run blobfuse2 in foreground or background>
+foreground: true|false <run cloudfuse in foreground or background>
 
 # Common configurations
 allow-other: true|false <allow other users to access the mounted directory - used for FUSE and File Cache>
@@ -46,9 +46,9 @@ profiler-ip: <IP address for dynamic-profiler to listen for REST calls. Default 
 
 # Logger configuration
 logging:
-  type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - syslog>
+  type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - base>
   level: log_off|log_crit|log_err|log_warning|log_info|log_trace|log_debug <log level. Default - log_warning> <log_debug will also enable sdk-trace logs>
-  file-path: <path where log files shall be stored. Default - '$HOME/.blobfuse2/blobfuse2.log'>
+  file-path: <path where log files shall be stored. Default - '$HOME/.cloudfuse/cloudfuse.log'>
   max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
   file-count: <maximum number of files to be rotated to preserve old logs. Default - 10>
   track-time: true|false <track time taken by important operations>
@@ -78,6 +78,7 @@ libfuse:
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
   direct-io: true|false <enable to bypass the kernel cache. It also disables cloudfuse data and metadata caching. Default - false>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
+  display-capacity-mb: <number of MB to display as the mounted storage capacity. Default - 1PB (1073741824 MB)>
   windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
 # Streaming configuration – remove and redirect to block-cache
@@ -96,7 +97,7 @@ entry_cache:
 xload:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   path: <path to local disk cache where downloaded files will be stored>
-  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.blobfuse2/xload_stats_{PID}.json'. Default - not exported>
+  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.cloudfuse/xload_stats_{PID}.json'. Default - not exported>
   validate-md5: <if md5 sum is present in the blob, validate it post download. Default - false>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
 
@@ -104,12 +105,13 @@ xload:
 block_cache:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   mem-size-mb: <total amount of memory to be preallocated for block cache (in MB). Default - 80% of free memory>
-  path: <path to local disk cache where downloaded blocked will be stored>
+  path: <path to local disk cache where downloaded blocks will be stored>
   disk-size-mb: <maximum disk cache size allowed. Default - 80% of free disk space>
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
   parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
+  prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
 
 # Disk cache related configuration
 file_cache:
@@ -144,7 +146,7 @@ file_cache:
 
 # Attribute cache related configuration
 attr_cache:
-  timeout-sec: <time attributes and directory contents can be cached (in sec). Default - 120 sec>
+  timeout-sec: <time attributes and directory contents can be cached (in sec). Minimum is 1. Default - 120 sec>
   no-cache-on-list: true|false <do not cache attributes or directory contents during listing. Enabling may cause performance problems.>
   enable-symlinks: true|false <enable symlink support. When false, symlinks will be treated like regular files. Enabling may cause performance problems.>
   max-files: <maximum number of files in the attribute cache at a time. Default - 5000000>
@@ -205,10 +207,10 @@ azstorage:
 
 # S3 storage configuration
 s3storage:
-  bucket-name: <name of the bucket to be mounted>
+  bucket-name: <name of the bucket to be mounted. Default - first accessible bucket>
   key-id: <S3 access key ID. Default - use credentials from environment variables or shared profile (see README)>
   secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
-  region: <S3 region. Default - us-east-1>
+  region: <S3 region. Default - us-east-1 or region provided in endpoint>
   profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
@@ -219,6 +221,7 @@ s3storage:
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
   use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
@@ -232,13 +235,13 @@ mountall:
 # Health Monitor configuration
 health_monitor:
   enable-monitoring: true|false <enable health monitor>
-  stats-poll-interval-sec: <Blobfuse2 stats polling interval (in sec). Default - 10 sec>
+  stats-poll-interval-sec: <Cloudfuse stats polling interval (in sec). Default - 10 sec>
   process-monitor-interval-sec: <CPU, memory and network usage polling interval (in sec). Default - 30 sec>
   output-path: <Path where health monitor will generate its output file. File name will be monitor_<pid>.json>
   # list of monitors to be disabled
   monitor-disable-list:
-    - cloudfuse_stats <Disable blobfuse2 stats polling>
+    - cloudfuse_stats <Disable cloudfuse stats polling>
     - file_cache_monitor <Disable file cache directory monitor>
-    - cpu_profiler <Disable CPU monitoring on blobfuse2 process>
-    - memory_profiler <Disable memory monitoring on blobfuse2 process>
-    - network_profiler <Disable network monitoring on blobfuse2 process>
+    - cpu_profiler <Disable CPU monitoring on cloudfuse process>
+    - memory_profiler <Disable memory monitoring on cloudfuse process>
+    - network_profiler <Disable network monitoring on cloudfuse process>
