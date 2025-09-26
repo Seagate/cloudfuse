@@ -291,7 +291,8 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 				// at what threshold will this mount evict?
 				evictionTriggerSize := evictionThreshold * float64(st.displayCapacity)
 				// set the size offset so when we're at the targetSize, we report that we're at the evictionTriggerSize
-				st.statSizeOffset = uint64(evictionTriggerSize - targetSize)
+				// don't allow negative offsets
+				st.statSizeOffset = uint64(min(0, evictionTriggerSize-targetSize))
 
 				// finally, record the bucket size to recognize the next update
 				st.bucketSize = bucketSize
