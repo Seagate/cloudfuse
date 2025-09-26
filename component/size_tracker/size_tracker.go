@@ -278,7 +278,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 			// Custom logic for use with Nx Plugin
 			// Check if cloud size has changed
 			bucketSize := stat.Blocks * uint64(blockSize)
-			if bucketSize != st.bucketSize {
+			if bucketSize != st.bucketSize && bucketSize > 0 {
 				// since the bucket size has been updated, assume it's a recent update
 				// so now we can correlate the relative size of this mount to the entire bucket
 
