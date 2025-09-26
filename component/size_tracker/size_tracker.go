@@ -42,6 +42,9 @@ type SizeTracker struct {
 	internal.BaseComponent
 	mountSize           *MountSize
 	totalBucketCapacity uint64
+	displayCapacity     uint64
+	bucketSize          uint64
+	statSizeOffset      uint64
 }
 
 type SizeTrackerOptions struct {
@@ -52,7 +55,7 @@ type SizeTrackerOptions struct {
 const compName = "size_tracker"
 const blockSize = int64(4096)
 const defaultJournalName = "mount_size.dat"
-const evictionThreshold = 0.95
+const evictionThreshold = 0.9
 
 var _ internal.Component = &SizeTracker{}
 
@@ -98,6 +101,14 @@ func (st *SizeTracker) Configure(_ bool) error {
 	}
 
 	st.totalBucketCapacity = conf.TotalBucketCapacity
+	st.displayCapacity = conf.TotalBucketCapacity
+	if conf.TotalBucketCapacity != 0 && config.IsSet("libfuse.display-capacity-mb") {
+		err = config.UnmarshalKey("libfuse.display-capacity-mb", &st.displayCapacity)
+		if err != nil {
+			st.displayCapacity = 0
+		}
+		st.displayCapacity *= common.MbToBytes
+	}
 
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
@@ -265,19 +276,29 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 
 		if err == nil && ret {
 			// Custom logic for use with Nx Plugin
-			// If the user is over the capacity limit set by Nx, then we need to prevent them from
-			// accidental overuse of their bucket. So we change our reporting to instead report
-			// the used capacity of the bucket to enable the VMS to start eviction
-			if float64(
-				stat.Blocks*uint64(blockSize),
-			) > evictionThreshold*float64(
-				st.totalBucketCapacity,
-			) {
-				log.Warn(
-					"SizeTracker::StatFs : changing from size_tracker size to S3 bucket size due to overuse of bucket",
-				)
-				blocks = stat.Blocks
+			// Check if cloud size has changed
+			bucketSize := stat.Blocks * uint64(blockSize)
+			if bucketSize != st.bucketSize {
+				// since the bucket size has been updated, assume it's a recent update
+				// so now we can correlate the relative size of this mount to the entire bucket
+
+				// the target is to fill the entire bucket to the eviction threshold
+				targetBucketSize := evictionThreshold * float64(st.totalBucketCapacity)
+				// what factor is that, from where we are now?
+				targetFactor := targetBucketSize / float64(bucketSize)
+				// now apply that factor to the current size of this mount, to get the target size
+				targetSize := float64(st.mountSize.GetSize()) * targetFactor
+				// at what threshold will this mount evict?
+				evictionTriggerSize := evictionThreshold * float64(st.displayCapacity)
+				// set the size offset so when we're at the targetSize, we report that we're at the evictionTriggerSize
+				st.statSizeOffset = uint64(evictionTriggerSize - targetSize)
+
+				// finally, record the bucket size to recognize the next update
+				st.bucketSize = bucketSize
 			}
+
+			// use the size offset to communicate the right target size to the Nx application
+			blocks += st.statSizeOffset / uint64(blockSize)
 		}
 	}
 
