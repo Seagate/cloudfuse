@@ -39,7 +39,7 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
-      zig: 0.14.1
+      zig: 0.15.1
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
