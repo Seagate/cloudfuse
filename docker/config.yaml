@@ -1,4 +1,5 @@
 # Refer ./setup/baseConfig.yaml for full set of config parameters
+config-version: 1.0.0
 allow-other: true
 
 logging:

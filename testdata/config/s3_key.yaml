@@ -1,3 +1,5 @@
+config-version: 1.0.0
+
 logging:
   level: log_debug
   file-path: "lyvecloudfuse-logs.txt"

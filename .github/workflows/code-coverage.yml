@@ -968,7 +968,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --disable-compression=true --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
+        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
 
       - name: Create Config File - ADLS Proxy
         env:

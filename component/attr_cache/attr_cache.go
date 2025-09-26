@@ -1219,28 +1219,4 @@ func NewAttrCacheComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, NewAttrCacheComponent)
-
-	attrCacheTimeout := config.AddUint32Flag(
-		"attr-cache-timeout",
-		defaultAttrCacheTimeout,
-		"attribute cache timeout",
-	)
-	config.BindPFlag(compName+".timeout-sec", attrCacheTimeout)
-
-	enableSymlinks := config.AddBoolFlag(
-		"enable-symlinks",
-		false,
-		"whether or not symlinks should be supported",
-	)
-	config.BindPFlag(compName+".enable-symlinks", enableSymlinks)
-	noCacheDirs := config.AddBoolFlag(
-		"no-cache-dirs",
-		false,
-		"whether or not empty directories should be cached",
-	)
-	config.BindPFlag(compName+".no-cache-dirs", noCacheDirs)
-
-	cacheOnList := config.AddBoolFlag("cache-on-list", true, "Cache attributes on listing.")
-	config.BindPFlag(compName+".cache-on-list", cacheOnList)
-	cacheOnList.Hidden = true
 }

@@ -27,7 +27,6 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -87,6 +86,7 @@ func (suite *secureConfigTestSuite) TestHelp() {
 }
 
 var testPlainTextConfig string = `
+config-version: 1.0.0
 foreground: false
 read-only: true
 allow-other: true
@@ -240,7 +240,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptInvalidKey() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("123"))
+	passphrase := ""
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
