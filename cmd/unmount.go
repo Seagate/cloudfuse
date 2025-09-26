@@ -115,7 +115,7 @@ func unmountCloudfuse(mntPath string, lazy bool, silent bool) error {
 		_, err = cliOut.Output()
 
 		if err == nil {
-			log.Info("unmountBlobfuse2 : successfully unmounted %s", mntPath)
+			log.Info("unmountCloudfuse : successfully unmounted %s", mntPath)
 			if !silent {
 				fmt.Println("Successfully unmounted", mntPath)
 			}
