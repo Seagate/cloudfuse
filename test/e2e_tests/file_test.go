@@ -99,7 +99,12 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 }
 
 // waitForCondition polls for a condition to be true, failing the test on timeout.
-func (suite *fileTestSuite) waitForCondition(timeout time.Duration, interval time.Duration, condition func() (bool, error), msgAndArgs ...interface{}) {
+func (suite *fileTestSuite) waitForCondition(
+	timeout time.Duration,
+	interval time.Duration,
+	condition func() (bool, error),
+	msgAndArgs ...interface{},
+) {
 	startTime := time.Now()
 	var lastErr error
 	for {

@@ -79,12 +79,12 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	}
 
 	// Set authentication config
-	s3.stConfig.authConfig.BucketName = opt.BucketName
-	s3.stConfig.authConfig.KeyID = secrets.KeyID
-	s3.stConfig.authConfig.SecretKey = secrets.SecretKey
-	s3.stConfig.authConfig.Region = opt.Region
-	s3.stConfig.authConfig.Profile = opt.Profile
-	s3.stConfig.authConfig.Endpoint = opt.Endpoint
+	s3.stConfig.AuthConfig.BucketName = opt.BucketName
+	s3.stConfig.AuthConfig.KeyID = secrets.KeyID
+	s3.stConfig.AuthConfig.SecretKey = secrets.SecretKey
+	s3.stConfig.AuthConfig.Region = opt.Region
+	s3.stConfig.AuthConfig.Profile = opt.Profile
+	s3.stConfig.AuthConfig.Endpoint = opt.Endpoint
 
 	// Set restricted characters
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin

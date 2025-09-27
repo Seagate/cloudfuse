@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/robfig/cron/v3"
 )
@@ -80,7 +81,12 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 				startFunc()
 			}
 
-			log.Info("schedule [%s] starting (active windows=%d)", windowName, windowCount)
+			log.Info(
+				"schedule [%s] (%s) starting (active windows=%d)",
+				windowName,
+				config.CronExpr,
+				windowCount,
+			)
 			fc.serviceScheduledOps()
 
 			// When should the window close?
@@ -130,17 +136,19 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 		// check if this schedule should already be active
 		// did this schedule have a start time within the last duration?
 		schedule := c.Entry(cronEntryId)
-		currentTime := time.Now()
-		currentWindowStartTime := schedule.Schedule.Next(currentTime.Add(-duration))
-		if currentTime.After(currentWindowStartTime) {
-			initialWindowEndTime = currentWindowStartTime.Add(duration)
+		now := time.Now()
+		for t := schedule.Schedule.Next(now.Add(-duration)); now.After(t); t = schedule.Schedule.Next(t) {
+			initialWindowEndTime = t.Add(duration)
+		}
+		if !initialWindowEndTime.IsZero() {
 			go schedule.Job.Run()
 		}
 	}
 }
 
-func (fc *FileCache) markFileForUpload(path string) {
+func (fc *FileCache) markFileForUpload(path string, flock *common.LockMapItem) {
 	fc.scheduleOps.Store(path, struct{}{})
+	flock.SyncPending = true
 	select {
 	case fc.uploadNotifyCh <- struct{}{}:
 		// Successfully notified

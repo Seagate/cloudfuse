@@ -44,7 +44,7 @@ type Connection struct {
 }
 
 type Config struct {
-	authConfig                s3AuthConfig
+	AuthConfig                s3AuthConfig
 	prefixPath                string
 	restrictedCharsWin        bool
 	partSize                  int64

@@ -338,7 +338,7 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 
 		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, ImmediateUpload: true, CloseInProgress: true})
+		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, AsyncUpload: true, CloseInProgress: true})
 		f.Close()
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
@@ -2046,6 +2046,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
 		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
 		// f.fsync() is another option but dup+close does it quickly compared to sync
+		// TODO: should we turn the dup+close comment into some platform-specific code?
 		// dupFd, err := syscall.Dup(int(f.Fd()))
 		// if err != nil {
 		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
@@ -2058,11 +2059,17 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// 	return syscall.EIO
 		// }
 
-		// Replace above with Sync since Dup is not supported on Windows
-		err := f.Sync()
-		if err != nil {
-			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
-			return syscall.EIO
+		// for scheduled uploads, we use a read-only file handle
+		if !options.AsyncUpload {
+			// Use Sync since Dup is not supported on Windows
+			err := f.Sync()
+			if err != nil {
+				log.Err(
+					"FileCache::FlushFile : error [unable to sync file] %s",
+					options.Handle.Path,
+				)
+				return syscall.EIO
+			}
 		}
 
 		// Write to storage
@@ -2074,7 +2081,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			options.Handle.Path,
 		)
 		// Figure out if we should upload immediately or append to pending OPS
-		if options.ImmediateUpload || !notInCloud || fc.alwaysOn {
+		if options.AsyncUpload || !notInCloud || fc.alwaysOn {
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -2143,9 +2150,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			)
 			_, statErr := os.Stat(localPath)
 			if statErr == nil {
-				fc.markFileForUpload(options.Handle.Path)
-				flock := fc.fileLocks.Get(options.Handle.Path)
-				flock.SyncPending = true
+				fc.markFileForUpload(options.Handle.Path, fc.fileLocks.Get(options.Handle.Path))
 			}
 			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 		}

@@ -1516,8 +1516,8 @@ func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	defer suite.cleanupTest()
 
-	now := time.Now()
-	second := (now.Second() + 2) % 60
+	testStartTime := time.Now()
+	second := (testStartTime.Second() + 2) % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
 	configContent := fmt.Sprintf(`file_cache:
@@ -1527,10 +1527,7 @@ func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
   schedule:
     - name: "Test"
       cron: %s
-      duration: "2h"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
-      duration: "4h"
+      duration: "30s"
 
 loopbackfs:
   path: %s`,
@@ -1560,7 +1557,7 @@ loopbackfs:
 	suite.assert.True(exists, "File should be in scheduleOps after creation")
 
 	// wait for uploads to start
-	time.Sleep(time.Now().Sub(now.Add(2 * time.Second).Truncate(time.Second)))
+	time.Sleep(time.Until(testStartTime.Add(2 * time.Second).Truncate(time.Second)))
 	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
 	for i := 0; i < 200 && os.IsNotExist(err); i++ {
 		time.Sleep(10 * time.Millisecond)
@@ -1591,9 +1588,6 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
     - name: "Test"
       cron: %s
       duration: "%ds"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
-      duration: "5s"
 
 loopbackfs:
   path: %s`,
@@ -1660,7 +1654,7 @@ loopbackfs:
 	)
 
 	suite.setupTestHelper(configContent)
-	suite.Zero(len(suite.fileCache.schedule), "Should have no schedule entries")
+	suite.assert.Empty(suite.fileCache.schedule, "Should have no schedule entries")
 
 	file := "no_schedule_test.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
@@ -1701,9 +1695,6 @@ func (suite *fileCacheTestSuite) TestExistingCloudFileImmediateUpload() {
   schedule:
     - name: "Test"
       cron: %s
-      duration: "5s"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
       duration: "5s"
 
 loopbackfs:
@@ -1761,9 +1752,6 @@ func (suite *fileCacheTestSuite) TestCreateFileAndRename() {
   schedule:
     - name: "Test"
       cron: %s
-      duration: "5s"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
       duration: "5s"
 
 loopbackfs:
@@ -1839,9 +1827,6 @@ func (suite *fileCacheTestSuite) TestDeleteFileAndScheduleOps() {
     - name: "Test"
       cron: %s
       duration: "5s"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
-      duration: "5s"
 
 loopbackfs:
   path: %s`,
@@ -1904,9 +1889,6 @@ func (suite *fileCacheTestSuite) TestCreateEmptyFileEqualTrue() {
     - name: "Test"
       cron: %s
       duration: "5s"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
-      duration: "5s"
 
 loopbackfs:
   path: %s`,
@@ -1956,9 +1938,6 @@ func (suite *fileCacheTestSuite) TestReadWriteLocalFile() {
   schedule:
     - name: "Test"
       cron: %s
-      duration: "5s"
-    - name: "TestWindow"
-      cron: "0 0 9 * * 0"
       duration: "5s"
 
 loopbackfs:

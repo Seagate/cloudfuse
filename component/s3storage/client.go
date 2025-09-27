@@ -67,7 +67,7 @@ const (
 
 type Client struct {
 	Connection
-	awsS3Client       *s3.Client // S3 client library supplied by AWS
+	AwsS3Client       *s3.Client // S3 client library supplied by AWS
 	blockLocks        common.KeyedMutex
 	stagedBlocks      map[string]map[string][]byte // map[fileName]map[blockId]data
 	stagedBlocksMutex sync.RWMutex                 // Mutex to protect the cache
@@ -112,13 +112,13 @@ func (cl *Client) Configure(cfg Config) error {
 	cl.Config = cfg
 
 	var credentialsProvider aws.CredentialsProvider
-	if cl.Config.authConfig.KeyID != nil && cl.Config.authConfig.SecretKey != nil {
-		keyID, err := cl.Config.authConfig.KeyID.Open()
+	if cl.Config.AuthConfig.KeyID != nil && cl.Config.AuthConfig.SecretKey != nil {
+		keyID, err := cl.Config.AuthConfig.KeyID.Open()
 		if err != nil || keyID == nil {
 			return errors.New("unable to decrypt key id")
 		}
 		defer keyID.Destroy()
-		secretKey, err := cl.Config.authConfig.SecretKey.Open()
+		secretKey, err := cl.Config.AuthConfig.SecretKey.Open()
 		if err != nil || secretKey == nil {
 			return errors.New("unable to decrypt secret key")
 		}
@@ -134,22 +134,22 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	var err error
-	if cl.Config.authConfig.Region == "" {
+	if cl.Config.AuthConfig.Region == "" {
 		region, exists := os.LookupEnv("AWS_REGION")
 		if !exists {
-			cl.Config.authConfig.Region, err = getRegionFromEndpoint(cl.Config.authConfig.Endpoint)
+			cl.Config.AuthConfig.Region, err = getRegionFromEndpoint(cl.Config.AuthConfig.Endpoint)
 			if err != nil {
-				cl.Config.authConfig.Region = defaultRegion
+				cl.Config.AuthConfig.Region = defaultRegion
 			}
 		} else {
-			cl.Config.authConfig.Region = region
+			cl.Config.AuthConfig.Region = region
 		}
 	}
 
-	if cl.Config.authConfig.Endpoint == "" {
-		cl.Config.authConfig.Endpoint = fmt.Sprintf(
+	if cl.Config.AuthConfig.Endpoint == "" {
+		cl.Config.AuthConfig.Endpoint = fmt.Sprintf(
 			"https://s3.%s.sv15.lyve.seagate.com",
-			cl.Config.authConfig.Region,
+			cl.Config.AuthConfig.Region,
 		)
 	}
 
@@ -157,10 +157,10 @@ func (cl *Client) Configure(cfg Config) error {
 
 	defaultConfig, err := config.LoadDefaultConfig(
 		ctx,
-		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
+		config.WithSharedConfigProfile(cl.Config.AuthConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithAppID(UserAgent()),
-		config.WithRegion(cl.Config.authConfig.Region),
+		config.WithRegion(cl.Config.AuthConfig.Region),
 	)
 
 	if err != nil {
@@ -172,7 +172,7 @@ func (cl *Client) Configure(cfg Config) error {
 				ctx,
 				config.WithCredentialsProvider(credentialsProvider),
 				config.WithAppID(UserAgent()),
-				config.WithRegion(cl.Config.authConfig.Region),
+				config.WithRegion(cl.Config.AuthConfig.Region),
 			)
 		}
 		if err != nil {
@@ -182,11 +182,18 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Create an Amazon S3 service client
-	cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-		o.UsePathStyle = cl.Config.usePathStyle
-		o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
-		o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-	})
+	if cl.Config.usePathStyle {
+		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+			o.UsePathStyle = true
+			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
+			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+		})
+	} else {
+		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
+			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+		})
+	}
 
 	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets(ctx)
@@ -224,7 +231,7 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// if no bucket-name was set, default to the first authorized bucket in the list
-	if cl.Config.authConfig.BucketName == "" {
+	if cl.Config.AuthConfig.BucketName == "" {
 		// which buckets does the user have access to?
 		authorizedBucketList := cl.filterAuthorizedBuckets(ctx, bucketList)
 		switch len(authorizedBucketList) {
@@ -233,25 +240,25 @@ func (cl *Client) Configure(cfg Config) error {
 			log.Err("Client::Configure : Error no authorized bucket exists in account: %v", err)
 			return errNoBucketInAccount
 		case 1:
-			cl.Config.authConfig.BucketName = bucketList[0]
+			cl.Config.AuthConfig.BucketName = bucketList[0]
 			log.Warn(
 				"Client::Configure : Bucket defaulted to the only authorized one: %s",
-				cl.Config.authConfig.BucketName,
+				cl.Config.AuthConfig.BucketName,
 			)
 		default:
 			// multiple authorized buckets were found, choose the first one, alphabetically
 			slices.Sort(bucketList)
-			cl.Config.authConfig.BucketName = bucketList[0]
+			cl.Config.AuthConfig.BucketName = bucketList[0]
 			log.Warn(
 				"Client::Configure : Bucket defaulted to the first authorized one, alphabetically: %s",
-				cl.Config.authConfig.BucketName,
+				cl.Config.AuthConfig.BucketName,
 			)
 		}
 		return nil
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
-	_, err = cl.headBucket(ctx, cl.Config.authConfig.BucketName)
+	_, err = cl.headBucket(ctx, cl.Config.AuthConfig.BucketName)
 	if err != nil {
 		// From the aws-sdk-go-v2 documentation
 		// If the bucket does not exist or you do not have permission to access it,
@@ -284,7 +291,10 @@ func (cl *Client) ListAuthorizedBuckets(ctx context.Context) ([]string, error) {
 }
 
 // filter out buckets for which we do not have permissions
-func (cl *Client) filterAuthorizedBuckets(ctx context.Context, bucketList []string) (authorizedBucketList []string) {
+func (cl *Client) filterAuthorizedBuckets(
+	ctx context.Context,
+	bucketList []string,
+) (authorizedBucketList []string) {
 	if len(bucketList) == 0 {
 		return bucketList
 	}
@@ -1185,7 +1195,7 @@ func (cl *Client) StageAndCommit(
 	//send command to start copy and get the upload id as it is needed later
 	var uploadID string
 	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
 		Key:         aws.String(key),
 		ContentType: aws.String(getContentType(key)),
 	}
@@ -1194,7 +1204,7 @@ func (cl *Client) StageAndCommit(
 		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
 	}
 
-	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
+	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
 			"Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ",
@@ -1238,7 +1248,7 @@ func (cl *Client) StageAndCommit(
 		if blk.Dirty() || len(data) > 0 {
 			// This block has data that is not yet in the bucket
 			uploadPartInput := &s3.UploadPartInput{
-				Bucket:     aws.String(cl.Config.authConfig.BucketName),
+				Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
 				Key:        aws.String(key),
 				PartNumber: &partNumber,
 				UploadId:   &uploadID,
@@ -1250,7 +1260,7 @@ func (cl *Client) StageAndCommit(
 			}
 
 			var partResp *s3.UploadPartOutput
-			partResp, err = cl.awsS3Client.UploadPart(ctx, uploadPartInput)
+			partResp, err = cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
 			eTag = partResp.ETag
 			blk.Flags.Clear(common.DirtyBlock)
 
@@ -1265,10 +1275,10 @@ func (cl *Client) StageAndCommit(
 		} else {
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
-			partResp, err = cl.awsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
-				Bucket:          aws.String(cl.Config.authConfig.BucketName),
+			partResp, err = cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
+				Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
 				Key:             aws.String(key),
-				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
+				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key)),
 				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
 				PartNumber:      &partNumber,
 				UploadId:        &uploadID,
@@ -1315,8 +1325,8 @@ func (cl *Client) StageAndCommit(
 	}
 
 	// complete the upload
-	_, err = cl.awsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(cl.Config.authConfig.BucketName),
+	_, err = cl.AwsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
 		MultipartUpload: &types.CompletedMultipartUpload{
@@ -1393,7 +1403,7 @@ func (cl *Client) combineSmallBlocks(
 }
 
 func (cl *Client) GetUsedSize(ctx context.Context) (uint64, error) {
-	headBucketOutput, err := cl.headBucket(ctx, cl.Config.authConfig.BucketName)
+	headBucketOutput, err := cl.headBucket(ctx, cl.Config.AuthConfig.BucketName)
 	if err != nil {
 		return 0, err
 	}
@@ -1501,7 +1511,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 
 	var uploadID string
 	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
 		Key:         aws.String(key),
 		ContentType: aws.String(getContentType(key)),
 	}
@@ -1510,7 +1520,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
 	}
 
-	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
+	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
 			"Client::CommitBlocks : Failed to create multipart upload. Here's why: %v ",
@@ -1565,7 +1575,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 		}
 
 		uploadPartInput := &s3.UploadPartInput{
-			Bucket:     aws.String(cl.Config.authConfig.BucketName),
+			Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
 			Key:        aws.String(key),
 			UploadId:   aws.String(uploadID),
 			PartNumber: &currentPartNumber,
@@ -1575,7 +1585,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 			uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
 		}
 
-		partResp, err := cl.awsS3Client.UploadPart(ctx, uploadPartInput)
+		partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
 		if err != nil {
 			log.Err("Client::CommitBlocks : failed to upload part: ", uploadErr)
 			break
@@ -1615,7 +1625,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 	}
 
 	completeInput := &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(cl.Config.authConfig.BucketName),
+		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: aws.String(uploadID),
 		MultipartUpload: &types.CompletedMultipartUpload{
@@ -1623,7 +1633,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 		},
 	}
 
-	_, err = cl.awsS3Client.CompleteMultipartUpload(ctx, completeInput)
+	_, err = cl.AwsS3Client.CompleteMultipartUpload(ctx, completeInput)
 	if err != nil {
 		log.Err(
 			"Client::CommitBlocks : Failed to complete multipart upload %s for %s: %v",

@@ -90,24 +90,10 @@ var updateCmd = &cobra.Command{
 			if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
 				return errors.New("--package should be one of tar|deb|rpm")
 			}
-			if os.Geteuid() != 0 && opt.Output == "" &&
-				(opt.Package == "deb" || opt.Package == "rpm") {
-				return errors.New(".deb and .rpm requires elevated privileges")
-			}
-			if opt.Output == "" && opt.Package == "tar" {
-				return errors.New(
-					"need to pass parameter --package with deb or rpm, or pass parameter --output with location to download to",
-				)
-			}
 
 		case "windows":
 			if opt.Package != "exe" && opt.Package != "zip" {
 				return errors.New("--package should be one of exe|zip")
-			}
-			if opt.Output == "" && (opt.Package == "zip") {
-				return errors.New(
-					"need to pass parameter --package with exe or zip, or pass parameter --output with location to download to",
-				)
 			}
 
 		default:
@@ -131,6 +117,28 @@ func installUpdate(ctx context.Context, opt *Options) error {
 	if relInfo.Version == common.CloudfuseVersion {
 		fmt.Println("cloudfuse is up to date")
 		return nil
+	}
+
+	// Before downloading/installing, enforce privileges and output-dependent rules
+	// only when an update is actually needed.
+	switch runtime.GOOS {
+	case "linux":
+		if opt.Output == "" { // implies we intend to install
+			if opt.Package == "tar" {
+				return errors.New(
+					"need to pass parameter --package with deb or rpm, or pass parameter --output with location to download to",
+				)
+			}
+			if os.Geteuid() != 0 && (opt.Package == "deb" || opt.Package == "rpm") {
+				return errors.New(".deb and .rpm requires elevated privileges")
+			}
+		}
+	case "windows":
+		if opt.Output == "" && opt.Package == "zip" {
+			return errors.New(
+				"need to pass parameter --package with exe or zip, or pass parameter --output with location to download to",
+			)
+		}
 	}
 
 	fileName, err := downloadUpdate(ctx, relInfo, opt.Output)

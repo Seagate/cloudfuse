@@ -116,11 +116,19 @@ func formatMessage(msgAndArgs ...interface{}) string {
 	if msgFormat, ok := msgAndArgs[0].(string); ok {
 		return fmt.Sprintf(msgFormat, msgAndArgs[1:]...)
 	}
-	return fmt.Sprintf("invalid message format: first argument not a string with multiple arguments. Args: %v", msgAndArgs)
+	return fmt.Sprintf(
+		"invalid message format: first argument not a string with multiple arguments. Args: %v",
+		msgAndArgs,
+	)
 }
 
 // waitForCondition polls for a condition to be true, failing the test on timeout.
-func (suite *dirTestSuite) waitForCondition(timeout time.Duration, interval time.Duration, condition func() (bool, error), msgAndArgs ...interface{}) {
+func (suite *dirTestSuite) waitForCondition(
+	timeout time.Duration,
+	interval time.Duration,
+	condition func() (bool, error),
+	msgAndArgs ...interface{},
+) {
 	startTime := time.Now()
 	var lastErr error
 	for {
@@ -775,7 +783,11 @@ func (suite *dirTestSuite) TestStatfs() {
 		expectedSize := numberOfFiles * 4096
 		suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
 			currentSize := DiskSize(pathPtr)
-			return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+			return currentSize == expectedSize, fmt.Errorf(
+				"expected %d, got %d",
+				expectedSize,
+				currentSize,
+			)
 		}, "DiskSize to be %d after first truncate", expectedSize)
 	}
 
@@ -788,7 +800,11 @@ func (suite *dirTestSuite) TestStatfs() {
 		expectedSize := numberOfFiles * len(suite.medBuff)
 		suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
 			currentSize := DiskSize(pathPtr)
-			return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+			return currentSize == expectedSize, fmt.Errorf(
+				"expected %d, got %d",
+				expectedSize,
+				currentSize,
+			)
 		}, "DiskSize to be %d after first truncate", expectedSize)
 	}
 
@@ -803,7 +819,11 @@ func (suite *dirTestSuite) TestStatfs() {
 		expectedSize := numberOfFiles * len(suite.medBuff)
 		suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
 			currentSize := DiskSize(pathPtr)
-			return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+			return currentSize == expectedSize, fmt.Errorf(
+				"expected %d, got %d",
+				expectedSize,
+				currentSize,
+			)
 		}, "DiskSize to be %d after first truncate", expectedSize)
 	}
 
@@ -816,7 +836,11 @@ func (suite *dirTestSuite) TestStatfs() {
 		expectedSize := numberOfFiles * 4096
 		suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
 			currentSize := DiskSize(pathPtr)
-			return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+			return currentSize == expectedSize, fmt.Errorf(
+				"expected %d, got %d",
+				expectedSize,
+				currentSize,
+			)
 		}, "DiskSize to be %d after first truncate", expectedSize)
 	}
 

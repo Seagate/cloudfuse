@@ -113,7 +113,7 @@ func GetAvailFree(path string) (uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	// Quick fix: Convert bytes to number of blocks to match Linux implementation for now. 
+	// Quick fix: Convert bytes to number of blocks to match Linux implementation for now.
 	// TODO: Eventually, change this back to return bytes instead of blocks, and fix linux implementation to match.
 	return avail / 4096, free / 4096, nil
 }
