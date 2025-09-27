@@ -26,15 +26,10 @@ package file_cache
 
 import (
 	"context"
-	"errors"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
-	"github.com/Seagate/cloudfuse/internal"
-	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/robfig/cron/v3"
 )
 
@@ -116,7 +111,7 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 				config.CronExpr,
 				windowCount,
 			)
-			fc.servicePendingOps()
+			fc.serviceScheduledOps()
 
 			// When should the window close?
 			remainingDuration := duration
@@ -152,7 +147,7 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 				case <-fc.uploadNotifyCh:
 					log.Debug("[%s] File change detected, processing pending uploads at %s\n",
 						windowName, time.Now().Format(time.Kitchen))
-					fc.servicePendingOps()
+					fc.serviceScheduledOps()
 				}
 			}
 		})
@@ -175,8 +170,9 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 	}
 }
 
-func (fc *FileCache) markFileForUpload(path string) {
+func (fc *FileCache) markFileForUpload(path string, flock *common.LockMapItem) {
 	fc.scheduleOps.Store(path, struct{}{})
+	flock.SyncPending = true
 	select {
 	case fc.uploadNotifyCh <- struct{}{}:
 		// Successfully notified
@@ -194,8 +190,8 @@ func (fc *FileCache) markFileForUpload(path string) {
 	}
 }
 
-func (fc *FileCache) servicePendingOps() {
-	log.Info("FileCache::servicePendingOps : Servicing pending uploads")
+func (fc *FileCache) serviceScheduledOps() {
+	log.Info("FileCache::serviceScheduledOps : Servicing scheduled uploads")
 
 	// Process pending operations
 	numFilesProcessed := 0
@@ -203,7 +199,7 @@ func (fc *FileCache) servicePendingOps() {
 		numFilesProcessed++
 		select {
 		case <-fc.stopAsyncUpload:
-			log.Info("FileCache::servicePendingOps : Upload processing interrupted")
+			log.Info("FileCache::serviceScheduledOps : Upload processing interrupted")
 			return false
 		case <-fc.closeWindowCh:
 			return false
@@ -212,7 +208,7 @@ func (fc *FileCache) servicePendingOps() {
 			err := fc.uploadPendingFile(path)
 			if err != nil {
 				log.Err(
-					"FileCache::servicePendingOps : %s upload failed: %v",
+					"FileCache::serviceScheduledOps : %s upload failed: %v",
 					path,
 					err,
 				)
@@ -222,80 +218,7 @@ func (fc *FileCache) servicePendingOps() {
 	})
 
 	log.Info(
-		"FileCache::servicePendingOps : Completed upload cycle, processed %d files",
+		"FileCache::serviceScheduledOps : Completed upload cycle, processed %d files",
 		numFilesProcessed,
 	)
-}
-
-func (fc *FileCache) uploadPendingFile(name string) error {
-	log.Trace("FileCache::uploadPendingFile : %s", name)
-
-	// lock the file
-	flock := fc.fileLocks.Get(name)
-	flock.Lock()
-	defer flock.Unlock()
-
-	// don't double upload
-	if !flock.SyncPending {
-		return nil
-	}
-
-	// look up file (or folder!)
-	localPath := filepath.Join(fc.tmpPath, name)
-	info, err := os.Stat(localPath)
-	if err != nil {
-		log.Err("FileCache::uploadPendingFile : %s failed to stat file. Here's why: %v", name, err)
-		return err
-	}
-	if info.IsDir() {
-		// upload folder
-		options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
-		err = fc.NextComponent().CreateDir(options)
-		if err != nil && !os.IsExist(err) {
-			return err
-		}
-	} else {
-		// this is a file
-		// prepare a handle
-		handle := handlemap.NewHandle(name)
-		// open the cached file
-		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
-		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
-			return err
-		}
-		// write handle attributes
-		inf, err := f.Stat()
-		if err == nil {
-			handle.Size = inf.Size()
-		}
-		handle.UnixFD = uint64(f.Fd())
-		handle.SetFileObject(f)
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-
-		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true, AsyncUpload: true})
-		f.Close()
-		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s Upload failed. Cause: %v", name, err)
-			return err
-		}
-	}
-	// update state
-	flock.SyncPending = false
-	fc.scheduleOps.Delete(name)
-	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
-
-	return nil
-}
-
-func (fc *FileCache) notInCloud(name string) bool {
-	notInCloud, _ := fc.checkCloud(name)
-	return notInCloud
-}
-
-func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error) {
-	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
-	return notInCloud, getAttrErr
 }
