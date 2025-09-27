@@ -2639,7 +2639,7 @@ func (suite *blockCacheTestSuite) TestBlockFailOverwrite() {
 	suite.assert.Equal(int64(0), fs.Size())
 }
 
-func (suite *blockCacheTestSuite) TestBlockDownloadFailed() {
+func (suite *blockCacheTestSuite) TestBlockDownloadOffsetGreaterThanFileSize() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
@@ -2671,28 +2671,23 @@ func (suite *blockCacheTestSuite) TestBlockDownloadFailed() {
 	n, err := tobj.blockCache.ReadInBuffer(
 		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
-	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "failed to download block")
-	suite.assert.Equal(0, n)
-
-	// 1-4MB data being prefetched in blocks 1-3
-	suite.assert.Equal(3, h.Buffers.Cooking.Len())
+	suite.assert.NoError(err)
+	suite.assert.Equal(int(_1MB), n)
 
 	// write at offset 1MB where block 1 download will fail
 	n, err = tobj.blockCache.WriteFile(
 		internal.WriteFileOptions{Handle: h, Offset: int64(_1MB), Data: dataBuff[:1*_1MB]},
 	)
-	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "failed to download block")
-	suite.assert.Equal(0, n)
-	suite.assert.False(h.Dirty())
+	suite.assert.NoError(err)
+	suite.assert.Equal(int(_1MB), n)
+	suite.assert.True(h.Dirty())
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 
 	fs, err := os.Stat(storagePath)
 	suite.assert.NoError(err)
-	suite.assert.Equal(int64(0), fs.Size())
+	suite.assert.Equal(int64(2*_1MB), fs.Size())
 }
 
 func (suite *blockCacheTestSuite) TestReadStagedBlock() {
@@ -3019,16 +3014,19 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 
 // TODO: Uncomment when stream is deprecated
 // func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
+
+// 	free := memory.FreeMemory()
+// 	maxbuffers := max(1, free/_1MB-1)
 // 	common.IsStream = true
-// 	config := "read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: 30\n  buffer-size-mb: 8\n"
+// 	config := fmt.Sprintf("read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: %d\n  buffer-size-mb: 1\n", maxbuffers)
 // 	tobj, err := setupPipeline(config)
 // 	defer tobj.cleanupPipeline()
 
-// 	suite.assert.NoError(err)
+// 	suite.assert.Nil(err)
 // 	if err == nil {
-// 		suite.assert.Equal("block_cache", tobj.blockCache.Name())
-// 		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
-// 		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
+// 		suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
+// 		suite.assert.EqualValues(tobj.blockCache.blockSize, 2*_1MB)
+// 		suite.assert.EqualValues(tobj.blockCache.memSize, 1*_1MB*maxbuffers)
 // 	}
 // }
 
@@ -3108,6 +3106,171 @@ func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	suite.assert.Equal(size, int(_1MB))
 	size = check(os.O_TRUNC) // size of the file would be zero here.
 	suite.assert.Equal(int(0), size)
+}
+
+func (suite *blockCacheTestSuite) TestReadCommittedLastBlockAfterAppends() {
+	prefetch := 12
+	cfg := fmt.Sprintf(
+		"block_cache:\n  block-size-mb: 1\n  mem-size-mb: 25\n  prefetch: %v\n  parallelism: 10",
+		prefetch,
+	)
+	tobj, err := setupPipeline(cfg)
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	path := getTestFileName(suite.T().Name())
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
+
+	// write using block cache
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	// Jump to 13thMB offset and write 500kb of data
+	n, err := tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: int64(13 * _1MB), Data: dataBuff[:(_1MB / 2)]},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB/2))
+	suite.assert.True(h.Dirty())
+
+	// Write remaining data backwards so that last block is staged first
+	for i := 0; i < 12; i++ {
+
+		n, err := tobj.blockCache.WriteFile(
+			internal.WriteFileOptions{
+				Handle: h,
+				Offset: int64(uint64(12-i) * _1MB),
+				Data:   dataBuff[:_1MB],
+			},
+		)
+		suite.assert.NoError(err)
+		suite.assert.Equal(n, int(_1MB))
+		suite.assert.True(h.Dirty())
+	}
+
+	// Now Jump to 15thMB offset and write 500kb of data
+	n, err = tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: int64(20 * _1MB), Data: dataBuff[:(_1MB / 2)]},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB/2))
+	suite.assert.True(h.Dirty())
+
+	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	_, err = os.Stat(storagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(h.Size, int64((20*_1MB)+(_1MB/2)))
+}
+
+func (suite *blockCacheTestSuite) TestReadCommittedLastBlocksOverwrite() {
+	prefetch := 12
+	cfg := fmt.Sprintf(
+		"block_cache:\n  block-size-mb: 1\n  mem-size-mb: 12\n  prefetch: %v\n  parallelism: 10",
+		prefetch,
+	)
+	tobj, err := setupPipeline(cfg)
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	path := getTestFileName(suite.T().Name())
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
+
+	tobj.blockCache.prefetch = 3
+
+	// write using block cache
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	// At 3MB offset write half mb data, assuming this is the last block
+	n, err := tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: int64(3 * _1MB), Data: dataBuff[:(_1MB / 2)]},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB/2))
+	suite.assert.True(h.Dirty())
+
+	// Fill some data before that so that last block gets committed
+	for i := int64(2); i >= 0; i-- {
+		n, err := tobj.blockCache.WriteFile(
+			internal.WriteFileOptions{
+				Handle: h,
+				Offset: int64(uint64(i) * _1MB),
+				Data:   dataBuff[:_1MB],
+			},
+		)
+		suite.assert.NoError(err)
+		suite.assert.Equal(n, int(_1MB))
+		suite.assert.True(h.Dirty())
+	}
+
+	// At 10MB offset write half mb data, assuming this is the last block
+	n, err = tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: int64(10 * _1MB), Data: dataBuff[:(_1MB / 2)]},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB/2))
+	suite.assert.True(h.Dirty())
+
+	// Fill some data before that so that last block gets committed
+	for i := int64(9); i >= 7; i-- {
+		n, err := tobj.blockCache.WriteFile(
+			internal.WriteFileOptions{
+				Handle: h,
+				Offset: int64(uint64(i) * _1MB),
+				Data:   dataBuff[:_1MB],
+			},
+		)
+		suite.assert.NoError(err)
+		suite.assert.Equal(n, int(_1MB))
+		suite.assert.True(h.Dirty())
+	}
+
+	// At 15MB offset write half mb data, assuming this is the last block
+	n, err = tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: int64(15 * _1MB), Data: dataBuff[:(_1MB / 2)]},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB/2))
+	suite.assert.True(h.Dirty())
+
+	// Fill some data before that so that last block gets committed
+	for i := int64(14); i >= 12; i-- {
+		n, err := tobj.blockCache.WriteFile(
+			internal.WriteFileOptions{
+				Handle: h,
+				Offset: int64(uint64(i) * _1MB),
+				Data:   dataBuff[:_1MB],
+			},
+		)
+		suite.assert.NoError(err)
+		suite.assert.Equal(n, int(_1MB))
+		suite.assert.True(h.Dirty())
+	}
+
+	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	_, err = os.Stat(storagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(h.Size, int64((15*_1MB)+(_1MB/2)))
 }
 
 // In order for 'go test' to run this suite, we need to create

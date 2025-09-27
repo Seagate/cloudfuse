@@ -37,6 +37,7 @@ foreground: true|false <run blobfuse2 in foreground or background>
 allow-other: true|false <allow other users to access the mounted directory - used for FUSE and File Cache>
 nonempty: true|false <allow mounting on non-empty directory>
 restricted-characters-windows: true|false <allows filenames with restricted characters to appear on Windows - used for AzStorage and S3Storage>
+disable-kernel-cache: true|false <disable kernel cache but keep cloudfuse cache. Default - false>
 
 # Dynamic profiler related configuration. This helps to root-cause high memory/cpu usage related issues.
 dynamic-profile: true|false <allows to turn on dynamic profiler for cpu/memory usage monitoring. Only for debugging, shall not be used in production>
@@ -56,6 +57,7 @@ logging:
 components:
   - libfuse
   - entry_cache
+  - xload
   - block_cache
   - file_cache
   - attr_cache
@@ -74,7 +76,7 @@ libfuse:
   disable-writeback-cache: true|false <disallow libfuse to buffer write requests if you must strictly open files in O_WRONLY or O_APPEND mode. alternatively, you can set ignore-open-flags.>
   ignore-open-flags: true|false <ignore the append and write only flag since O_APPEND and O_WRONLY is not supported with writeback caching. alternatively, you can disable-writeback-cache. Default value is true>
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
-  direct-io: true|false <enable to bypass the kernel cache>
+  direct-io: true|false <enable to bypass the kernel cache. It also disables cloudfuse data and metadata caching. Default - false>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
   windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
@@ -90,7 +92,15 @@ stream:
 entry_cache:
   timeout-sec: <cache eviction timeout (in sec). Default - 30 sec>
 
-# Block cache related configuration. Block cache is only supported on Linux.
+# Xload configuration
+xload:
+  block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
+  path: <path to local disk cache where downloaded files will be stored>
+  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.blobfuse2/xload_stats_{PID}.json'. Default - not exported>
+  validate-md5: <if md5 sum is present in the blob, validate it post download. Default - false>
+  cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
+
+# Block cache related configuration
 block_cache:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   mem-size-mb: <total amount of memory to be preallocated for block cache (in MB). Default - 80% of free memory>
@@ -99,7 +109,7 @@ block_cache:
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
   parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores>
-  prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
+  cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
 
 # Disk cache related configuration
 file_cache:
@@ -120,15 +130,16 @@ file_cache:
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
   schedule:
     - name: <Name of Cron job, Ex. "Mon,Tue,etc...", Weekends, Weekdays>
-      cron: <Cron configuration>
-            "0 * * * * *"
-          #  | | | | | |
-          #  | | | | | +---- Day of week (every day)
-          #  | | | | +------ Month (every month)
-          #  | | | +-------- Day of month (every day)
-          #  | | +---------- Hour (every hour)
-          #  | +------------ Minute (every minute)
-          #  +-------------- Second (0th second)
+      cron:
+        <Cron configuration>
+        "0 * * * * *"
+        #  | | | | | |
+        #  | | | | | +---- Day of week (every day)
+        #  | | | | +------ Month (every month)
+        #  | | | +-------- Day of month (every day)
+        #  | | +---------- Hour (every hour)
+        #  | +------------ Minute (every minute)
+        #  +-------------- Second (0th second)
       duration: <Length of time to run the scheduled upload session. Format is <number><unit>, Example:"5h" =  5 hours, "30m" = 30 minutes, "2s" = 2 seconds>
 
 # Attribute cache related configuration
@@ -207,7 +218,7 @@ s3storage:
   disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
-  usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
   health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>
 

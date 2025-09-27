@@ -364,6 +364,16 @@ func (suite *utilTestSuite) TestExpandPath() {
 	path = ""
 	expandedPath = ExpandPath(path)
 	suite.assert.Equal(expandedPath, path)
+
+	path = "$HOME/.cloudfuse/config_$web.yaml"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(path, "$web")
+
+	path = "$HOME/.cloudfuse/$web"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(path, "$web")
 }
 
 func (suite *utilTestSuite) TestExpandPathDriveLetter() {
@@ -508,4 +518,90 @@ func (suite *utilTestSuite) TestCRC64() {
 	crc1 := GetCRC64(data, len(data))
 
 	suite.assert.NotEqual(crc, crc1)
+}
+
+func (s *utilTestSuite) TestGetMD5() {
+	assert := assert.New(s.T())
+
+	f, err := os.Create("abc.txt")
+	assert.NoError(err)
+
+	_, err = f.Write([]byte(randomString(50)))
+	assert.NoError(err)
+
+	f.Close()
+
+	f, err = os.Open("abc.txt")
+	assert.NoError(err)
+
+	md5Sum, err := GetMD5(f)
+	assert.NoError(err)
+	assert.NotZero(md5Sum)
+
+	f.Close()
+	os.Remove("abc.txt")
+}
+
+func (s *utilTestSuite) TestComponentExists() {
+	components := []string{
+		"component1",
+		"component2",
+		"component3",
+	}
+
+	exists := ComponentInPipeline(components, "component1")
+	s.True(exists)
+
+	exists = ComponentInPipeline(components, "component4")
+	s.False(exists)
+
+}
+
+func (s *utilTestSuite) TestValidatePipeline() {
+	err := ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "azstorage"})
+	s.Error(err)
+
+	err = ValidatePipeline([]string{"libfuse", "file_cache", "xload", "azstorage"})
+	s.Error(err)
+
+	err = ValidatePipeline([]string{"libfuse", "block_cache", "xload", "azstorage"})
+	s.Error(err)
+
+	err = ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "xload", "azstorage"})
+	s.Error(err)
+
+	err = ValidatePipeline([]string{"libfuse", "file_cache", "azstorage"})
+	s.NoError(err)
+
+	err = ValidatePipeline([]string{"libfuse", "block_cache", "azstorage"})
+	s.NoError(err)
+
+	err = ValidatePipeline([]string{"libfuse", "xload", "attr_cache", "azstorage"})
+	s.NoError(err)
+}
+
+func (s *utilTestSuite) TestUpdatePipeline() {
+	pipeline := UpdatePipeline([]string{"libfuse", "file_cache", "azstorage"}, "xload")
+	s.NotNil(pipeline)
+	s.False(ComponentInPipeline(pipeline, "file_cache"))
+	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+
+	pipeline = UpdatePipeline([]string{"libfuse", "block_cache", "azstorage"}, "xload")
+	s.NotNil(pipeline)
+	s.False(ComponentInPipeline(pipeline, "block_cache"))
+	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+
+	pipeline = UpdatePipeline([]string{"libfuse", "file_cache", "azstorage"}, "block_cache")
+	s.NotNil(pipeline)
+	s.False(ComponentInPipeline(pipeline, "file_cache"))
+	s.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
+
+	pipeline = UpdatePipeline([]string{"libfuse", "xload", "azstorage"}, "block_cache")
+	s.NotNil(pipeline)
+	s.False(ComponentInPipeline(pipeline, "xload"))
+	s.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
+
+	pipeline = UpdatePipeline([]string{"libfuse", "xload", "azstorage"}, "xload")
+	s.NotNil(pipeline)
+	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
 }

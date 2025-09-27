@@ -221,7 +221,7 @@ func (s *clientTestSuite) TestCredentialsErrorInvalidKeyID() {
 }
 
 func (s *clientTestSuite) TestCredentialsErrorInvalidSecretKey() {
-	// TODO Fix this test for localstack
+	// This test needs to be skipped for LocalStack as we can't test invalid credentials
 	if storageTestConfigurationParameters.BucketName == "test" {
 		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
 		return
@@ -230,11 +230,12 @@ func (s *clientTestSuite) TestCredentialsErrorInvalidSecretKey() {
 	defer s.cleanupTest()
 	// setup
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  use-path-style: %t",
 		storageTestConfigurationParameters.BucketName,
 		storageTestConfigurationParameters.KeyID,
 		"WRONGSECRETKEY",
 		storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.UsePathStyle,
 	)
 	// S3 connection creation should fail
 	err := s.setupTestHelper(config, false)
@@ -242,12 +243,6 @@ func (s *clientTestSuite) TestCredentialsErrorInvalidSecretKey() {
 }
 
 func (s *clientTestSuite) TestCredentialsErrorInvalidBucket() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	config := fmt.Sprintf(
@@ -309,20 +304,15 @@ func (s *clientTestSuite) TestCredentialsErrorInvalidEndpoint2() {
 }
 
 func (s *clientTestSuite) TestCredentialsIncorrectRegion() {
-	// This test needs to be skipped for LocalStack, does not use region
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s",
+		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s\n  use-path-style: %t",
 		storageTestConfigurationParameters.BucketName,
 		storageTestConfigurationParameters.KeyID,
 		storageTestConfigurationParameters.SecretKey,
 		"ap-southeast-1",
+		storageTestConfigurationParameters.UsePathStyle,
 	)
 	// S3 connection creation should fail as this address does not exist
 	err := s.setupTestHelper(config, false)
@@ -330,22 +320,16 @@ func (s *clientTestSuite) TestCredentialsIncorrectRegion() {
 }
 
 func (s *clientTestSuite) TestEnvVarCredentials() {
-	// TODO: Fix this test for LocalStack
-	// This test needs to be skipped for LocalStack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
 	os.Setenv("AWS_REGION", storageTestConfigurationParameters.Region)
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  endpoint: %s",
+		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  use-path-style: %t",
 		storageTestConfigurationParameters.BucketName,
 		storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.UsePathStyle,
 	)
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
@@ -357,8 +341,7 @@ func (s *clientTestSuite) TestEnvVarCredentials() {
 }
 
 func (s *clientTestSuite) TestEnvVarCredentialsErr() {
-	// TODO: Fix this test for LocalStack
-	// This test needs to be skipped for LocalStack
+	// This test needs to be skipped for LocalStack as we can't test invalid credentials
 	if storageTestConfigurationParameters.BucketName == "test" {
 		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
 		return
@@ -369,9 +352,10 @@ func (s *clientTestSuite) TestEnvVarCredentialsErr() {
 	os.Setenv("AWS_ACCESS_KEY_ID", "WRONGACCESSKEY")
 	os.Setenv("AWS_SECRET_ACCESS_KEY", "WRONGSECRETKEY")
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  endpoint: %s",
+		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  use-path-style: %t",
 		storageTestConfigurationParameters.BucketName,
 		storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.UsePathStyle,
 	)
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
@@ -382,13 +366,6 @@ func (s *clientTestSuite) TestEnvVarCredentialsErr() {
 }
 
 func (s *clientTestSuite) TestEnvVarCredentialsErrRegion() {
-	// TODO: Fix this test for LocalStack
-	// This test needs to be skipped for LocalStack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
@@ -431,13 +408,6 @@ func (s *clientTestSuite) TestDefaultConfig() {
 }
 
 func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
-	// TODO Fix this test for localstack
-	// This test needs to be skipped for LocalStack as it doesn't use a region
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
@@ -458,21 +428,16 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
 }
 
 func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  profile: %s",
+		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  profile: %s\n  use-path-style: %t",
 		storageTestConfigurationParameters.BucketName,
 		s.client.Config.AuthConfig.Endpoint,
 		"NoProfile",
+		storageTestConfigurationParameters.UsePathStyle,
 	)
 	// Invalid profile, but environment variables should take precedence
 	err := s.setupTestHelper(config, false)
@@ -483,21 +448,16 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
 }
 
 func (s *clientTestSuite) TestCredentialPrecedenceConfigOverProfile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s\n  profile: %s",
+		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s\n  profile: %s\n  use-path-style: %t",
 		storageTestConfigurationParameters.BucketName,
 		storageTestConfigurationParameters.Endpoint,
 		storageTestConfigurationParameters.KeyID,
 		storageTestConfigurationParameters.SecretKey,
 		"NoProfile",
+		storageTestConfigurationParameters.UsePathStyle,
 	)
 	// Invalid profile, but config should take precedence
 	err := s.setupTestHelper(config, false)
@@ -505,12 +465,6 @@ func (s *clientTestSuite) TestCredentialPrecedenceConfigOverProfile() {
 }
 
 func (s *clientTestSuite) TestCredentialPrecedenceRegion() {
-	// This test needs to be skipped for LocalStack as it doesn't use a region
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_REGION", storageTestConfigurationParameters.Region)

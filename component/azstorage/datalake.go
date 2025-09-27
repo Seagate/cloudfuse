@@ -27,6 +27,7 @@ package azstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -196,11 +197,24 @@ func (dl *Datalake) TestPipeline() error {
 	// we are just validating the auth mode used. So, no need to iterate over the pages
 	_, err := listPathPager.NextPage(context.Background())
 	if err != nil {
-		log.Err("Datalake::TestPipeline : Failed to validate account with given auth %s", err.Error)
+		log.Err(
+			"Datalake::TestPipeline : Failed to validate account with given auth %s",
+			err.Error(),
+		)
+		var respErr *azcore.ResponseError
+		errors.As(err, &respErr)
+		if respErr != nil {
+			return fmt.Errorf("Datalake::TestPipeline : [%s]", respErr.ErrorCode)
+		}
 		return err
 	}
 
 	return dl.BlockBlob.TestPipeline()
+}
+
+// IsAccountADLS : Check account is ADLS or not
+func (dl *Datalake) IsAccountADLS() bool {
+	return dl.BlockBlob.IsAccountADLS()
 }
 
 // check the connection to the service by calling GetProperties on the container
@@ -345,7 +359,12 @@ func (dl *Datalake) DeleteDirectory(ctx context.Context, name string) (err error
 // RenameFile : Rename the file
 // While renaming the file, Creation time is preserved but LMT is changed for the destination blob.
 // and also Etag of the destination blob changes
-func (dl *Datalake) RenameFile(ctx context.Context, source string, target string, srcAttr *internal.ObjAttr) error {
+func (dl *Datalake) RenameFile(
+	ctx context.Context,
+	source string,
+	target string,
+	srcAttr *internal.ObjAttr,
+) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
 	fileClient := dl.getFileClientPathEscape(source)
@@ -398,7 +417,10 @@ func (dl *Datalake) RenameDirectory(ctx context.Context, source string, target s
 }
 
 // GetAttr : Retrieve attributes of the path
-func (dl *Datalake) GetAttr(ctx context.Context, name string) (blobAttr *internal.ObjAttr, err error) {
+func (dl *Datalake) GetAttr(
+	ctx context.Context,
+	name string,
+) (blobAttr *internal.ObjAttr, err error) {
 	log.Trace("Datalake::GetAttr : name %s", name)
 
 	fileClient := dl.getFileClient(name)
@@ -683,7 +705,12 @@ func (dl *Datalake) StageBlock(ctx context.Context, name string, data []byte, id
 }
 
 // CommitBlocks : persists the block list
-func (dl *Datalake) CommitBlocks(ctx context.Context, name string, blockList []string, newEtag *string) error {
+func (dl *Datalake) CommitBlocks(
+	ctx context.Context,
+	name string,
+	blockList []string,
+	newEtag *string,
+) error {
 	return dl.BlockBlob.CommitBlocks(ctx, name, blockList, newEtag)
 }
 

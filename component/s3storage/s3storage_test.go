@@ -2015,12 +2015,6 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 }
 
 func (s *s3StorageTestSuite) TestOverwriteBlocks() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
@@ -2119,12 +2113,6 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 }
 
 func (s *s3StorageTestSuite) TestAppendBlocks() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
@@ -2173,12 +2161,6 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 }
 
 func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
@@ -2227,12 +2209,6 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 }
 
 func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
@@ -2923,6 +2899,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -2948,6 +2925,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -2981,6 +2959,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 	// Setup
@@ -2995,6 +2974,7 @@ func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3060,12 +3040,6 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 }
 
 func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
@@ -3123,16 +3097,11 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 }
 
 func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3189,6 +3158,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3255,16 +3225,11 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 }
 
 func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3348,6 +3313,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3407,16 +3373,11 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 }
 
 func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3493,6 +3454,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	blockSizeMB := 7
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 
@@ -3556,16 +3518,11 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 }
 
 func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
-	// TODO Fix this test for localstack
-	if storageTestConfigurationParameters.BucketName == "test" {
-		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
-		return
-	}
-
 	defer s.cleanupTest()
 	blockSizeMB := 7
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = int64(blockSizeMB)
 	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(config, s.bucket, true)
 

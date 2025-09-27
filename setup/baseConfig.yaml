@@ -52,6 +52,7 @@ logging:
 components:
   - libfuse
   - stream
+  - xload
   - block_cache
   - file_cache
   - attr_cache
@@ -83,11 +84,17 @@ stream:
   buffer-size-mb: <size for each buffer. Default - 0 MB>
   file-caching: <read/write mode file level caching or handle level caching. Default - false (handle level caching ON)>
 
-# Block cache related configuration. Block cache is only supported on Linux.
+# Xload configuration
+xload:
+  path: <path to local disk cache where downloaded files will be stored>
+  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.blobfuse2/xload_stats_{PID}.json'. Default - not exported>
+  validate-md5: <if md5 sum is present in the blob, validate it post download. Default - false>
+
+# Block cache related configuration
 block_cache:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   mem-size-mb: <total amount of memory to be preallocated for block cache (in MB). Default - 80% of free memory>
-  path: <path to local disk cache where downloaded blocked will be stored>
+  path: <path to local disk cache where downloaded blocks will be stored>
   disk-size-mb: <maximum disk cache size allowed. Default - 80% of free disk space>
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
@@ -188,7 +195,7 @@ s3storage:
   disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
-  usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
   health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>

@@ -112,7 +112,9 @@ func open(name string, flag int, perm uint32) (fd syscall.Handle, err error) {
 	}
 	// We add the FILE_SHARE_DELETE flag which allows the open file to be renamed and deleted before being closed.
 	// This is not enabled in Go.
-	sharemode := uint32(syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE)
+	sharemode := uint32(
+		syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE,
+	)
 	var sa *syscall.SecurityAttributes
 	if flag&syscall.O_CLOEXEC == 0 {
 		sa = makeInheritSa()
@@ -210,7 +212,8 @@ func addExtendedPrefix(path string) string {
 			// Already extended with \??\
 			return path
 		}
-		if os.IsPathSeparator(path[0]) && os.IsPathSeparator(path[1]) && path[2] == '?' && os.IsPathSeparator(path[3]) {
+		if os.IsPathSeparator(path[0]) && os.IsPathSeparator(path[1]) && path[2] == '?' &&
+			os.IsPathSeparator(path[3]) {
 			// Already extended with \\?\ or any combination of directory separators.
 			return path
 		}

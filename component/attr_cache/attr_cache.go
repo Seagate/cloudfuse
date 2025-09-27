@@ -57,6 +57,9 @@ type AttrCache struct {
 	maxFiles       int
 	cache          *cacheTreeMap
 	cacheLock      sync.RWMutex
+	cleanupDone    chan bool
+	cleanupCtx     context.Context
+	cleanupStop    context.CancelFunc
 }
 
 // Structure defining your config parameters
@@ -107,7 +110,12 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 	log.Trace("AttrCache::Start : Starting component %s", ac.Name())
 
 	// AttrCache : start code goes here
-	ac.cache = newCacheTreeMap()
+	ac.cache = newCacheTreeMap(ac.maxFiles)
+
+	// Start background cleanup goroutine
+	ac.cleanupCtx, ac.cleanupStop = context.WithCancel(ctx)
+	ac.cleanupDone = make(chan bool)
+	go ac.backgroundCleanup()
 
 	return nil
 }
@@ -115,6 +123,12 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 // Stop : Stop the component functionality and kill all threads started
 func (ac *AttrCache) Stop() error {
 	log.Trace("AttrCache::Stop : Stopping component %s", ac.Name())
+
+	// Stop the background cleanup goroutine
+	if ac.cleanupStop != nil {
+		ac.cleanupStop()
+		<-ac.cleanupDone // Wait for cleanup goroutine to finish
+	}
 
 	return nil
 }
@@ -334,6 +348,78 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 		dirCacheItem.markInCloud(true)
 		// recurse
 		ac.markAncestorsInCloud(getParentDir(dirPath), time)
+	}
+}
+
+// backgroundCleanup: runs in a separate goroutine to periodically clean up expired entries
+func (ac *AttrCache) backgroundCleanup() {
+	defer close(ac.cleanupDone)
+
+	// Ensure minimum interval to prevent panic with NewTicker.
+	// Note: `cacheTimeout` is immutable post-start and should not be modified during runtime.
+	interval := time.Duration(ac.cacheTimeout) * time.Second
+	if interval <= 0 {
+		interval = time.Second // Use 1 second as minimum interval
+	}
+
+	// Create ticker based on cache timeout interval
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ac.cleanupCtx.Done():
+			log.Trace("AttrCache::backgroundCleanup : Stopping background cleanup")
+			return
+		case <-ticker.C:
+			ac.cleanupExpiredEntries()
+		}
+	}
+}
+
+// cleanupExpiredEntries: removes expired entries from the cache map
+// This runs in a background goroutine to prevent memory leaks
+func (ac *AttrCache) cleanupExpiredEntries() {
+	// First pass: collect keys to delete under read lock to minimize write lock duration
+	var keysToDelete []string
+
+	ac.cacheLock.RLock()
+	for path, item := range ac.cache.cacheMap {
+		// Never delete the root entry
+		if path == "" {
+			continue
+		}
+		// Check if entry has exceeded the cache timeout
+		if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+			keysToDelete = append(keysToDelete, path)
+		}
+	}
+	ac.cacheLock.RUnlock()
+
+	// sort keysToDelete in reverse order to delete children before parents
+	slices.SortFunc(keysToDelete, func(a, b string) int {
+		return strings.Compare(b, a)
+	})
+
+	// Second pass: delete expired entries under write lock, re-checking expiration
+	if len(keysToDelete) > 0 {
+		ac.cacheLock.Lock()
+		for _, path := range keysToDelete {
+			// Re-check if entry still exists and is still expired
+			if item, exists := ac.cache.cacheMap[path]; exists {
+				if len(item.children) == 0 &&
+					time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+					if item.parent != nil {
+						if item.exists() {
+							item.parent.listCache = nil
+						}
+						delete(item.parent.children, item.attr.Name)
+					}
+					delete(ac.cache.cacheMap, path)
+				}
+			}
+		}
+		ac.cacheLock.Unlock()
 	}
 }
 
@@ -1049,7 +1135,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
 			return nil, syscall.ENOENT
 		} else {
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return value.attr, nil
 		}
 	}

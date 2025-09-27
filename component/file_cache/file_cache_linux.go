@@ -71,3 +71,22 @@ func (fc *FileCache) getAvailableSize() (uint64, error) {
 	available := statfs.Bavail * uint64(statfs.Bsize)
 	return available, nil
 }
+
+func (fc *FileCache) syncFile(f *os.File, path string) error {
+	// Flush all data to disk that has been buffered by the kernel.
+	// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
+	// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
+	// f.fsync() is another option but dup+close does it quickly compared to sync
+	dupFd, err := unix.Dup(int(f.Fd()))
+	if err != nil {
+		log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", path)
+		return syscall.EIO
+	}
+
+	err = unix.Close(dupFd)
+	if err != nil {
+		log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", path)
+		return syscall.EIO
+	}
+	return nil
+}

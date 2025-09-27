@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -74,14 +75,14 @@ var unmountCmd = &cobra.Command{
 			for _, mntPath := range lstMnt {
 				match, _ := regexp.MatchString(mntPathPrefix, mntPath)
 				if match {
-					err := unmountCloudfuse(mntPath, lazy)
+					err := unmountCloudfuse(mntPath, lazy, false)
 					if err != nil {
 						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
 					}
 				}
 			}
 		} else {
-			err := unmountCloudfuse(args[0], lazy)
+			err := unmountCloudfuse(args[0], lazy, false)
 			if err != nil {
 				return err
 			}
@@ -98,7 +99,7 @@ var unmountCmd = &cobra.Command{
 }
 
 // Attempts to unmount the directory and returns true if the operation succeeded
-func unmountCloudfuse(mntPath string, lazy bool) error {
+func unmountCloudfuse(mntPath string, lazy bool, silent bool) error {
 	unmountCmd := []string{"fusermount3", "fusermount"}
 
 	var errb bytes.Buffer
@@ -114,7 +115,10 @@ func unmountCloudfuse(mntPath string, lazy bool) error {
 		_, err = cliOut.Output()
 
 		if err == nil {
-			fmt.Println("Successfully unmounted", mntPath)
+			log.Info("unmountBlobfuse2 : successfully unmounted %s", mntPath)
+			if !silent {
+				fmt.Println("Successfully unmounted", mntPath)
+			}
 			return nil
 		}
 

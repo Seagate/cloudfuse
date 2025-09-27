@@ -102,6 +102,8 @@ func (az *AzStorage) Configure(isParent bool) error {
 		return err
 	}
 
+reconfigure:
+
 	err = ParseAndValidateConfig(az, conf)
 	if err != nil {
 		log.Err("AzStorage::Configure : Config validation failed [%s]", err.Error())
@@ -112,6 +114,16 @@ func (az *AzStorage) Configure(isParent bool) error {
 	if err != nil {
 		log.Err("AzStorage::Configure : Failed to validate storage account [%s]", err.Error())
 		return err
+	}
+
+	// If user has not specified the account type then detect it's HNS or FNS
+	if conf.AccountType == "" && az.storage.IsAccountADLS() {
+		log.Crit(
+			"AzStorage::Configure : Auto detected account type as adls, reconfiguring storage connection.",
+		)
+		az.storage = nil
+		conf.AccountType = "adls"
+		goto reconfigure
 	}
 
 	return nil
@@ -174,7 +186,11 @@ func (az *AzStorage) configureAndTest(isParent bool) error {
 				"AzStorage::configureAndTest : Failed to validate credentials [%s]",
 				err.Error(),
 			)
-			return fmt.Errorf("failed to authenticate credentials for %s", az.Name())
+			return fmt.Errorf(
+				"failed to authenticate %s credentials with error [%s]",
+				az.Name(),
+				err.Error(),
+			)
 		}
 	}
 
@@ -563,12 +579,26 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
-	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
+	var size int64
+	var path string
+	if options.Handle != nil {
+		size = atomic.LoadInt64(&options.Handle.Size)
+		path = options.Handle.Path
+	} else {
+		size = options.Size
+		path = options.Path
+		if len(path) == 0 {
+			log.Err("AzStorage::ReadInBuffer : Path not given for download")
+			return 0, fmt.Errorf("path not given for download")
+		}
+	}
+
+	if options.Offset > size {
 		return 0, syscall.ERANGE
 	}
 
 	var dataLen = int64(len(options.Data))
-	if atomic.LoadInt64(&options.Handle.Size) < (options.Offset + int64(len(options.Data))) {
+	if size < (options.Offset + int64(len(options.Data))) {
 		dataLen = options.Handle.Size - options.Offset
 	}
 
@@ -576,24 +606,13 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, nil
 	}
 
-	err = az.storage.ReadInBuffer(
-		az.ctx,
-		options.Handle.Path,
-		options.Offset,
-		dataLen,
-		options.Data,
-		options.Etag,
-	)
-	az.updateConnectionState(err)
+	length = int(dataLen)
+	err = az.storage.ReadInBuffer(az.ctx, path, options.Offset, dataLen, options.Data, options.Etag)
 	if err != nil {
-		log.Err(
-			"AzStorage::ReadInBuffer : Failed to read %s [%s]",
-			options.Handle.Path,
-			err.Error(),
-		)
+		log.Err("AzStorage::ReadInBuffer : Failed to read %s [%s]", path, err.Error())
+		length = 0
 	}
 
-	length = int(dataLen)
 	return
 }
 

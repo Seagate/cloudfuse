@@ -40,6 +40,7 @@ jobs:
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
       zig: 0.15.1
+      GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -47,12 +48,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -63,6 +64,13 @@ jobs:
           FUSELIB: ${{ matrix.fuselib }}
         run: |-
           sudo apt-get install fuse3 ${FUSELIB} -y
+
+      - name: Cache Zig
+        if: runner.os == 'Linux'
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.local/bin
+          key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
 
       - name: Install Zig
         env:
@@ -80,10 +88,20 @@ jobs:
 
           ZIG_DIR="zig-${ZIG_ARCH}-linux-${ENV_ZIG}"
           ZIG_TARBALL="${ZIG_DIR}.tar.xz"
+          ZIG_DIR_PATH="$HOME/.local/bin/${ZIG_DIR}"
+
+          # If cached Zig already exists, add it to PATH and skip download
+          if [ -d "${ZIG_DIR_PATH}" ]; then
+            echo "Found cached Zig at ${ZIG_DIR_PATH}"
+            echo "${ZIG_DIR_PATH}" >> $GITHUB_PATH
+            exit 0
+          fi
+
+          # Otherwise download and extract Zig, then add to PATH
           curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/${ZIG_DIR}" >> $GITHUB_PATH
+          echo "${ZIG_DIR_PATH}" >> $GITHUB_PATH
           rm zig.tar.xz
 
       - name: Create Directory Structure
@@ -220,7 +238,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -237,7 +255,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -267,7 +285,7 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -284,7 +302,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -319,7 +337,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -337,7 +355,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR} -z
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -373,7 +391,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -390,7 +408,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=true -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -420,7 +438,7 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -437,7 +455,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -475,7 +493,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -491,7 +509,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -520,7 +538,7 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -536,7 +554,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -585,7 +603,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR} -z
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -623,7 +641,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -639,7 +657,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -size-tracker=true
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          
+
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
@@ -885,7 +903,7 @@ jobs:
           ls -l /usr/local/bin/cfusemon*
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test mount ${MOUNT_DIR}/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -916,7 +934,7 @@ jobs:
           mkdir -p ${MOUNT_DIR}/hmon_test
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test mount ${MOUNT_DIR}/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -993,7 +1011,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1018,7 +1036,7 @@ jobs:
         run: |
           echo 'mode: count' > ./cloudfuse_coverage_raw.rpt
           tail -q -n +2 ./*.cov >> ./cloudfuse_coverage_raw.rpt
-          cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "common/types.go" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" | grep -v "component/azstorage/azauthspn.go" | grep -v "component/stream" | grep -v "component/custom" | grep -v "component/azstorage/azauthcli.go" | grep -v "exported/exported.go" |  grep -v "component/block_cache/stream.go" > ./cloudfuse_coverage.rpt
+          cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "common/types.go" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" | grep -v "component/azstorage/azauthspn.go" | grep -v "component/stream" | grep -v "component/custom" | grep -v "component/azstorage/azauthcli.go" | grep -v "exported/exported.go" |  grep -v "component/block_cache/stream.go"  | grep -v "component/azstorage/azAuthWorkloadIdentity.go"  | grep -v "component/azstorage/azauthWorkloadIdentity.go" | grep -v "component/azstorage/policies.go" > ./cloudfuse_coverage.rpt
           go tool cover -func cloudfuse_coverage.rpt  > ./cloudfuse_func_cover.rpt
           go tool cover -html=./cloudfuse_coverage.rpt -o ./cloudfuse_coverage.html
           go tool cover -html=./cloudfuse_ut.cov -o ./cloudfuse_ut.html
@@ -1055,6 +1073,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1062,12 +1081,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -1199,7 +1218,7 @@ jobs:
         run: |-
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1247,7 +1266,7 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1264,7 +1283,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1319,7 +1338,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1355,7 +1374,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1372,7 +1391,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -adls=true -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1421,7 +1440,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1464,7 +1483,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1480,7 +1499,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1511,7 +1530,7 @@ jobs:
           echo "    - cloudfuse_stats" >> configBlockProfilerTemp.yaml
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1527,7 +1546,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1549,7 +1568,7 @@ jobs:
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
-  
+
       - name: S3 Coverage - Block Cache
         shell: bash
         env:
@@ -1581,7 +1600,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1624,7 +1643,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1640,7 +1659,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR} -quick-test=true -stream-direct-test=true -size-tracker=true
           cd -
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1762,7 +1781,7 @@ jobs:
           sleep 5
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           kill $pid
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1865,7 +1884,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           cat ${cloudfuse_ADLS_CFG_HMON}
           ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1882,7 +1901,7 @@ jobs:
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cfusemon_stop_pid.cov health-monitor stop --pid=$win_pid
           kill $pid
           kill $pid_mon
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1905,7 +1924,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           cat ${cloudfuse_ADLS_CFG_HMON}
           ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
-          
+
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
@@ -1922,7 +1941,7 @@ jobs:
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cfusemon_stop_all.cov health-monitor stop all
           kill $pid
           kill $pid_mon
-          
+
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
@@ -1938,7 +1957,7 @@ jobs:
         run: |
           echo 'mode: count' > ./cloudfuse_coverage_raw.rpt
           tail -q -n +2 ./*.cov >> ./cloudfuse_coverage_raw.rpt
-          cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "common/types.go" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" | grep -v "component/azstorage/azauthspn.go" | grep -v "component/stream" | grep -v "component/custom" | grep -v "component/azstorage/azauthcli.go" | grep -v "exported/exported.go" |  grep -v "component/block_cache/stream.go" > ./cloudfuse_coverage.rpt
+          cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "common/types.go" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" | grep -v "component/azstorage/azauthspn.go" | grep -v "component/stream" | grep -v "component/custom" | grep -v "component/azstorage/azauthcli.go" | grep -v "exported/exported.go" |  grep -v "component/block_cache/stream.go"  | grep -v "component/azstorage/azauthWorkloadIdentity.go" | grep -v "component/azstorage/policies.go" > ./cloudfuse_coverage.rpt
           go tool cover -func cloudfuse_coverage.rpt  > ./cloudfuse_func_cover.rpt
           go tool cover -html=./cloudfuse_coverage.rpt -o ./cloudfuse_coverage.html
           go tool cover -html=./cloudfuse_ut.cov -o ./cloudfuse_ut.html
@@ -1973,12 +1992,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true

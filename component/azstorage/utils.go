@@ -26,11 +26,9 @@
 package azstorage
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -67,8 +65,8 @@ const (
 	KeepAlive              time.Duration = 30 * time.Second
 	DualStack              bool          = true
 	MaxIdleConns           int           = 0 // No limit
-	MaxIdleConnsPerHost    int           = 100
-	MaxConnsPerHost        int           = 0 // No limit
+	MaxIdleConnsPerHost    int           = 200
+	MaxConnsPerHost        int           = 300
 	IdleConnTimeout        time.Duration = 90 * time.Second
 	TLSHandshakeTimeout    time.Duration = 10 * time.Second
 	ExpectContinueTimeout  time.Duration = 1 * time.Second
@@ -107,10 +105,18 @@ func getAzStorageClientOptions(conf *AzStorageConfig) (azcore.ClientOptions, err
 		)
 	}
 
+	perCallPolicies := []policy.Policy{telemetryPolicy}
+
+	serviceApiVersion := os.Getenv("AZURE_STORAGE_SERVICE_API_VERSION")
+	if serviceApiVersion != "" {
+		// We need to override the service version
+		perCallPolicies = append(perCallPolicies, newServiceVersionPolicy(serviceApiVersion))
+	}
+
 	return azcore.ClientOptions{
 		Retry:           retryOptions,
 		Logging:         logOptions,
-		PerCallPolicies: []policy.Policy{telemetryPolicy},
+		PerCallPolicies: perCallPolicies,
 		Transport:       transportOptions,
 	}, err
 }
@@ -133,6 +139,11 @@ func getAzDatalakeServiceClientOptions(conf *AzStorageConfig) (*serviceBfs.Clien
 
 // getLogOptions : to configure the SDK logging policy
 func getSDKLogOptions() policy.LogOptions {
+	// If BLOBFUSE_DISABLE_SDK_LOG env var is set to true, then disable the SDK logging
+	if os.Getenv("BLOBFUSE_DISABLE_SDK_LOG") == "true" {
+		return policy.LogOptions{}
+	}
+
 	if log.GetType() == "silent" || log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
 		return policy.LogOptions{}
 	} else {
@@ -149,7 +160,8 @@ func getSDKLogOptions() policy.LogOptions {
 //   - logging type is silent
 //   - logging level is less than debug
 func setSDKLogListener() {
-	if log.GetType() == "silent" || log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
+	if os.Getenv("BLOBFUSE_DISABLE_SDK_LOG") == "true" || log.GetType() == "silent" ||
+		log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
 		// reset listener
 		azlog.SetListener(nil)
 	} else {
@@ -184,7 +196,7 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 			}).Dial, /*Context*/
 			MaxIdleConns:          MaxIdleConns, // No limit
 			MaxIdleConnsPerHost:   MaxIdleConnsPerHost,
-			MaxConnsPerHost:       MaxConnsPerHost, // No limit
+			MaxConnsPerHost:       MaxConnsPerHost,
 			IdleConnTimeout:       IdleConnTimeout,
 			TLSHandshakeTimeout:   TLSHandshakeTimeout,
 			ExpectContinueTimeout: ExpectContinueTimeout,
@@ -206,28 +218,6 @@ func getCloudConfiguration(endpoint string) cloud.Configuration {
 	} else {
 		return cloud.AzurePublic
 	}
-}
-
-// cloudfuseTelemetryPolicy is a custom pipeline policy to prepend the cloudfuse user agent string to the one coming from SDK.
-// This is added in the PerCallPolicies which executes after the SDK's default telemetry policy.
-type cloudfuseTelemetryPolicy struct {
-	telemetryValue string
-}
-
-// newCloudfuseTelemetryPolicy creates an object which prepends the cloudfuse user agent string to the User-Agent request header
-func newCloudfuseTelemetryPolicy(telemetryValue string) policy.Policy {
-	return &cloudfuseTelemetryPolicy{telemetryValue: telemetryValue}
-}
-
-func (p cloudfuseTelemetryPolicy) Do(req *policy.Request) (*http.Response, error) {
-	userAgent := p.telemetryValue
-
-	// prepend the cloudfuse user agent string
-	if ua := req.Raw().Header.Get(common.UserAgentHeader); ua != "" {
-		userAgent = fmt.Sprintf("%s %s", userAgent, ua)
-	}
-	req.Raw().Header.Set(common.UserAgentHeader, userAgent)
-	return req.Next()
 }
 
 // ----------- Store error code handling ---------------
@@ -568,17 +558,6 @@ func sanitizeSASKey(key string) *memguard.Enclave {
 	}
 
 	return memguard.NewEnclave([]byte(key))
-}
-
-func getMD5(fi *os.File) ([]byte, error) {
-	hasher := md5.New()
-	_, err := io.Copy(hasher, fi)
-
-	if err != nil {
-		return nil, errors.New("failed to generate md5")
-	}
-
-	return hasher.Sum(nil), nil
 }
 
 func autoDetectAuthMode(opt AzStorageOptions) string {

@@ -318,11 +318,13 @@ nfpms:
       deb:
         dependencies:
           - fuse3
+          - libfuse3-3
           - libc6 (>= 2.24)
 
       rpm:
         dependencies:
           - fuse3
+          - fuse3-libs
           - glibc >= 2.24
 
   - id: linux-fuse2
@@ -382,11 +384,13 @@ nfpms:
       deb:
         dependencies:
           - fuse
+          - libfuse2
           - libc6 (>= 2.24)
 
       rpm:
         dependencies:
           - fuse
+          - fuse-libs
           - glibc >= 2.24
 
 signs:

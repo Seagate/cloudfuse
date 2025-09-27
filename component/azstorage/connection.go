@@ -94,6 +94,7 @@ type AzConnection interface {
 	ConnectionOkay(ctx context.Context) error
 	SetupPipeline() error
 	TestPipeline() error
+	IsAccountADLS() bool
 
 	ListContainers(ctx context.Context) ([]string, error)
 

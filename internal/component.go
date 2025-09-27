@@ -77,7 +77,6 @@ type Component interface {
 	CreateDir(CreateDirOptions) error
 	DeleteDir(DeleteDirOptions) error
 	IsDirEmpty(IsDirEmptyOptions) bool
-	DeleteEmptyDirs(DeleteDirOptions) (bool, error)
 
 	OpenDir(OpenDirOptions) error
 	StreamDir(StreamDirOptions) ([]*ObjAttr, string, error)

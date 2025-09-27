@@ -40,7 +40,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "1.12.2"
+	cloudfuseVersion_ = "2.0.0"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -61,6 +61,7 @@ const (
 	TbToBytes         = 1024 * 1024 * 1024 * 1024
 	DefaultCapacityMb = 1024 * TbToBytes / MbToBytes // 1 PB
 	CfuseStats        = "cloudfuse_stats"
+	BlockIDLength     = 16
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 
@@ -390,6 +391,11 @@ func NewUUID() (u uuid) {
 	return
 }
 
+// returns block id of given length
+func GetBlockID(length int64) string {
+	return base64.StdEncoding.EncodeToString(NewUUIDWithLength(length))
+}
+
 func GetIdLength(id string) int64 {
 	existingBlockId, _ := base64.StdEncoding.DecodeString(id)
 	return int64(len(existingBlockId))
@@ -399,4 +405,10 @@ func init() {
 	DefaultWorkDir = JoinUnixFilepath(GetDefaultWorkDir(), ".cloudfuse")
 	DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
 	StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
+}
+
+var azureSpecialContainers = map[string]bool{
+	"web":        true,
+	"logs":       true,
+	"changefeed": true,
 }

@@ -59,7 +59,6 @@ type FileCache struct {
 	createEmptyFile bool
 	allowNonEmpty   bool
 	cacheTimeout    float64
-	cleanupOnStart  bool
 	policyTrace     bool
 	missedChmodList sync.Map      // uses object name (common.JoinUnixFilepath)
 	offlineOps      sync.Map      // uses object name (common.JoinUnixFilepath)
@@ -172,13 +171,6 @@ func (fc *FileCache) Priority() internal.ComponentPriority {
 //	this shall not block the call otherwise pipeline will not start
 func (fc *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", fc.Name())
-
-	if fc.cleanupOnStart {
-		err := common.TempCacheCleanup(fc.tmpPath)
-		if err != nil {
-			return fmt.Errorf("error in %s error [fail to cleanup temp cache]", fc.Name())
-		}
-	}
 
 	if fc.policy == nil {
 		return fmt.Errorf("config error in %s error [cache policy missing]", fc.Name())
@@ -408,7 +400,6 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	fc.allowNonEmpty = conf.AllowNonEmpty
-	fc.cleanupOnStart = conf.CleanupOnStart
 	fc.policyTrace = conf.EnablePolicyTrace
 	fc.offloadIO = conf.OffloadIO
 	fc.offlineAccess = !conf.BlockOfflineAccess
@@ -549,7 +540,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-entries %d",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
@@ -561,7 +552,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.hardLimit,
 		conf.Policy,
 		fc.allowNonEmpty,
-		fc.cleanupOnStart,
+		conf.CleanupOnStart,
 		fc.policyTrace,
 		fc.offloadIO,
 		fc.offlineAccess,
@@ -881,10 +872,10 @@ func (fc *FileCache) StreamDir(
 			// Case 3: Item is in both local cache and cloud
 			if !attr.IsDir() {
 				flock := fc.fileLocks.Get(attr.Path)
-				flock.Lock()
+				flock.RLock()
 				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
 				info, err := os.Stat(filepath.Join(localPath, dirent.Name())) // Grab local cache attributes
-				flock.Unlock()
+				flock.RUnlock()
 				if err == nil {
 					// attr is a pointer returned by NextComponent
 					// modifying attr could corrupt cached directory listings
@@ -913,12 +904,12 @@ func (fc *FileCache) StreamDir(
 				if err != nil && errors.Is(err, os.ErrNotExist) {
 					// get the lock on the file, to allow any pending operation to complete
 					flock := fc.fileLocks.Get(entryPath)
-					flock.Lock()
+					flock.RLock()
 					// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
 					info, err := os.Stat(
 						filepath.Join(localPath, entry.Name()),
 					) // Grab local cache attributes
-					flock.Unlock()
+					flock.RUnlock()
 					if err == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 						log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
@@ -937,42 +928,31 @@ func (fc *FileCache) StreamDir(
 func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("FileCache::IsDirEmpty : %s", options.Name)
 
-	// If the directory does not exist locally then call the next component
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-	f, err := common.Open(localPath)
-	switch {
-	case err == nil:
-		log.Debug("FileCache::IsDirEmpty : %s found in local cache", options.Name)
-		// Check local cache directory is empty or not
-		path, err := f.Readdirnames(1)
-
-		// If the local directory has a path in it, it is likely due to !createEmptyFile.
-		if err == nil && !fc.createEmptyFile && len(path) > 0 {
-			log.Debug("FileCache::IsDirEmpty : %s has local contents (%s)", options.Name, path[0])
-			return false
-		}
-
-		// If there are files in local cache then don't allow deletion of directory
-		if err != io.EOF {
-			// Local directory is not empty fail the call
-			log.Debug("FileCache::IsDirEmpty : %s was not empty in local cache", options.Name)
-			return false
-		}
-	case os.IsNotExist(err):
-		// Not found in local cache so check with container
-		log.Debug("FileCache::IsDirEmpty : %s not found in local cache", options.Name)
-	default:
-		// Unknown error, check with container
-		log.Err("FileCache::IsDirEmpty : %s failed to open local dir [%v]", options.Name, err)
+	// Check if directory is empty at remote or not, if container is not empty then return false
+	emptyAtRemote := fc.NextComponent().IsDirEmpty(options)
+	if !emptyAtRemote {
+		log.Debug("FileCache::IsDirEmpty : %s is not empty at remote", options.Name)
+		return emptyAtRemote
 	}
 
-	log.Debug("FileCache::IsDirEmpty : %s checking with container", options.Name)
-	// when offline, this will return false
-	return fc.NextComponent().IsDirEmpty(options)
+	// Remote is empty so we need to check for the local directory
+	// While checking local directory we need to ensure that we delete all empty directories and then
+	// return the result.
+	cleanup, err := fc.deleteEmptyDirs(internal.DeleteDirOptions(options))
+	if err != nil {
+		log.Debug(
+			"FileCache::IsDirEmpty : %s failed to delete empty directories [%s]",
+			options.Name,
+			err.Error(),
+		)
+		return false
+	}
+
+	return cleanup
 }
 
 // DeleteEmptyDirs: delete empty directories in local cache, return error if directory is not empty
-func (fc *FileCache) DeleteEmptyDirs(options internal.DeleteDirOptions) (bool, error) {
+func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, error) {
 	localPath := options.Name
 	if !strings.Contains(options.Name, fc.tmpPath) {
 		localPath = filepath.Join(fc.tmpPath, options.Name)
@@ -982,6 +962,10 @@ func (fc *FileCache) DeleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 
 	entries, err := os.ReadDir(localPath)
 	if err != nil {
+		if err == syscall.ENOENT || os.IsNotExist(err) {
+			return true, nil
+		}
+
 		log.Debug(
 			"FileCache::DeleteEmptyDirs : Unable to read directory %s [%s]",
 			localPath,
@@ -992,19 +976,19 @@ func (fc *FileCache) DeleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			val, err := fc.DeleteEmptyDirs(internal.DeleteDirOptions{
+			val, err := fc.deleteEmptyDirs(internal.DeleteDirOptions{
 				Name: filepath.Join(localPath, entry.Name()),
 			})
 			if err != nil {
 				log.Err(
-					"FileCache::DeleteEmptyDirs : Unable to delete directory %s [%s]",
+					"FileCache::deleteEmptyDirs : Unable to delete directory %s [%s]",
 					localPath,
 					err.Error(),
 				)
 				return val, err
 			}
 		} else {
-			log.Err("FileCache::DeleteEmptyDirs : Directory %s is not empty, contains file %s", localPath, entry.Name())
+			log.Err("FileCache::deleteEmptyDirs : Directory %s is not empty, contains file %s", localPath, entry.Name())
 			return false, fmt.Errorf("unable to delete directory %s, contains file %s", localPath, entry.Name())
 		}
 	}
@@ -1059,7 +1043,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	objectNames := combineLists(srcObjects, dstObjects)
 
 	// acquire a file lock on each entry (and defer unlock)
-	var flocks []*common.LockMapItem
+	flocks := make([]*common.LockMapItem, 0, len(objectNames))
 	for _, objectName := range objectNames {
 		flock := fc.fileLocks.Get(objectName)
 		flocks = append(flocks, flock)
@@ -2043,26 +2027,9 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 
 		// Flush all data to disk that has been buffered by the kernel.
-		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
-		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
-		// f.fsync() is another option but dup+close does it quickly compared to sync
-		// TODO: should we turn the dup+close comment into some platform-specific code?
-		// dupFd, err := syscall.Dup(int(f.Fd()))
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// err = syscall.Close(dupFd)
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
 		// for scheduled uploads, we use a read-only file handle
 		if !options.AsyncUpload {
-			// Use Sync since Dup is not supported on Windows
-			err := f.Sync()
+			err := fc.syncFile(f, options.Handle.Path)
 			if err != nil {
 				log.Err(
 					"FileCache::FlushFile : error [unable to sync file] %s",
@@ -2200,8 +2167,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// wait for download or deletion to complete before getting local file info
 	flock := fc.fileLocks.Get(options.Name)
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
-	flock.Lock()
-	defer flock.Unlock()
+	flock.RLock()
 
 	// To cover case 1, get attributes from storage
 	var exists bool
@@ -2223,13 +2189,13 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
+	flock.RUnlock()
 	if err == nil {
 		if !exists { // Case 2 (only in local cache)
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
 			exists = true
 			attrs = newObjAttr(options.Name, info)
 		} else if !info.IsDir() { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
-			log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
 			// attrs is a pointer returned by NextComponent
 			// modifying attrs could corrupt cached directory listings
 			// to update properties, we need to make a deep copy first

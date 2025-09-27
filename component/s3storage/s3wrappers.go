@@ -45,7 +45,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -98,10 +97,6 @@ func (cl *Client) ConnectionOkay(ctx context.Context) error {
 func (cl *Client) getObjectMultipartDownload(ctx context.Context, name string, fi *os.File) error {
 	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
-	downloader := manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
-	})
 
 	getObjectInput := &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
@@ -112,7 +107,7 @@ func (cl *Client) getObjectMultipartDownload(ctx context.Context, name string, f
 		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
 	}
 
-	_, err := downloader.Download(ctx, fi, getObjectInput)
+	_, err := cl.downloader.Download(ctx, fi, getObjectInput)
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
@@ -142,10 +137,18 @@ func (cl *Client) getObject(ctx context.Context, options getObjectOptions) (io.R
 		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		Key:    aws.String(key),
-		Range:  aws.String(rangeString),
+	getObjectInput := &s3.GetObjectInput{}
+	if rangeString != "" {
+		getObjectInput = &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+			Key:    aws.String(key),
+			Range:  aws.String(rangeString),
+		}
+	} else {
+		getObjectInput = &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+			Key:    aws.String(key),
+		}
 	}
 
 	if cl.Config.enableChecksum {
@@ -188,12 +191,7 @@ func (cl *Client) putObject(ctx context.Context, options putObjectOptions) error
 	if options.size < cl.Config.uploadCutoff {
 		_, err = cl.AwsS3Client.PutObject(ctx, putObjectInput)
 	} else {
-		uploader := manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
-			u.PartSize = cl.Config.partSize
-			u.Concurrency = cl.Config.concurrency
-		})
-
-		_, err = uploader.Upload(ctx, putObjectInput)
+		_, err = cl.uploader.Upload(ctx, putObjectInput)
 	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
