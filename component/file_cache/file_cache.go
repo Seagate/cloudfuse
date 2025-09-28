@@ -181,21 +181,21 @@ func (fc *FileCache) Start(ctx context.Context) error {
 		return fmt.Errorf("config error in %s error [fail to start policy]", fc.Name())
 	}
 
-	if fc.offlineAccess {
-		// since the channel will simply be closed in Stop(), it doesn't need a value type
-		fc.stopAsyncUpload = make(chan struct{})
-		fc.offlineOpAdded = make(chan struct{}, 1)
-		go fc.serviceOfflineOps()
-	}
-
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
 
+	// setup async uploads
+	fc.stopAsyncUpload = make(chan struct{})
 	fc.uploadNotifyCh = make(chan struct{}, 1)
 	err = fc.SetupScheduler()
 	if err != nil {
 		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
+	}
+	if fc.offlineAccess {
+		// since the channel will simply be closed in Stop(), it doesn't need a value type
+		fc.offlineOpAdded = make(chan struct{}, 1)
+		go fc.serviceOfflineOps()
 	}
 
 	return nil
@@ -238,6 +238,12 @@ func (fc *FileCache) serviceOfflineOps() {
 			log.Crit("FileCache::serviceOfflineOps : Stopping")
 			// TODO: Persist pending ops
 			return
+		case <-fc.closeWindowCh:
+			// upload schedule is not active, wait before checking again
+			select {
+			case <-time.After(time.Second):
+			case <-fc.stopAsyncUpload:
+			}
 		default:
 			// check if we're connected
 			if !fc.NextComponent().CloudConnected() {
@@ -255,6 +261,8 @@ func (fc *FileCache) serviceOfflineOps() {
 				select {
 				case <-fc.stopAsyncUpload:
 					return false // Stop the iteration
+				case <-fc.closeWindowCh:
+					return false // upload schedule is not active
 				default:
 					err := fc.uploadPendingFile(key.(string))
 					if isOffline(err) {

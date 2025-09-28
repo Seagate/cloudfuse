@@ -46,6 +46,9 @@ type Config struct {
 type WeeklySchedule []UploadWindow
 
 func (fc *FileCache) SetupScheduler() error {
+	// setup a component-wide signal for when uploads should wait
+	fc.closeWindowCh = make(chan struct{})
+	// always on
 	if len(fc.schedule) == 0 {
 		log.Info(
 			"FileCache::SetupScheduler : Empty schedule configuration, defaulting to always-on mode",
@@ -55,6 +58,7 @@ func (fc *FileCache) SetupScheduler() error {
 	}
 
 	// Setup the cron scheduler
+	close(fc.closeWindowCh) // schedule starts inactive
 	cronScheduler := cron.New(cron.WithSeconds())
 	fc.scheduleUploads(cronScheduler, fc.schedule)
 	cronScheduler.Start()
