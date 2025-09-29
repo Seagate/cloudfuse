@@ -2018,7 +2018,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
 	if options.Handle.Dirty() {
-		if fc.lazyWrite && !options.CloseInProgress {
+		if fc.lazyWrite && !options.CloseInProgress && !options.AsyncUpload {
 			// As lazy-write is enable, upload will be scheduled when file is closed.
 			log.Info(
 				"FileCache::FlushFile : %s will be flushed when handle %d is closed",
