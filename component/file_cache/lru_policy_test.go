@@ -491,22 +491,22 @@ func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
 	suite.assert.Equal(snapshot, snapshotFromFile) // this checks deep equality
 }
 
-func (suite *lruPolicyTestSuite) TestNoEvictionIfInScheduleOps() {
+func (suite *lruPolicyTestSuite) TestNoEvictionIfInPendingOps() {
 	defer suite.cleanupTest()
 
 	fileName := filepath.Join(cache_path, "scheduled_file")
 	suite.policy.CacheValid(fileName)
 
 	fakeSchedule := &FileCache{}
-	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("scheduled_file"), struct{}{})
+	fakeSchedule.pendingOps.Store(common.NormalizeObjectName("scheduled_file"), struct{}{})
 	suite.policy.schedule = fakeSchedule
 
 	time.Sleep(2 * time.Second)
 
-	suite.assert.True(suite.policy.IsCached(fileName), "File in scheduleOps should not be evicted")
+	suite.assert.True(suite.policy.IsCached(fileName), "File in pendingOps should not be evicted")
 }
 
-func (suite *lruPolicyTestSuite) TestEvictionRespectsScheduleOps() {
+func (suite *lruPolicyTestSuite) TestEvictionRespectsPendingOps() {
 	defer suite.cleanupTest()
 
 	fileNames := []string{
@@ -520,8 +520,8 @@ func (suite *lruPolicyTestSuite) TestEvictionRespectsScheduleOps() {
 	}
 
 	fakeSchedule := &FileCache{}
-	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("file2"), struct{}{})
-	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("file4"), struct{}{})
+	fakeSchedule.pendingOps.Store(common.NormalizeObjectName("file2"), struct{}{})
+	fakeSchedule.pendingOps.Store(common.NormalizeObjectName("file4"), struct{}{})
 	suite.policy.schedule = fakeSchedule
 
 	time.Sleep(3 * time.Second)
@@ -529,12 +529,12 @@ func (suite *lruPolicyTestSuite) TestEvictionRespectsScheduleOps() {
 	suite.assert.False(suite.policy.IsCached(fileNames[0]), "file1 should be evicted")
 	suite.assert.True(
 		suite.policy.IsCached(fileNames[1]),
-		"file2 should NOT be evicted (in scheduleOps)",
+		"file2 should NOT be evicted (in pendingOps)",
 	)
 	suite.assert.False(suite.policy.IsCached(fileNames[2]), "file3 should be evicted")
 	suite.assert.True(
 		suite.policy.IsCached(fileNames[3]),
-		"file4 should NOT be evicted (in scheduleOps)",
+		"file4 should NOT be evicted (in pendingOps)",
 	)
 }
 

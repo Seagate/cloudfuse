@@ -161,7 +161,7 @@ func (p *lruPolicy) ShutdownPolicy() error {
 }
 
 func (fc *FileCache) IsScheduled(objName string) bool {
-	_, inSchedule := fc.scheduleOps.Load(objName)
+	_, inSchedule := fc.pendingOps.Load(objName)
 	return inSchedule
 }
 

@@ -450,6 +450,7 @@ func (suite *fileCacheTestSuite) TestCreateDirErrExist() {
 	path := "a"
 	options := internal.CreateDirOptions{Name: path}
 	err := suite.fileCache.CreateDir(options)
+	suite.assert.NoError(err)
 	// test
 	err = suite.fileCache.CreateDir(options)
 	suite.assert.ErrorIs(err, os.ErrExist)
@@ -1448,10 +1449,10 @@ func (suite *fileCacheTestSuite) TestWriteFileErrorBadFd() {
 	// Setup
 	file := "file20"
 	handle := handlemap.NewHandle(file)
-	len, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle})
+	length, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
-	suite.assert.Equal(0, len)
+	suite.assert.Equal(0, length)
 }
 
 func (suite *fileCacheTestSuite) TestFlushFileEmpty() {
@@ -1547,8 +1548,8 @@ loopbackfs:
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
-	_, exists := suite.fileCache.scheduleOps.Load(file)
-	suite.assert.True(exists, "File should be in scheduleOps after creation")
+	_, exists := suite.fileCache.pendingOps.Load(file)
+	suite.assert.True(exists, "File should be in pendingOps after creation")
 
 	// wait for uploads to start
 	time.Sleep(time.Until(testStartTime.Add(2 * time.Second).Truncate(time.Second)))
@@ -1558,8 +1559,8 @@ loopbackfs:
 		_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
 	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
-	_, exists = suite.fileCache.scheduleOps.Load(file)
-	suite.assert.False(exists, "File should have been removed from scheduleOps after upload")
+	_, exists = suite.fileCache.pendingOps.Load(file)
+	suite.assert.False(exists, "File should have been removed from pendingOps after upload")
 	suite.assert.False(
 		suite.fileCache.fileLocks.Get(file).SyncPending,
 		"SyncPending flag should be cleared after upload",
@@ -1627,7 +1628,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file2))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file2))
-	_, scheduled := suite.fileCache.scheduleOps.Load(file2)
+	_, scheduled := suite.fileCache.pendingOps.Load(file2)
 	suite.assert.True(scheduled, "File should be scheduled when scheduler is OFF")
 	flock := suite.fileCache.fileLocks.Get(file2)
 	suite.assert.True(flock.SyncPending, "SyncPending flag should be set")
@@ -1660,8 +1661,8 @@ loopbackfs:
 	suite.assert.NoError(err)
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file),
 		"File should be uploaded immediately with no schedule (always-on mode)")
-	_, exists := suite.fileCache.scheduleOps.Load(file)
-	suite.assert.False(exists, "File should not be in scheduleOps map")
+	_, exists := suite.fileCache.pendingOps.Load(file)
+	suite.assert.False(exists, "File should not be in pendingOps map")
 
 	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
 	suite.assert.NoError(err)
@@ -1705,8 +1706,8 @@ loopbackfs:
 	originalContent := []byte("original cloud content")
 
 	// Create the file in the cloud storage directly
-	err := os.MkdirAll(suite.fake_storage_path, 0777)
-	err = os.WriteFile(filepath.Join(suite.fake_storage_path, originalFile), originalContent, 0777)
+	_ = os.MkdirAll(suite.fake_storage_path, 0777)
+	_ = os.WriteFile(filepath.Join(suite.fake_storage_path, originalFile), originalContent, 0777)
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, originalFile))
 	suite.assert.NoFileExists(filepath.Join(suite.cache_path, originalFile))
 
@@ -1719,7 +1720,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 	// Write new content to the file
 	modifiedContent := []byte("modified cloud file content")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	_, _ = suite.fileCache.WriteFile(internal.WriteFileOptions{
 		Handle: handle,
 		Data:   modifiedContent,
 		Offset: 0,
@@ -1775,9 +1776,9 @@ loopbackfs:
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, srcFile),
 		"File should not exist in cloud storage when scheduler is OFF")
 
-	// Check if file is in scheduleOps with original name
-	_, existsInSchedule := suite.fileCache.scheduleOps.Load(srcFile)
-	suite.assert.True(existsInSchedule, "File should be in scheduleOps before rename")
+	// Check if file is in pendingOps with original name
+	_, existsInSchedule := suite.fileCache.pendingOps.Load(srcFile)
+	suite.assert.True(existsInSchedule, "File should be in pendingOps before rename")
 
 	// Rename the file
 	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: srcFile, Dst: dstFile})
@@ -1789,15 +1790,15 @@ loopbackfs:
 	suite.assert.FileExists(filepath.Join(suite.cache_path, dstFile),
 		"Destination file should exist in local cache after rename")
 
-	// Check if the file has been renamed in scheduleOps
-	_, existsInScheduleOld := suite.fileCache.scheduleOps.Load(srcFile)
+	// Check if the file has been renamed in pendingOps
+	_, existsInScheduleOld := suite.fileCache.pendingOps.Load(srcFile)
 	suite.assert.False(
 		existsInScheduleOld,
-		"Old file name should not be in scheduleOps after rename",
+		"Old file name should not be in pendingOps after rename",
 	)
 
-	_, existsInScheduleNew := suite.fileCache.scheduleOps.Load(dstFile)
-	suite.assert.True(existsInScheduleNew, "New file name should be in scheduleOps after rename")
+	_, existsInScheduleNew := suite.fileCache.pendingOps.Load(dstFile)
+	suite.assert.True(existsInScheduleNew, "New file name should be in pendingOps after rename")
 
 	// Check that file lock status was properly transferred
 	flock := suite.fileCache.fileLocks.Get(dstFile)
@@ -1806,7 +1807,7 @@ loopbackfs:
 	}
 }
 
-func (suite *fileCacheTestSuite) TestDeleteFileAndScheduleOps() {
+func (suite *fileCacheTestSuite) TestDeleteFileAndPendingOps() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
@@ -1851,9 +1852,9 @@ loopbackfs:
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, testFile),
 		"File should not exist in cloud storage when scheduler is OFF")
 
-	// Check if file is in scheduleOps before deletion
-	_, existsInSchedule := suite.fileCache.scheduleOps.Load(testFile)
-	suite.assert.True(existsInSchedule, "File should be in scheduleOps before deletion")
+	// Check if file is in pendingOps before deletion
+	_, existsInSchedule := suite.fileCache.pendingOps.Load(testFile)
+	suite.assert.True(existsInSchedule, "File should be in pendingOps before deletion")
 
 	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: testFile})
 	suite.assert.NoError(err)
@@ -1862,10 +1863,10 @@ loopbackfs:
 	suite.assert.NoFileExists(filepath.Join(suite.cache_path, testFile),
 		"File should not exist in local cache after deletion")
 
-	// Check if the file has been deleted in scheduleOps
-	_, existsInScheduleAfterDelete := suite.fileCache.scheduleOps.Load(testFile)
+	// Check if the file has been deleted in pendingOps
+	_, existsInScheduleAfterDelete := suite.fileCache.pendingOps.Load(testFile)
 	suite.assert.False(existsInScheduleAfterDelete,
-		"File should not be in scheduleOps after deletion")
+		"File should not be in pendingOps after deletion")
 }
 
 func (suite *fileCacheTestSuite) TestCreateEmptyFileEqualTrue() {
@@ -1909,10 +1910,10 @@ loopbackfs:
 		"Handle should not be marked as dirty when create-empty-file is true",
 	)
 
-	// The file shouldn't be in scheduleOps because it's already in cloud storage
-	_, existsInSchedule := suite.fileCache.scheduleOps.Load(testFile)
+	// The file shouldn't be in pendingOps because it's already in cloud storage
+	_, existsInSchedule := suite.fileCache.pendingOps.Load(testFile)
 	suite.assert.False(existsInSchedule,
-		"File should not be in scheduleOps because it's already in cloud storage")
+		"File should not be in pendingOps because it's already in cloud storage")
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -1964,9 +1965,9 @@ loopbackfs:
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, testFile),
 		"File should not exist in cloud storage when scheduler is OFF")
 
-	// Check if file is in scheduleOps initially
-	_, existsInSchedule := suite.fileCache.scheduleOps.Load(testFile)
-	suite.assert.True(existsInSchedule, "File should be in scheduleOps after creation")
+	// Check if file is in pendingOps initially
+	_, existsInSchedule := suite.fileCache.pendingOps.Load(testFile)
+	suite.assert.True(existsInSchedule, "File should be in pendingOps after creation")
 
 	// Write to file again with updated content
 	newContent := []byte("updated file content")
@@ -1982,9 +1983,9 @@ loopbackfs:
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	// Check scheduleOps to verify changes
-	_, stillInSchedule := suite.fileCache.scheduleOps.Load(testFile)
-	suite.assert.True(stillInSchedule, "File should remain in scheduleOps after modification")
+	// Check pendingOps to verify changes
+	_, stillInSchedule := suite.fileCache.pendingOps.Load(testFile)
+	suite.assert.True(stillInSchedule, "File should remain in pendingOps after modification")
 
 	// Verify the local content was updated
 	localData, err := os.ReadFile(filepath.Join(suite.cache_path, testFile))
@@ -2022,10 +2023,10 @@ loopbackfs:
 	// The invalid schedule should be skipped but valid one should be there
 	hasValidSchedule := false
 	for _, sched := range suite.fileCache.schedule {
-		if sched.Name == "InvalidTest" {
+		if sched.name == "InvalidTest" {
 			suite.assert.Fail("Invalid schedule should not be added")
 		}
-		if sched.Name == "ValidTest" {
+		if sched.name == "ValidTest" {
 			hasValidSchedule = true
 		}
 	}
