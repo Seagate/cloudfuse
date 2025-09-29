@@ -123,7 +123,14 @@ type AzConnection interface {
 
 	ReadToFile(ctx context.Context, name string, offset int64, count int64, fi *os.File) error
 	ReadBuffer(ctx context.Context, name string, offset int64, length int64) ([]byte, error)
-	ReadInBuffer(ctx context.Context, name string, offset int64, length int64, data []byte, etag *string) error
+	ReadInBuffer(
+		ctx context.Context,
+		name string,
+		offset int64,
+		length int64,
+		data []byte,
+		etag *string,
+	) error
 
 	WriteFromFile(ctx context.Context, name string, metadata map[string]*string, fi *os.File) error
 	WriteFromBuffer(
