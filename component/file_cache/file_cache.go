@@ -205,6 +205,9 @@ func (fc *FileCache) Start(ctx context.Context) error {
 func (fc *FileCache) Stop() error {
 	log.Trace("Stopping component : %s", fc.Name())
 
+	// stop async uploads
+	close(fc.stopAsyncUpload)
+
 	// Wait for all async upload to complete if any
 	if fc.lazyWrite {
 		log.Info("FileCache::Stop : Waiting for async close to complete")
