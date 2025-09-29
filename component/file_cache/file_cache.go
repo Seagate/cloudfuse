@@ -383,7 +383,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, scheduleWindows: %d",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,

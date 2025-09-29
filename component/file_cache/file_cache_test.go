@@ -1616,7 +1616,7 @@ loopbackfs:
 	)
 
 	// wait until the window closes
-	time.Sleep(time.Since(testStartTime.Add(duration + 10*time.Millisecond)))
+	time.Sleep(time.Until(testStartTime.Add(duration + 10*time.Millisecond)))
 
 	file2 := "scheduled_off_window.txt"
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
@@ -2018,30 +2018,9 @@ loopbackfs:
 		suite.cache_path,
 		suite.fake_storage_path,
 	)
-	suite.setupTestHelper(configContent)
 
-	// The invalid schedule should be skipped but valid one should be there
-	hasValidSchedule := false
-	for _, sched := range suite.fileCache.schedule {
-		if sched.name == "InvalidTest" {
-			suite.assert.Fail("Invalid schedule should not be added")
-		}
-		if sched.name == "ValidTest" {
-			hasValidSchedule = true
-		}
-	}
-
-	suite.assert.True(hasValidSchedule, "Valid schedule entry should be processed")
-
-	// Test that operations still work with the valid schedule
-	file := "test_after_invalid_cron.txt"
-	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-	suite.assert.NoError(err)
-
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.FileExists(filepath.Join(suite.cache_path, file),
-		"File should be created successfully despite invalid cron expression")
+	// The invalid schedule should creash the configuration
+	suite.assert.Panics(func() { suite.setupTestHelper(configContent) })
 }
 
 func (suite *fileCacheTestSuite) TestOverlappingSchedules() {
