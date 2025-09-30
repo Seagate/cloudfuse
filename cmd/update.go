@@ -264,8 +264,8 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 }
 
 func findChecksum(packageName string, checksumTable string) (string, error) {
-	lines := strings.Split(checksumTable, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(checksumTable, "\n")
+	for line := range lines {
 		parts := strings.Fields(line)
 		if len(parts) == 2 && parts[1] == packageName {
 			return parts[0], nil
