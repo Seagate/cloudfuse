@@ -82,6 +82,7 @@ type lruPolicy struct {
 // It contains only the fields that need to be saved, and they are exported.
 type LRUPolicySnapshot struct {
 	NodeList           []string // Just node names, *without their fc.tmp prefix*, in linked list order
+	SyncPendingFlags   []bool   // the SyncPending flag for each node, in the same order as NodeList
 	CurrMarkerPosition uint64   // Node index of currMarker
 	LastMarkerPosition uint64   // Node index of lastMarker
 }
@@ -181,7 +182,12 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 		case current == p.lastMarker:
 			snapshot.LastMarkerPosition = index
 		case strings.HasPrefix(current.name, p.tmpPath):
-			snapshot.NodeList = append(snapshot.NodeList, current.name[len(p.tmpPath):])
+			relName := current.name[len(p.tmpPath):]
+			objName := common.NormalizeObjectName(relName[1:])
+			snapshot.NodeList = append(snapshot.NodeList, relName)
+			flock := p.fileLocks.Get(objName)
+			// don't acquire the locks - worst case scenario, we resync something unnecessarily
+			snapshot.SyncPendingFlags = append(snapshot.SyncPendingFlags, flock.SyncPending)
 		default:
 			log.Err("lruPolicy::saveSnapshot : %s Ignoring unrecognized cache path", current.name)
 		}
@@ -194,6 +200,8 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	if snapshot == nil {
 		return
 	}
+	// maintain backward compatibility
+	loadSyncPending := len(snapshot.NodeList) == len(snapshot.SyncPendingFlags)
 	p.Lock()
 	defer p.Unlock()
 	// walk the slice and write the entries into the policy
@@ -201,7 +209,13 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	nodeIndex := 0
 	nextNode := p.head
 	tail := p.lastMarker
-	for _, v := range snapshot.NodeList {
+	for i, v := range snapshot.NodeList {
+		// restore SyncPending flag
+		if loadSyncPending && snapshot.SyncPendingFlags[i] {
+			objName := v[1:]
+			flock := p.fileLocks.Get(objName)
+			flock.SyncPending = true
+		}
 		// recreate the node
 		fullPath := filepath.Join(p.tmpPath, v)
 		newNode := &lruNode{
