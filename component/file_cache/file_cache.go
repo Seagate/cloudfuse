@@ -453,6 +453,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		maxSizeMB:     conf.MaxSizeMB,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
+		pendingOps:    &fc.pendingOps,
 	}
 
 	return cacheConfig
@@ -1191,7 +1192,6 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	// update file state
 	flock.LazyOpen = false
-	flock.SyncPending = false
 	// remove deleted file from async upload map
 	fc.pendingOps.Delete(options.Name)
 
@@ -2118,7 +2118,6 @@ func (fc *FileCache) renamePendingOp(srcName, dstName string, dflock *common.Loc
 	_, operationPending := fc.pendingOps.LoadAndDelete(srcName)
 	if operationPending {
 		fc.pendingOps.Store(dstName, struct{}{})
-		dflock.SyncPending = true
 	}
 }
 
@@ -2144,7 +2143,6 @@ func (fc *FileCache) renameOpenHandles(
 		}
 		// copy flags
 		dflock.LazyOpen = sflock.LazyOpen
-		dflock.SyncPending = sflock.SyncPending
 	}
 }
 

@@ -1561,10 +1561,6 @@ loopbackfs:
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 	_, exists = suite.fileCache.pendingOps.Load(file)
 	suite.assert.False(exists, "File should have been removed from pendingOps after upload")
-	suite.assert.False(
-		suite.fileCache.fileLocks.Get(file).SyncPending,
-		"SyncPending flag should be cleared after upload",
-	)
 }
 
 func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
@@ -1630,8 +1626,6 @@ loopbackfs:
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file2))
 	_, scheduled := suite.fileCache.pendingOps.Load(file2)
 	suite.assert.True(scheduled, "File should be scheduled when scheduler is OFF")
-	flock := suite.fileCache.fileLocks.Get(file2)
-	suite.assert.True(flock.SyncPending, "SyncPending flag should be set")
 }
 
 func (suite *fileCacheTestSuite) TestNoScheduleAlwaysOn() {
@@ -1667,11 +1661,6 @@ loopbackfs:
 	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
-
-	flock := suite.fileCache.fileLocks.Get(file)
-	if flock != nil {
-		suite.assert.False(flock.SyncPending, "SyncPending flag should be clear")
-	}
 }
 
 func (suite *fileCacheTestSuite) TestExistingCloudFileImmediateUpload() {
@@ -1799,12 +1788,6 @@ loopbackfs:
 
 	_, existsInScheduleNew := suite.fileCache.pendingOps.Load(dstFile)
 	suite.assert.True(existsInScheduleNew, "New file name should be in pendingOps after rename")
-
-	// Check that file lock status was properly transferred
-	flock := suite.fileCache.fileLocks.Get(dstFile)
-	if flock != nil {
-		suite.assert.True(flock.SyncPending, "SyncPending flag should be set on renamed file")
-	}
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFileAndPendingOps() {

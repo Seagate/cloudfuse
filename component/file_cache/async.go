@@ -186,7 +186,6 @@ func (fc *FileCache) startScheduler() {
 func (fc *FileCache) addPendingOp(name string, flock *common.LockMapItem) {
 	log.Trace("FileCache::addPendingOp : %s", name)
 	fc.pendingOps.Store(name, struct{}{})
-	flock.SyncPending = true
 	select {
 	case fc.pendingOpAdded <- struct{}{}:
 	default: // do not block
@@ -262,7 +261,8 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	defer flock.Unlock()
 
 	// don't double upload
-	if !flock.SyncPending {
+	_, stillPending := fc.pendingOps.Load(name)
+	if !stillPending {
 		return nil
 	}
 
@@ -308,11 +308,15 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		}
 	}
 	// update state
-	flock.SyncPending = false
 	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
 	fc.pendingOps.Delete(name)
 
 	return nil
+}
+
+func (fc *FileCache) IsScheduled(objName string) bool {
+	_, inSchedule := fc.pendingOps.Load(objName)
+	return inSchedule
 }
 
 // this returns true when offline access is enabled, and it's safe to access this object offline

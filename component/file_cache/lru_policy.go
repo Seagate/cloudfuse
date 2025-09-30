@@ -73,16 +73,13 @@ type lruPolicy struct {
 
 	// DU utility was found on the path or not
 	duPresent bool
-
-	// Tracks scheduled files to skip during eviction
-	schedule *FileCache
 }
 
 // LRUPolicySnapshot represents the *persisted state* of lruPolicy.
 // It contains only the fields that need to be saved, and they are exported.
 type LRUPolicySnapshot struct {
 	NodeList           []string // Just node names, *without their fc.tmp prefix*, in linked list order
-	SyncPendingFlags   []bool   // the SyncPending flag for each node, in the same order as NodeList
+	SyncPendingFlags   []bool   // whether each file in NodeList belongs in the pendingOps map
 	CurrMarkerPosition uint64   // Node index of currMarker
 	LastMarkerPosition uint64   // Node index of lastMarker
 }
@@ -161,11 +158,6 @@ func (p *lruPolicy) ShutdownPolicy() error {
 	return p.createSnapshot().writeToFile(p.tmpPath)
 }
 
-func (fc *FileCache) IsScheduled(objName string) bool {
-	_, inSchedule := fc.pendingOps.Load(objName)
-	return inSchedule
-}
-
 func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 	log.Trace("lruPolicy::saveSnapshot")
 	var snapshot LRUPolicySnapshot
@@ -183,11 +175,10 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 			snapshot.LastMarkerPosition = index
 		case strings.HasPrefix(current.name, p.tmpPath):
 			relName := current.name[len(p.tmpPath):]
-			objName := common.NormalizeObjectName(relName[1:])
 			snapshot.NodeList = append(snapshot.NodeList, relName)
-			flock := p.fileLocks.Get(objName)
-			// don't acquire the locks - worst case scenario, we resync something unnecessarily
-			snapshot.SyncPendingFlags = append(snapshot.SyncPendingFlags, flock.SyncPending)
+			objName := common.NormalizeObjectName(relName[1:])
+			_, isPending := p.pendingOps.Load(objName)
+			snapshot.SyncPendingFlags = append(snapshot.SyncPendingFlags, isPending)
 		default:
 			log.Err("lruPolicy::saveSnapshot : %s Ignoring unrecognized cache path", current.name)
 		}
@@ -201,7 +192,7 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 		return
 	}
 	// maintain backward compatibility
-	loadSyncPending := len(snapshot.NodeList) == len(snapshot.SyncPendingFlags)
+	loadPendingOps := len(snapshot.NodeList) == len(snapshot.SyncPendingFlags)
 	p.Lock()
 	defer p.Unlock()
 	// walk the slice and write the entries into the policy
@@ -210,11 +201,10 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	nextNode := p.head
 	tail := p.lastMarker
 	for i, v := range snapshot.NodeList {
-		// restore SyncPending flag
-		if loadSyncPending && snapshot.SyncPendingFlags[i] {
+		// populate pendingOps
+		if loadPendingOps && snapshot.SyncPendingFlags[i] {
 			objName := v[1:]
-			flock := p.fileLocks.Get(objName)
-			flock.SyncPending = true
+			p.pendingOps.Store(objName, struct{}{})
 		}
 		// recreate the node
 		fullPath := filepath.Join(p.tmpPath, v)
@@ -524,7 +514,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 		if objName[0] == '/' {
 			objName = objName[1:]
 		}
-		if p.schedule != nil && p.schedule.IsScheduled(objName) {
+		if _, syncPending := p.pendingOps.Load(objName); syncPending {
 			continue
 		}
 
@@ -594,7 +584,7 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	// check if the file is pending upload (it was modified offline)
-	if flock.SyncPending {
+	if _, syncPending := p.pendingOps.Load(objName); syncPending {
 		log.Warn("lruPolicy::DeleteItem : %s File is not synchronized to cloud storage", name)
 		p.CacheValid(name)
 		return
