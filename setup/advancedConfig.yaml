@@ -92,11 +92,11 @@ stream:
 entry_cache:
   timeout-sec: <cache eviction timeout (in sec). Default - 30 sec>
 
-# Xload configuration 
+# Xload configuration
 xload:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   path: <path to local disk cache where downloaded files will be stored>
-  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.blobfuse2/xload_stats_{PID}.json'. Default - not exported> 
+  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.blobfuse2/xload_stats_{PID}.json'. Default - not exported>
   validate-md5: <if md5 sum is present in the blob, validate it post download. Default - false>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
 
@@ -130,15 +130,16 @@ file_cache:
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
   schedule:
     - name: <Name of Cron job, Ex. "Mon,Tue,etc...", Weekends, Weekdays>
-      cron: <Cron configuration>
-            "0 * * * * *"
-          #  | | | | | |
-          #  | | | | | +---- Day of week (every day)
-          #  | | | | +------ Month (every month)
-          #  | | | +-------- Day of month (every day)
-          #  | | +---------- Hour (every hour)
-          #  | +------------ Minute (every minute)
-          #  +-------------- Second (0th second)
+      cron:
+        <Cron configuration>
+        "0 * * * * *"
+        #  | | | | | |
+        #  | | | | | +---- Day of week (every day)
+        #  | | | | +------ Month (every month)
+        #  | | | +-------- Day of month (every day)
+        #  | | +---------- Hour (every hour)
+        #  | +------------ Minute (every minute)
+        #  +-------------- Second (0th second)
       duration: <Length of time to run the scheduled upload session. Format is <number><unit>, Example:"5h" =  5 hours, "30m" = 30 minutes, "2s" = 2 seconds>
 
 # Attribute cache related configuration
@@ -217,7 +218,7 @@ s3storage:
   disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
-  usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
