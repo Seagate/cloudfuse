@@ -34,6 +34,7 @@ config-version: 1.0.0
 foreground: true|false <run cloudfuse in foreground or background>
 
 # Common configurations
+read-only: true|false <mount in read only mode - used for Streaming and FUSE>
 allow-other: true|false <allow other users to access the mounted directory - used for FUSE and File Cache>
 nonempty: true|false <allow mounting on non-empty directory>
 restricted-characters-windows: true|false <allows filenames with restricted characters to appear on Windows - used for AzStorage and S3Storage>
@@ -56,7 +57,7 @@ logging:
 # Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
 components:
   - libfuse
-  - entry_cache
+  - stream
   - xload
   - block_cache
   - file_cache
@@ -88,10 +89,6 @@ stream:
   max-buffers: <total number of buffers to store blocks in. Default - 0>
   buffer-size-mb: <size for each buffer. Default - 0 MB>
   file-caching: <read/write mode file level caching or handle level caching. Default - false (handle level caching ON)>
-
-# Entry Cache configuration
-entry_cache:
-  timeout-sec: <cache eviction timeout (in sec). Default - 30 sec>
 
 # Xload configuration
 xload:
