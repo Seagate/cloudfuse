@@ -48,8 +48,8 @@ type SizeTracker struct {
 }
 
 type SizeTrackerOptions struct {
-	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
-	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
+	JournalName           string `config:"journal-name"             yaml:"journal-name,omitempty"`
+	TotalBucketCapacityMb uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
 }
 
 const compName = "size_tracker"
@@ -100,14 +100,16 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	st.totalBucketCapacity = conf.TotalBucketCapacity
-	st.displayCapacity = conf.TotalBucketCapacity
-	if conf.TotalBucketCapacity != 0 && config.IsSet("libfuse.display-capacity-mb") {
-		err = config.UnmarshalKey("libfuse.display-capacity-mb", &st.displayCapacity)
+	st.totalBucketCapacity = conf.TotalBucketCapacityMb * common.MbToBytes
+	st.displayCapacity = st.totalBucketCapacity
+	if conf.TotalBucketCapacityMb != 0 && config.IsSet("libfuse.display-capacity-mb") {
+		var displayCapacityMb uint64
+		err = config.UnmarshalKey("libfuse.display-capacity-mb", &displayCapacityMb)
 		if err != nil {
-			st.displayCapacity = 0
+			log.Err("SizeTracker::Configure : Invalid display capacity")
+			displayCapacityMb = 0
 		}
-		st.displayCapacity *= common.MbToBytes
+		st.displayCapacity = displayCapacityMb * common.MbToBytes
 	}
 
 	journalName := defaultJournalName
