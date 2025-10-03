@@ -302,23 +302,23 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 		stat, ret, err := st.NextComponent().StatFs()
 
 		if err == nil && ret {
-			bucketUsage_uint64 := stat.Blocks * uint64(blockSize)
+			returnedBucketUsage := stat.Blocks * uint64(blockSize)
+			// convert everything to float64
+			bucketCapacity := float64(st.totalBucketCapacity)
+			bucketUsage := float64(returnedBucketUsage)
+			displayCapacity := float64(st.displayCapacity)
+			serverUsage := float64(st.mountSize.GetSize())
 			// Custom logic for use with Nx Plugin
 			// the target is to fill the entire bucket to the eviction threshold
-			bucketPercentFull := float64(bucketUsage_uint64) / float64(st.totalBucketCapacity)
+			bucketPercentFull := bucketUsage / bucketCapacity
 			isBucketOverused := bucketPercentFull > evictionThreshold
 			if isBucketOverused {
 				// use a usage offset to control this server's storage use
 				// update the offset whenever we get updated bucket usage
-				isBucketUsageUpdated := bucketUsage_uint64 != st.bucketUsage
+				isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
 				if isBucketUsageUpdated {
 					// record the bucket size to recognize the next update
-					st.bucketUsage = bucketUsage_uint64
-					// convert everything to float64
-					bucketCapacity := float64(st.totalBucketCapacity)
-					bucketUsage := float64(bucketUsage_uint64)
-					displayCapacity := float64(st.displayCapacity)
-					serverUsage := float64(st.mountSize.GetSize())
+					st.bucketUsage = returnedBucketUsage
 					// bucket
 					// the goal is to hold the bucket at 90% full
 					targetBucketUsage := bucketCapacity * evictionThreshold
