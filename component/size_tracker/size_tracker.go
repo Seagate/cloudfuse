@@ -337,9 +337,9 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 					// above, we chose to make everyone evict the same fraction of their data
 					// but what if a new server joins, and has nothing to evict?
 					// To handle this case, we check:
-					// is this server being starved, while the bucket is not completely full?
-					serverIsStarved := serverUsage < minServerFraction*bucketCapacity
-					bucketHasRoom := bucketUsage < bucketCapacity
+					// is this server being starved, while the bucket is not critically full?
+					serverIsStarved := serverFraction < minServerFraction
+					bucketHasRoom := bucketUsage < bucketCapacity*.97
 					if serverIsStarved && bucketHasRoom {
 						// artificially set the usage to 75% so the mount doesn't show up as reserved
 						reportUsage = displayCapacity * 0.75
