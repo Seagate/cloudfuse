@@ -1482,8 +1482,8 @@ func (tui *appContext) createYAMLConfig() error {
 	}
 
 	// Write the encrypted YAML config data to a file
-	if err := os.WriteFile("config.aes", cipherText, 0600); err != nil {
-		return fmt.Errorf("Failed to create encrypted config.aes file: %v", err)
+	if err := os.WriteFile("config.yaml.aes", cipherText, 0600); err != nil {
+		return fmt.Errorf("Failed to create encrypted config.yaml.aes file: %v", err)
 	}
 
 	// Update configFilePath member to point to the created config file
@@ -1492,7 +1492,7 @@ func (tui *appContext) createYAMLConfig() error {
 		return fmt.Errorf("Failed to get current working directory: %v", err)
 	}
 
-	tui.config.configFilePath = filepath.Join(currDir, "config.aes")
+	tui.config.configFilePath = filepath.Join(currDir, "config.yaml.aes")
 
 	return nil
 }
