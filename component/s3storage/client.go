@@ -74,6 +74,7 @@ type Client struct {
 	uploader          *manager.Uploader
 	stagedBlocks      map[string]map[string][]byte // map[fileName]map[blockId]data
 	stagedBlocksMutex sync.RWMutex                 // Mutex to protect the cache
+	stagingPool       sync.Pool
 }
 
 // Verify that Client implements S3Connection interface
@@ -1441,7 +1442,8 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 	log.Trace("Client::CommitBlocks: name %s, %d blocks", name, len(blockList))
 
 	//struct for starting a multipart upload
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	key := cl.getKey(name, false, false)
 
 	// Retrieve cached blocks for this file
@@ -1500,73 +1502,116 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 		return err
 	}
 
-	// Upload Parts
-	completedParts := make([]types.CompletedPart, 0, len(blockList))
-	var currentPartNumber int32 = 1
-	var uploadErr error
+	// Upload parts concurrently
+	concurrency := cl.Config.concurrency
+	if concurrency <= 0 {
+		concurrency = DefaultConcurrency
+	}
+
+	completedParts := make([]types.CompletedPart, len(blockList))
+	sem := make(chan struct{}, concurrency)
+	var (
+		uploadErr error
+		errMu     sync.Mutex
+		wg        sync.WaitGroup
+	)
+
+	setUploadErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		errMu.Lock()
+		if uploadErr == nil {
+			uploadErr = err
+			cancel()
+		}
+		errMu.Unlock()
+	}
 
 	for i, blockID := range blockList {
-		blockData, blockExists := cachedFileBlocks[blockID]
-		if !blockExists {
-			uploadErr = fmt.Errorf(
-				"block ID %s from blockList not found in cache for %s",
-				blockID,
-				name,
-			)
-			log.Err("Client::CommitBlocks: %v", uploadErr)
-			break
-		}
-
-		partSize := len(blockData)
+		i := i
+		blockID := blockID
 		isLastPart := (i == len(blockList)-1)
 
-		if partSize < DefaultPartSize && !isLastPart {
-			log.Err(
-				"Client::CommitBlocks: cached block ID %s for %s is too small (%d bytes) and not the last part: %v",
-				blockID,
-				name,
-				partSize,
-				uploadErr,
-			)
-			break
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		uploadPartInput := &s3.UploadPartInput{
-			Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
-			Key:        aws.String(key),
-			UploadId:   aws.String(uploadID),
-			PartNumber: &currentPartNumber,
-			Body:       bytes.NewReader(blockData),
-		}
-		if cl.Config.enableChecksum {
-			uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
-		}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
 
-		partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
-		if err != nil {
-			log.Err("Client::CommitBlocks : failed to upload part: ", uploadErr)
-			break
-		}
+			blockData, blockExists := cachedFileBlocks[blockID]
+			if !blockExists {
+				err := fmt.Errorf(
+					"block ID %s from blockList not found in cache for %s",
+					blockID,
+					name,
+				)
+				log.Err("Client::CommitBlocks: %v", err)
+				setUploadErr(err)
+				return
+			}
 
-		cleanETag := strings.Trim(*partResp.ETag, "\"")
-		partNum := currentPartNumber
-		cPart := types.CompletedPart{
-			ETag:       aws.String(cleanETag),
-			PartNumber: &partNum,
-		}
-		// Collect the checksums
-		// It is easier to just collect all checksums and then upload them together
-		// as ones that are not used will just be nil and an object can only ever
-		// have one valid checksum
-		if cl.Config.enableChecksum {
-			cPart.ChecksumCRC32 = partResp.ChecksumCRC32
-			cPart.ChecksumCRC32C = partResp.ChecksumCRC32C
-			cPart.ChecksumSHA1 = partResp.ChecksumSHA1
-			cPart.ChecksumSHA256 = partResp.ChecksumSHA256
-		}
-		completedParts = append(completedParts, cPart)
-		currentPartNumber++
+			partSize := len(blockData)
+			if partSize < DefaultPartSize && !isLastPart {
+				err := fmt.Errorf(
+					"Client::CommitBlocks: cached block ID %s for %s is too small (%d bytes) and not the last part",
+					blockID,
+					name,
+					partSize,
+				)
+				log.Err("Client::CommitBlocks: %v", err)
+				setUploadErr(err)
+				return
+			}
+
+			partNum := int32(i + 1)
+			uploadPartInput := &s3.UploadPartInput{
+				Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
+				Key:        aws.String(key),
+				UploadId:   aws.String(uploadID),
+				PartNumber: &partNum,
+				Body:       bytes.NewReader(blockData),
+			}
+			if cl.Config.enableChecksum {
+				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+			}
+
+			partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
+			if err != nil {
+				if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+					return
+				}
+				parsedErr := parseS3Err(err, fmt.Sprintf("UploadPart(%s, part %d)", name, partNum))
+				setUploadErr(
+					fmt.Errorf("failed to upload part %d for %s: %w", partNum, name, parsedErr),
+				)
+				return
+			}
+
+			cleanETag := strings.Trim(*partResp.ETag, "\"")
+			partNumCopy := partNum
+			completedParts[i] = types.CompletedPart{
+				ETag:       aws.String(cleanETag),
+				PartNumber: &partNumCopy,
+			}
+
+			if cl.Config.enableChecksum {
+				part := &completedParts[i]
+				part.ChecksumCRC32 = partResp.ChecksumCRC32
+				part.ChecksumCRC32C = partResp.ChecksumCRC32C
+				part.ChecksumSHA1 = partResp.ChecksumSHA1
+				part.ChecksumSHA256 = partResp.ChecksumSHA256
+			}
+		}()
 	}
+
+	wg.Wait()
 
 	// Complete or Abort Multipart Upload
 	if uploadErr != nil {
@@ -1621,9 +1666,13 @@ func (cl *Client) StageBlock(name string, data []byte, id string) error {
 		cl.stagedBlocks[name] = make(map[string][]byte)
 	}
 
-	dataCopy := make([]byte, len(data))
-	copy(dataCopy, data)
-	cl.stagedBlocks[name][id] = dataCopy
+	buf := cl.getStagingBuffer(len(data))
+	copy(buf, data)
+
+	if existing, exists := cl.stagedBlocks[name][id]; exists {
+		cl.putStagingBuffer(existing)
+	}
+	cl.stagedBlocks[name][id] = buf
 
 	log.Debug("Client::StageBlock: Cached block ID %s for %s", id, name)
 	return nil
@@ -1633,6 +1682,45 @@ func (cl *Client) StageBlock(name string, data []byte, id string) error {
 func (cl *Client) cleanupStagedBlocks(name string) {
 	cl.stagedBlocksMutex.Lock()
 	defer cl.stagedBlocksMutex.Unlock()
-	delete(cl.stagedBlocks, name)
-	log.Debug("Client::cleanupStagedBlocks: Cleaned cache for %s", name)
+
+	if cl.stagedBlocks == nil {
+		return
+	}
+
+	if cached, ok := cl.stagedBlocks[name]; ok {
+		for _, buf := range cached {
+			cl.putStagingBuffer(buf)
+		}
+		delete(cl.stagedBlocks, name)
+		log.Debug("Client::cleanupStagedBlocks: Cleaned cache for %s", name)
+
+		if len(cl.stagedBlocks) == 0 {
+			cl.stagedBlocks = nil
+		}
+	}
+}
+
+func (cl *Client) getStagingBuffer(size int) []byte {
+	if size == 0 {
+		return nil
+	}
+
+	if pooled := cl.stagingPool.Get(); pooled != nil {
+		buf := pooled.([]byte)
+		if cap(buf) >= size {
+			return buf[:size]
+		}
+		// buffer is too small for the current request; return it for future reuse
+		cl.stagingPool.Put(buf[:cap(buf)])
+	}
+
+	return make([]byte, size)
+}
+
+func (cl *Client) putStagingBuffer(buf []byte) {
+	if buf == nil {
+		return
+	}
+
+	cl.stagingPool.Put(buf[:cap(buf)])
 }
