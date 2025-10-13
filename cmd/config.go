@@ -26,9 +26,11 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -921,13 +923,10 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 				tui.showCacheConfirmationModal(cacheSizeText,
 					// Callback function if the user selects Finish
 					func() {
-						if err := tui.createYAMLConfig(); err != nil {
-							tui.showErrorModal(
-								"[red::b]ERROR:[-::-] Failed to create YAML config:\n"+err.Error(),
-								func() {
-									tui.pages.SwitchToPage("page5")
-								},
-							)
+						if err := tui.exitConfig(); err != nil {
+							tui.showErrorModal("[red::b]ERROR:[-::-]\n"+err.Error(), func() {
+								tui.pages.SwitchToPage("page5")
+							})
 							return
 						}
 						tui.showExitModal(func() {
@@ -941,8 +940,8 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 
 			} else {
 				// If caching is disabled, just finish the configuration
-				if err := tui.createYAMLConfig(); err != nil {
-					tui.showErrorModal("[red::b]ERROR:[-::-] Failed to create YAML config:\n"+err.Error(), func() {
+				if err := tui.exitConfig(); err != nil {
+					tui.showErrorModal("[red::b]ERROR:[-::-]\n"+err.Error(), func() {
 						tui.pages.SwitchToPage("page5")
 					})
 					return
@@ -1200,6 +1199,55 @@ func (tui *appContext) showExitModal(onConfirm func()) {
 				"[black::i]Thank you for using CloudFuse Config![-::-]", processingEmojis[len(processingEmojis)-1], tui.config.configFilePath))
 		})
 	}()
+}
+
+// Function to handle exiting the configuration process.
+// Creates the YAML config file and executes a dry run.
+func (tui *appContext) exitConfig() error {
+	if err := tui.createYAMLConfig(); err != nil {
+		return fmt.Errorf("Failed to create YAML config:\n%v", err)
+	}
+	if err := tui.dryRun(); err != nil {
+		return fmt.Errorf("Configuration validation failed:\n%v", err)
+	}
+	return nil
+}
+
+func (tui *appContext) dryRun() error {
+	// Create /tmp/mnt-test directory if it doesn't exist. Needs to be empty for dry run.
+	mountPoint := filepath.Join(os.TempDir(), "mnt-test")
+	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
+		if err := os.MkdirAll(mountPoint, 0700); err != nil {
+			return fmt.Errorf(
+				"Failed to create test mount point '%s' for dry run: %v",
+				mountPoint,
+				err,
+			)
+		}
+	}
+
+	// Spawn child process to run cloudfuse with the generated config file and --dry-run flag
+	cmd := exec.Command(
+		"cloudfuse",
+		"mount",
+		mountPoint,
+		"--config-file",
+		tui.config.configFilePath,
+		"--dry-run",
+		"--passphrase",
+		tui.config.configEncryptionPassphrase,
+	)
+
+	// Capture stdout and stderr
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Dry run failed: %v\n%s", err, errBuf.String())
+	}
+
+	return nil
 }
 
 // Helper function to center lines of text within a specified width.
