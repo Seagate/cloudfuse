@@ -1213,6 +1213,7 @@ func (tui *appContext) exitConfig() error {
 	return nil
 }
 
+// Function to perform a dry run of cloudfuse with the generated config file.
 func (tui *appContext) dryRun() error {
 	// Create /tmp/mnt-test directory if it doesn't exist. Needs to be empty for dry run.
 	mountPoint := filepath.Join(os.TempDir(), "mnt-test")
