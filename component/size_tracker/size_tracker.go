@@ -34,7 +34,6 @@ import (
 	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/s3storage"
 	"github.com/Seagate/cloudfuse/internal"
-	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
 // Common structure for Component
@@ -132,58 +131,28 @@ func (st *SizeTracker) Priority() internal.ComponentPriority {
 func (st *SizeTracker) OnConfigChange() {
 }
 
-func (st *SizeTracker) RenameDir(options internal.RenameDirOptions) error {
-	// Rename dir should not allow renaming files into a directory that already exists so we should not
-	// need to update the size here.
-	return st.NextComponent().RenameDir(options)
-}
-
 // File operations
-func (st *SizeTracker) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
-	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-
-	handle, err := st.NextComponent().CreateFile(options)
-
-	// File already exists but create succeeded so remove old file size
-	if err == nil && getAttrErr == nil {
-		st.mountSize.Subtract(uint64(attr.Size))
-	}
-
-	return handle, err
-}
-
 func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
 	err := st.NextComponent().DeleteFile(options)
+	if err != nil {
+		return err
+	}
 
-	// If the file is a symlink then it has no size so don't change the size
-	if err == nil && getAttrErr == nil && !attr.IsSymlink() {
+	if getAttrErr == nil {
 		st.mountSize.Subtract(uint64(attr.Size))
 	}
 
-	return err
-}
-
-func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
-	dstAttr, dstErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Dst})
-
-	err := st.NextComponent().RenameFile(options)
-
-	// If dst already exists and rename succeeds, remove overwritten dst size
-	if dstErr == nil && err == nil {
-		st.mountSize.Subtract(uint64(dstAttr.Size))
-	}
-
-	return err
+	return nil
 }
 
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
 	var oldSize int64
-	attr, getAttrErr1 := st.NextComponent().
+	oldAttr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr1 == nil {
-		oldSize = attr.Size
+		oldSize = oldAttr.Size
 	} else {
 		log.Err("SizeTracker::WriteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr1)
 	}
@@ -192,16 +161,17 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	if err != nil {
 		return bytesWritten, err
 	}
-	newSize := max(oldSize, options.Offset+int64(len(options.Data)))
 
-	diff := newSize - oldSize
-
-	// File already exists and WriteFile succeeded subtract difference in file size
-	if diff < 0 {
-		// diff is negative, so change it back to positive before converting to a uint64
-		st.mountSize.Subtract(uint64(-diff))
-	} else {
-		st.mountSize.Add(uint64(diff))
+	newAttr, getAttrErr2 := st.NextComponent().
+		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
+	if getAttrErr2 == nil {
+		diff := newAttr.Size - oldSize
+		if diff < 0 {
+			// diff is negative, so change it back to positive before converting to a uint64
+			st.mountSize.Subtract(uint64(-diff))
+		} else {
+			st.mountSize.Add(uint64(diff))
+		}
 	}
 
 	return bytesWritten, nil
@@ -215,16 +185,19 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	}
 
 	err := st.NextComponent().TruncateFile(options)
-	newSize := options.Size - origSize
+	if err != nil {
+		return err
+	}
+	diff := options.Size - origSize
 
 	// File already exists and truncate succeeded subtract difference in file size
-	if err == nil && getAttrErr == nil && newSize < 0 {
-		st.mountSize.Subtract(uint64(-newSize))
-	} else if err == nil && getAttrErr == nil && newSize >= 0 {
-		st.mountSize.Add(uint64(newSize))
+	if getAttrErr == nil && diff < 0 {
+		st.mountSize.Subtract(uint64(-diff))
+	} else if getAttrErr == nil && diff >= 0 {
+		st.mountSize.Add(uint64(diff))
 	}
 
-	return err
+	return nil
 }
 
 func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error {
@@ -238,8 +211,14 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 	if err != nil {
 		return err
 	}
+
 	fileInfo, err := options.File.Stat()
 	if err != nil {
+		log.Err(
+			"SizeTracker::CopyFromFile : Unable to stat file %s. Current tracked size is invalid. Error: : %v",
+			options.Name,
+			err,
+		)
 		return nil
 	}
 	newSize := fileInfo.Size() - origSize

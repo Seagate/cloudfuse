@@ -946,7 +946,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	if err == nil {
 		modifyTime := time.Now()
-		newSize := options.Offset + int64(len(options.Data))
+		newSize := max(attr.Size, options.Offset+int64(len(options.Data)))
 
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
