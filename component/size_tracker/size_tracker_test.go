@@ -625,6 +625,55 @@ func (suite *sizeTrackerTestSuite) TestStatFS() {
 	suite.assert.NoError(err)
 }
 
+func (suite *sizeTrackerTestSuite) TestStatFSFallbackEnabledSingleTenant() {
+	suite.cleanupTest()
+	fallbackConfig := fmt.Sprintf(
+		"size_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: %d",
+		journal_test_name,
+		10*1024*1024,
+	)
+	suite.setupTestHelper(fallbackConfig)
+	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
+
+	// divide by zero test
+	stat, ret, err := suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	suite.assert.Equal(uint64(0), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+	data := make([]byte, 1024*1024)
+	_, _ = rand.Read(data)
+	_, err = suite.sizeTracker.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+	stat, ret, err = suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+
+	suite.assert.Equal(uint64(len(data)/4096), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(int64(4096), stat.Frsize)
+	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
+}
+
 func (suite *sizeTrackerTestSuite) TestStatFSNoWrites() {
 	defer suite.cleanupTest()
 	stat, ret, err := suite.sizeTracker.StatFs()
