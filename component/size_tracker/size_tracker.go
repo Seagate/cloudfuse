@@ -96,7 +96,7 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	st.totalBucketCapacity = conf.TotalBucketCapacity
+	st.totalBucketCapacity = conf.TotalBucketCapacity * common.MbToBytes
 
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
@@ -142,6 +142,8 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 
 	if getAttrErr == nil {
 		st.mountSize.Subtract(uint64(attr.Size))
+	} else {
+		log.Err("SizeTracker::DeleteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Name, getAttrErr)
 	}
 
 	return nil
@@ -149,6 +151,7 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
 	var oldSize int64
+	var newSize int64
 	oldAttr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr1 == nil {
@@ -165,69 +168,82 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	newAttr, getAttrErr2 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr2 == nil {
-		diff := newAttr.Size - oldSize
+		newSize = newAttr.Size
+	}
+	diff := newSize - oldSize
+
+	if getAttrErr2 == nil {
 		if diff < 0 {
-			// diff is negative, so change it back to positive before converting to a uint64
 			st.mountSize.Subtract(uint64(-diff))
 		} else {
 			st.mountSize.Add(uint64(diff))
 		}
+	} else {
+		log.Err("SizeTracker::WriteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr2)
 	}
 
 	return bytesWritten, nil
 }
 
 func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error {
-	var origSize int64
-	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-	if getAttrErr == nil {
-		origSize = attr.Size
+	var oldSize int64
+	var newSize int64
+	oldAttr, getAttrErr1 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if getAttrErr1 == nil {
+		oldSize = oldAttr.Size
 	}
 
 	err := st.NextComponent().TruncateFile(options)
 	if err != nil {
 		return err
 	}
-	diff := options.Size - origSize
+
+	newAttr, getAttrErr2 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if getAttrErr2 == nil {
+		newSize = newAttr.Size
+	}
+	diff := newSize - oldSize
 
 	// File already exists and truncate succeeded subtract difference in file size
-	if getAttrErr == nil && diff < 0 {
+	if getAttrErr1 == nil && getAttrErr2 == nil && diff < 0 {
 		st.mountSize.Subtract(uint64(-diff))
-	} else if getAttrErr == nil && diff >= 0 {
+	} else if getAttrErr1 == nil && getAttrErr2 == nil && diff >= 0 {
 		st.mountSize.Add(uint64(diff))
+	} else {
+		log.Err("SizeTracker::TruncateFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v %v", options.Name, getAttrErr1, getAttrErr2)
 	}
 
 	return nil
 }
 
 func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error {
-	var origSize int64
-	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-	if err == nil {
-		origSize = attr.Size
+	var oldSize int64
+	var newSize int64
+
+	// File may not exist yet, in that case ignore the error and the old size will be 0
+	oldAttr, getAttrErr1 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if getAttrErr1 == nil {
+		oldSize = oldAttr.Size
 	}
 
-	err = st.NextComponent().CopyFromFile(options)
+	err := st.NextComponent().CopyFromFile(options)
 	if err != nil {
 		return err
 	}
 
-	fileInfo, err := options.File.Stat()
-	if err != nil {
-		log.Err(
-			"SizeTracker::CopyFromFile : Unable to stat file %s. Current tracked size is invalid. Error: : %v",
-			options.Name,
-			err,
-		)
-		return nil
+	newAttr, getAttrErr2 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if getAttrErr2 == nil {
+		newSize = newAttr.Size
 	}
-	newSize := fileInfo.Size() - origSize
+	diff := newSize - oldSize
 
 	// File already exists and CopyFromFile succeeded subtract difference in file size
-	if newSize < 0 {
-		st.mountSize.Subtract(uint64(-newSize))
+	if getAttrErr2 == nil && diff < 0 {
+		st.mountSize.Subtract(uint64(-diff))
+	} else if getAttrErr2 == nil && diff >= 0 {
+		st.mountSize.Add(uint64(diff))
 	} else {
-		st.mountSize.Add(uint64(newSize))
+		log.Err("SizeTracker::CopyFromFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v %v", options.Name, getAttrErr1, getAttrErr2)
 	}
 
 	return nil
