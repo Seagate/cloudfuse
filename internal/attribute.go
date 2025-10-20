@@ -63,7 +63,7 @@ func CreateObjAttrDir(path string, creationTime time.Time) (attr *ObjAttr) {
 	attr = CreateObjAttr(path, 4096, currentTime)
 	// Change the relevant fields for a directory
 	attr.Mode = os.ModeDir
-	attr.Ctime = creationTime
+	attr.Crtime = creationTime
 	// set flags
 	attr.Flags = NewDirBitMap()
 	attr.Flags.Set(PropFlagModeDefault)
