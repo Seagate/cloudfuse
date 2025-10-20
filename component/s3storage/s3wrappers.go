@@ -266,7 +266,7 @@ func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal
 	var object *internal.ObjAttr
 
 	if isDir {
-		object = createObjAttrDir(name)
+		object = internal.CreateObjAttrDir(name, *result.LastModified)
 	} else {
 		object = createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
 	}
@@ -538,7 +538,7 @@ func (cl *Client) List(
 				continue
 			}
 			path := split(cl.Config.prefixPath, dirName)
-			attr := internal.CreateObjAttrDir(path)
+			attr := internal.CreateObjAttrDir(path, time.Now())
 			objectAttrList = append(objectAttrList, attr)
 		}
 	}
@@ -581,23 +581,6 @@ func createObjAttr(
 		attr.Flags.Set(internal.PropFlagSymlink)
 		attr.Metadata[symlinkKey] = to.Ptr("true")
 	}
-
-	return attr
-}
-
-// create an object attributes struct for a directory
-func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
-	// strip any trailing slash
-	path = internal.TruncateDirName(path)
-	// For these dirs we get only the name and no other properties so hardcoding time to current time
-	currentTime := time.Now()
-
-	attr = createObjAttr(path, 4096, currentTime, false)
-	// Change the relevant fields for a directory
-	attr.Mode = os.ModeDir
-	// set flags
-	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr
 }

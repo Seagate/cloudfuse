@@ -80,7 +80,7 @@ func newCacheTreeMap(maxFiles int) *cacheTreeMap {
 	// initialize map
 	cacheMap := make(map[string]*attrCacheItem)
 	// create tree root node
-	rootAttr := internal.CreateObjAttrDir("")
+	rootAttr := internal.CreateObjAttrDir("", time.Now())
 	rootNode := newAttrCacheItem(rootAttr, true, time.Now())
 	// add to cacheMap
 	cacheMap[""] = rootNode
@@ -142,7 +142,7 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	parentItem, parentFound := ctm.get(parentPath)
 	// if there is no parent, create one and add it
 	if !parentFound || (!parentItem.exists() && newItem.exists()) {
-		newParentAttr := internal.CreateObjAttrDir(parentPath)
+		newParentAttr := internal.CreateObjAttrDir(parentPath, newItem.attr.Ctime)
 		parentItem = newAttrCacheItem(newParentAttr, newItem.exists(), newItem.cachedAt)
 		// recurse
 		ctm.insertItem(parentItem, fromDirList)

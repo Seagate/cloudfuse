@@ -229,7 +229,7 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	stbuf.Ctim.Nsec = 0
 	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
 	stbuf.Mtim.Nsec = 0
-	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Birthtim = fuse.NewTimespec(attr.Crtime)
 	stbuf.Birthtim.Nsec = 0
 }
 

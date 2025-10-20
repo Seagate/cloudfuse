@@ -670,7 +670,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 		return nil, err
 	} else if len(objects) > 0 {
 		// create and return an objAttr for the directory
-		attr := internal.CreateObjAttrDir(dirName)
+		attr := internal.CreateObjAttrDir(dirName, time.Now())
 		return attr, nil
 	}
 

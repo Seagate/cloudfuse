@@ -51,7 +51,7 @@ func (suite *cacheMapTestSuite) SetupTest() {
 	nestedDir, nestedFiles := generateFSTree("a")
 	// directories
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
-		attr := internal.CreateObjAttrDir(dir.Value.(string))
+		attr := internal.CreateObjAttrDir(dir.Value.(string), time.Now())
 		suite.cache.insert(insertOptions{
 			attr:     attr,
 			exists:   true,
@@ -116,7 +116,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	dirName := "testFolder"
 	dirPath := path.Join(workingPath, dirName)
 	insertTime = time.Now()
-	dirAttr := internal.CreateObjAttrDir(dirPath)
+	dirAttr := internal.CreateObjAttrDir(dirPath, insertTime)
 	// insert
 	insertedItem = suite.cache.insert(insertOptions{
 		attr:     dirAttr,

@@ -220,7 +220,7 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 			if !found {
 				log.Info("AttrCache::deleteDirectory : %s recording directory as deleted", path)
 				ac.cache.insert(insertOptions{
-					attr:     internal.CreateObjAttrDir(path),
+					attr:     internal.CreateObjAttrDir(path, time.Now()),
 					exists:   false,
 					cachedAt: deletedAt,
 				})
@@ -302,7 +302,7 @@ func (ac *AttrCache) moveCachedItem(
 	// create the destination attr
 	var dstAttr *internal.ObjAttr
 	if srcItem.attr.IsDir() {
-		dstAttr = internal.CreateObjAttrDir(dstPath)
+		dstAttr = internal.CreateObjAttrDir(dstPath, srcItem.attr.Ctime)
 	} else {
 		dstAttr = internal.CreateObjAttr(dstPath, srcItem.attr.Size, srcItem.attr.Mtime)
 	}
@@ -332,7 +332,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 		dirCacheItem, found := ac.cache.get(dirPath)
 		if !found || !dirCacheItem.exists() {
 			log.Warn("AttrCache::markAncestorsInCloud : Adding parent directory %s", dirPath)
-			dirObjAttr := internal.CreateObjAttrDir(dirPath)
+			dirObjAttr := internal.CreateObjAttrDir(dirPath, time)
 			dirCacheItem = ac.cache.insert(insertOptions{
 				attr:     dirObjAttr,
 				exists:   true,
@@ -443,7 +443,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			oldDirAttrCacheItem.invalidate()
 		}
 		// add (or replace) the directory entry
-		newDirAttr := internal.CreateObjAttrDir(options.Name)
+		newDirAttr := internal.CreateObjAttrDir(options.Name, time.Now())
 		newDirAttrCacheItem := ac.cache.insert(insertOptions{
 			attr:     newDirAttr,
 			exists:   true,
@@ -871,7 +871,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		ancestorCacheItem, found := ac.cache.get(dirPath)
 		if !found || !ancestorCacheItem.exists() {
 			log.Warn("AttrCache::updateAncestorsInCloud : Adding directory entry %s", dirPath)
-			ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
+			ancestorObjAttr := internal.CreateObjAttrDir(dirPath, time)
 			ancestorCacheItem = ac.cache.insert(insertOptions{
 				attr:     ancestorObjAttr,
 				exists:   true,
@@ -1046,6 +1046,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 		}
 
 		// use local file to update the attribute cache entry
+		_ = options.File.Sync()
 		fileStat, statErr := options.File.Stat()
 		if statErr != nil {
 			// if we can't stat the local file, we know nothing

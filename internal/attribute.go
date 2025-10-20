@@ -54,7 +54,7 @@ func CreateObjAttr(objectPath string, size int64, lastModified time.Time) (attr 
 }
 
 // create an object attributes struct for a directory
-func CreateObjAttrDir(path string) (attr *ObjAttr) {
+func CreateObjAttrDir(path string, creationTime time.Time) (attr *ObjAttr) {
 	// strip any trailing slash
 	path = TruncateDirName(path)
 	// For these dirs we get only the name and no other properties so hardcoding time to current time
@@ -63,6 +63,7 @@ func CreateObjAttrDir(path string) (attr *ObjAttr) {
 	attr = CreateObjAttr(path, 4096, currentTime)
 	// Change the relevant fields for a directory
 	attr.Mode = os.ModeDir
+	attr.Ctime = creationTime
 	// set flags
 	attr.Flags = NewDirBitMap()
 	attr.Flags.Set(PropFlagModeDefault)

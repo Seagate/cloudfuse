@@ -1355,7 +1355,11 @@ func (suite *attrCacheTestSuite) TestRenameFile() {
 	suite.addPathToCache(src, false)
 	// Add negative entry to cache for Dst
 	suite.attrCache.cache.insert(
-		insertOptions{attr: internal.CreateObjAttrDir(dst), exists: false, cachedAt: time.Now()},
+		insertOptions{
+			attr:     internal.CreateObjAttrDir(dst, time.Now()),
+			exists:   false,
+			cachedAt: time.Now(),
+		},
 	)
 	attr, found = suite.attrCache.cache.get(src)
 	suite.assert.True(found)
