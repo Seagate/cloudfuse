@@ -149,6 +149,24 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
+func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
+	dstAttr, dstErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Dst})
+
+	err := st.NextComponent().RenameFile(options)
+
+	// If dst already exists and rename succeeds, remove overwritten dst size
+	if dstErr == nil && err == nil {
+		log.Debug(
+			"SizeTracker::RenameFile : dst file %s existed with size %d, subtracting from mount size",
+			options.Dst,
+			dstAttr.Size,
+		)
+		st.mountSize.Subtract(uint64(dstAttr.Size))
+	}
+
+	return err
+}
+
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
 	var oldSize int64
 	var newSize int64
