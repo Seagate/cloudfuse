@@ -5,8 +5,8 @@ go 1.25.0
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.2
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.4.2
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.4.3
 	github.com/JeffreyRichter/enum v0.0.0-20180725232043-2567042f9cda
 	github.com/awnumar/memguard v0.23.0
 	github.com/aws/aws-sdk-go-v2 v1.39.2
