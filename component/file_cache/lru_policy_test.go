@@ -315,6 +315,10 @@ func (suite *lruPolicyTestSuite) verifyPolicy(expectedPolicy, actualPolicy *lruP
 			suite.assert.Same(actualPolicy.lastMarker, actual)
 		default:
 			suite.assert.Equal(expected.name, actual.name)
+			objName := expected.name[len(suite.policy.tmpPath)+1:]
+			_, expectedPending := expectedPolicy.pendingOps.Load(objName)
+			_, actualPending := actualPolicy.pendingOps.Load(objName)
+			suite.assert.Equal(expectedPending, actualPending)
 		}
 		suite.assert.NotNil(actual, "actual list is shorter than expected")
 		suite.assert.NotNil(expected, "actual list is longer than expected")
@@ -334,6 +338,32 @@ func (suite *lruPolicyTestSuite) TestCreateSnapshotEmpty() {
 	suite.assert.Empty(snapshot.NodeList)
 	suite.assert.Zero(snapshot.CurrMarkerPosition)
 	suite.assert.EqualValues(1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshot() {
+	defer suite.cleanupTest()
+	// setup
+	numFiles := 5
+	pathPrefix := filepath.Join(cache_path, "temp")
+	for i := 1; i <= numFiles; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+		if i > 3 {
+			suite.policy.pendingOps.Store("temp"+fmt.Sprint(i), struct{}{})
+		}
+	}
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Len(snapshot.NodeList, numFiles)
+	for i, v := range snapshot.NodeList {
+		suite.assert.Equal(pathPrefix+fmt.Sprint(numFiles-i), filepath.Join(cache_path, v))
+	}
 	suite.verifyPolicy(originalPolicy, suite.policy)
 }
 
@@ -481,6 +511,7 @@ func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
 		NodeList:           []string{"a", "b", "c"},
 		CurrMarkerPosition: 1,
 		LastMarkerPosition: 2,
+		SyncPendingFlags:   []bool{true, false, false},
 	}
 	// test
 	err := snapshot.writeToFile(cache_path)
@@ -491,50 +522,48 @@ func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
 	suite.assert.Equal(snapshot, snapshotFromFile) // this checks deep equality
 }
 
-func (suite *lruPolicyTestSuite) TestNoEvictionIfInScheduleOps() {
+func (suite *lruPolicyTestSuite) TestNoEvictionIfInPendingOps() {
 	defer suite.cleanupTest()
 
-	fileName := filepath.Join(cache_path, "scheduled_file")
+	name := "pending_file"
+	fileName := filepath.Join(cache_path, name)
 	suite.policy.CacheValid(fileName)
 
-	fakeSchedule := &FileCache{}
-	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("scheduled_file"), struct{}{})
-	suite.policy.schedule = fakeSchedule
+	suite.policy.pendingOps.Store(name, struct{}{})
 
 	time.Sleep(2 * time.Second)
 
-	suite.assert.True(suite.policy.IsCached(fileName), "File in scheduleOps should not be evicted")
+	suite.assert.True(suite.policy.IsCached(fileName), "File in pendingOps should not be evicted")
 }
 
-func (suite *lruPolicyTestSuite) TestEvictionRespectsScheduleOps() {
+func (suite *lruPolicyTestSuite) TestEvictionRespectsPendingOps() {
 	defer suite.cleanupTest()
 
+	objNames := []string{"File1", "file2", "file3", "file4"}
 	fileNames := []string{
-		filepath.Join(cache_path, "file1"),
-		filepath.Join(cache_path, "file2"),
-		filepath.Join(cache_path, "file3"),
-		filepath.Join(cache_path, "file4"),
+		filepath.Join(cache_path, objNames[0]),
+		filepath.Join(cache_path, objNames[1]),
+		filepath.Join(cache_path, objNames[2]),
+		filepath.Join(cache_path, objNames[3]),
 	}
 	for _, name := range fileNames {
 		suite.policy.CacheValid(name)
 	}
 
-	fakeSchedule := &FileCache{}
-	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("file2"), struct{}{})
-	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("file4"), struct{}{})
-	suite.policy.schedule = fakeSchedule
+	suite.policy.pendingOps.Store(objNames[1], struct{}{})
+	suite.policy.pendingOps.Store(objNames[3], struct{}{})
 
 	time.Sleep(3 * time.Second)
 
 	suite.assert.False(suite.policy.IsCached(fileNames[0]), "file1 should be evicted")
 	suite.assert.True(
 		suite.policy.IsCached(fileNames[1]),
-		"file2 should NOT be evicted (in scheduleOps)",
+		"file2 should NOT be evicted (in pendingOps)",
 	)
 	suite.assert.False(suite.policy.IsCached(fileNames[2]), "file3 should be evicted")
 	suite.assert.True(
 		suite.policy.IsCached(fileNames[3]),
-		"file4 should NOT be evicted (in scheduleOps)",
+		"file4 should NOT be evicted (in pendingOps)",
 	)
 }
 
