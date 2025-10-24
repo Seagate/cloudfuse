@@ -42,17 +42,22 @@ type SizeTracker struct {
 	internal.BaseComponent
 	mountSize           *MountSize
 	totalBucketCapacity uint64
+	displayCapacity     uint64
+	bucketUsage         uint64
+	statSizeOffset      uint64
 }
 
 type SizeTrackerOptions struct {
-	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
-	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
+	JournalName           string `config:"journal-name"             yaml:"journal-name,omitempty"`
+	TotalBucketCapacityMb uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
 }
 
 const compName = "size_tracker"
 const blockSize = int64(4096)
 const defaultJournalName = "mount_size.dat"
-const evictionThreshold = 0.95
+const evictionThreshold = 0.9
+const minDisplayCapacity = 1 * common.TbToBytes
+const minServerFraction = 0.05
 
 var _ internal.Component = &SizeTracker{}
 
@@ -97,7 +102,40 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	st.totalBucketCapacity = conf.TotalBucketCapacity
+	if conf.TotalBucketCapacityMb != 0 {
+		// bucket capacity must be at least 10% of largest mounted device to be recognized by Nx
+		if conf.TotalBucketCapacityMb*common.MbToBytes > minDisplayCapacity {
+			st.totalBucketCapacity = conf.TotalBucketCapacityMb * common.MbToBytes
+		} else {
+			log.Warn(
+				"SizeTracker::Configure : Bucket capacity set to %dMB. Defaulting to minimum (%dMB)",
+				conf.TotalBucketCapacityMb,
+				minDisplayCapacity/common.MbToBytes,
+			)
+			st.totalBucketCapacity = minDisplayCapacity
+		}
+		// set display capacity
+		st.displayCapacity = st.totalBucketCapacity
+		if config.IsSet("libfuse.display-capacity-mb") {
+			var confDisplayCapacityMb uint64
+			err = config.UnmarshalKey("libfuse.display-capacity-mb", &confDisplayCapacityMb)
+			if err == nil {
+				if confDisplayCapacityMb*common.MbToBytes > minDisplayCapacity {
+					st.displayCapacity = confDisplayCapacityMb * common.MbToBytes
+				} else {
+					log.Warn(
+						"SizeTracker::Configure : Display capacity set to %dMB. Defaulting to minimum (%dMB)",
+						confDisplayCapacityMb,
+						minDisplayCapacity/common.MbToBytes,
+					)
+					st.displayCapacity = minDisplayCapacity
+				}
+			} else {
+				log.Err("SizeTracker::Configure : Invalid display capacity")
+				confDisplayCapacityMb = 0
+			}
+		}
+	}
 
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
@@ -264,19 +302,54 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 		stat, ret, err := st.NextComponent().StatFs()
 
 		if err == nil && ret {
+			returnedBucketUsage := stat.Blocks * uint64(blockSize)
+			// convert everything to float64
+			bucketCapacity := float64(st.totalBucketCapacity)
+			bucketUsage := float64(returnedBucketUsage)
+			displayCapacity := float64(st.displayCapacity)
+			serverUsage := float64(st.mountSize.GetSize())
 			// Custom logic for use with Nx Plugin
-			// If the user is over the capacity limit set by Nx, then we need to prevent them from
-			// accidental overuse of their bucket. So we change our reporting to instead report
-			// the used capacity of the bucket to enable the VMS to start eviction
-			if float64(
-				stat.Blocks*uint64(blockSize),
-			) > evictionThreshold*float64(
-				st.totalBucketCapacity,
-			) {
-				log.Warn(
-					"SizeTracker::StatFs : changing from size_tracker size to S3 bucket size due to overuse of bucket",
-				)
-				blocks = stat.Blocks
+			// the target is to fill the entire bucket to the eviction threshold
+			bucketPercentFull := bucketUsage / bucketCapacity
+			isBucketOverused := bucketPercentFull > evictionThreshold
+			if isBucketOverused {
+				// use a usage offset to control this server's storage use
+				// update the offset whenever we get updated bucket usage
+				isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
+				if isBucketUsageUpdated {
+					// record the bucket size to recognize the next update
+					st.bucketUsage = returnedBucketUsage
+					// bucket
+					// the goal is to hold the bucket at 90% full
+					targetBucketUsage := bucketCapacity * evictionThreshold
+					// how much needs to be evicted from the bucket?
+					targetBucketReduction := bucketUsage - targetBucketUsage
+
+					// server
+					// what fraction of the bucket is the server using?
+					serverFraction := serverUsage / bucketUsage
+					// so, if everyone needs to evict the same percent, how much does this server need to evict?
+					targetServerReduction := targetBucketReduction * serverFraction
+					// to get the server to evict that, we need to report being over 90% by that amount
+					reportUsage := displayCapacity*evictionThreshold + targetServerReduction
+
+					// don't starve latecomers
+					// above, we chose to make everyone evict the same fraction of their data
+					// but what if a new server joins, and has nothing to evict?
+					// To handle this case, we check:
+					// is this server being starved, while the bucket is not critically full?
+					serverIsStarved := serverFraction < minServerFraction
+					bucketHasRoom := bucketUsage < bucketCapacity*.97
+					if serverIsStarved && bucketHasRoom {
+						// artificially set the usage to 75% so the mount doesn't show up as reserved
+						reportUsage = displayCapacity * 0.75
+					}
+
+					// to display the reported size, we use an offset
+					st.statSizeOffset = uint64(max(0, reportUsage-serverUsage))
+				}
+				// use the size offset to communicate the right target size to the Nx application
+				blocks += st.statSizeOffset / uint64(blockSize)
 			}
 		}
 	}
