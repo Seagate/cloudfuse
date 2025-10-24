@@ -1,5 +1,19 @@
 # Cloudfuse Changelog #
 
+## **2.0.1** ##
+
+October 23rd 2025
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Features ###
+
+- [#681](https://github.com/Seagate/cloudfuse/pull/681) Bump blobfuse version to 2.5.0
+
+### Bug Fixes ###
+
+- [#691](https://github.com/Seagate/cloudfuse/pull/691) Add libfuse as explicit dependency
+- [#729](https://github.com/Seagate/cloudfuse/pull/729) Fix size_tracker bug
+
 ## **2.0.0** ##
 
 September 4th 2025
