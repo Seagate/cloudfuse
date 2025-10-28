@@ -3,7 +3,7 @@
 #   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory, sync-to-flush) are set to 'false' by default.
 #      No need to mention them in your config file unless you are setting them to true.
 #   2. 'loopbackfs' is purely for testing and shall not be used in production configuration.
-#   3. 'stream' and 'file_cache' can not co-exist and config file shall have only one of them based on your use case.
+#   3. 'stream', 'block-cache', and 'file_cache' can not co-exist and config file shall have only one of them based on your use case.
 #   4. By default log level is set to 'log_warning' level and are redirected to syslog.
 #      Either use 'base' logging or syslog filters to redirect logs to separate file.
 #      To install syslog filter follow below steps:
@@ -86,9 +86,11 @@ stream:
 
 # Xload configuration
 xload:
+  block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   path: <path to local disk cache where downloaded files will be stored>
-  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.blobfuse2/xload_stats_{PID}.json'. Default - not exported>
+  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.cloudfuse/xload_stats_{PID}.json'. Default - not exported>
   validate-md5: <if md5 sum is present in the blob, validate it post download. Default - false>
+  cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
 
 # Block cache related configuration
 block_cache:
@@ -99,6 +101,7 @@ block_cache:
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
   parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores>
+  cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty. Default - false>
   prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
 
 # Disk cache related configuration
