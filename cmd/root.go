@@ -329,6 +329,10 @@ func Execute() error {
 }
 
 func init() {
+	cobra.OnInitialize(func() {
+		// set logger to stdout by default (and avoid nil deref panics!)
+		log.SetDefaultLogger("", common.LogConfig{})
+	})
 	rootCmd.PersistentFlags().
 		BoolVar(&disableVersionCheck, "disable-version-check", false, "To disable version check that is performed automatically")
 }
