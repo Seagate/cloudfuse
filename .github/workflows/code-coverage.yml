@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   BuildAndTest-Coverage:
+    name: Build and Test with Code Coverage
     strategy:
       matrix:
         go: ["1.25"]
@@ -57,7 +58,8 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - run: go version
+      - name: Go Version
+        run: go version
 
       - name: Install libfuse
         env:
@@ -1053,6 +1055,7 @@ jobs:
         run: "./test/scripts/coveragecheck.sh file"
 
   BuildAndTest-Coverage-Windows:
+    name: Build and Test with Code Coverage on Windows
     strategy:
       matrix:
         go: ["1.25"]
@@ -1090,7 +1093,8 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - run: go version
+      - name: Go Version
+        run: go version
 
       # From rclone github repo under MIT license
       # https://github.com/rclone/rclone/blob/master/.github/workflows/build.yml
@@ -1976,6 +1980,7 @@ jobs:
     needs:
       - BuildAndTest-Coverage
       - BuildAndTest-Coverage-Windows
+    name: Cleanup Test Accounts
     strategy:
       matrix:
         go: ["1.25"]
@@ -2001,7 +2006,9 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - run: go version
+
+      - name: Go Version
+        run: go version
 
       - name: Install dependency
         env:

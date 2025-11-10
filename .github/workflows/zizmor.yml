@@ -7,12 +7,16 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   zizmor:
     name: zizmor latest via PyPI
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
+      security-events: write # Needed to upload the analysis results
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
