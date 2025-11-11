@@ -35,7 +35,7 @@ require (
 	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/crypto v0.43.0
-	golang.org/x/sys v0.37.0
+	golang.org/x/sys v0.38.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 )
