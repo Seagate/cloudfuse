@@ -6,6 +6,10 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   create-installer:
     # Run Inno Setup to create the Windows app installer, then write it to actions/cache
@@ -64,7 +68,7 @@ jobs:
           WINFSP: ${{ env.winfsp }}
         run: |
           curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
-      
+
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -108,8 +112,8 @@ jobs:
       go: "1.25"
       zig: 0.15.1
     permissions:
-      contents: write
-      id-token: write
+      contents: write # Needed to create releases
+      id-token: write # Needed for signing with Cosign
 
     steps:
       # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
@@ -172,7 +176,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Needed to update gh-pages branch
 
     steps:
       - name: Install dependencies

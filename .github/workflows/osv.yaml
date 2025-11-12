@@ -14,27 +14,31 @@ permissions: {}
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   merge_group:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
-    - cron: '17 23 * * 3'
+    - cron: "17 23 * * 3"
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   scan-scheduled:
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9bb69575e74019c2ad085a1860787043adf47ccb" # v2.2.4
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read # Needed for analysis of GitHub Actions workflows
+      contents: read # To clone and analyze the code
+      security-events: write # To upload the analysis results
 
   scan-pr:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9bb69575e74019c2ad085a1860787043adf47ccb" # v2.2.4
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read # Needed for analysis of GitHub Actions workflows
+      contents: read # To clone and analyze the code
+      security-events: write # To upload the analysis results

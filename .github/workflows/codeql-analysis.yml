@@ -18,6 +18,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze
@@ -28,8 +32,8 @@ jobs:
         language: ["go", "python", "actions"]
         os: [ubuntu-latest, windows-latest]
         exclude:
-        - os:  windows-latest
-          language: actions
+          - os: windows-latest
+            language: actions
         # CodeQL supports [ 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'swift' ]
         # Use only 'java-kotlin' to analyze code written in Java, Kotlin or both
         # Use only 'javascript-typescript' to analyze code written in JavaScript, TypeScript or both
@@ -37,9 +41,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read # Needed for analysis of GitHub Actions workflows
+      contents: read # To clone and analyze the code
+      security-events: write # To upload the analysis results
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
