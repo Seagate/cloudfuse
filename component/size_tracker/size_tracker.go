@@ -97,7 +97,7 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	st.totalBucketCapacity = conf.TotalBucketCapacity
+	st.totalBucketCapacity = conf.TotalBucketCapacity * common.MbToBytes
 
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
