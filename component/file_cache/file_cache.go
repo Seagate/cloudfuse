@@ -357,8 +357,8 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	fc.diskHighWaterMark = 0
-	if conf.HardLimit && conf.MaxSizeMB != 0 {
-		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
+	if fc.hardLimit && fc.maxCacheSize != 0 {
+		fc.diskHighWaterMark = (((fc.maxCacheSize * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
 	if config.IsSet(compName + ".schedule") {
@@ -1290,7 +1290,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// check if we are running out of space
-	if downloadRequired && cloudAttr != nil {
+	if cloudAttr != nil {
 		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)
