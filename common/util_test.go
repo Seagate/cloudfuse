@@ -559,49 +559,49 @@ func (s *utilTestSuite) TestComponentExists() {
 
 func (s *utilTestSuite) TestValidatePipeline() {
 	err := ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "azstorage"})
-	s.Error(err)
+	s.Assert().Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "xload", "azstorage"})
-	s.Error(err)
+	s.Assert().Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "block_cache", "xload", "azstorage"})
-	s.Error(err)
+	s.Assert().Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "xload", "azstorage"})
-	s.Error(err)
+	s.Assert().Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "azstorage"})
-	s.NoError(err)
+	s.Assert().NoError(err)
 
 	err = ValidatePipeline([]string{"libfuse", "block_cache", "azstorage"})
-	s.NoError(err)
+	s.Assert().NoError(err)
 
 	err = ValidatePipeline([]string{"libfuse", "xload", "attr_cache", "azstorage"})
-	s.NoError(err)
+	s.Assert().NoError(err)
 }
 
 func (s *utilTestSuite) TestUpdatePipeline() {
 	pipeline := UpdatePipeline([]string{"libfuse", "file_cache", "azstorage"}, "xload")
 	s.NotNil(pipeline)
 	s.False(ComponentInPipeline(pipeline, "file_cache"))
-	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+	s.Assert().Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "block_cache", "azstorage"}, "xload")
 	s.NotNil(pipeline)
 	s.False(ComponentInPipeline(pipeline, "block_cache"))
-	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+	s.Assert().Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "file_cache", "azstorage"}, "block_cache")
 	s.NotNil(pipeline)
 	s.False(ComponentInPipeline(pipeline, "file_cache"))
-	s.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
+	s.Assert().Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "xload", "azstorage"}, "block_cache")
 	s.NotNil(pipeline)
 	s.False(ComponentInPipeline(pipeline, "xload"))
-	s.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
+	s.Assert().Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "xload", "azstorage"}, "xload")
 	s.NotNil(pipeline)
-	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+	s.Assert().Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
 }

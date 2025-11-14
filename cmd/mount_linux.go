@@ -41,6 +41,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -63,6 +64,11 @@ func createDaemon(
 	umask int,
 	fname string,
 ) error {
+	pid := os.Getpid()
+	traceFile := fmt.Sprintf("%s.%d.trace", strings.ReplaceAll(options.MountPath, "/", "_"), pid)
+	// we link this file to stderr of child process in daemon mode
+	traceFilePath := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), traceFile)
+
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
 		PidFilePerm: pidFilePerm,
@@ -92,7 +98,7 @@ retry:
 		rmErr := os.Remove(pidFileName)
 		if rmErr != nil {
 			log.Err("mount : auto cleanup failed [%v]", rmErr.Error())
-			return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
+			return fmt.Errorf("failed to daemonize application [%s]", err.Error())
 		}
 		goto retry
 	}
@@ -151,9 +157,15 @@ retry:
 			buff, err := os.ReadFile(dmnCtx.LogFileName)
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
-				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
+				err = fmt.Errorf("failed to mount, please check logs [%s]", err.Error())
 			} else {
-				return Destroy(string(buff))
+				err = fmt.Errorf("%s", string(buff))
+			}
+
+			// Safe to delete the temp file.
+			rmErr := os.Remove(traceFilePath)
+			if rmErr != nil {
+				log.Err("mount : Failed to delete temp file: %s[%v]", traceFilePath, err)
 			}
 
 		case <-time.After(options.WaitForMount):
