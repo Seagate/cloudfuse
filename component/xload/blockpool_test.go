@@ -143,7 +143,7 @@ func (suite *blockpoolTestSuite) TestBlockPoolBufferExhaution() {
 	suite.assert.EqualValues(1, bp.blockSize)
 
 	var blocks []*Block
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		b := bp.GetBlock(true)
 		suite.assert.NotNil(b)
 		blocks = append(blocks, b)
