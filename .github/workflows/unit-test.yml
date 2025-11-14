@@ -14,12 +14,17 @@ on:
         required: true
         default: true
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   linux-unit-test:
     name: Build and Test on Linux
     strategy:
       matrix:
-        job_name: ["linux-fuse3", "linux-fuse2", "linux-fuse3-arm", "linux-fuse2-arm"]
+        job_name:
+          ["linux-fuse3", "linux-fuse2", "linux-fuse3-arm", "linux-fuse2-arm"]
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
