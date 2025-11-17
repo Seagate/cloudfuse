@@ -268,7 +268,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	fc.refreshSec = conf.RefreshSec
-	fc.hardLimit = conf.HardLimit
+	fc.hardLimit = true
 
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
@@ -352,14 +352,17 @@ func (fc *FileCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
 	}
+	if config.IsSet(compName + ".hard-limit") {
+		fc.hardLimit = conf.HardLimit
+	}
 
 	fc.diskHighWaterMark = 0
-	if conf.HardLimit && conf.MaxSizeMB != 0 {
-		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
+	if fc.hardLimit && fc.maxCacheSize != 0 {
+		fc.diskHighWaterMark = (((fc.maxCacheSize * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
 	if config.IsSet(compName + ".schedule") {
-		var rawSchedule []map[string]interface{}
+		var rawSchedule []map[string]any
 		err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
 		if err != nil {
 			log.Err(
@@ -468,7 +471,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
 		cacheTimeout:  uint32(fc.cacheTimeout),
-		maxSizeMB:     conf.MaxSizeMB,
+		maxSizeMB:     fc.maxCacheSize,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 	}
@@ -1177,7 +1180,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					err.Error(),
 				)
 				_ = f.Close()
-				_ = os.Remove(localPath)
+				err = os.Remove(localPath)
+				if err != nil {
+					log.Err(
+						"FileCache::openFileInternal : Failed to remove file %s [%s]",
+						localPath,
+						err.Error(),
+					)
+				}
 				return err
 			}
 		}
@@ -1280,7 +1290,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// check if we are running out of space
-	if downloadRequired && cloudAttr != nil {
+	if cloudAttr != nil {
 		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)

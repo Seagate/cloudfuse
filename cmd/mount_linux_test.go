@@ -32,6 +32,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -138,6 +139,14 @@ func (suite *mountTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
+	}
+}
+
+func (suite *mountTestSuite) SetupSuite() {
+	out, err := executeCommandC(rootCmd, "mount")
+	strings.Contains(out, "accepts 1 arg(s), received 0")
+	if err == nil {
+		panic("Unable to parse the empty flags to mount command")
 	}
 }
 

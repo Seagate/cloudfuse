@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -231,9 +232,7 @@ func populateContentType(newSet string) error { //nolint
 	// We can simply append the new data to end of the map
 	// however there may be conflicting keys and hence we need to merge manually
 	//ContentTypeMap = append(ContentTypeMap, data)
-	for k, v := range data {
-		ContentTypes[k] = v
-	}
+	maps.Copy(ContentTypes, data)
 	return nil
 }
 
