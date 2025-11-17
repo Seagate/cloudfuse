@@ -2021,13 +2021,13 @@ jobs:
         run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
         env:
           STORAGE_ACCOUNT_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          STORAGE_ACCOUNT_Key: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STORAGE_ACCOUNT_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
 
       - name: Cleanup Datalake Storage
         run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
         env:
           STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          STORAGE_ACCOUNT_Key: "${{ secrets.AZTEST_ADLS_KEY }}"
+          STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
 
       - name: Cleanup S3 Storage
         run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
