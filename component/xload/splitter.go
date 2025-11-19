@@ -165,8 +165,11 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 		log.Err("downloadSplitter::Process : Failed to create file %s [%s]", item.Path, err.Error())
 		return -1, fmt.Errorf("failed to open file %s [%s]", item.Path, err.Error())
 	}
-
-	defer item.FileHandle.Close()
+	defer func() {
+		if err := item.FileHandle.Close(); err != nil {
+			log.Err("downloadSplitter::Process : error closing transfer pipe [%v]", err)
+		}
+	}()
 
 	if item.DataLen == 0 {
 		log.Debug("downloadSplitter::Process : 0 byte file %s", item.Path)
