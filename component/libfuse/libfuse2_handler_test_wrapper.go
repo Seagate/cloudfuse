@@ -431,7 +431,7 @@ func testFTruncate(suite *libfuseTestSuite) {
 	handle := handlemap.NewHandle(name)
 	fh := handlemap.Add(handle)
 
-	options := internal.TruncateFileOptions{Handle: handle, Name: name, NewSize: size}
+	options := internal.TruncateFileOptions{Handle: handle, Name: name, OldSize: -1, NewSize: size}
 	suite.mock.EXPECT().TruncateFile(options).Return(nil)
 
 	err := cfuseFS.Truncate(path, size, uint64(fh))
@@ -447,7 +447,7 @@ func testFTruncateError(suite *libfuseTestSuite) {
 	handle := handlemap.NewHandle(name)
 	fh := handlemap.Add(handle)
 
-	options := internal.TruncateFileOptions{Handle: handle, Name: name, NewSize: size}
+	options := internal.TruncateFileOptions{Handle: handle, Name: name, OldSize: -1, NewSize: size}
 	suite.mock.EXPECT().TruncateFile(options).Return(errors.New("failed to truncate file"))
 
 	err := cfuseFS.Truncate(path, size, uint64(fh))

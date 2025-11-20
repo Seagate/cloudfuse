@@ -138,7 +138,10 @@ func (suite *dataValidationTestSuite) computeMD5(filePath string) []byte {
 	return hash.Sum(nil)
 }
 
-func (suite *dataValidationTestSuite) helperValidateFileContent(localFilePath string, remoteFilePath string) {
+func (suite *dataValidationTestSuite) helperValidateFileContent(
+	localFilePath string,
+	remoteFilePath string,
+) {
 	// check if file sizes are same
 	localFileInfo, err := os.Stat(localFilePath)
 	suite.NoError(err)
@@ -151,7 +154,11 @@ func (suite *dataValidationTestSuite) helperValidateFileContent(localFilePath st
 	suite.Equal(localMD5sum, remoteMD5sum)
 }
 
-func (suite *dataValidationTestSuite) helperCreateFile(localFilePath string, remoteFilePath string, size int64) {
+func (suite *dataValidationTestSuite) helperCreateFile(
+	localFilePath string,
+	remoteFilePath string,
+	size int64,
+) {
 	buffer := make([]byte, 1*1024*1024)
 	rand.Read(buffer)
 
@@ -182,7 +189,11 @@ func (suite *dataValidationTestSuite) helperCreateFile(localFilePath string, rem
 	suite.NoError(err)
 }
 
-func (suite *dataValidationTestSuite) helperTruncateFile(localFilePath string, remoteFilePath string, size int64) {
+func (suite *dataValidationTestSuite) helperTruncateFile(
+	localFilePath string,
+	remoteFilePath string,
+	size int64,
+) {
 	srcFile, err := os.OpenFile(localFilePath, os.O_RDWR, 0666)
 	suite.NoError(err)
 	err = srcFile.Truncate(size)
@@ -199,7 +210,12 @@ func (suite *dataValidationTestSuite) helperTruncateFile(localFilePath string, r
 	suite.NoError(err)
 }
 
-func (suite *dataValidationTestSuite) helperWriteToFile(localFilePath string, remoteFilePath string, offset int64, size int) {
+func (suite *dataValidationTestSuite) helperWriteToFile(
+	localFilePath string,
+	remoteFilePath string,
+	offset int64,
+	size int,
+) {
 	buffer := make([]byte, 1*1024*1024)
 
 	localFile, err := os.OpenFile(localFilePath, os.O_RDWR, 0666)

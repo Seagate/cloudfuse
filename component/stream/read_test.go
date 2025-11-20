@@ -116,9 +116,9 @@ func (suite *streamTestSuite) getRequestOptions(
 	} else {
 		data = make([]byte, endIndex-offset)
 	}
-	readInBufferOptions := internal.ReadInBufferOptions{Handle: handle, Offset: offset, Data: data}
+	readInBufferOptions := &internal.ReadInBufferOptions{Handle: handle, Offset: offset, Data: data}
 
-	return openFileOptions, &readInBufferOptions, &data
+	return openFileOptions, readInBufferOptions, &data
 }
 
 // return data buffer populated with data of the given size

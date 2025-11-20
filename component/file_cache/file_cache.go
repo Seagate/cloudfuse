@@ -2020,13 +2020,20 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		// flushed to storage on close.
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			log.Err("FileCache::TruncateFile : error [couldn't find fd in handle] %s", options.Handle.Path)
+			log.Err(
+				"FileCache::TruncateFile : error [couldn't find fd in handle] %s",
+				options.Handle.Path,
+			)
 			return syscall.EBADF
 		}
 
 		err := f.Truncate(options.NewSize)
 		if err != nil {
-			log.Err("FileCache::TruncateFile : error truncating file %s [%s]", options.Handle.Path, err.Error())
+			log.Err(
+				"FileCache::TruncateFile : error truncating file %s [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
 			return err
 		}
 

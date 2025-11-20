@@ -259,7 +259,7 @@ func (suite *streamTestSuite) TestCacheSmallFileFilenameOnOpen() {
 		Mode:  os.FileMode(0777),
 	}
 	getFileBlockOffsetsOptions = internal.GetFileBlockOffsetsOptions{Name: fileNames[1]}
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1),
@@ -438,12 +438,12 @@ func (suite *streamTestSuite) TestFilenameReadLargeFileBlocks() {
 		Data:   make([]byte, 7),
 	}
 
-	suite.mock.EXPECT().ReadInBuffer(internal.ReadInBufferOptions{
+	suite.mock.EXPECT().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: handle1,
 		Offset: 0,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
 
-	suite.mock.EXPECT().ReadInBuffer(internal.ReadInBufferOptions{
+	suite.mock.EXPECT().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: handle1,
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
@@ -472,7 +472,7 @@ func (suite *streamTestSuite) TestFilenamePurgeOnClose() {
 		BlockList: []*common.Block{},
 	}
 	bol.Flags.Set(common.BlobFlagHasNoBlocks)
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1),
@@ -480,7 +480,9 @@ func (suite *streamTestSuite) TestFilenamePurgeOnClose() {
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
 	suite.mock.EXPECT().GetFileBlockOffsets(getFileBlockOffsetsOptions).Return(bol, nil)
-	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(len(readInBufferOptions.Data), nil)
+	suite.mock.EXPECT().
+		ReadInBuffer(readInBufferOptions).
+		Return(len(readInBufferOptions.Data), nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)
 
 	assertBlockCached(suite, 0, handle)
@@ -513,7 +515,7 @@ func (suite *streamTestSuite) TestFilenameWriteToSmallFileEviction() {
 		BlockList: []*common.Block{},
 	}
 	bol.Flags.Set(common.BlobFlagHasNoBlocks)
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1*MB),
@@ -684,7 +686,7 @@ func (suite *streamTestSuite) TestFilenameStreamOnly2() {
 	}
 
 	suite.mock.EXPECT().GetFileBlockOffsets(getFileBlockOffsetsOptions2).Return(bol, nil)
-	suite.mock.EXPECT().ReadInBuffer(internal.ReadInBufferOptions{
+	suite.mock.EXPECT().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: handle2,
 		Offset: 0,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)

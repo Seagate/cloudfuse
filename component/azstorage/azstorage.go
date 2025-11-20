@@ -502,7 +502,11 @@ func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 	err := az.storage.TruncateFile(options)
 
 	if err == nil {
-		azStatsCollector.PushEvents(truncateFile, options.Name, map[string]any{size: options.NewSize})
+		azStatsCollector.PushEvents(
+			truncateFile,
+			options.Name,
+			map[string]any{size: options.NewSize},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
 	return err
