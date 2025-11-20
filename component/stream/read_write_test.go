@@ -241,7 +241,7 @@ func (suite *streamTestSuite) TestCacheSmallFileOnOpen() {
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
-	bol.Flags.Set(common.SmallFile)
+	bol.Flags.Set(common.BlobFlagHasNoBlocks)
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
 	suite.mock.EXPECT().GetFileBlockOffsets(getFileBlockOffsetsOptions).Return(bol, nil)
@@ -259,7 +259,7 @@ func (suite *streamTestSuite) TestCacheSmallFileOnOpen() {
 		Mode:  os.FileMode(0777),
 	}
 	getFileBlockOffsetsOptions = internal.GetFileBlockOffsetsOptions{Name: fileNames[1]}
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1),
@@ -301,7 +301,7 @@ func (suite *streamTestSuite) TestReadInBuffer() {
 	_, _ = suite.stream.OpenFile(openFileOptions)
 
 	// get second block
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 2*MB),
@@ -392,7 +392,7 @@ func (suite *streamTestSuite) TestStreamOnly() {
 	_, err := suite.stream.OpenFile(openFileOptions)
 	suite.assert.Error(err)
 
-	writeFileOptions := internal.WriteFileOptions{
+	writeFileOptions := &internal.WriteFileOptions{
 		Handle: handle,
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB),
@@ -432,18 +432,18 @@ func (suite *streamTestSuite) TestReadLargeFileBlocks() {
 	assertHandleNotStreamOnly(suite, handle1)
 
 	// data spans two blocks
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle1,
 		Offset: 1*MB - 2,
 		Data:   make([]byte, 7),
 	}
 
-	suite.mock.EXPECT().ReadInBuffer(internal.ReadInBufferOptions{
+	suite.mock.EXPECT().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: handle1,
 		Offset: 0,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
 
-	suite.mock.EXPECT().ReadInBuffer(internal.ReadInBufferOptions{
+	suite.mock.EXPECT().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: handle1,
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
@@ -471,8 +471,8 @@ func (suite *streamTestSuite) TestPurgeOnClose() {
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
-	bol.Flags.Set(common.SmallFile)
-	readInBufferOptions := internal.ReadInBufferOptions{
+	bol.Flags.Set(common.BlobFlagHasNoBlocks)
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1),
@@ -512,8 +512,8 @@ func (suite *streamTestSuite) TestWriteToSmallFileEviction() {
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
-	bol.Flags.Set(common.SmallFile)
-	readInBufferOptions := internal.ReadInBufferOptions{
+	bol.Flags.Set(common.BlobFlagHasNoBlocks)
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1*MB),
@@ -527,7 +527,7 @@ func (suite *streamTestSuite) TestWriteToSmallFileEviction() {
 	assertNumberOfCachedFileBlocks(suite, 1, handle)
 
 	// append new block and confirm old gets evicted
-	writeFileOptions := internal.WriteFileOptions{
+	writeFileOptions := &internal.WriteFileOptions{
 		Handle: handle,
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB),
@@ -562,7 +562,7 @@ func (suite *streamTestSuite) TestLargeFileEviction() {
 		BlockList:     []*common.Block{block1, block2},
 		BlockIdLength: 10,
 	}
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 0,
 		Data:   make([]byte, 1*MB),
@@ -579,7 +579,7 @@ func (suite *streamTestSuite) TestLargeFileEviction() {
 	assertNumberOfCachedFileBlocks(suite, 1, handle)
 
 	// get second block
-	readInBufferOptions = internal.ReadInBufferOptions{
+	readInBufferOptions = &internal.ReadInBufferOptions{
 		Handle: handle,
 		Offset: 1 * MB,
 		Data:   make([]byte, 1*MB),
@@ -592,7 +592,7 @@ func (suite *streamTestSuite) TestLargeFileEviction() {
 	assertNumberOfCachedFileBlocks(suite, 2, handle)
 
 	// write to second block
-	writeFileOptions := internal.WriteFileOptions{
+	writeFileOptions := &internal.WriteFileOptions{
 		Handle: handle,
 		Offset: 1*MB + 2,
 		Data:   make([]byte, 2),
@@ -676,14 +676,14 @@ func (suite *streamTestSuite) TestStreamOnlyHandle() {
 	_ = suite.stream.CloseFile(closeFileOptions)
 
 	// get block for second handle and confirm it gets cached
-	readInBufferOptions := internal.ReadInBufferOptions{
+	readInBufferOptions := &internal.ReadInBufferOptions{
 		Handle: handle2,
 		Offset: 0,
 		Data:   make([]byte, 4),
 	}
 
 	suite.mock.EXPECT().GetFileBlockOffsets(getFileBlockOffsetsOptions).Return(bol, nil)
-	suite.mock.EXPECT().ReadInBuffer(internal.ReadInBufferOptions{
+	suite.mock.EXPECT().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: handle2,
 		Offset: 0,
 		Data:   make([]byte, 1*MB)}).Return(len(readInBufferOptions.Data), nil)
@@ -706,7 +706,7 @@ func (suite *streamTestSuite) TestCreateFile() {
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
-	bol.Flags.Set(common.SmallFile)
+	bol.Flags.Set(common.BlobFlagHasNoBlocks)
 
 	suite.mock.EXPECT().CreateFile(createFileoptions).Return(handle1, nil)
 	_, _ = suite.stream.CreateFile(createFileoptions)

@@ -262,7 +262,7 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFile() {
 	assert.NoFileExists(filepath.Join(testPath, fileEmpty))
 
 	n, err := suite.lfs.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]},
 	)
 	assert.NoError(err)
 	assert.Equal(5, n, "TestRenameWriteFile: failed to write the specified number of bytes")
@@ -291,7 +291,7 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFileGetAttr() {
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
 
 	n, err := suite.lfs.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]},
 	)
 	assert.NoError(err)
 	assert.Equal(5, n, "TestRenameWriteFile: failed to write the specified number of bytes")
@@ -346,7 +346,7 @@ func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 
 	for _, testCase := range testCases {
 		n, err := suite.lfs.ReadInBuffer(
-			internal.ReadInBufferOptions{
+			&internal.ReadInBufferOptions{
 				Handle: handle,
 				Offset: testCase.offset,
 				Data:   testCase.data,
@@ -380,7 +380,7 @@ func (suite *LoopbackFSTestSuite) TestWriteFile() {
 	assert.NotNil(handle)
 
 	n, err := suite.lfs.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]},
 	)
 	assert.NoError(err)
 	assert.Equal(5, n, "WriteFile: failed to write the specified number of bytes")
@@ -390,7 +390,7 @@ func (suite *LoopbackFSTestSuite) TestWriteFile() {
 	assert.EqualValues(5, attr.Size)
 
 	n, err = suite.lfs.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 5, Data: []byte(quotesText)[5:]},
+		&internal.WriteFileOptions{Handle: handle, Offset: 5, Data: []byte(quotesText)[5:]},
 	)
 	assert.NoError(err)
 	assert.Len([]byte(quotesText)[5:], n, "WriteFile: failed to write specified number of bytes")
@@ -413,7 +413,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateFile() {
 	assert.NoError(err, "TruncateFile: failed to open file")
 	assert.NotNil(handle)
 
-	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, Size: 10})
+	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, NewSize: 10})
 	assert.NoError(err)
 	info, err := os.Stat(filepath.Join(testPath, fileLorem))
 	assert.NoError(err, "TruncateFile: cannot stat file")
@@ -436,7 +436,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateClosedFile() {
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
 	assert.NoError(err, "TruncateFile: Failed to close file")
 
-	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, Size: 10})
+	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, NewSize: 10})
 	assert.NoError(err)
 	info, err := os.Stat(filepath.Join(testPath, fileLorem))
 	assert.NoError(err, "TruncateFile: cannot stat file")
