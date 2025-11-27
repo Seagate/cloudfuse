@@ -25,6 +25,7 @@
 package size_tracker
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -81,16 +82,10 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 	_ = f.Close()
 
 	ms := &MountSize{
-		journalPath: common.ExpandPath(common.DefaultWorkDir) + "/" + filename,
-		flushTicker: time.NewTicker(10 * time.Second),
-		stopCh:      make(chan struct{}),
+		journalPath: filename,
 	}
 	ms.size.Store(initialSize)
 	ms.lastJournaledSize.Store(initialSize)
-
-	// Use a wait group to ensure that the background close finishes before the go routine ends
-	ms.wg.Add(1)
-	go ms.runJournalWriter()
 
 	return ms, nil
 }
@@ -148,7 +143,17 @@ func (ms *MountSize) Subtract(delta uint64) uint64 {
 	}
 }
 
-func (ms *MountSize) CloseFile() error {
+func (ms *MountSize) Start(ctx context.Context) {
+	// start listening for the flush ticker
+	// Use a wait group to ensure that the background close finishes before the go routine ends
+	ms.wg.Add(1)
+	go ms.runJournalWriter()
+	// start ticker
+	ms.flushTicker = time.NewTicker(10 * time.Second)
+	ms.stopCh = make(chan struct{})
+}
+
+func (ms *MountSize) Stop() error {
 	close(ms.stopCh)
 	ms.flushTicker.Stop()
 	ms.wg.Wait()
