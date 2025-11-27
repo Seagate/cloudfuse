@@ -73,13 +73,14 @@ func (st *SizeTracker) SetNextComponent(nc internal.Component) {
 //	this shall not block the call otherwise pipeline will not start
 func (st *SizeTracker) Start(ctx context.Context) error {
 	log.Trace("SizeTracker::Start : Starting component %s", st.Name())
+	st.mountSize.Start()
 	return nil
 }
 
 // Stop : Stop the component functionality and kill all threads started
 func (st *SizeTracker) Stop() error {
 	log.Trace("SizeTracker::Stop : Stopping component %s", st.Name())
-	_ = st.mountSize.CloseFile()
+	_ = st.mountSize.Stop()
 	return nil
 }
 

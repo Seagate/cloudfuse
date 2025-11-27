@@ -79,16 +79,8 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 		initialSize = binary.BigEndian.Uint64(buf)
 	}
 
-	ms := &MountSize{
-		file:        f,
-		flushTicker: time.NewTicker(10 * time.Second),
-		stopCh:      make(chan struct{}),
-	}
+	ms := &MountSize{file: f}
 	ms.size.Store(initialSize)
-
-	// Use a wait group to ensure that the background close finishes before the go routine ends
-	ms.wg.Add(1)
-	go ms.runJournalWriter()
 
 	return ms, nil
 }
@@ -136,7 +128,15 @@ func (ms *MountSize) Subtract(delta uint64) uint64 {
 	}
 }
 
-func (ms *MountSize) CloseFile() error {
+func (ms *MountSize) Start() {
+	ms.flushTicker = time.NewTicker(10 * time.Second)
+	ms.stopCh = make(chan struct{})
+	// Use a wait group to ensure that the background close finishes before the go routine ends
+	ms.wg.Add(1)
+	go ms.runJournalWriter()
+}
+
+func (ms *MountSize) Stop() error {
 	close(ms.stopCh)
 	ms.flushTicker.Stop()
 	ms.wg.Wait()
