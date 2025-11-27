@@ -144,13 +144,14 @@ func (ms *MountSize) Subtract(delta uint64) uint64 {
 }
 
 func (ms *MountSize) Start(ctx context.Context) {
+	// create stop signal
+	ms.stopCh = make(chan struct{})
+	// start ticker
+	ms.flushTicker = time.NewTicker(10 * time.Second)
 	// start listening for the flush ticker
 	// Use a wait group to ensure that the background close finishes before the go routine ends
 	ms.wg.Add(1)
 	go ms.runJournalWriter()
-	// start ticker
-	ms.flushTicker = time.NewTicker(10 * time.Second)
-	ms.stopCh = make(chan struct{})
 }
 
 func (ms *MountSize) Stop() error {
