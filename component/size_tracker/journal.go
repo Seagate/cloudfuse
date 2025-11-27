@@ -25,7 +25,6 @@
 package size_tracker
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -143,7 +142,7 @@ func (ms *MountSize) Subtract(delta uint64) uint64 {
 	}
 }
 
-func (ms *MountSize) Start(ctx context.Context) {
+func (ms *MountSize) Start() {
 	// create stop signal
 	ms.stopCh = make(chan struct{})
 	// start ticker

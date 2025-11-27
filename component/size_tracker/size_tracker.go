@@ -73,7 +73,7 @@ func (st *SizeTracker) SetNextComponent(nc internal.Component) {
 //	this shall not block the call otherwise pipeline will not start
 func (st *SizeTracker) Start(ctx context.Context) error {
 	log.Trace("SizeTracker::Start : Starting component %s", st.Name())
-	st.mountSize.Start(ctx)
+	st.mountSize.Start()
 	return nil
 }
 

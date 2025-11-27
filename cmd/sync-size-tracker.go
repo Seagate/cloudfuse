@@ -123,6 +123,7 @@ var syncCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open size journal: %w", err)
 		}
+		ms.Start()
 		defer func() { _ = ms.Stop() }()
 
 		current := ms.GetSize()
