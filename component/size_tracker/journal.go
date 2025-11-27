@@ -159,8 +159,15 @@ func (ms *MountSize) CloseFile() error {
 // NOTE: Uses Unix advisory locks (flock). For Windows portability, an OS-specific lock
 // implementation should be added.
 func (ms *MountSize) applyDeltaLocked(delta int64) error {
-	// Open the journal file with a short-lived handle and lock it exclusively
-	f, err := os.OpenFile(ms.journalPath, os.O_CREATE|os.O_RDWR, 0644)
+	// Open the journal file via OpenRoot to match CreateSizeJournal's path handling
+	root, err := os.OpenRoot(common.ExpandPath(common.DefaultWorkDir))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	// Short-lived handle and lock it exclusively
+	f, err := root.OpenFile(ms.journalPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
