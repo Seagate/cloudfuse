@@ -31,6 +31,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/sys/windows"
 )
 
 type Mount struct {
@@ -46,12 +48,20 @@ const mountFile = "mounts.json"
 
 func getAppDataFolder(useSystem bool) (string, error) {
 	if useSystem {
-		systemRoot := os.Getenv("SystemRoot")
-		if systemRoot == "" {
+		systemRoot, err := windows.GetWindowsDirectory()
+		if err != nil {
 			return "", errors.New("Could not find system root")
 		}
 		systemRoot = filepath.Clean(systemRoot)
-		fullPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", "AppData", "Roaming", "Cloudfuse")
+		fullPath := filepath.Join(
+			systemRoot,
+			"System32",
+			"config",
+			"systemprofile",
+			"AppData",
+			"Roaming",
+			"Cloudfuse",
+		)
 		return fullPath, nil
 	}
 
