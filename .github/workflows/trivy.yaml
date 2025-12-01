@@ -7,13 +7,13 @@ name: trivy
 permissions: {}
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
     inputs:
       run:
-        description: 'Run the workflow'
+        description: "Run the workflow"
         required: true
         default: true
-        type: boolean 
+        type: boolean
   push:
     branches:
       - main
@@ -22,16 +22,20 @@ on:
     # every Monday at 7:31pm
     - cron: "31 19 * * 1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   scan:
     name: Build
     runs-on: "ubuntu-latest"
     permissions:
-      security-events: write
+      security-events: write # Needed to upload the analysis results
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           persist-credentials: false
 
@@ -56,6 +60,6 @@ jobs:
           exit-code: 1
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
+        uses: github/codeql-action/upload-sarif@014f16e7ab1402f30e7c3329d33797e7948572db # v4.31.3
         with:
           sarif_file: "trivy-results.sarif"

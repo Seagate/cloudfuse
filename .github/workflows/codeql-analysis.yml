@@ -18,6 +18,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze
@@ -28,8 +32,8 @@ jobs:
         language: ["go", "python", "actions"]
         os: [ubuntu-latest, windows-latest]
         exclude:
-        - os:  windows-latest
-          language: actions
+          - os: windows-latest
+            language: actions
         # CodeQL supports [ 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'swift' ]
         # Use only 'java-kotlin' to analyze code written in Java, Kotlin or both
         # Use only 'javascript-typescript' to analyze code written in JavaScript, TypeScript or both
@@ -37,23 +41,23 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read # Needed for analysis of GitHub Actions workflows
+      contents: read # To clone and analyze the code
+      security-events: write # To upload the analysis results
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           persist-credentials: false
 
       # Install latest version of Go. Codeql runs on an older version of go
       - name: Install Go
         if: matrix.language == 'go'
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: "1.25"
           check-latest: true
@@ -69,7 +73,7 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
+        uses: github/codeql-action/init@014f16e7ab1402f30e7c3329d33797e7948572db # v4.31.3
         with:
           languages: ${{ matrix.language }}
           # If you wish to specify custom queries, you can do so here or in a config file.
@@ -103,6 +107,6 @@ jobs:
           ./build.sh
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
+        uses: github/codeql-action/analyze@014f16e7ab1402f30e7c3329d33797e7948572db # v4.31.3
         with:
           category: "/language:${{matrix.language}}"
