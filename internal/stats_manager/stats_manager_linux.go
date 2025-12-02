@@ -54,7 +54,11 @@ func (sc *StatsCollector) statsDumper() {
 		disableMonitoring()
 		return
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Err("stats_manager::statsDumper : error when closing transfer pipe [%v]", err)
+		}
+	}()
 
 	log.Info("stats_manager::statsDumper : opened transfer pipe file")
 
@@ -163,7 +167,11 @@ func statsPolling() {
 		disableMonitoring()
 		return
 	}
-	defer tf.Close()
+	defer func() {
+		if err := tf.Close(); err != nil {
+			log.Err("stats_manager::statsPolling : error closing transfer pipe [%v]", err)
+		}
+	}()
 
 	log.Info("stats_manager::statsPolling : opened transfer pipe file")
 

@@ -89,7 +89,11 @@ func (cfs *CloudfuseStats) statsPoll() {
 		log.Err("StatsReader::statsPoll : unable to open pipe file [%v]", err)
 		return
 	}
-	defer pf.Close()
+	defer func() {
+		if err := pf.Close(); err != nil {
+			log.Err("StatsReader::statsPoll : Error when closing pipe file [%v]", err)
+		}
+	}()
 
 	ticker := time.NewTicker(time.Duration(cfs.pollInterval) * time.Second)
 	defer ticker.Stop()
