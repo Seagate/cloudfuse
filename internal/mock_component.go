@@ -121,6 +121,20 @@ func (mr *MockComponentMockRecorder) CloseFile(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseFile", reflect.TypeOf((*MockComponent)(nil).CloseFile), arg0)
 }
 
+// CloudConnected mocks base method.
+func (m *MockComponent) CloudConnected() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloudConnected")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// CloudConnected indicates an expected call of CloudConnected.
+func (mr *MockComponentMockRecorder) CloudConnected() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloudConnected", reflect.TypeOf((*MockComponent)(nil).CloudConnected))
+}
+
 // Configure mocks base method.
 func (m *MockComponent) Configure(arg0 bool) error {
 	m.ctrl.T.Helper()

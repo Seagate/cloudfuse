@@ -28,6 +28,7 @@ package file_cache
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -45,7 +46,8 @@ type cachePolicyConfig struct {
 	highThreshold float64
 	lowThreshold  float64
 
-	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
+	fileLocks  *common.LockMap // uses object name (common.JoinUnixFilepath)
+	pendingOps *sync.Map
 
 	policyTrace bool
 }

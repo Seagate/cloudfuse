@@ -448,6 +448,37 @@ func (s *s3StorageTestSuite) TestListBuckets() {
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 
+func (s *s3StorageTestSuite) TestCloudConnected() {
+	defer s.cleanupTest()
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
+func (s *s3StorageTestSuite) TestUpdateConnectionState() {
+	defer s.cleanupTest()
+	connected := s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(connected)
+	s.assert.False(s.s3Storage.CloudConnected())
+	connected = s.s3Storage.updateConnectionState(nil)
+	s.assert.True(connected)
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
+func (s *s3StorageTestSuite) TestCloudOfflineCached() {
+	defer s.cleanupTest()
+	s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(s.s3Storage.CloudConnected())
+	s.s3Storage.updateConnectionState(nil)
+}
+
+func (s *s3StorageTestSuite) TestCloudOfflineContext() {
+	defer s.cleanupTest()
+	s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "file" + randomString(8)})
+	s.assert.Nil(h)
+	s.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	s.s3Storage.updateConnectionState(nil)
+}
+
 func (s *s3StorageTestSuite) TestCreateDir() {
 	defer s.cleanupTest()
 	// Testing dir and dir/
@@ -3041,6 +3072,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	rand.Read(updatedBlock)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes)
 	s.s3Storage.Storage.ReadInBuffer(
+		context.Background(),
 		name,
 		int64(blockSizeBytes),
 		int64(blockSizeBytes),
@@ -3097,6 +3129,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSizeBytes + blockSizeBytes/2)
 	s.s3Storage.Storage.ReadInBuffer(
+		context.Background(),
 		name,
 		int64(blockSizeBytes),
 		int64(blockSizeBytes)/2,

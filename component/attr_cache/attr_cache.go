@@ -27,6 +27,7 @@ package attr_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -36,6 +37,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -240,12 +242,12 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 }
 
 // does the cache show this path as existing?
-func (ac *AttrCache) pathExistsInCache(path string) bool {
+func (ac *AttrCache) getItemIfExists(path string) *attrCacheItem {
 	item, found := ac.cache.get(path)
-	if !found {
-		return false
+	if found && item.exists() {
+		return item
 	}
-	return item.exists()
+	return nil
 }
 
 // returns the parent directory (without a trailing slash)
@@ -449,7 +451,9 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			exists:   true,
 			cachedAt: time.Now(),
 		})
-		// update flags for tracking directory existence
+		// this is a new directory, so we have a complete (empty) listing for it
+		newDirAttrCacheItem.listingComplete = true
+		// update flag for tracking directory existence
 		if ac.cacheDirs {
 			newDirAttrCacheItem.markInCloud(false)
 		}
@@ -534,15 +538,25 @@ func (ac *AttrCache) StreamDir(
 					options.Name, numAdded, len(pathList))
 			}
 		}
-	}
-	// add cached items in
-	if len(cachedPathList) > 0 {
-		log.Info(
-			"AttrCache::StreamDir : %s merging in %d list cache entries...",
-			options.Name,
-			len(cachedPathList),
-		)
-		pathList = append(pathList, cachedPathList...)
+	} else if errors.Is(err, &common.CloudUnreachableError{}) {
+		// return expired cachedPathList
+		if cachedPathList != nil {
+			pathList = cachedPathList
+			nextToken = cachedToken
+		} else {
+			// return whatever entries we have (but only if the token is empty)
+			entry, found := ac.cache.get(options.Name)
+			if options.Token == "" && found && entry.listingComplete {
+				for _, v := range entry.children {
+					if v.exists() && v.valid() {
+						pathList = append(pathList, v.attr)
+					}
+				}
+			} else {
+				// the cloud is unavailable, and we have nothing to provide
+				err = common.NewNoCachedDataError(err)
+			}
+		}
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
@@ -559,7 +573,18 @@ func (ac *AttrCache) StreamDir(
 			return a.Path == b.Path
 		},
 	)
-	ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
+	// cache the listing (if there was no error)
+	if err == nil {
+		// record when the directory was listed, an up to what token
+		// this will allow us to serve directory listings from this cache
+		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
+		// if the listing is complete, record the fact that we have a complete listing
+		if nextToken == "" {
+			ac.markListingComplete(options.Name)
+		}
+	} else {
+		log.Err("AttrCache::StreamDir : %s encountered error [%v]", options.Name, err)
+	}
 	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
 	return pathList, nextToken, err
 }
@@ -572,9 +597,8 @@ func (ac *AttrCache) fetchCachedDirList(
 	path string,
 	token string,
 ) ([]*internal.ObjAttr, string, error) {
-	var pathList []*internal.ObjAttr
 	if !ac.cacheOnList {
-		return pathList, "", fmt.Errorf("cache on list is disabled")
+		return nil, "", fmt.Errorf("cache on list is disabled")
 	}
 	// start accessing the cache
 	ac.cacheLock.RLock()
@@ -583,25 +607,22 @@ func (ac *AttrCache) fetchCachedDirList(
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Warn("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
-		return pathList, "", fmt.Errorf("%s directory not found in cache", path)
+		return nil, "", common.NewNoCachedDataError(
+			fmt.Errorf("%s directory not found in cache", path),
+		)
 	}
 	// is the requested data cached?
-	if listDirCache.listCache == nil {
-		listDirCache.listCache = make(map[string]listCacheSegment)
-	}
 	cachedListSegment, found := listDirCache.listCache[token]
 	if !found {
 		// the data for this token is not in the cache
 		// don't provide cached data when new (uncached) data is being requested
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s not cached", path, token)
-		return pathList, "", fmt.Errorf("%s directory listing segment %s not cached", path, token)
+		return nil, "", fmt.Errorf("%s directory listing segment %s not cached", path, token)
 	}
 	// check timeout
 	if time.Since(cachedListSegment.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
-		// drop the invalid segment from the list cache
-		delete(listDirCache.listCache, token)
-		return pathList, "", fmt.Errorf(
+		return cachedListSegment.entries, "", fmt.Errorf(
 			"%s directory listing segment %s cache expired",
 			path,
 			token,
@@ -673,14 +694,17 @@ func (ac *AttrCache) cacheListSegment(
 	}
 	// add the new entry
 	listDirItem.listCache[token] = newListCacheSegment
-	// scan the listing cache and remove expired entries
-	for k, v := range listDirItem.listCache {
-		if currTime.Sub(v.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
-			delete(listDirItem.listCache, k)
-		}
-	}
 	log.Trace("AttrCache::cacheListSegment : %s cached list entries \"%s\"-\"%s\" (%d items)",
 		listDirPath, token, nextToken, len(pathList))
+}
+
+func (ac *AttrCache) markListingComplete(listDirPath string) {
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
+	listDirItem, found := ac.cache.get(listDirPath)
+	if found {
+		listDirItem.listingComplete = true
+	}
 }
 
 // IsDirEmpty: Whether or not the directory is empty
@@ -693,14 +717,15 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 			"AttrCache::IsDirEmpty : %s Dir cache is disabled. Checking with container",
 			options.Name,
 		)
+		// when offline, this will return false
 		return ac.NextComponent().IsDirEmpty(options)
 	}
 	// Is the directory in our cache?
 	ac.cacheLock.RLock()
-	pathInCache := ac.pathExistsInCache(options.Name)
-	ac.cacheLock.RUnlock()
+	defer ac.cacheLock.RUnlock()
+	item := ac.getItemIfExists(options.Name)
 	// If the directory does not exist in the attribute cache then let the next component answer
-	if !pathInCache {
+	if item == nil {
 		log.Debug(
 			"AttrCache::IsDirEmpty : %s not found in attr_cache. Checking with container",
 			options.Name,
@@ -709,9 +734,14 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	}
 	log.Debug("AttrCache::IsDirEmpty : %s found in attr_cache", options.Name)
 	// Check if the cached directory is empty or not
-	if ac.anyContentsInCache(options.Name) {
+	if item.hasExistingChildren() {
 		log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache", options.Name)
 		return false
+	}
+	// do we have a complete listing?
+	if item.listingComplete {
+		// we know the directory is empty
+		return true
 	}
 	// Dir is in cache but no contents are, so check with container
 	log.Debug(
@@ -721,16 +751,10 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return ac.NextComponent().IsDirEmpty(options)
 }
 
-func (ac *AttrCache) anyContentsInCache(prefix string) bool {
-	ac.cacheLock.RLock()
-	defer ac.cacheLock.RUnlock()
-
-	directory, found := ac.cache.get(prefix)
-	if found && directory.exists() {
-		for _, chldItem := range directory.children {
-			if chldItem.exists() {
-				return true
-			}
+func (value *attrCacheItem) hasExistingChildren() bool {
+	for _, childItem := range value.children {
+		if childItem.exists() {
+			return true
 		}
 	}
 	return false
@@ -752,7 +776,7 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 		if ac.cacheDirs {
 			// if attr_cache is tracking directories, validate this rename
 			// First, check if the destination directory already exists
-			if ac.pathExistsInCache(options.Dst) {
+			if ac.getItemIfExists(options.Dst) != nil {
 				return os.ErrExist
 			}
 		} else {
@@ -1121,9 +1145,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		// Retrieved attributes so cache them
+		log.Debug("AttrCache::GetAttr : %s Caching record from cloud", options.Name)
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
 			exists:   true,
@@ -1132,13 +1157,43 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	case syscall.ENOENT:
+	case err == syscall.ENOENT:
 		// cache this entity not existing
+		log.Debug("AttrCache::GetAttr : %s Caching ENOENT from cloud", options.Name)
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
 			exists:   false,
 			cachedAt: time.Now(),
 		})
+	case errors.Is(err, &common.CloudUnreachableError{}):
+		// the cloud connection is down
+		// do we have an entry, but it's expired? Let's serve that.
+		if found && value.valid() {
+			// Serve the request from the attribute cache
+			if !value.exists() {
+				log.Debug("AttrCache::GetAttr : %s ENOENT found in cache (offline)", options.Name)
+				return value.attr, errors.Join(syscall.ENOENT, err)
+			} else {
+				log.Debug("AttrCache::GetAttr : %s Entry found in cache (offline)", options.Name)
+				return value.attr, err
+			}
+		} else {
+			// we have no cached data about this item
+			// but do we have a complete listing for its parent directory?
+			entry, found := ac.cache.get(getParentDir(options.Name))
+			if found && entry.listingComplete {
+				log.Debug("AttrCache::GetAttr : %s Not in directory (offline)", options.Name)
+				return nil, errors.Join(syscall.ENOENT, err)
+			} else {
+				// we have no way of knowing whether the requested item is in the directory in the cloud
+				// NOTE:
+				// the OS can call GetAttr on a file without listing its parent directory
+				// so having a valid file entry in cache does not mean we have a complete listing of its parent
+				// so we can't just check if the directory has any children as a proxy for whether it's been listed
+				log.Err("AttrCache::GetAttr : %s No cached data (offline)", options.Name)
+				return nil, common.NewNoCachedDataError(err)
+			}
+		}
 	}
 	return pathAttr, err
 }

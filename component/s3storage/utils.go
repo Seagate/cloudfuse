@@ -26,6 +26,7 @@
 package s3storage
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,6 +39,8 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 
+	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/smithy-go"
 )
 
@@ -142,7 +145,24 @@ func parseS3Err(err error, attemptedAction string) error {
 		}
 	}
 
+	var maerr *retry.MaxAttemptsError
+	qeerr := &ratelimit.QuotaExceededError{}
+	if errors.As(err, &maerr) || errors.As(err, qeerr) || errors.Is(err, context.Canceled) {
+		log.Err(
+			"%s : Failed to %s because cloud storage is unreachable",
+			functionName,
+			attemptedAction,
+		)
+		return common.NewCloudUnreachableError(err)
+	}
+
 	// unrecognized error - parsing failed
+	// log error information to debug log
+	unwrappedErr := err
+	for unwrappedErr != nil {
+		log.Debug("Uncaught S3 error is of type \"%T\" and value %v.", unwrappedErr, unwrappedErr)
+		unwrappedErr = errors.Unwrap(unwrappedErr)
+	}
 	// print and return the original error
 	log.Err("%s : Failed to %s. Here's why: %v", functionName, attemptedAction, err)
 	return err

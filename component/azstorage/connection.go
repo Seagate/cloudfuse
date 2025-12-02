@@ -26,6 +26,7 @@
 package azstorage
 
 import (
+	"context"
 	"os"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -90,47 +91,65 @@ type AzConnection interface {
 	Configure(cfg AzStorageConfig) error
 	UpdateConfig(cfg AzStorageConfig) error
 
+	ConnectionOkay(ctx context.Context) error
 	SetupPipeline() error
 	TestPipeline() error
 	IsAccountADLS() bool
 
-	ListContainers() ([]string, error)
+	ListContainers(ctx context.Context) ([]string, error)
 
 	// This is just for test, shall not be used otherwise
 	SetPrefixPath(string) error
 
-	CreateFile(name string, mode os.FileMode) error
-	CreateDirectory(name string) error
-	CreateLink(source string, target string) error
+	CreateFile(ctx context.Context, name string, mode os.FileMode) error
+	CreateDirectory(ctx context.Context, name string) error
+	CreateLink(ctx context.Context, source string, target string) error
 
-	DeleteFile(name string) error
-	DeleteDirectory(name string) error
+	DeleteFile(ctx context.Context, name string) error
+	DeleteDirectory(ctx context.Context, name string) error
 
-	RenameFile(string, string, *internal.ObjAttr) error
-	RenameDirectory(string, string) error
+	RenameFile(context.Context, string, string, *internal.ObjAttr) error
+	RenameDirectory(context.Context, string, string) error
 
-	GetAttr(name string) (attr *internal.ObjAttr, err error)
+	GetAttr(ctx context.Context, name string) (attr *internal.ObjAttr, err error)
 
 	// Standard operations to be supported by any account type
-	List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
+	List(
+		ctx context.Context,
+		prefix string,
+		marker *string,
+		count int32,
+	) ([]*internal.ObjAttr, *string, error)
 
-	ReadToFile(name string, offset int64, count int64, fi *os.File) error
-	ReadBuffer(name string, offset int64, length int64) ([]byte, error)
-	ReadInBuffer(name string, offset int64, length int64, data []byte, etag *string) error
+	ReadToFile(ctx context.Context, name string, offset int64, count int64, fi *os.File) error
+	ReadBuffer(ctx context.Context, name string, offset int64, length int64) ([]byte, error)
+	ReadInBuffer(
+		ctx context.Context,
+		name string,
+		offset int64,
+		length int64,
+		data []byte,
+		etag *string,
+	) error
 
-	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
-	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
-	Write(options internal.WriteFileOptions) error
-	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
+	WriteFromFile(ctx context.Context, name string, metadata map[string]*string, fi *os.File) error
+	WriteFromBuffer(
+		ctx context.Context,
+		name string,
+		metadata map[string]*string,
+		data []byte,
+	) error
+	Write(ctx context.Context, options internal.WriteFileOptions) error
+	GetFileBlockOffsets(ctx context.Context, name string) (*common.BlockOffsetList, error)
 
-	ChangeMod(string, os.FileMode) error
-	ChangeOwner(string, int, int) error
-	TruncateFile(string, int64) error
-	StageAndCommit(name string, bol *common.BlockOffsetList) error
+	ChangeMod(context.Context, string, os.FileMode) error
+	ChangeOwner(context.Context, string, int, int) error
+	TruncateFile(context.Context, string, int64) error
+	StageAndCommit(ctx context.Context, name string, bol *common.BlockOffsetList) error
 
-	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)
-	StageBlock(string, []byte, string) error
-	CommitBlocks(string, []string, *string) error
+	GetCommittedBlockList(context.Context, string) (*internal.CommittedBlockList, error)
+	StageBlock(context.Context, string, []byte, string) error
+	CommitBlocks(context.Context, string, []string, *string) error
 
 	UpdateServiceClient(_, _ string) error
 

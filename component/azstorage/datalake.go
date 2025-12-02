@@ -217,9 +217,15 @@ func (dl *Datalake) IsAccountADLS() bool {
 	return dl.BlockBlob.IsAccountADLS()
 }
 
-func (dl *Datalake) ListContainers() ([]string, error) {
+// check the connection to the service by calling GetProperties on the container
+func (dl *Datalake) ConnectionOkay(ctx context.Context) error {
+	log.Trace("BlockBlob::ConnectionOkay : checking connection to cloud service")
+	return dl.BlockBlob.ConnectionOkay(ctx)
+}
+
+func (dl *Datalake) ListContainers(ctx context.Context) ([]string, error) {
 	log.Trace("Datalake::ListContainers : Listing containers")
-	return dl.BlockBlob.ListContainers()
+	return dl.BlockBlob.ListContainers(ctx)
 }
 
 func (dl *Datalake) SetPrefixPath(path string) error {
@@ -229,14 +235,14 @@ func (dl *Datalake) SetPrefixPath(path string) error {
 }
 
 // CreateFile : Create a new file in the filesystem/directory
-func (dl *Datalake) CreateFile(name string, mode os.FileMode) error {
+func (dl *Datalake) CreateFile(ctx context.Context, name string, mode os.FileMode) error {
 	log.Trace("Datalake::CreateFile : name %s", name)
-	err := dl.BlockBlob.CreateFile(name, mode)
+	err := dl.BlockBlob.CreateFile(ctx, name, mode)
 	if err != nil {
 		log.Err("Datalake::CreateFile : Failed to create file %s [%s]", name, err.Error())
 		return err
 	}
-	err = dl.ChangeMod(name, mode)
+	err = dl.ChangeMod(ctx, name, mode)
 	if err != nil {
 		log.Err(
 			"Datalake::CreateFile : Failed to set permissions on file %s [%s]",
@@ -250,11 +256,11 @@ func (dl *Datalake) CreateFile(name string, mode os.FileMode) error {
 }
 
 // CreateDirectory : Create a new directory in the filesystem/directory
-func (dl *Datalake) CreateDirectory(name string) error {
+func (dl *Datalake) CreateDirectory(ctx context.Context, name string) error {
 	log.Trace("Datalake::CreateDirectory : name %s", name)
 
 	directoryURL := dl.getDirectoryClient(name)
-	_, err := directoryURL.Create(context.Background(), &directory.CreateOptions{
+	_, err := directoryURL.Create(ctx, &directory.CreateOptions{
 		CPKInfo: dl.datalakeCPKOpt,
 		AccessConditions: &directory.AccessConditions{
 			ModifiedAccessConditions: &directory.ModifiedAccessConditions{
@@ -294,16 +300,16 @@ func (dl *Datalake) CreateDirectory(name string) error {
 }
 
 // CreateLink : Create a symlink in the filesystem/directory
-func (dl *Datalake) CreateLink(source string, target string) error {
+func (dl *Datalake) CreateLink(ctx context.Context, source string, target string) error {
 	log.Trace("Datalake::CreateLink : %s -> %s", source, target)
-	return dl.BlockBlob.CreateLink(source, target)
+	return dl.BlockBlob.CreateLink(ctx, source, target)
 }
 
 // DeleteFile : Delete a file in the filesystem/directory
-func (dl *Datalake) DeleteFile(name string) (err error) {
+func (dl *Datalake) DeleteFile(ctx context.Context, name string) (err error) {
 	log.Trace("Datalake::DeleteFile : name %s", name)
 	fileClient := dl.getFileClient(name)
-	_, err = fileClient.Delete(context.Background(), nil)
+	_, err = fileClient.Delete(ctx, nil)
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
 		switch serr {
@@ -330,11 +336,11 @@ func (dl *Datalake) DeleteFile(name string) (err error) {
 }
 
 // DeleteDirectory : Delete a directory in the filesystem/directory
-func (dl *Datalake) DeleteDirectory(name string) (err error) {
+func (dl *Datalake) DeleteDirectory(ctx context.Context, name string) (err error) {
 	log.Trace("Datalake::DeleteDirectory : name %s", name)
 
 	directoryClient := dl.getDirectoryClient(name)
-	_, err = directoryClient.Delete(context.Background(), nil)
+	_, err = directoryClient.Delete(ctx, nil)
 	// TODO : There is an ability to pass a continuation token here for recursive delete, should we implement this logic to follow continuation token? The SDK does not currently do this.
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -353,13 +359,18 @@ func (dl *Datalake) DeleteDirectory(name string) (err error) {
 // RenameFile : Rename the file
 // While renaming the file, Creation time is preserved but LMT is changed for the destination blob.
 // and also Etag of the destination blob changes
-func (dl *Datalake) RenameFile(source string, target string, srcAttr *internal.ObjAttr) error {
+func (dl *Datalake) RenameFile(
+	ctx context.Context,
+	source string,
+	target string,
+	srcAttr *internal.ObjAttr,
+) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
 	fileClient := dl.getFileClientPathEscape(source)
 
 	renameResponse, err := fileClient.Rename(
-		context.Background(),
+		ctx,
 		dl.getFormattedPath(target),
 		&file.RenameOptions{
 			CPKInfo: dl.datalakeCPKOpt,
@@ -380,12 +391,12 @@ func (dl *Datalake) RenameFile(source string, target string, srcAttr *internal.O
 }
 
 // RenameDirectory : Rename the directory
-func (dl *Datalake) RenameDirectory(source string, target string) error {
+func (dl *Datalake) RenameDirectory(ctx context.Context, source string, target string) error {
 	log.Trace("Datalake::RenameDirectory : %s -> %s", source, target)
 
 	directoryClient := dl.getDirectoryClientPathEscape(source)
 	_, err := directoryClient.Rename(
-		context.Background(),
+		ctx,
 		dl.getFormattedPath(target),
 		&directory.RenameOptions{
 			CPKInfo: dl.datalakeCPKOpt,
@@ -406,11 +417,14 @@ func (dl *Datalake) RenameDirectory(source string, target string) error {
 }
 
 // GetAttr : Retrieve attributes of the path
-func (dl *Datalake) GetAttr(name string) (blobAttr *internal.ObjAttr, err error) {
+func (dl *Datalake) GetAttr(
+	ctx context.Context,
+	name string,
+) (blobAttr *internal.ObjAttr, err error) {
 	log.Trace("Datalake::GetAttr : name %s", name)
 
 	fileClient := dl.getFileClient(name)
-	prop, err := fileClient.GetProperties(context.Background(), &file.GetPropertiesOptions{
+	prop, err := fileClient.GetProperties(ctx, &file.GetPropertiesOptions{
 		CPKInfo: dl.datalakeCPKOpt,
 	})
 	if err != nil {
@@ -457,7 +471,7 @@ func (dl *Datalake) GetAttr(name string) (blobAttr *internal.ObjAttr, err error)
 	}
 
 	if dl.Config.honourACL && dl.Config.authConfig.ObjectID != "" {
-		acl, err := fileClient.GetAccessControl(context.Background(), nil)
+		acl, err := fileClient.GetAccessControl(ctx, nil)
 		if err != nil {
 			// Just ignore the error here as rest of the attributes have been retrieved
 			log.Err("Datalake::GetAttr : Failed to get ACL for %s [%s]", name, err.Error())
@@ -489,36 +503,50 @@ func (dl *Datalake) GetAttr(name string) (blobAttr *internal.ObjAttr, err error)
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
 func (dl *Datalake) List(
+	ctx context.Context,
 	prefix string,
 	marker *string,
 	count int32,
 ) ([]*internal.ObjAttr, *string, error) {
-	return dl.BlockBlob.List(prefix, marker, count)
+	return dl.BlockBlob.List(ctx, prefix, marker, count)
 }
 
 // ReadToFile : Download a file to a local file
-func (dl *Datalake) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
-	return dl.BlockBlob.ReadToFile(name, offset, count, fi)
+func (dl *Datalake) ReadToFile(
+	ctx context.Context,
+	name string,
+	offset int64,
+	count int64,
+	fi *os.File,
+) (err error) {
+	return dl.BlockBlob.ReadToFile(ctx, name, offset, count, fi)
 }
 
 // ReadBuffer : Download a specific range from a file to a buffer
-func (dl *Datalake) ReadBuffer(name string, offset int64, length int64) ([]byte, error) {
-	return dl.BlockBlob.ReadBuffer(name, offset, length)
+func (dl *Datalake) ReadBuffer(
+	ctx context.Context,
+	name string,
+	offset int64,
+	length int64,
+) ([]byte, error) {
+	return dl.BlockBlob.ReadBuffer(ctx, name, offset, length)
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
 func (dl *Datalake) ReadInBuffer(
+	ctx context.Context,
 	name string,
 	offset int64,
 	length int64,
 	data []byte,
 	etag *string,
 ) error {
-	return dl.BlockBlob.ReadInBuffer(name, offset, length, data, etag)
+	return dl.BlockBlob.ReadInBuffer(ctx, name, offset, length, data, etag)
 }
 
 // WriteFromFile : Upload local file to file
 func (dl *Datalake) WriteFromFile(
+	ctx context.Context,
 	name string,
 	metadata map[string]*string,
 	fi *os.File,
@@ -531,7 +559,7 @@ func (dl *Datalake) WriteFromFile(
 
 	if dl.Config.preserveACL {
 		fileClient = dl.Filesystem.NewFileClient(filepath.Join(dl.Config.prefixPath, name))
-		resp, err := fileClient.GetAccessControl(context.Background(), nil)
+		resp, err := fileClient.GetAccessControl(ctx, nil)
 		if err != nil {
 			log.Err("Datalake::getACL : Failed to get ACLs for file %s [%s]", name, err.Error())
 		} else if resp.ACL != nil {
@@ -540,13 +568,13 @@ func (dl *Datalake) WriteFromFile(
 	}
 
 	// Upload the file, which will override the permissions and ACL
-	retCode := dl.BlockBlob.WriteFromFile(name, metadata, fi)
+	retCode := dl.BlockBlob.WriteFromFile(ctx, name, metadata, fi)
 
 	if acl != "" {
 		// Cannot set both permissions and ACL in one call. ACL includes permission as well so just setting those back
 		// Just setting up the permissions will delete existing ACLs applied on the blob so do not convert this code to
 		// just set the permissions.
-		_, err := fileClient.SetAccessControl(context.Background(), &file.SetAccessControlOptions{
+		_, err := fileClient.SetAccessControl(ctx, &file.SetAccessControlOptions{
 			ACL: &acl,
 		})
 
@@ -560,29 +588,41 @@ func (dl *Datalake) WriteFromFile(
 }
 
 // WriteFromBuffer : Upload from a buffer to a file
-func (dl *Datalake) WriteFromBuffer(name string, metadata map[string]*string, data []byte) error {
-	return dl.BlockBlob.WriteFromBuffer(name, metadata, data)
+func (dl *Datalake) WriteFromBuffer(
+	ctx context.Context,
+	name string,
+	metadata map[string]*string,
+	data []byte,
+) error {
+	return dl.BlockBlob.WriteFromBuffer(ctx, name, metadata, data)
 }
 
 // Write : Write to a file at given offset
-func (dl *Datalake) Write(options internal.WriteFileOptions) error {
-	return dl.BlockBlob.Write(options)
+func (dl *Datalake) Write(ctx context.Context, options internal.WriteFileOptions) error {
+	return dl.BlockBlob.Write(ctx, options)
 }
 
-func (dl *Datalake) StageAndCommit(name string, bol *common.BlockOffsetList) error {
-	return dl.BlockBlob.StageAndCommit(name, bol)
+func (dl *Datalake) StageAndCommit(
+	ctx context.Context,
+	name string,
+	bol *common.BlockOffsetList,
+) error {
+	return dl.BlockBlob.StageAndCommit(ctx, name, bol)
 }
 
-func (dl *Datalake) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
-	return dl.BlockBlob.GetFileBlockOffsets(name)
+func (dl *Datalake) GetFileBlockOffsets(
+	ctx context.Context,
+	name string,
+) (*common.BlockOffsetList, error) {
+	return dl.BlockBlob.GetFileBlockOffsets(ctx, name)
 }
 
-func (dl *Datalake) TruncateFile(name string, size int64) error {
-	return dl.BlockBlob.TruncateFile(name, size)
+func (dl *Datalake) TruncateFile(ctx context.Context, name string, size int64) error {
+	return dl.BlockBlob.TruncateFile(ctx, name, size)
 }
 
 // ChangeMod : Change mode of a path
-func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
+func (dl *Datalake) ChangeMod(ctx context.Context, name string, mode os.FileMode) error {
 	log.Trace("Datalake::ChangeMod : Change mode of file %s to %s", name, mode)
 	fileClient := dl.getFileClient(name)
 
@@ -591,7 +631,7 @@ func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 		// and create new string with the username included in the string
 		// Keeping this code here so in future if its required we can get the string and manipulate
 
-		currPerm, err := fileURL.getACL(context.Background())
+		currPerm, err := fileURL.getACL(ctx)
 		e := storeDatalakeErrToErr(err)
 		if e == ErrFileNotFound {
 			return syscall.ENOENT
@@ -602,7 +642,7 @@ func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 	*/
 
 	newPerm := getACLPermissions(mode)
-	_, err := fileClient.SetAccessControl(context.Background(), &file.SetAccessControlOptions{
+	_, err := fileClient.SetAccessControl(ctx, &file.SetAccessControlOptions{
 		Permissions: &newPerm,
 	})
 	if err != nil {
@@ -627,7 +667,7 @@ func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 }
 
 // ChangeOwner : Change owner of a path
-func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
+func (dl *Datalake) ChangeOwner(ctx context.Context, name string, _ int, _ int) error {
 	log.Trace("Datalake::ChangeOwner : name %s", name)
 
 	if dl.Config.ignoreAccessModifiers {
@@ -640,7 +680,7 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 	// fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 	// group := strconv.Itoa(gid)
 	// owner := strconv.Itoa(uid)
-	// _, err := fileURL.SetAccessControl(context.Background(), azbfs.BlobFSAccessControl{Group: group, Owner: owner})
+	// _, err := fileURL.SetAccessControl(ctx, azbfs.BlobFSAccessControl{Group: group, Owner: owner})
 	// e := storeDatalakeErrToErr(err)
 	// if e == ErrFileNotFound {
 	// 	return syscall.ENOENT
@@ -652,18 +692,26 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 }
 
 // GetCommittedBlockList : Get the list of committed blocks
-func (dl *Datalake) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	return dl.BlockBlob.GetCommittedBlockList(name)
+func (dl *Datalake) GetCommittedBlockList(
+	ctx context.Context,
+	name string,
+) (*internal.CommittedBlockList, error) {
+	return dl.BlockBlob.GetCommittedBlockList(ctx, name)
 }
 
 // StageBlock : stages a block and returns its blockid
-func (dl *Datalake) StageBlock(name string, data []byte, id string) error {
-	return dl.BlockBlob.StageBlock(name, data, id)
+func (dl *Datalake) StageBlock(ctx context.Context, name string, data []byte, id string) error {
+	return dl.BlockBlob.StageBlock(ctx, name, data, id)
 }
 
 // CommitBlocks : persists the block list
-func (dl *Datalake) CommitBlocks(name string, blockList []string, newEtag *string) error {
-	return dl.BlockBlob.CommitBlocks(name, blockList, newEtag)
+func (dl *Datalake) CommitBlocks(
+	ctx context.Context,
+	name string,
+	blockList []string,
+	newEtag *string,
+) error {
+	return dl.BlockBlob.CommitBlocks(ctx, name, blockList, newEtag)
 }
 
 func (dl *Datalake) SetFilter(filter string) error {
