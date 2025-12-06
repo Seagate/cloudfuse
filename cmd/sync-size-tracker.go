@@ -127,11 +127,7 @@ var syncCmd = &cobra.Command{
 		defer func() { _ = ms.Stop() }()
 
 		current := ms.GetSize()
-		if total > current {
-			ms.Add(total - current)
-		} else if total < current {
-			ms.Subtract(current - total)
-		}
+		ms.Add(int64(total - current))
 
 		// Print minimal status
 		var bucket string

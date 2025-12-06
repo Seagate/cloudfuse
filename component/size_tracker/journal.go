@@ -37,12 +37,12 @@ import (
 )
 
 type MountSize struct {
-	size              atomic.Uint64
-	lastJournaledSize atomic.Uint64
-	journalPath       string
-	flushTicker       *time.Ticker
-	stopCh            chan struct{}
-	wg                sync.WaitGroup
+	size         atomic.Uint64 // cached copy of size from file
+	pendingDelta atomic.Int64  // net change not yet written to the file
+	journalPath  string
+	flushTicker  *time.Ticker
+	stopCh       chan struct{}
+	wg           sync.WaitGroup
 }
 
 func CreateSizeJournal(filename string) (*MountSize, error) {
@@ -84,7 +84,6 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 		journalPath: filename,
 	}
 	ms.size.Store(initialSize)
-	ms.lastJournaledSize.Store(initialSize)
 
 	return ms, nil
 }
@@ -108,38 +107,8 @@ func (ms *MountSize) GetSize() uint64 {
 	return ms.size.Load()
 }
 
-func (ms *MountSize) Add(delta uint64) uint64 {
-	newVal := ms.size.Add(delta)
-	// Persist delta safely across processes
-	if err := ms.applyDeltaLocked(int64(delta)); err != nil {
-		log.Err("SizeTracker::Add : delta persist failed: %v", err)
-	}
-	return newVal
-}
-
-func (ms *MountSize) Subtract(delta uint64) uint64 {
-	for {
-		old := ms.size.Load()
-		var newVal uint64
-		if old < delta {
-			newVal = 0
-		} else {
-			newVal = old - delta
-		}
-		if ms.size.CompareAndSwap(old, newVal) {
-			// Persist delta (negative) safely across processes
-			var apply uint64
-			if old < delta {
-				apply = old
-			} else {
-				apply = delta
-			}
-			if err := ms.applyDeltaLocked(-int64(apply)); err != nil {
-				log.Err("SizeTracker::Subtract : delta persist failed: %v", err)
-			}
-			return newVal
-		}
-	}
+func (ms *MountSize) Add(delta int64) int64 {
+	return ms.pendingDelta.Add(delta)
 }
 
 func (ms *MountSize) Start() {
@@ -160,18 +129,16 @@ func (ms *MountSize) Stop() error {
 	return nil
 }
 
-// applyDeltaLocked performs a cross-process safe read-modify-write of the 8-byte total.
-// NOTE: Uses Unix advisory locks (flock). For Windows portability, an OS-specific lock
-// implementation should be added.
-func (ms *MountSize) applyDeltaLocked(delta int64) error {
-	// Open the journal file via OpenRoot to match CreateSizeJournal's path handling
+// safely read from and update the size file
+func (ms *MountSize) sync() error {
+	// Open the journal's root
 	root, err := os.OpenRoot(common.ExpandPath(common.DefaultWorkDir))
 	if err != nil {
 		return err
 	}
 	defer root.Close()
 
-	// Short-lived handle and lock it exclusively
+	// Get a short-lived handle and lock it exclusively
 	f, err := root.OpenFile(ms.journalPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return err
@@ -182,17 +149,27 @@ func (ms *MountSize) applyDeltaLocked(delta int64) error {
 	}
 	defer unlock(f.Fd())
 
-	var buf [8]byte
 	// Read current total (treat missing/short as zero)
+	var buf [8]byte
 	if _, err := f.ReadAt(buf[:], 0); err != nil && err != os.ErrNotExist {
 		// If file empty treat as zero
 		if err != os.ErrNotExist {
+			ms.size.Store(0)
 			return err
 		}
 	}
 	current := binary.BigEndian.Uint64(buf[:])
 
-	// Apply delta with saturation at 0
+	// update local copy
+	ms.size.Store(current)
+
+	// get pending delta
+	delta := ms.pendingDelta.Load()
+	if delta == 0 {
+		return nil
+	}
+
+	// bottom out at zero
 	var updated uint64
 	if delta < 0 {
 		dec := uint64(-delta)
@@ -205,6 +182,7 @@ func (ms *MountSize) applyDeltaLocked(delta int64) error {
 		updated = current + uint64(delta)
 	}
 
+	// write updated size to file
 	binary.BigEndian.PutUint64(buf[:], updated)
 	if _, err := f.WriteAt(buf[:], 0); err != nil {
 		return err
@@ -212,25 +190,20 @@ func (ms *MountSize) applyDeltaLocked(delta int64) error {
 	if err := f.Sync(); err != nil {
 		return err
 	}
-	ms.lastJournaledSize.Store(updated)
+	ms.size.Store(updated)
+
+	// clear / update pendingDelta
+	ms.pendingDelta.Add(-delta)
+
 	return nil
 }
 
 // flushIfChanged writes current absolute size only if different from last flushed.
 // This is a fallback periodic sync (updates are already durable on each delta).
 func (ms *MountSize) flushIfChanged() error {
-	cur := ms.size.Load()
-	last := ms.lastJournaledSize.Load()
-	if cur == last {
+	if ms.pendingDelta.Load() == 0 {
 		return nil
 	}
 	// Use locked overwrite via delta to avoid racing with other processes doing RMW cycles.
-	return ms.applyDeltaLocked(int64(cur) - int64(last))
-}
-
-func minUint64(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
+	return ms.sync()
 }
