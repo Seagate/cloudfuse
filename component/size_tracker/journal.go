@@ -27,6 +27,7 @@ package size_tracker
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -50,40 +51,12 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create default work dir [%s]", err.Error())
 	}
-
-	root, err := os.OpenRoot(common.ExpandPath(common.DefaultWorkDir))
-	if err != nil {
-		return nil, err
-	}
-	defer root.Close()
-
-	// Short-lived handle to read initial size under lock
-	f, err := root.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, err
-	}
-	if err := exclusiveLock(f.Fd()); err != nil {
-		_ = f.Close()
-		return nil, err
-	}
-	var initialSize uint64
-	{
-		fileInfo, statErr := f.Stat()
-		if statErr == nil && fileInfo.Size() >= 8 {
-			var buf [8]byte
-			if _, readErr := f.ReadAt(buf[:], 0); readErr == nil {
-				initialSize = binary.BigEndian.Uint64(buf[:])
-			}
-		}
-	}
-	_ = f.Sync()
-	_ = unlock(f.Fd())
-	_ = f.Close()
-
 	ms := &MountSize{
 		journalPath: filename,
 	}
-	ms.size.Store(initialSize)
+	if err := ms.sync(); err != nil {
+		return nil, err
+	}
 
 	return ms, nil
 }
@@ -93,11 +66,11 @@ func (ms *MountSize) runJournalWriter() {
 	for {
 		select {
 		case <-ms.flushTicker.C:
-			if err := ms.flushIfChanged(); err != nil {
-				log.Err("SizeTracker::runJournalWriter : flush error: %v", err)
-			}
-		case <-ms.stopCh:
 			_ = ms.flushIfChanged()
+		case <-ms.stopCh:
+			if err := ms.flushIfChanged(); err != nil {
+				log.Err("SizeTracker::runJournalWriter : Failed to sync when stopping.")
+			}
 			return
 		}
 	}
@@ -150,17 +123,19 @@ func (ms *MountSize) sync() error {
 	defer unlock(f.Fd())
 
 	// Read current total (treat missing/short as zero)
+	var current uint64
 	var buf [8]byte
-	if _, err := f.ReadAt(buf[:], 0); err != nil && err != os.ErrNotExist {
-		// If file empty treat as zero
-		if err != os.ErrNotExist {
-			ms.size.Store(0)
-			return err
-		}
+	_, err = f.ReadAt(buf[:], 0)
+	switch err {
+	case nil:
+		// update local copy
+		current = binary.BigEndian.Uint64(buf[:])
+	case io.EOF:
+		// Treat empty and short read as zero
+	default:
+		// return I/O errors without changing ms.size
+		return err
 	}
-	current := binary.BigEndian.Uint64(buf[:])
-
-	// update local copy
 	ms.size.Store(current)
 
 	// get pending delta
@@ -190,8 +165,9 @@ func (ms *MountSize) sync() error {
 	if err := f.Sync(); err != nil {
 		return err
 	}
-	ms.size.Store(updated)
 
+	// update state
+	ms.size.Store(updated)
 	// clear / update pendingDelta
 	ms.pendingDelta.Add(-delta)
 
@@ -201,9 +177,18 @@ func (ms *MountSize) sync() error {
 // flushIfChanged writes current absolute size only if different from last flushed.
 // This is a fallback periodic sync (updates are already durable on each delta).
 func (ms *MountSize) flushIfChanged() error {
+	log.Err("SizeTracker::flushIfChanged : syncing delta: %u.", ms.pendingDelta.Load())
 	if ms.pendingDelta.Load() == 0 {
 		return nil
 	}
 	// Use locked overwrite via delta to avoid racing with other processes doing RMW cycles.
-	return ms.sync()
+	err := ms.sync()
+	if err != nil {
+		log.Err(
+			"SizeTracker::flushIfChanged : sync failed (with delta %u). Here's why: %v",
+			ms.pendingDelta.Load(),
+			err,
+		)
+	}
+	return err
 }
