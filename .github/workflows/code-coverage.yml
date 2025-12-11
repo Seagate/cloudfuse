@@ -221,10 +221,10 @@ jobs:
 
       - name: Create Config File - Block Blob
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           CONTAINER_NAME: ${{ matrix.containerName }}
@@ -317,10 +317,10 @@ jobs:
 
       - name: Create Config File - Block Blob - Block Cache
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
@@ -370,10 +370,10 @@ jobs:
 
       - name: Create Config File - ADLS
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
-          ACCOUNT_TYPE: adls
-          ACCOUNT_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
+          STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
+          STO_ACC_TYPE: adls
+          STO_ACC_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
@@ -672,10 +672,10 @@ jobs:
 
       - name: Create Config File - Stream
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
@@ -701,10 +701,10 @@ jobs:
 
       - name: Create Config File - Block Blob
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
@@ -875,10 +875,10 @@ jobs:
       - name: "CLI : Secure Config"
         shell: bash {0}
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
@@ -971,10 +971,10 @@ jobs:
 
       - name: Create Config File - Block Blob Proxy
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
@@ -992,10 +992,10 @@ jobs:
 
       - name: Create Config File - ADLS Proxy
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
-          ACCOUNT_TYPE: adls
-          ACCOUNT_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
+          STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
+          STO_ACC_TYPE: adls
+          STO_ACC_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
@@ -1199,10 +1199,10 @@ jobs:
       - name: Create Config File - Block Blob
         shell: bash
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
@@ -1301,10 +1301,10 @@ jobs:
       - name: Create Config File - Block Blob - Block Cache
         shell: bash
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           WORK_DIR: ${{ env.WORK_DIR }}
@@ -1356,10 +1356,10 @@ jobs:
       - name: Create Config File - ADLS
         shell: bash
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
-          ACCOUNT_TYPE: adls
-          ACCOUNT_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
+          STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
+          STO_ACC_TYPE: adls
+          STO_ACC_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
@@ -1677,10 +1677,10 @@ jobs:
       - name: Create Config File - Stream
         shell: bash
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_STREAM_CFG: ${{ env.cloudfuse_STREAM_CFG }}
@@ -1719,10 +1719,10 @@ jobs:
       - name: Create Config File - Block Blob
         shell: bash
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
@@ -1845,10 +1845,10 @@ jobs:
       - name: "CLI : Secure Config"
         shell: bash {0}
         env:
-          NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-          ACCOUNT_TYPE: block
-          ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
+          STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+          STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STO_ACC_TYPE: block
+          STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
@@ -2021,13 +2021,13 @@ jobs:
         run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
         env:
           STORAGE_ACCOUNT_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          STORAGE_ACCOUNT_Key: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+          STORAGE_ACCOUNT_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
 
       - name: Cleanup Datalake Storage
         run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
         env:
           STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          STORAGE_ACCOUNT_Key: "${{ secrets.AZTEST_ADLS_KEY }}"
+          STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
 
       - name: Cleanup S3 Storage
         run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
