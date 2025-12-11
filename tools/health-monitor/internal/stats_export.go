@@ -118,7 +118,9 @@ func (se *StatsExporter) Destroy() {
 		}
 	}
 
-	se.opFile.Close()
+	if err := se.opFile.Close(); err != nil {
+		log.Err("stats_exporter::Destroy : unable to close file [%v]", err)
+	}
 	close(se.channel)
 	se.wg.Wait()
 }
@@ -235,7 +237,9 @@ func (se *StatsExporter) checkOutputFile() error {
 		}
 
 		log.Debug("stats_exporter::checkOutputFile : closing file %v", f.Name())
-		se.opFile.Close()
+		if err = se.opFile.Close(); err != nil {
+			log.Err("stats_exporter::checkOutputFile : failed to close file [%v]", err)
+		}
 
 		err = se.getNewFile()
 		if err != nil {
