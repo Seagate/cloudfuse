@@ -132,7 +132,7 @@ var syncCmd = &cobra.Command{
 		// Print minimal status
 		var bucket string
 		_ = config.UnmarshalKey("s3storage.bucket-name", &bucket)
-		fmt.Printf("sync complete: bucket=%s prefix=%q size=%d (was %d) journal=%s\n",
+		fmt.Printf("sync complete: bucket=%s prefix=%s size=%d (was %d) journal=%s\n",
 			bucket, dir, total, current, journalName)
 		return nil
 	},
