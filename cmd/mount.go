@@ -369,52 +369,49 @@ var mountCmd = &cobra.Command{
 		}
 
 		if config.IsSet("libfuse-options") {
-			for _, v := range options.LibfuseOptions {
-				parameter := strings.Split(v, "=")
-				if len(parameter) > 2 || len(parameter) <= 0 {
-					return errors.New(common.FuseAllowedFlags)
-				}
+			for _, raw := range options.LibfuseOptions {
+				v := strings.TrimSpace(raw)
+				key, val, hasEq := strings.Cut(v, "=")
 
-				v = strings.TrimSpace(v)
 				if ignoreFuseOptions(v) {
 					continue
-				} else if v == "allow_other" || v == "allow_other=true" {
+				} else if v == "allow_other" || (hasEq && key == "allow_other" && val == "true") {
 					config.Set("allow-other", "true")
-				} else if strings.HasPrefix(v, "attr_timeout=") {
-					config.Set("lfuse.attribute-expiration-sec", parameter[1])
-				} else if strings.HasPrefix(v, "entry_timeout=") {
-					config.Set("lfuse.entry-expiration-sec", parameter[1])
-				} else if strings.HasPrefix(v, "negative_timeout=") {
-					config.Set("lfuse.negative-entry-expiration-sec", parameter[1])
-				} else if v == "ro" || v == "ro=true" {
+				} else if hasEq && key == "attr_timeout" {
+					config.Set("lfuse.attribute-expiration-sec", val)
+				} else if hasEq && key == "entry_timeout" {
+					config.Set("lfuse.entry-expiration-sec", val)
+				} else if hasEq && key == "negative_timeout" {
+					config.Set("lfuse.negative-entry-expiration-sec", val)
+				} else if v == "ro" || (hasEq && key == "ro" && val == "true") {
 					config.Set("read-only", "true")
-				} else if v == "allow_root" || v == "allow_root=true" {
+				} else if v == "allow_root" || (hasEq && key == "allow_root" && val == "true") {
 					config.Set("allow-root", "true")
-				} else if v == "nonempty" || v == "nonempty=true" {
+				} else if v == "nonempty" || (hasEq && key == "nonempty" && val == "true") {
 					// For fuse3, -o nonempty mount option has been removed and
 					// mounting over non-empty directories is now always allowed.
 					// For fuse2, this option is supported.
 					options.NonEmpty = true
 					config.Set("nonempty", "true")
-				} else if strings.HasPrefix(v, "umask=") {
-					umask, err := strconv.ParseUint(parameter[1], 10, 32)
+				} else if hasEq && key == "umask" {
+					umask, err := strconv.ParseUint(val, 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse umask [%s]", err.Error())
 					}
 					config.Set("lfuse.umask", fmt.Sprint(umask))
-				} else if strings.HasPrefix(v, "uid=") {
-					val, err := strconv.ParseUint(parameter[1], 10, 32)
+				} else if hasEq && key == "uid" {
+					valUint, err := strconv.ParseUint(val, 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse uid [%s]", err.Error())
 					}
-					config.Set("lfuse.uid", fmt.Sprint(val))
-				} else if strings.HasPrefix(v, "gid=") {
-					val, err := strconv.ParseUint(parameter[1], 10, 32)
+					config.Set("lfuse.uid", fmt.Sprint(valUint))
+				} else if hasEq && key == "gid" {
+					valUint, err := strconv.ParseUint(val, 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse gid [%s]", err.Error())
 					}
-					config.Set("lfuse.gid", fmt.Sprint(val))
-				} else if v == "direct_io" || v == "direct_io=true" {
+					config.Set("lfuse.gid", fmt.Sprint(valUint))
+				} else if v == "direct_io" || (hasEq && key == "direct_io" && val == "true") {
 					config.Set("lfuse.direct-io", "true")
 					config.Set("direct-io", "true")
 					directIO = true
@@ -463,7 +460,6 @@ var mountCmd = &cobra.Command{
 			Level:       logLevel,
 			TimeTracker: options.Logging.TimeTracker,
 		})
-
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
 		}
@@ -531,18 +527,14 @@ var mountCmd = &cobra.Command{
 					"mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]",
 					err,
 				)
-				return Destroy(
-					fmt.Sprintf(
-						"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
-						err.Error(),
-					),
+				return fmt.Errorf(
+					"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
+					err.Error(),
 				)
 			}
 
 			log.Err("mount :  failed to initialize new pipeline [%v]", err)
-			return Destroy(
-				fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()),
-			)
+			return fmt.Errorf("mount : failed to initialize new pipeline [%s]", err.Error())
 		}
 
 		// Dry run ends here
@@ -671,16 +663,15 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	err := pipeline.Start(ctx)
 	if err != nil {
 		log.Err("mount: error unable to start pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to start pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to start pipeline [%s]", err.Error())
 	}
 
 	err = pipeline.Stop()
 	if err != nil {
 		log.Err("mount: error unable to stop pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to stop pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to stop pipeline [%s]", err.Error())
 	}
 
-	_ = log.Destroy()
 	return nil
 }
 
@@ -930,13 +921,4 @@ func init() {
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)
 	config.AddConfigChangeEventListener(config.ConfigChangeEventHandlerFunc(OnConfigChange))
-}
-
-func Destroy(message string) error {
-	_ = log.Destroy()
-	if message != "" {
-		return fmt.Errorf("%s", message)
-	}
-
-	return nil
 }

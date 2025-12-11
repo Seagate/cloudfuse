@@ -73,13 +73,14 @@ func (st *SizeTracker) SetNextComponent(nc internal.Component) {
 //	this shall not block the call otherwise pipeline will not start
 func (st *SizeTracker) Start(ctx context.Context) error {
 	log.Trace("SizeTracker::Start : Starting component %s", st.Name())
+	st.mountSize.Start()
 	return nil
 }
 
 // Stop : Stop the component functionality and kill all threads started
 func (st *SizeTracker) Stop() error {
 	log.Trace("SizeTracker::Stop : Stopping component %s", st.Name())
-	_ = st.mountSize.CloseFile()
+	_ = st.mountSize.Stop()
 	return nil
 }
 
@@ -178,7 +179,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
@@ -215,7 +216,7 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	}
 
 	err := st.NextComponent().TruncateFile(options)
-	newSize := options.Size - origSize
+	newSize := options.NewSize - origSize
 
 	// File already exists and truncate succeeded subtract difference in file size
 	if err == nil && getAttrErr == nil && newSize < 0 {
