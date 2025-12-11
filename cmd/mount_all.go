@@ -65,7 +65,16 @@ var mountAllCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mountAllOpts.cloudfuseBinPath = os.Args[0]
+		exe, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("cannot determine executable path: %w", err)
+		}
+		exe, err = filepath.EvalSymlinks(exe)
+		if err != nil {
+			return fmt.Errorf("cannot resolve symlinks for executable: %w", err)
+		}
+
+		mountAllOpts.cloudfuseBinPath = exe
 		options.MountPath = args[0]
 		return processCommand()
 	},
