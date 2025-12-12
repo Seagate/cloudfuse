@@ -142,6 +142,7 @@ func (st *SizeTracker) RenameDir(options internal.RenameDirOptions) error {
 
 // File operations
 func (st *SizeTracker) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
+	log.Trace("SizeTracker::CreateFile : %s", options.Name)
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
 	handle, err := st.NextComponent().CreateFile(options)
@@ -155,6 +156,7 @@ func (st *SizeTracker) CreateFile(options internal.CreateFileOptions) (*handlema
 }
 
 func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
+	log.Trace("SizeTracker::DeleteFile : %s", options.Name)
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
 	err := st.NextComponent().DeleteFile(options)
@@ -167,6 +169,7 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
+	log.Trace("SizeTracker::RenameFile : %s->%s", options.Src, options.Dst)
 	dstAttr, dstErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Dst})
 
 	err := st.NextComponent().RenameFile(options)
@@ -180,6 +183,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 }
 
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
+	// log.Trace("SizeTracker::WriteFile : %s", options.Handle.Path)
 	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
@@ -204,6 +208,7 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 }
 
 func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error {
+	log.Trace("SizeTracker::TruncateFile : %s to %dB", options.Name, options.Size)
 	var origSize int64
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if getAttrErr == nil {
@@ -227,6 +232,7 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 }
 
 func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error {
+	log.Trace("SizeTracker::CopyFromFile : %s", options.Name)
 	var origSize int64
 	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err == nil {
@@ -298,6 +304,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 }
 
 func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
+	log.Trace("SizeTracker::CopyFromFile : %s", opt.Name)
 	var origSize int64
 	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: opt.Name})
 	if err == nil {
