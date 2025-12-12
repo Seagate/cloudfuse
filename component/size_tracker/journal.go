@@ -25,10 +25,12 @@
 package size_tracker
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,6 +43,7 @@ type MountSize struct {
 	size         atomic.Uint64 // cached copy of size from file
 	pendingDelta atomic.Int64  // net change not yet written to the file
 	journalPath  string
+	epoch        atomic.Uint64 // tracks mount epoch to detect mismatches
 	flushTicker  *time.Ticker
 	stopCh       chan struct{}
 	wg           sync.WaitGroup
@@ -81,6 +84,7 @@ func (ms *MountSize) GetSize() uint64 {
 }
 
 func (ms *MountSize) Add(delta int64) int64 {
+	log.Trace("MountSize::Add : %d", delta)
 	return ms.pendingDelta.Add(delta)
 }
 
@@ -122,44 +126,117 @@ func (ms *MountSize) sync() error {
 	}
 	defer unlock(f.Fd())
 
-	// Read current total (treat missing/short as zero)
-	var current uint64
-	var buf [8]byte
-	_, err = f.ReadAt(buf[:], 0)
-	switch err {
-	case nil:
-		// update local copy
-		current = binary.BigEndian.Uint64(buf[:])
-	case io.EOF:
-		// Treat empty and short read as zero
-	default:
-		// return I/O errors without changing ms.size
-		return err
+	// Read current values from INI-style text file. Treat missing values as defaults.
+	// version=1
+	// epoch=<uint64>
+	// size_bytes=<uint64>
+	// updated_unix_ms=<int64>
+	var currentSize, fileEpoch uint64
+	// Read entire file
+	stat, statErr := f.Stat()
+	if statErr != nil {
+		return statErr
 	}
-	ms.size.Store(current)
+	var data []byte
+	if stat.Size() > 0 {
+		// Legacy single-value journal: if file size is 8 bytes and we're initializing (epoch==0), read it.
+		if stat.Size() == 8 && ms.epoch.Load() == 0 {
+			var buf8 [8]byte
+			if _, err := f.ReadAt(buf8[:], 0); err != nil && err != io.EOF {
+				return err
+			}
+			currentSize = binary.BigEndian.Uint64(buf8[:])
+		} else {
+			data = make([]byte, stat.Size())
+			if _, err := f.ReadAt(data, 0); err != nil && err != io.EOF {
+				return err
+			}
+			// Parse simple key=value lines
+			lines := bytes.Split(data, []byte("\n"))
+			for _, ln := range lines {
+				ln = bytes.TrimSpace(ln)
+				if len(ln) == 0 ||
+					bytes.HasPrefix(ln, []byte("#")) ||
+					bytes.HasPrefix(ln, []byte(";")) {
+					continue
+				}
+				kv := bytes.SplitN(ln, []byte("="), 2)
+				if len(kv) != 2 {
+					continue
+				}
+				key := string(bytes.TrimSpace(kv[0]))
+				val := string(bytes.TrimSpace(kv[1]))
+				switch key {
+				case "version":
+					// currently unused beyond presence; could validate == 1
+				case "epoch":
+					if u, perr := parseUint64(val); perr == nil {
+						fileEpoch = u
+					}
+				case "size_bytes":
+					if u, perr := parseUint64(val); perr == nil {
+						currentSize = u
+					}
+				case "updated_unix_ms":
+					// parsed but not used currently; skip
+				}
+			}
+		}
+	}
 
-	// get pending delta
+	// Update local copy of size and adopt epoch from file.
+	ms.size.Store(currentSize)
+	myEpoch := ms.epoch.Load()
 	delta := ms.pendingDelta.Load()
-	if delta == 0 {
-		return nil
-	}
 
-	// bottom out at zero
+	if myEpoch != fileEpoch {
+		// Epoch changed externally: discard our delta and adopt the new epoch.
+		if delta != 0 {
+			log.Debug(
+				"SizeTracker::sync : epoch changed (local=%d -> file=%d) — discarding delta %d.",
+				myEpoch,
+				fileEpoch,
+				delta,
+			)
+			ms.pendingDelta.Add(-delta)
+		}
+		delta = 0
+	}
+	// epoch starts at 1
+	if fileEpoch == 0 {
+		log.Debug("SizeTracker::sync : starting file epoch at 1")
+		fileEpoch = 1
+	}
+	ms.epoch.Store(fileEpoch)
+
+	// Compute updated size (bottom out at zero)
 	var updated uint64
 	if delta < 0 {
 		dec := uint64(-delta)
-		if current < dec {
+		if currentSize < dec {
 			updated = 0
 		} else {
-			updated = current - dec
+			updated = currentSize - dec
 		}
 	} else {
-		updated = current + uint64(delta)
+		updated = currentSize + uint64(delta)
 	}
 
-	// write updated size to file
-	binary.BigEndian.PutUint64(buf[:], updated)
-	if _, err := f.WriteAt(buf[:], 0); err != nil {
+	// Prepare new file contents
+	buf := &bytes.Buffer{}
+	fmt.Fprintf(buf, "version=1\n")
+	fmt.Fprintf(buf, "epoch=%d\n", ms.epoch.Load())
+	fmt.Fprintf(buf, "size_bytes=%d\n", updated)
+	fmt.Fprintf(buf, "updated_unix_ms=%d\n", time.Now().UnixMilli())
+
+	// Overwrite file atomically-ish: seek to start and write new contents, then truncate
+	if _, err := f.Seek(0, 0); err != nil {
+		return err
+	}
+	if _, err := f.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	if err := f.Truncate(int64(buf.Len())); err != nil {
 		return err
 	}
 	if err := f.Sync(); err != nil {
@@ -169,15 +246,26 @@ func (ms *MountSize) sync() error {
 	// update state
 	ms.size.Store(updated)
 	// clear / update pendingDelta
-	ms.pendingDelta.Add(-delta)
+	if delta != 0 {
+		ms.pendingDelta.Add(-delta)
+	}
 
 	return nil
+}
+
+// parse helpers
+func parseUint64(s string) (uint64, error) {
+	return strconv.ParseUint(s, 10, 64)
+}
+
+func parseInt64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
 }
 
 // flushIfChanged writes current absolute size only if different from last flushed.
 // This is a fallback periodic sync (updates are already durable on each delta).
 func (ms *MountSize) flushIfChanged() error {
-	log.Err("SizeTracker::flushIfChanged : syncing delta: %u.", ms.pendingDelta.Load())
+	log.Debug("SizeTracker::flushIfChanged : syncing delta: %d.", ms.pendingDelta.Load())
 	if ms.pendingDelta.Load() == 0 {
 		return nil
 	}
