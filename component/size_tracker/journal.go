@@ -69,10 +69,20 @@ func (ms *MountSize) runJournalWriter() {
 	for {
 		select {
 		case <-ms.flushTicker.C:
-			_ = ms.flushIfChanged()
+			if err := ms.sync(); err != nil {
+				log.Warn(
+					"SizeTracker::runJournalWriter : periodic sync failed (with delta %d). Here's why: %v",
+					ms.pendingDelta.Load(),
+					err,
+				)
+			}
 		case <-ms.stopCh:
-			if err := ms.flushIfChanged(); err != nil {
-				log.Err("SizeTracker::runJournalWriter : Failed to sync when stopping.")
+			if err := ms.sync(); err != nil {
+				log.Err(
+					"SizeTracker::runJournalWriter : final sync failed (with delta=%d). Here's why: %v",
+					ms.pendingDelta.Load(),
+					err,
+				)
 			}
 			return
 		}
@@ -260,23 +270,4 @@ func parseUint64(s string) (uint64, error) {
 
 func parseInt64(s string) (int64, error) {
 	return strconv.ParseInt(s, 10, 64)
-}
-
-// flushIfChanged writes current absolute size only if different from last flushed.
-// This is a fallback periodic sync (updates are already durable on each delta).
-func (ms *MountSize) flushIfChanged() error {
-	log.Debug("SizeTracker::flushIfChanged : syncing delta: %d.", ms.pendingDelta.Load())
-	if ms.pendingDelta.Load() == 0 {
-		return nil
-	}
-	// Use locked overwrite via delta to avoid racing with other processes doing RMW cycles.
-	err := ms.sync()
-	if err != nil {
-		log.Err(
-			"SizeTracker::flushIfChanged : sync failed (with delta %u). Here's why: %v",
-			ms.pendingDelta.Load(),
-			err,
-		)
-	}
-	return err
 }
