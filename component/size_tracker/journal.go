@@ -84,7 +84,7 @@ func (ms *MountSize) GetSize() uint64 {
 }
 
 func (ms *MountSize) Add(delta int64) int64 {
-	log.Trace("MountSize::Add : %d", delta)
+	log.Trace("SizeTracker::Add : %d", delta)
 	return ms.pendingDelta.Add(delta)
 }
 
