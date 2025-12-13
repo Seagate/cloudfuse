@@ -97,7 +97,7 @@ var decryptCmd = &cobra.Command{
 	Short:             "Decrypt your config file",
 	Long:              "Decrypt your config file",
 	SuggestFor:        []string{"de", "dec"},
-	Example:           "cloudfuse secure decrypt --config-file=config.yaml --passphrase=PASSPHRASE",
+	Example:           "cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=PASSPHRASE",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
