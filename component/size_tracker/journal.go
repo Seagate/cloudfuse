@@ -213,9 +213,13 @@ func (ms *MountSize) sync() error {
 
 	myEpoch := ms.epoch.Load()
 	delta := ms.pendingDelta.Load()
-	ms.size.Store(currentSize)
+
+	// Determine which size to use as the base
+	var baseSize uint64
 	if myEpoch < fileEpoch {
-		// Epoch changed externally: discard our delta and adopt the new epoch.
+		// Epoch changed externally: adopt file's size and discard our delta
+		baseSize = currentSize
+		ms.size.Store(currentSize)
 		if delta != 0 {
 			log.Debug(
 				"SizeTracker::sync : epoch changed (local=%d -> file=%d) — discarding delta %d.",
@@ -227,6 +231,13 @@ func (ms *MountSize) sync() error {
 			delta = 0
 		}
 		ms.epoch.Store(fileEpoch)
+	} else if myEpoch > fileEpoch {
+		// Our epoch is higher: use our local size as base (overwrite file)
+		baseSize = ms.size.Load()
+	} else {
+		// Epochs are equal: use file's size and update our cached size
+		baseSize = currentSize
+		ms.size.Store(currentSize)
 	}
 
 	// make sure epoch is nonzero
@@ -236,13 +247,13 @@ func (ms *MountSize) sync() error {
 	var updated uint64
 	if delta < 0 {
 		dec := uint64(-delta)
-		if currentSize < dec {
+		if baseSize < dec {
 			updated = 0
 		} else {
-			updated = currentSize - dec
+			updated = baseSize - dec
 		}
 	} else {
-		updated = currentSize + uint64(delta)
+		updated = baseSize + uint64(delta)
 	}
 
 	// Prepare new file contents
