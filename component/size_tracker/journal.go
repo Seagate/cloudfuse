@@ -188,12 +188,10 @@ func (ms *MountSize) sync() error {
 		}
 	}
 
-	// Update local copy of size and adopt epoch from file.
-	ms.size.Store(currentSize)
 	myEpoch := ms.epoch.Load()
 	delta := ms.pendingDelta.Load()
-
-	if myEpoch != fileEpoch {
+	ms.size.Store(currentSize)
+	if myEpoch < fileEpoch {
 		// Epoch changed externally: discard our delta and adopt the new epoch.
 		if delta != 0 {
 			log.Debug(
@@ -203,15 +201,13 @@ func (ms *MountSize) sync() error {
 				delta,
 			)
 			ms.pendingDelta.Add(-delta)
+			delta = 0
 		}
-		delta = 0
+		ms.epoch.Store(fileEpoch)
 	}
-	// epoch starts at 1
-	if fileEpoch == 0 {
-		log.Debug("SizeTracker::sync : starting file epoch at 1")
-		fileEpoch = 1
-	}
-	ms.epoch.Store(fileEpoch)
+
+	// make sure epoch is nonzero
+	ms.epoch.CompareAndSwap(0, 1)
 
 	// Compute updated size (bottom out at zero)
 	var updated uint64
