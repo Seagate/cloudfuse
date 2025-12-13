@@ -90,7 +90,20 @@ func (ms *MountSize) runJournalWriter() {
 }
 
 func (ms *MountSize) GetSize() uint64 {
-	return ms.size.Load()
+	delta := ms.pendingDelta.Load()
+	baseSize := ms.size.Load()
+	var updated uint64
+	if delta < 0 {
+		dec := uint64(-delta)
+		if baseSize < dec {
+			updated = 0
+		} else {
+			updated = baseSize - dec
+		}
+	} else {
+		updated = baseSize + uint64(delta)
+	}
+	return updated
 }
 
 func (ms *MountSize) Add(delta int64) int64 {
