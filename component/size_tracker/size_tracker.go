@@ -331,6 +331,25 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 	return nil
 }
 
+func (st *SizeTracker) CreateLink(options internal.CreateLinkOptions) error {
+	log.Trace("SizeTracker::CreateLink : %s", options.Name)
+	var origSize int64
+	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if err == nil {
+		origSize = attr.Size
+	}
+
+	err = st.NextComponent().CreateLink(options)
+	if err != nil {
+		return err
+	}
+
+	newSize := int64(len(options.Target))
+	st.mountSize.Add(newSize - origSize)
+
+	return nil
+}
+
 // ------------------------- Factory -------------------------------------------
 
 // Pipeline will call this method to create your object, initialize your variables here
