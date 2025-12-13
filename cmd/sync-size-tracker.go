@@ -118,22 +118,45 @@ var syncCmd = &cobra.Command{
 			}
 		}
 
-		// Update journal
-		ms, err := size_tracker.CreateSizeJournal(journalName)
-		if err != nil {
-			return fmt.Errorf("failed to open size journal: %w", err)
+		// Update journal and verify accuracy
+		var oldSize, newSize uint64
+		firstRead := true
+		maxAttempts := 3
+		for attempt := 0; newSize != total && attempt < maxAttempts; attempt++ {
+			ms, err := size_tracker.CreateSizeJournal(journalName)
+			if err != nil {
+				return fmt.Errorf("failed to open size journal: %w", err)
+			}
+			ms.Start()
+			newSize = ms.GetSize()
+			if firstRead {
+				oldSize = newSize
+				firstRead = false
+			}
+			if total != newSize {
+				ms.Add(int64(total - newSize))
+				ms.IncrementEpoch()
+			}
+			ms.Stop() // Stop syncs
 		}
-		ms.Start()
-		defer func() { _ = ms.Stop() }()
-
-		current := ms.GetSize()
-		ms.Add(int64(total - current))
 
 		// Print minimal status
 		var bucket string
 		_ = config.UnmarshalKey("s3storage.bucket-name", &bucket)
-		fmt.Printf("sync complete: bucket=%s prefix=%s size=%d (was %d) journal=%s\n",
-			bucket, dir, total, current, journalName)
+		res := "failure"
+		if newSize == total {
+			res = "success"
+		}
+		fmt.Printf(
+			"Sync %s: %s/%s contains %dB. %s updated (%d -> %d).\n",
+			res,
+			bucket,
+			dir,
+			total,
+			journalName,
+			oldSize,
+			newSize,
+		)
 		return nil
 	},
 }

@@ -106,6 +106,10 @@ func (ms *MountSize) Stop() error {
 	return nil
 }
 
+func (ms *MountSize) IncrementEpoch() {
+	ms.epoch.Add(1)
+}
+
 // safely read from and update the size file
 func (ms *MountSize) sync() error {
 	// Open the journal's root
