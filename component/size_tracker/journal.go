@@ -151,7 +151,11 @@ func (ms *MountSize) sync() error {
 	if err := exclusiveLock(f.Fd()); err != nil {
 		return err
 	}
-	defer unlock(f.Fd())
+	defer func() {
+		if unlockErr := unlock(f.Fd()); unlockErr != nil {
+			log.Err("SizeTracker::sync : failed to unlock journal file: %v", unlockErr)
+		}
+	}()
 
 	// Read current values from INI-style text file. Treat missing values as defaults.
 	// version=1
@@ -290,8 +294,4 @@ func (ms *MountSize) sync() error {
 // parse helpers
 func parseUint64(s string) (uint64, error) {
 	return strconv.ParseUint(s, 10, 64)
-}
-
-func parseInt64(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
 }

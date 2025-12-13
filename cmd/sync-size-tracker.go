@@ -137,7 +137,7 @@ var syncCmd = &cobra.Command{
 				ms.Add(int64(total - newSize))
 				ms.IncrementEpoch()
 			}
-			ms.Stop() // Stop syncs
+			_ = ms.Stop() // Stop syncs
 		}
 
 		// Print minimal status
