@@ -135,6 +135,10 @@ func (ms *MountSize) IncrementEpoch() {
 
 // safely read from and update the size file
 func (ms *MountSize) sync() error {
+	err := common.CreateDefaultDirectory()
+	if err != nil {
+		return fmt.Errorf("failed to create default work dir: %v", err)
+	}
 	// Open the journal's root
 	root, err := os.OpenRoot(common.ExpandPath(common.DefaultWorkDir))
 	if err != nil {
