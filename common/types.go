@@ -30,6 +30,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"os/user"
 	"reflect"
 	"runtime"
 	"sync"
@@ -108,10 +109,17 @@ var CfsDisabled = false
 
 func GetDefaultWorkDir() string {
 	val, err := os.UserHomeDir()
-	if err != nil {
-		return "./"
+	if err == nil {
+		return val
 	}
-	return val
+
+	// Fallback: get home directory from password entry
+	currentUser, err := user.Current()
+	if err == nil {
+		return currentUser.HomeDir
+	}
+
+	return "./"
 }
 
 var MountPath string
