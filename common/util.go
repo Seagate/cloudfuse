@@ -443,16 +443,6 @@ func ExpandPath(path string) string {
 		if azureSpecialContainers[key] {
 			return "$" + key // Keep it as is
 		}
-		// For HOME, fall back to os.UserHomeDir() if env var is not set
-		if key == "HOME" {
-			if val := os.Getenv(key); val != "" {
-				return val
-			}
-			if homeDir, err := os.UserHomeDir(); err == nil {
-				return homeDir
-			}
-			return ""
-		}
 		return os.Getenv(key) // Expand normally
 	})
 
