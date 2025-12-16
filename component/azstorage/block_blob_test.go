@@ -151,10 +151,11 @@ func uploadReaderAtToBlockBlob(
 		if readerSize <= singleUploadSize {
 			o.BlockSize = singleUploadSize // Default if unspecified
 		} else {
-			o.BlockSize = int64(math.Ceil(float64(readerSize) / blockblob.MaxBlocks)) // buffer / max blocks = block size to use all 50,000 blocks
-			if o.BlockSize < blob.DefaultDownloadBlockSize {                          // If the block size is smaller than 4MB, round up to 4MB
-				o.BlockSize = blob.DefaultDownloadBlockSize
-			}
+			o.BlockSize = max(
+				// buffer / max blocks = block size to use all 50,000 blocks
+				int64(math.Ceil(float64(readerSize)/blockblob.MaxBlocks)),
+				// If the block size is smaller than 4MB, round up to 4MB
+				blob.DefaultDownloadBlockSize)
 		}
 	}
 
@@ -165,7 +166,7 @@ func uploadReaderAtToBlockBlob(
 
 	blockIDList := make([]string, numBlocks) // Base-64 encoded block IDs
 
-	for i := uint16(0); i < numBlocks; i++ {
+	for i := range numBlocks {
 		offset := int64(i) * o.BlockSize
 		chunkSize := o.BlockSize
 
@@ -206,11 +207,14 @@ type blockBlobTestSuite struct {
 }
 
 func newTestAzStorage(configuration string) (*AzStorage, error) {
-	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
+	err := config.ReadConfigFromReader(strings.NewReader(configuration))
+	if err != nil {
+		return nil, err
+	}
 	az := NewazstorageComponent()
 
 	// Set to false to allow testing with Azurite
-	err := az.Configure(false)
+	err = az.Configure(false)
 
 	return az.(*AzStorage), err
 }
@@ -433,7 +437,7 @@ func (s *blockBlobTestSuite) TestListContainers() {
 	// Setup
 	num := 10
 	prefix := generateContainerName()
-	for i := 0; i < num; i++ {
+	for i := range num {
 		c := s.serviceClient.NewContainerClient(prefix + fmt.Sprint(i))
 		c.Create(ctx, nil)
 		defer c.Delete(ctx, nil)
@@ -1003,7 +1007,7 @@ func (s *blockBlobTestSuite) TestRenameDirWithoutMarker() {
 	src := generateDirectoryName()
 	dst := generateDirectoryName()
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		blockBlobClient := s.containerClient.NewBlockBlobClient(fmt.Sprintf("%s/blob%v", src, i))
 		testData := "test data"
 		data := []byte(testData)
@@ -1025,7 +1029,7 @@ func (s *blockBlobTestSuite) TestRenameDirWithoutMarker() {
 	err := s.az.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 	s.assert.NoError(err)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		srcBlobClient := s.containerClient.NewBlockBlobClient(fmt.Sprintf("%s/blob%v", src, i))
 		dstBlobClient := s.containerClient.NewBlockBlobClient(fmt.Sprintf("%s/blob%v", dst, i))
 
