@@ -205,7 +205,7 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	diff := newSize - oldSize
 
 	// File already exists and WriteFile succeeded subtract difference in file size
-	log.Debug("SizeTracker::WriteFile : %s Add(%d)", options.Handle.Path, diff)
+	log.Debug("SizeTracker::WriteFile : %s Add(%d-%d)", options.Handle.Path, newSize, oldSize)
 	st.mountSize.Add(diff)
 
 	return bytesWritten, nil
@@ -252,7 +252,7 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 	if err != nil {
 		return nil
 	}
-	log.Debug("SizeTracker::CopyFromFile : %s Add(%d)", options.Name, fileInfo.Size()-origSize)
+	log.Debug("SizeTracker::CopyFromFile : %s Add(%d-%d)", options.Name, fileInfo.Size(), origSize)
 	st.mountSize.Add(fileInfo.Size() - origSize)
 	return nil
 }
@@ -332,7 +332,7 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 		log.Err("SizeTracker::CommitData : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", opt.Name, err)
 	}
 
-	log.Debug("SizeTracker::CommitData : %s Add(%d)", opt.Name, newSize-origSize)
+	log.Debug("SizeTracker::CommitData : %s Add(%d-%d)", opt.Name, newSize, origSize)
 	st.mountSize.Add(newSize - origSize)
 
 	return nil
@@ -352,7 +352,7 @@ func (st *SizeTracker) CreateLink(options internal.CreateLinkOptions) error {
 	}
 
 	newSize := int64(len(options.Target))
-	log.Debug("SizeTracker::CommitData : %s Add(%d)", options.Name, newSize-origSize)
+	log.Debug("SizeTracker::CommitData : %s Add(%d-%d)", options.Name, newSize, origSize)
 	st.mountSize.Add(newSize - origSize)
 
 	return nil
