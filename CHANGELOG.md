@@ -2,7 +2,7 @@
 
 ## **2.0.2** ##
 
-December 15th 2025
+December 16th 2025
 This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
 
 ### Bug Fixes ###
