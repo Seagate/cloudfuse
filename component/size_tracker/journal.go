@@ -292,6 +292,7 @@ func (ms *MountSize) sync() error {
 		ms.pendingDelta.Add(-delta)
 	}
 
+	log.Debug("SizeTracker::sync : %d + %d = %d", baseSize, delta, updated)
 	return nil
 }
 
