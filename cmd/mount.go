@@ -38,6 +38,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -473,12 +474,9 @@ var mountCmd = &cobra.Command{
 
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
 
-		// check if cloudfuse stats monitor is added in the disable list
-		for _, mon := range options.MonitorOpt.DisableList {
-			if mon == common.CfuseStats {
-				common.CfsDisabled = true
-				break
-			}
+		// check if blobfuse stats monitor is added in the disable list
+		if slices.Contains(options.MonitorOpt.DisableList, common.CfuseStats) {
+			common.CfsDisabled = true
 		}
 
 		config.Set("mount-path", options.MountPath)

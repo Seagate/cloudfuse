@@ -114,7 +114,7 @@ type azAuthBlobWorkloadIdentity struct {
 // getServiceClient : returns SPN based service client for blob
 func (azWorkloadIdentity *azAuthBlobWorkloadIdentity) getServiceClient(
 	stConfig *AzStorageConfig,
-) (interface{}, error) {
+) (any, error) {
 	cred, err := azWorkloadIdentity.getTokenCredential()
 	if err != nil {
 		log.Err(
@@ -151,7 +151,7 @@ type azAuthDatalakeWorkloadIdentity struct {
 // getServiceClient : returns SPN based service client for blob
 func (azWorkloadIdentity *azAuthDatalakeWorkloadIdentity) getServiceClient(
 	stConfig *AzStorageConfig,
-) (interface{}, error) {
+) (any, error) {
 	cred, err := azWorkloadIdentity.getTokenCredential()
 	if err != nil {
 		log.Err(
