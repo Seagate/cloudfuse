@@ -132,10 +132,7 @@ func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, err
 	}
 
 	// Wait for the read operation to complete or timeout.
-	readTimeout := time.Until(deadline)
-	if readTimeout < 0 {
-		readTimeout = 0
-	}
+	readTimeout := max(time.Until(deadline), 0)
 	eventState, err := windows.WaitForSingleObject(event, uint32(readTimeout.Milliseconds()))
 	if err != nil {
 		return "", fmt.Errorf("ReadFile WaitForSingleObject failed: %w", err)

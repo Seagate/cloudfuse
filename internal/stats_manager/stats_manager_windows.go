@@ -269,7 +269,7 @@ func statsPolling() {
 
 			// send the stats collected so far to transfer pipe
 			stMgrOpt.transferMtx.Lock()
-			err = windows.WriteFile(tPipe, []byte(fmt.Sprintf("%v\n", string(msg))), nil, nil)
+			err = windows.WriteFile(tPipe, fmt.Appendf(nil, "%v\n", string(msg)), nil, nil)
 			stMgrOpt.transferMtx.Unlock()
 			if err != nil {
 				log.Err("stats_manager::statsDumper : Unable to write to pipe [%v]", err)
