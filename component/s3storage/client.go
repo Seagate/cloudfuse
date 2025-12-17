@@ -1020,7 +1020,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple parts
 		err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 		if err != nil {
-			log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
+			log.Err("Client::Write : Failed to upload to object %s. Here's why: %v", name, err)
 			return err
 		}
 	} else {
@@ -1143,7 +1143,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	if combineBlocks {
 		bol.BlockList, err = cl.combineSmallBlocks(name, bol.BlockList)
 		if err != nil {
-			log.Err("Client::StageAndCommit : Failed to combine small blocks: %v ", name, err)
+			log.Err("Client::StageAndCommit : Failed to combine small blocks for %s: %v", name, err)
 			return err
 		}
 	}
@@ -1167,7 +1167,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
-			"Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ",
+			"Client::StageAndCommit : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1180,7 +1180,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 	if uploadID == "" {
 		log.Err(
-			"Client::StageAndCommit : No upload id found in start upload request. Here's why: %v ",
+			"Client::StageAndCommit : No upload id found in start upload request for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1265,7 +1265,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 		if err != nil {
 			log.Info(
-				"Client::StageAndCommit : Attempting to abort upload due to error: ",
+				"Client::StageAndCommit : Attempting to abort upload due to error: %s",
 				err.Error(),
 			)
 			abortErr := cl.abortMultipartUpload(key, uploadID)
@@ -1302,7 +1302,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		},
 	})
 	if err != nil {
-		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: %s", err.Error())
 		abortErr := cl.abortMultipartUpload(key, uploadID)
 		return errors.Join(err, abortErr)
 	}
@@ -1339,14 +1339,14 @@ func (cl *Client) combineSmallBlocks(
 			if len(blk.Data) == 0 && !blk.Truncated() {
 				result, err := cl.getObject(getObjectOptions{name: name, offset: blk.StartIndex, count: blk.EndIndex - blk.StartIndex})
 				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
+					log.Err("Client::combineSmallBlocks : Unable to get object with error: %s", err.Error())
 					return nil, err
 				}
 
 				defer result.Close()
 				addData, err = io.ReadAll(result)
 				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: ", err.Error())
+					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: %s", err.Error())
 					return nil, err
 				}
 			} else {
@@ -1487,7 +1487,7 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
-			"Client::CommitBlocks : Failed to create multipart upload. Here's why: %v ",
+			"Client::CommitBlocks : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1500,7 +1500,7 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 	}
 	if uploadID == "" {
 		log.Err(
-			"Client::CommitBlocks : No upload id found in start upload request. Here's why: %v ",
+			"Client::CommitBlocks : No upload id found in start upload request for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1551,7 +1551,7 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 
 		partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
 		if err != nil {
-			log.Err("Client::CommitBlocks : failed to upload part: ", uploadErr)
+			log.Err("Client::CommitBlocks : failed to upload part: %v", uploadErr)
 			break
 		}
 

@@ -97,7 +97,7 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 			defer buff.Destroy()
 		} else {
 			err := errors.New("AzAuthSPN::getTokenCredential : Client secret not provided for SPN")
-			log.Err(err.Error())
+			log.Err("%s", err.Error())
 			return nil, err
 		}
 

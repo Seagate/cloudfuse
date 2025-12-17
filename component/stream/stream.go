@@ -109,7 +109,7 @@ func (st *Stream) Configure(_ bool) error {
 	st.cache = NewStreamConnection(conf, st)
 
 	log.Info(
-		"Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v, StreamCacheMb %v, MaxBlocksPerFile %v",
+		"Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v",
 		conf.BufferSize,
 		conf.BlockSize,
 		conf.CachedObjLimit,

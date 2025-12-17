@@ -135,9 +135,9 @@ func parseS3Err(err error, attemptedAction string) error {
 				errorCode,
 			)
 			if strings.HasPrefix(attemptedAction, "HeadObject") {
-				log.Warn(message)
+				log.Warn("%s", message)
 			} else {
-				log.Err(message)
+				log.Err("%s", message)
 			}
 			return syscall.ENOENT
 		}

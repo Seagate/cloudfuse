@@ -91,7 +91,7 @@ func (suite *entryCacheTestSuite) SetupTest() {
 		"read-only: true\n\nentry_cache:\n  timeout-sec: 7\n\nloopbackfs:\n  path: %s",
 		suite.fake_storage_path,
 	)
-	log.Debug(defaultConfig)
+	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	os.RemoveAll(suite.fake_storage_path)

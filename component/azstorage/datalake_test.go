@@ -283,7 +283,7 @@ func (s *datalakeTestSuite) TestCreateDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -320,7 +320,7 @@ func (s *datalakeTestSuite) TestCreateDirWithCPKEnabled() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName()}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -345,7 +345,7 @@ func (s *datalakeTestSuite) TestDeleteDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -484,7 +484,7 @@ func (s *datalakeTestSuite) TestIsDirEmpty() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -535,7 +535,7 @@ func (s *datalakeTestSuite) TestStreamDir() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.NoError(err)
@@ -575,7 +575,7 @@ func (s *datalakeTestSuite) TestStreamDirRoot() {
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
@@ -661,7 +661,7 @@ func (s *datalakeTestSuite) TestStreamDirWindowsNameConvert() {
 	// Testing dir and dir/
 	var paths = []string{windowsDirName, windowsDirName + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.NoError(err)
