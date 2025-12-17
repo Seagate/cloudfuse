@@ -471,16 +471,16 @@ func getFileModeFromACL(objid string, acl string, owner string) (os.FileMode, er
 		userACL := acl[idx : idx+3]
 		mask := extractPermission(acl, "mask::")
 
-		permissions := ""
+		var permissions strings.Builder
 		for i, c := range userACL {
 			if userACL[i] == mask[i] {
-				permissions += string(c)
+				permissions.WriteString(string(c))
 			} else {
-				permissions += "-"
+				permissions.WriteString("-")
 			}
 		}
 
-		return permissions
+		return permissions.String()
 	}
 
 	// Sample string : user::rwx,user:objid1:r--,user:objid2:r--,group::r--,mask::r-x,other::rwx:

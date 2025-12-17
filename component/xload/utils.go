@@ -88,11 +88,11 @@ func (Mode) SYNC() Mode {
 }
 
 func (m Mode) String() string {
-	return enum.StringInt(m, reflect.TypeOf(m))
+	return enum.StringInt(m, reflect.TypeFor[Mode]())
 }
 
 func (m *Mode) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(m), s, true, false)
+	enumVal, err := enum.ParseInt(reflect.TypeFor[*Mode](), s, true, false)
 	if enumVal != nil {
 		*m = enumVal.(Mode)
 	}

@@ -43,7 +43,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -415,9 +414,9 @@ func (cl *Client) CreateLink(source string, target string, isSymlink bool) error
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-	symlinkMap := map[string]*string{symlinkKey: to.Ptr("false")}
+	symlinkMap := map[string]*string{symlinkKey: new("false")}
 	if isSymlink {
-		symlinkMap[symlinkKey] = to.Ptr("true")
+		symlinkMap[symlinkKey] = new("true")
 	}
 	return cl.WriteFromBuffer(source, symlinkMap, data)
 }

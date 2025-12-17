@@ -1,6 +1,6 @@
 module github.com/Seagate/cloudfuse
 
-go 1.25.4
+go 1.26rc1
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0

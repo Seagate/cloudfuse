@@ -1,5 +1,4 @@
 //go:build !authtest && !azurite
-// +build !authtest,!azurite
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1538,7 +1537,7 @@ func (s *datalakeTestSuite) TestRenameFileMetadataConservation() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: src})
 	// Add srcMeta to source
 	srcMeta := make(map[string]*string)
-	srcMeta["foo"] = to.Ptr("bar")
+	srcMeta["foo"] = new("bar")
 	source.SetMetadata(ctx, srcMeta, nil)
 	dst := generateFileName()
 
@@ -3416,7 +3415,7 @@ func (s *datalakeTestSuite) TestList() {
 	s.assert.NotEqual(0, blobList[0].Mode)
 
 	// Test listing with marker
-	blobList, marker, err = s.az.storage.List(base, to.Ptr("invalid-marker"), 0)
+	blobList, marker, err = s.az.storage.List(base, new("invalid-marker"), 0)
 	s.assert.Error(err)
 	s.assert.Empty(blobList)
 	s.assert.Nil(marker)

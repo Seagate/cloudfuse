@@ -1,5 +1,4 @@
 //go:build !unittest
-// +build !unittest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.

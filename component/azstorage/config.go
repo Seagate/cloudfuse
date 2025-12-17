@@ -75,11 +75,11 @@ func (AuthType) WORKLOADIDENTITY() AuthType {
 }
 
 func (a AuthType) String() string {
-	return enum.StringInt(a, reflect.TypeOf(a))
+	return enum.StringInt(a, reflect.TypeFor[AuthType]())
 }
 
 func (a *AuthType) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(a), s, true, false)
+	enumVal, err := enum.ParseInt(reflect.TypeFor[*AuthType](), s, true, false)
 	if enumVal != nil {
 		*a = enumVal.(AuthType)
 	}
@@ -104,11 +104,11 @@ func (AccountType) ADLS() AccountType {
 }
 
 func (a AccountType) String() string {
-	return enum.StringInt(a, reflect.TypeOf(a))
+	return enum.StringInt(a, reflect.TypeFor[AccountType]())
 }
 
 func (a *AccountType) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(a), s, true, false)
+	enumVal, err := enum.ParseInt(reflect.TypeFor[*AccountType](), s, true, false)
 	if enumVal != nil {
 		*a = enumVal.(AccountType)
 	}

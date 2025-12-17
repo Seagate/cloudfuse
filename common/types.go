@@ -162,11 +162,11 @@ func (LogLevel) LOG_DEBUG() LogLevel {
 }
 
 func (l LogLevel) String() string {
-	return enum.StringInt(l, reflect.TypeOf(l))
+	return enum.StringInt(l, reflect.TypeFor[LogLevel]())
 }
 
 func (l *LogLevel) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(l), s, true, false)
+	enumVal, err := enum.ParseInt(reflect.TypeFor[*LogLevel](), s, true, false)
 	if enumVal != nil {
 		*l = enumVal.(LogLevel)
 	}

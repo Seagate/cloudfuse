@@ -1,5 +1,4 @@
 //go:build !authtest
-// +build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1289,7 +1288,7 @@ func (s *blockBlobTestSuite) TestRenameFileMetadataConservation() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: src})
 	// Add srcMeta to source
 	srcMeta := make(map[string]*string)
-	srcMeta["foo"] = to.Ptr("bar")
+	srcMeta["foo"] = new("bar")
 	source.SetMetadata(ctx, srcMeta, nil)
 	dst := generateFileName()
 
