@@ -61,7 +61,7 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
 	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
-	log.Debug(defaultConfig)
+	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)

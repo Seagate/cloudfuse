@@ -64,7 +64,7 @@ func (cfs *CloudfuseStats) statsReader() error {
 		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 		err = windows.ConnectNamedPipe(handle, nil)
 		if err == windows.ERROR_PIPE_CONNECTED {
-			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying...", cfs.transferPipe, err)
+			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying... [%v]", cfs.transferPipe, err)
 			windows.Close(handle)
 			time.Sleep(1 * time.Second)
 		} else if err != nil {
@@ -169,7 +169,7 @@ func (cfs *CloudfuseStats) statsPoll() {
 
 	for t := range ticker.C {
 		_, err = writer.WriteString(fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
-		log.Debug("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
+		log.Debug("stats_manager::statsDumper : writing to polling pipe file: %s", fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
 			break
