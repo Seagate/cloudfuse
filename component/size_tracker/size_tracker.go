@@ -377,6 +377,8 @@ func (st *SizeTracker) updateState(bucketUsageFactor float64) {
 			st.evictionMode = Normal
 		} else if bucketUsageFactor > emergencyThreshold {
 			st.evictionMode = Emergency
+			// severe overuse strongly suggests an incorrect server count
+			st.serverCount++
 		}
 	case Emergency:
 		if bucketUsageFactor < bucketNormalizedThreshold {
