@@ -320,7 +320,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 				intendedCapacity := bucketCapacity / serverCount
 				// Use a finite state machine. The evictionMode is the state.
 				// calculate bucket usage and update eviction mode accordingly
-				st.evictionMode = updateState(st.evictionMode, bucketUsage/bucketCapacity)
+				st.updateState(bucketUsage / bucketCapacity)
 				switch st.evictionMode {
 				case Normal:
 					// the server count starts as the bucket capacity divided by the display capacity
@@ -366,33 +366,23 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 	return &stat, true, nil
 }
 
-func updateState(currentState EvictionMode, bucketUsageFactor float64) EvictionMode {
-	switch currentState {
+func (st *SizeTracker) updateState(bucketUsageFactor float64) {
+	switch st.evictionMode {
 	case Normal:
-		if bucketUsageFactor < overuseThreshold {
-			return Normal
-		} else if bucketUsageFactor < emergencyThreshold {
-			return Overuse
-		} else {
-			return Emergency
+		if bucketUsageFactor > overuseThreshold {
+			st.evictionMode = Overuse
 		}
 	case Overuse:
 		if bucketUsageFactor < bucketNormalizedThreshold {
-			return Normal
-		} else if bucketUsageFactor < emergencyThreshold {
-			return Overuse
-		} else {
-			return Emergency
+			st.evictionMode = Normal
+		} else if bucketUsageFactor > emergencyThreshold {
+			st.evictionMode = Emergency
 		}
 	case Emergency:
 		if bucketUsageFactor < bucketNormalizedThreshold {
-			return Normal
-		} else {
-			return Emergency
+			st.evictionMode = Normal
 		}
 	}
-
-	return currentState
 }
 
 func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
