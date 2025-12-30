@@ -62,7 +62,11 @@ func FuzzNormalizeObjectName(f *testing.F) {
 
 		inputWithoutBackslash := strings.ReplaceAll(input, "\\", "/")
 		if result != inputWithoutBackslash {
-			t.Errorf("unexpected transformation: expected %q, got %q", inputWithoutBackslash, result)
+			t.Errorf(
+				"unexpected transformation: expected %q, got %q",
+				inputWithoutBackslash,
+				result,
+			)
 		}
 	})
 }
@@ -84,7 +88,12 @@ func FuzzJoinUnixFilepath(f *testing.F) {
 		result := JoinUnixFilepath(part1, part2)
 
 		if strings.Contains(result, "\\") {
-			t.Errorf("result contains backslash: JoinUnixFilepath(%q, %q) = %q", part1, part2, result)
+			t.Errorf(
+				"result contains backslash: JoinUnixFilepath(%q, %q) = %q",
+				part1,
+				part2,
+				result,
+			)
 		}
 	})
 }

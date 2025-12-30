@@ -339,7 +339,11 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 
 	// Validate nonce length before passing to GCM to prevent panic
 	if len(nonce) != gcm.NonceSize() {
-		return nil, fmt.Errorf("invalid nonce length: got %d, expected %d", len(nonce), gcm.NonceSize())
+		return nil, fmt.Errorf(
+			"invalid nonce length: got %d, expected %d",
+			len(nonce),
+			gcm.NonceSize(),
+		)
 	}
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
