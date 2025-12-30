@@ -95,5 +95,3 @@ func FuzzDecryptMalformed(f *testing.F) {
 		_, _ = DecryptData(ciphertext, enclave)
 	})
 }
-
-
