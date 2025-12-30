@@ -337,6 +337,11 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 		return nil, err
 	}
 
+	// Validate nonce length before passing to GCM to prevent panic
+	if len(nonce) != gcm.NonceSize() {
+		return nil, fmt.Errorf("invalid nonce length: got %d, expected %d", len(nonce), gcm.NonceSize())
+	}
+
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, err
@@ -346,21 +351,33 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 }
 
 func extractSalt(cipherData []byte) ([]byte, error) {
-	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
-	if len(cipherData) < int(uint16Size+saltLength) {
+	// Check minimum length for salt length field
+	if len(cipherData) < int(uint16Size) {
+		return nil, errors.New("cipher data too short to contain salt length")
+	}
+	saltLength := int(binary.LittleEndian.Uint16(cipherData[:uint16Size]))
+	if len(cipherData) < uint16Size+saltLength {
 		return nil, errors.New("invalid data length")
 	}
 	return cipherData[uint16Size : uint16Size+saltLength], nil
 }
 
 func extractNonceAndCiphertext(cipherData []byte) ([]byte, []byte, error) {
-	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
+	// Check minimum length for salt length field
+	if len(cipherData) < int(uint16Size) {
+		return nil, nil, errors.New("cipher data too short to contain salt length")
+	}
+	saltLength := int(binary.LittleEndian.Uint16(cipherData[:uint16Size]))
 	offset := uint16Size + saltLength
 
-	nonceLength := binary.LittleEndian.Uint16(cipherData[offset : offset+uint16Size])
+	// Check if data is long enough to contain nonce length field
+	if len(cipherData) < offset+uint16Size {
+		return nil, nil, errors.New("cipher data too short to contain nonce length")
+	}
+	nonceLength := int(binary.LittleEndian.Uint16(cipherData[offset : offset+uint16Size]))
 	offset += uint16Size
 
-	if len(cipherData) < int(offset+nonceLength) {
+	if len(cipherData) < offset+nonceLength {
 		return nil, nil, errors.New("invalid data length")
 	}
 
