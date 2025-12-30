@@ -80,7 +80,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	data := make([]byte, size)
 
 	n, err := tobj.blockCache.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
 	) // Write data to file
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(n, size)
@@ -101,7 +101,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	_, _ = tobj.blockCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
@@ -124,7 +124,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	_, _ = tobj.blockCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)

@@ -1390,9 +1390,9 @@ func (suite *attrCacheTestSuite) TestWriteFileError() {
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).
 		Return(&internal.ObjAttr{Path: path}, nil)
-	suite.mock.EXPECT().WriteFile(options).Return(0, errors.New("Failed to write a file"))
+	suite.mock.EXPECT().WriteFile(&options).Return(0, errors.New("Failed to write a file"))
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.Error(err)
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
@@ -1412,9 +1412,9 @@ func (suite *attrCacheTestSuite) TestWriteFileDoesNotExist() {
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).
 		Return(&internal.ObjAttr{Path: path}, nil)
-	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
+	suite.mock.EXPECT().WriteFile(&options).Return(0, nil)
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.NoError(err)
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
@@ -1432,9 +1432,9 @@ func (suite *attrCacheTestSuite) TestWriteFileExists() {
 	options := internal.WriteFileOptions{Handle: &handle, Metadata: nil}
 	// Entry Already Exists
 	suite.addPathToCache(path, true)
-	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
+	suite.mock.EXPECT().WriteFile(&options).Return(0, nil)
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.NoError(err)
 	suite.assertExists(path)
 }
@@ -1445,7 +1445,7 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	path := "a"
 	size := 1024
 
-	options := internal.TruncateFileOptions{Name: path, Size: int64(size)}
+	options := internal.TruncateFileOptions{Name: path, NewSize: int64(size)}
 
 	// Error
 	suite.mock.EXPECT().TruncateFile(options).Return(errors.New("Failed to truncate a file"))

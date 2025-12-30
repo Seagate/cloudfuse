@@ -120,12 +120,12 @@ type AzConnection interface {
 
 	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
 	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
-	Write(options internal.WriteFileOptions) error
+	Write(options *internal.WriteFileOptions) error
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 
 	ChangeMod(string, os.FileMode) error
 	ChangeOwner(string, int, int) error
-	TruncateFile(string, int64) error
+	TruncateFile(options internal.TruncateFileOptions) error
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)
