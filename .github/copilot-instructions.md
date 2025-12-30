@@ -1,6 +1,6 @@
-# Azure Storage Fuse (Blobfuse2)
+# Azure Storage Fuse (cloudfuse)
 
-Azure Storage Fuse (Blobfuse2) is a Microsoft-supported FUSE filesystem driver that provides virtual filesystem backed by Azure Blob Storage. It uses libfuse (fuse3) to communicate with the Linux FUSE kernel module and implements filesystem operations using Azure Storage REST APIs.
+Cloudfuse is a  FUSE filesystem driver that provides virtual filesystem backed by S3 or Azure Blob Storage. It uses libfuse (fuse3) to communicate with the Linux FUSE kernel module and implements filesystem operations using the AWS S3 or Azure Storage REST APIs.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
@@ -16,12 +16,12 @@ Always reference these instructions first and fallback to search or bash command
   sudo apt install -y libfuse3-dev fuse3 gcc
   ```
 
-- Install Go 1.24.4+ (already available in most environments):
+- Install Go 1.25.4+ (already available in most environments):
   ```bash
-  go version  # Should show 1.24.4 or higher
+  go version  # Should show 1.25.4 or higher
   ```
 
-- Build blobfuse2 binary:
+- Build cloudfuse binary:
   ```bash
   ./build.sh
   ```
@@ -35,8 +35,8 @@ Always reference these instructions first and fallback to search or bash command
 
 - Verify binary functionality:
   ```bash
-  ./blobfuse2 --version
-  ./blobfuse2 -h
+  ./cloudfuse --version
+  ./cloudfuse -h
   ```
 
 ### Testing
@@ -76,22 +76,22 @@ Always reference these instructions first and fallback to search or bash command
 1. **Binary Creation and Basic Commands**:
    ```bash
    ./build.sh
-   ./blobfuse2 --version
-   ./blobfuse2 -h
-   ./blobfuse2 mount --help
+   ./cloudfuse --version
+   ./cloudfuse -h
+   ./cloudfuse mount --help
    ```
 
 2. **Config Generation**:
    ```bash
-   mkdir -p /tmp/blobfuse-test
-   ./blobfuse2 gen-config --tmp-path=/tmp/blobfuse-test --o /tmp/blobfuse-test/config.yaml
-   cat /tmp/blobfuse-test/config.yaml
+   mkdir -p /tmp/cloudfuse-test
+   ./cloudfuse gen-config --tmp-path=/tmp/cloudfuse-test --o /tmp/cloudfuse-test/config.yaml
+   cat /tmp/cloudfuse-test/config.yaml
    ```
 
 3. **Health Monitor**:
    ```bash
    ./build.sh health
-   ./bfusemon --help
+   ./cfusemon --help
    ```
 
 4. **Format and Lint Validation**:
@@ -102,13 +102,13 @@ Always reference these instructions first and fallback to search or bash command
 
 ## Build System Details
 
-- **Primary Build Script**: `./build.sh` - builds blobfuse2 with fuse3 by default
+- **Primary Build Script**: `./build.sh` - builds cloudfuse with fuse3 by default
 - **Build Variants**: 
   - `./build.sh` - standard fuse3 build
   - `./build.sh fuse2` - legacy fuse2 build
   - `./build.sh health` - health monitor binary
-- **Output**: `blobfuse2` binary (~30MB) and optionally `bfusemon` binary (~6MB)
-- **Go Version**: Requires Go 1.24.4+ (specified in go.mod)
+- **Output**: `cloudfuse` binary (~30MB) and optionally `cfusemon` binary (~6MB)
+- **Go Version**: Requires Go 1.25.4+ (specified in go.mod)
 - **Tags**: Use `fuse3` tag for testing/building (default), `fuse2` for legacy systems
 
 ## Testing Infrastructure
@@ -126,7 +126,7 @@ Always reference these instructions first and fallback to search or bash command
 - **common/**: Shared utilities, configuration, logging
 - **internal/**: Internal APIs and pipeline management
 - **test/**: All testing code and scripts
-- **tools/health-monitor/**: Blobfuse2 monitoring tool
+- **tools/health-monitor/**: cloudfuse monitoring tool
 
 ## Configuration
 
@@ -134,7 +134,7 @@ Always reference these instructions first and fallback to search or bash command
   - `sampleFileCacheConfig.yaml` - file-based caching
   - `sampleBlockCacheConfig.yaml` - block-based caching
   - `setup/baseConfig.yaml` - complete configuration options
-- **Config Generation**: Use `blobfuse2 gen-config` to auto-generate configs
+- **Config Generation**: Use `cloudfuse gen-config` to auto-generate configs
 - **Authentication**: Supports account keys, SAS tokens, MSI, SPN, Azure CLI
 
 ## Important Notes
@@ -163,14 +163,14 @@ go test -v -timeout=10m ./internal/... ./common/... --tags=unittest,fuse3
 $(go env GOPATH)/bin/golangci-lint run --tests=false --build-tags fuse3 --max-issues-per-linter=0
 
 # Binary functionality
-./blobfuse2 --version
-./blobfuse2 gen-config --tmp-path=/tmp/test --o /tmp/test-config.yaml
+./cloudfuse --version
+./cloudfuse gen-config --tmp-path=/tmp/test --o /tmp/test-config.yaml
 ```
 
 ## CI/CD Integration
 
-- **Build Pipeline**: Azure Pipelines (blobfuse2-1es_ci.yaml)
-- **Testing**: Automated on Ubuntu 20/22, both x86 and ARM64
+- **Build Pipeline**: Github Actions
+- **Testing**: Automated on Ubuntu 24, both x86 and ARM64
 - **Performance**: Dedicated benchmark workflows
 - **Security**: CodeQL analysis and dependency scanning
 - **Release**: Automated package building and distribution
@@ -180,7 +180,7 @@ $(go env GOPATH)/bin/golangci-lint run --tests=false --build-tags fuse3 --max-is
 - **Build Failures**: Check Go version, ensure libfuse3-dev installed
 - **Test Failures**: Network/credential tests expected to fail without Azure setup
 - **Mount Failures**: Verify FUSE permissions and Azure credentials
-- **Performance**: Use health monitor (`bfusemon`) for runtime diagnostics
+- **Performance**: Use health monitor (`cfusemon`) for runtime diagnostics
 
 ## Key Files to Monitor
 
