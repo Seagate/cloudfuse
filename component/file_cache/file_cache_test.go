@@ -1144,6 +1144,48 @@ func (suite *fileCacheTestSuite) TestDeleteFileError() {
 	suite.assert.EqualValues(syscall.ENOENT, err)
 }
 
+// Test that closing a deleted file succeeds even with a dirty handle
+// This tests the fix for the bug where closing a dirty, open, deleted file would fail
+// because flushFileInternal would try to upload a file that was already deleted from cache
+func (suite *fileCacheTestSuite) TestCloseDeletedFileWithDirtyHandle() {
+	defer suite.cleanupTest()
+
+	path := "file_deleted_dirty"
+
+	// Create and open a file
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+
+	// Write to the file to make it dirty
+	testData := "test data that makes file dirty"
+	data := []byte(testData)
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	// Verify the handle is dirty
+	suite.assert.True(handle.Dirty())
+
+	// Delete the file while it's still open
+	// This will remove it from cache via CachePurge
+	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.NoError(err)
+
+	// File should not be in cache anymore
+	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, path)))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+
+	// Close the file - this should succeed even though the file was deleted
+	// Previously this would fail because flushFileInternal would try to open
+	// the deleted local file for upload
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// File should not exist in fake storage (it was deleted)
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
+}
+
 func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	defer suite.cleanupTest()
 	path := "file7"
