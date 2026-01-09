@@ -140,22 +140,26 @@ var syncCmd = &cobra.Command{
 			_ = ms.Stop() // Stop syncs
 		}
 
-		// Print minimal status
+		// Print a short user-friendly status
 		var bucket string
 		_ = config.UnmarshalKey("s3storage.bucket-name", &bucket)
-		res := "failure"
-		if newSize == total {
-			res = "success"
+		delta := newSize - oldSize
+		journalUpdateStr := string(delta)
+		if delta > 0 {
+			journalUpdateStr = "+" + journalUpdateStr
 		}
-		fmt.Printf(
-			"Sync %s: %s/%s contains %dB. %s updated (%d -> %d).\n",
+		res := "✓"
+		if newSize != total {
+			res = "✗"
+			journalUpdateStr = string(oldSize) + journalUpdateStr
+		}
+		fmt.Printf("%s Synced %s/%s: %dB (journal: %s %s)\n",
 			res,
 			bucket,
 			dir,
 			total,
 			journalName,
-			oldSize,
-			newSize,
+			journalUpdateStr,
 		)
 		return nil
 	},
