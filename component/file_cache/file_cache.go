@@ -1670,9 +1670,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
-	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
 	if options.Handle.Dirty() {
 		if fc.lazyWrite && !options.CloseInProgress {
@@ -1706,6 +1703,22 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				return syscall.EIO
 			}
 		}
+
+		// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
+		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
+		if !fc.policy.IsCached(localPath) {
+			// the only way the file would not be in cache is if it was deleted
+			// succeed gracefully by just skipping the upload
+			// this is especially important to allow dirty open handles to deleted files to be closed
+			log.Warn(
+				"FileCache::FlushFile : %s has been deleted. Skipping upload.",
+				options.Handle.Path,
+			)
+			return nil
+		}
+
+		// refresh the file in the cache
+		fc.policy.CacheValid(localPath)
 
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
