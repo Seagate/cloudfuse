@@ -254,7 +254,7 @@ func generateNestedPathAttr(path string, size int64, mode os.FileMode) []*intern
 func generateListPathAttr(path string, numEntries int) []*internal.ObjAttr {
 	path = internal.TruncateDirName(path)
 	pathAttrs := make([]*internal.ObjAttr, 0)
-	for i := 0; i < numEntries; i++ {
+	for i := range numEntries {
 		filename := fmt.Sprintf("%s/file%d", path, i)
 		newPathAttr := getPathAttr(filename, defaultSize, fs.FileMode(defaultMode), true)
 		pathAttrs = append(pathAttrs, newPathAttr)

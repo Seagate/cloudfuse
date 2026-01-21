@@ -6,6 +6,10 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   create-installer:
     # Run Inno Setup to create the Windows app installer, then write it to actions/cache
@@ -17,12 +21,12 @@ jobs:
       winfsp: winfsp-2.1.25156.msi
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -52,7 +56,7 @@ jobs:
         # Get the WinFSP installer (from cache or download)
       - name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -64,10 +68,10 @@ jobs:
           WINFSP: ${{ env.winfsp }}
         run: |
           curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
-      
+
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -93,7 +97,7 @@ jobs:
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -108,8 +112,8 @@ jobs:
       go: "1.25"
       zig: 0.15.1
     permissions:
-      contents: write
-      id-token: write
+      contents: write # Needed to create releases
+      id-token: write # Needed for signing with Cosign
 
     steps:
       # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
@@ -119,7 +123,7 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu libfuse-dev libfuse3-dev
       # Get code and Go ready
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -135,14 +139,14 @@ jobs:
           rm zig.tar.xz
 
       - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
           cache: false
 
       - name: Set up Cosign
-        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
 
       - name: Set Version
         id: get_version
@@ -152,7 +156,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -172,14 +176,14 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Needed to update gh-pages branch
 
     steps:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y createrepo-c
 
       - name: Checkout gh-pages branch
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: gh-pages
           path: gh-pages
