@@ -66,7 +66,12 @@ func checkBlockConsistency(
 	} else {
 		// Compare checksums
 		if !bytes.Equal(actualHash, xattrHash) {
-			log.Err("BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v", fileName, xattrHash, actualHash)
+			log.Err(
+				"BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v",
+				fileName,
+				xattrHash,
+				actualHash,
+			)
 			_ = os.Remove(localPath)
 			return false
 		}
