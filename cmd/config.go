@@ -177,7 +177,10 @@ func init() {
 // Initializes the tview application, builds the TUI application, and runs it.
 func (tui *appContext) run() error {
 	// Disable cloudfuse logging during TUI session to prevent log messages from interfering with the UI.
-	if err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_OFF()}); err != nil {
+	if err := log.SetDefaultLogger(
+		"silent",
+		common.LogConfig{Level: common.ELogLevel.LOG_OFF()},
+	); err != nil {
 		// If setting silent logger fails, this fallback is sufficient.
 		log.SetLogLevel(1)
 	}
@@ -942,9 +945,12 @@ func (tui *appContext) buildCachingPage() tview.Primitive {
 			} else {
 				// If caching is disabled, just finish the configuration
 				if err := tui.createYAMLConfig(); err != nil {
-					tui.showErrorModal("[red::b]ERROR:[-::-] Failed to create YAML config:\n"+err.Error(), func() {
-						tui.pages.SwitchToPage("page5")
-					})
+					tui.showErrorModal(
+						"[red::b]ERROR:[-::-] Failed to create YAML config:\n"+err.Error(),
+						func() {
+							tui.pages.SwitchToPage("page5")
+						},
+					)
 					return
 				}
 				tui.showExitModal(func() {
@@ -1049,8 +1055,13 @@ func (tui *appContext) buildPreviewPage(previewPage string) tview.Primitive {
 			colorYellow, tui.config.cacheRetentionDurationSec,
 		)
 	} else {
-		summaryText += fmt.Sprintf("  Cache Retention: [%s::b]%d sec (%d %s)[-]\n\n",
-			colorYellow, tui.config.cacheRetentionDurationSec, tui.config.cacheRetentionDuration, tui.config.cacheRetentionUnit)
+		summaryText += fmt.Sprintf(
+			"  Cache Retention: [%s::b]%d sec (%d %s)[-]\n\n",
+			colorYellow,
+			tui.config.cacheRetentionDurationSec,
+			tui.config.cacheRetentionDuration,
+			tui.config.cacheRetentionUnit,
+		)
 	}
 
 	// Set a dynamic width and height for the summary widget

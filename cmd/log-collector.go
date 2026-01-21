@@ -72,7 +72,9 @@ var gatherLogsCmd = &cobra.Command{
 			)
 		}
 
-		if gatherLogOpts.logConfigFile, err = filepath.Abs(gatherLogOpts.logConfigFile); err != nil {
+		if gatherLogOpts.logConfigFile, err = filepath.Abs(
+			gatherLogOpts.logConfigFile,
+		); err != nil {
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 

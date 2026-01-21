@@ -151,7 +151,11 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 			log.Err("downloadSplitter::Process : %s is a directory", item.Path)
 			return -1, fmt.Errorf("%s is a directory", item.Path)
 		} else if item.DataLen == uint64(size) {
-			log.Debug("downloadSplitter::Process : %s will be served from local path, priority %v", item.Path, item.Priority)
+			log.Debug(
+				"downloadSplitter::Process : %s will be served from local path, priority %v",
+				item.Path,
+				item.Priority,
+			)
 			return int(size), nil
 		}
 	}
@@ -234,9 +238,16 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 					operationSuccess = false
 					cancel() // cancel the context to stop download of other chunks
 				} else {
-					_, err := item.FileHandle.WriteAt(respSplitItem.Block.Data[:respSplitItem.DataLen], respSplitItem.Block.Offset)
+					_, err := item.FileHandle.WriteAt(
+						respSplitItem.Block.Data[:respSplitItem.DataLen],
+						respSplitItem.Block.Offset,
+					)
 					if err != nil {
-						log.Err("downloadSplitter::Process : Failed to write data to file %s [%s]", item.Path, err.Error())
+						log.Err(
+							"downloadSplitter::Process : Failed to write data to file %s [%s]",
+							item.Path,
+							err.Error(),
+						)
 						operationSuccess = false
 						cancel() // cancel the context to stop download of other chunks
 					}
@@ -283,7 +294,11 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 			// log.Debug("downloadSplitter::Process : Scheduling download for %s offset %v", item.Path, offset)
 			err := ds.GetNext().Schedule(splitItem)
 			if err != nil {
-				log.Err("downloadSplitter::Process : Failed to schedule download for %s [%s]", item.Path, err.Error())
+				log.Err(
+					"downloadSplitter::Process : Failed to schedule download for %s [%s]",
+					item.Path,
+					err.Error(),
+				)
 				responseChannel <- &WorkItem{Err: fmt.Errorf("failed to schedule download for %s [%s]", item.Path, err.Error())}
 			}
 		}
@@ -361,12 +376,19 @@ func (ds *downloadSplitter) checkConsistency(item *WorkItem) error {
 		// Compute md5 of local file
 		fileMD5, err := common.GetMD5(item.FileHandle)
 		if err != nil {
-			log.Err("downloadSplitter::checkConsistency : Failed to generate MD5Sum for %s [%s]", item.Path, err.Error())
+			log.Err(
+				"downloadSplitter::checkConsistency : Failed to generate MD5Sum for %s [%s]",
+				item.Path,
+				err.Error(),
+			)
 			return err
 		}
 		// compare md5 and fail is not match
 		if !reflect.DeepEqual(fileMD5, item.MD5) {
-			log.Err("downloadSplitter::checkConsistency : MD5Sum mismatch on download for file %s", item.Path)
+			log.Err(
+				"downloadSplitter::checkConsistency : MD5Sum mismatch on download for file %s",
+				item.Path,
+			)
 			return fmt.Errorf("md5sum mismatch on download for file %s", item.Path)
 		}
 	}
