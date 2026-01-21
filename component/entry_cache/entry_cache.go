@@ -177,7 +177,11 @@ func (c *EntryCache) StreamDir(
 		}
 		return pathList, token, err
 	} else {
-		log.Debug("EntryCache::StreamDir : Serving list from cache for path: %s, token %s", options.Name, options.Token)
+		log.Debug(
+			"EntryCache::StreamDir : Serving list from cache for path: %s, token %s",
+			options.Name,
+			options.Token,
+		)
 		item := pathEntry.(pathCacheItem)
 		return item.children, item.nextToken, nil
 	}

@@ -190,7 +190,11 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	if getAttrErr1 == nil {
 		oldSize = attr.Size
 	} else {
-		log.Err("SizeTracker::WriteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr1)
+		log.Err(
+			"SizeTracker::WriteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v",
+			options.Handle.Path,
+			getAttrErr1,
+		)
 	}
 
 	bytesWritten, err := st.NextComponent().WriteFile(options)
@@ -310,7 +314,11 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 	if err == nil {
 		origSize = attr.Size
 	} else {
-		log.Err("SizeTracker::CommitData : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", opt.Name, err)
+		log.Err(
+			"SizeTracker::CommitData : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v",
+			opt.Name,
+			err,
+		)
 	}
 
 	err = st.NextComponent().CommitData(opt)
@@ -323,7 +331,11 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 	if err == nil {
 		newSize = attr.Size
 	} else {
-		log.Err("SizeTracker::CommitData : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", opt.Name, err)
+		log.Err(
+			"SizeTracker::CommitData : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v",
+			opt.Name,
+			err,
+		)
 	}
 
 	st.mountSize.Add(newSize - origSize)

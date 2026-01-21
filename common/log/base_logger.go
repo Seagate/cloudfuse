@@ -183,7 +183,11 @@ func (l *BaseLogger) init() error {
 			l.fileConfig.currentLogSize = uint64(fi.Size())
 		}
 		var err error
-		l.logFileHandle, err = os.OpenFile(l.fileConfig.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		l.logFileHandle, err = os.OpenFile(
+			l.fileConfig.LogFile,
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+			0644,
+		)
 		if err != nil {
 			l.logFileHandle = os.Stdout
 		}
