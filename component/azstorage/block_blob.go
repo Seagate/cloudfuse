@@ -485,7 +485,11 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 			)
 			return syscall.ENOENT
 		} else {
-			log.Err("BlockBlob::RenameDirectory : Failed to get source directory marker blob properties for %s [%s]", source, err.Error())
+			log.Err(
+				"BlockBlob::RenameDirectory : Failed to get source directory marker blob properties for %s [%s]",
+				source,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -976,7 +980,11 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 				CPKInfo: bb.blobCPKOpt,
 			})
 			if err != nil {
-				log.Warn("BlockBlob::ReadToFile : Failed to get properties of blob %s [%s]", name, err.Error())
+				log.Warn(
+					"BlockBlob::ReadToFile : Failed to get properties of blob %s [%s]",
+					name,
+					err.Error(),
+				)
 			} else {
 				blobMD5 := prop.ContentMD5
 				if blobMD5 == nil {
@@ -1146,7 +1154,10 @@ func (bb *BlockBlob) calculateBlockSize(name string, fileSize int64) (blockSize 
 
 			if blockSize > blockblob.MaxStageBlockBytes {
 				// After rounding off the blockSize has become bigger then max allowed blocks.
-				log.Err("BlockBlob::calculateBlockSize : blockSize exceeds max allowed block size for %s", name)
+				log.Err(
+					"BlockBlob::calculateBlockSize : blockSize exceeds max allowed block size for %s",
+					name,
+				)
 				err = errors.New("block-size is too large to upload to a block blob")
 				return 0, err
 			}
@@ -1370,7 +1381,9 @@ func (bb *BlockBlob) createNewBlocks(
 			}
 		}
 	} else if math.Ceil((float64)(numOfBlocks)+(float64)(length)/(float64)(blockSize)) > blockblob.MaxBlocks {
-		return 0, errors.New("cannot accommodate data within the block limit with configured block-size")
+		return 0, errors.New(
+			"cannot accommodate data within the block limit with configured block-size",
+		)
 	}
 
 	// BufferSize is the size of the buffer that will go beyond our current blob (appended)
@@ -1478,7 +1491,11 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 		} else {
 			err := bb.WriteFromBuffer(name, nil, make([]byte, size))
 			if err != nil {
-				log.Err("BlockBlob::TruncateFile : Failed to set the %s to 0 bytes [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::TruncateFile : Failed to set the %s to 0 bytes [%s]",
+					name,
+					err.Error(),
+				)
 			}
 		}
 		return err
@@ -1503,7 +1520,11 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 	} else {
 		bol, err := bb.GetFileBlockOffsets(name)
 		if err != nil {
-			log.Err("BlockBlob::TruncateFile : Failed to get block list of file %s [%s]", name, err.Error())
+			log.Err(
+				"BlockBlob::TruncateFile : Failed to get block list of file %s [%s]",
+				name,
+				err.Error(),
+			)
 			return err
 		}
 		if bol.SmallFile() {
@@ -1514,22 +1535,38 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 			}
 			err = bb.WriteFromBuffer(name, nil, data)
 			if err != nil {
-				log.Err("BlockBlob::TruncateFile : Failed to write from buffer file %s", name, err.Error())
+				log.Err(
+					"BlockBlob::TruncateFile : Failed to write from buffer file %s",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		} else {
 			if size < attr.Size {
 				bol = bb.removeBlocks(bol, size, name)
 			} else if size > attr.Size {
-				_, err = bb.createNewBlocks(bol, bol.BlockList[len(bol.BlockList)-1].EndIndex, size-attr.Size)
+				_, err = bb.createNewBlocks(
+					bol,
+					bol.BlockList[len(bol.BlockList)-1].EndIndex,
+					size-attr.Size,
+				)
 				if err != nil {
-					log.Err("BlockBlob::TruncateFile : Failed to create new blocks for file %s", name, err.Error())
+					log.Err(
+						"BlockBlob::TruncateFile : Failed to create new blocks for file %s",
+						name,
+						err.Error(),
+					)
 					return err
 				}
 			}
 			err = bb.StageAndCommit(name, bol)
 			if err != nil {
-				log.Err("BlockBlob::TruncateFile : Failed to stage and commit file %s", name, err.Error())
+				log.Err(
+					"BlockBlob::TruncateFile : Failed to stage and commit file %s",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1607,14 +1644,21 @@ func (bb *BlockBlob) Write(options internal.WriteFileOptions) error {
 		// case 2: given offset is within the size of the blob - and the blob consists of multiple blocks
 		// case 3: new blocks need to be added
 	} else {
-		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(offset, length)
+		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(
+			offset,
+			length,
+		)
 		// keeps track of how much new data will be appended to the end of the file (applicable only to case 3)
 		newBufferSize := int64(0)
 		// case 3?
 		if exceedsFileBlocks {
 			newBufferSize, err = bb.createNewBlocks(fileOffsets, offset, length)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to create new blocks for file %s", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to create new blocks for file %s",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1622,9 +1666,19 @@ func (bb *BlockBlob) Write(options internal.WriteFileOptions) error {
 		oldDataBuffer := make([]byte, oldDataSize+newBufferSize)
 		if !appendOnly {
 			// fetch the blocks that will be impacted by the new changes so we can overwrite them
-			err = bb.ReadInBuffer(name, fileOffsets.BlockList[index].StartIndex, oldDataSize, oldDataBuffer, nil)
+			err = bb.ReadInBuffer(
+				name,
+				fileOffsets.BlockList[index].StartIndex,
+				oldDataSize,
+				oldDataBuffer,
+				nil,
+			)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to read data in buffer %s [%s]",
+					name,
+					err.Error(),
+				)
 			}
 		}
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data

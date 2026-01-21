@@ -972,11 +972,20 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 			DstAttr: dstAttr,
 		})
 		if err != nil {
-			log.Err("Libfuse::Rename : error renaming file %s -> %s [%s]", srcPath, dstPath, err.Error())
+			log.Err(
+				"Libfuse::Rename : error renaming file %s -> %s [%s]",
+				srcPath,
+				dstPath,
+				err.Error(),
+			)
 			return -fuse.EIO
 		}
 
-		libfuseStatsCollector.PushEvents(renameFile, srcPath, map[string]any{source: srcPath, dest: dstPath})
+		libfuseStatsCollector.PushEvents(
+			renameFile,
+			srcPath,
+			map[string]any{source: srcPath, dest: dstPath},
+		)
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 
 	}

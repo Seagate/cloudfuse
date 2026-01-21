@@ -283,7 +283,10 @@ func (az *AzStorage) StreamDir(
 			az.listBlocked = false
 			log.Info("AzStorage::StreamDir : Unblocked List API")
 		} else {
-			log.Info("AzStorage::StreamDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
+			log.Info(
+				"AzStorage::StreamDir : Blocked List API for %d more seconds",
+				int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()),
+			)
 			return make([]*internal.ObjAttr, 0), "", nil
 		}
 	}
@@ -317,7 +320,10 @@ func (az *AzStorage) StreamDir(
 			   and will terminate the readdir call. As there are more items left on the server side we
 			   need to retry getting a list here.
 			*/
-			log.Warn("AzStorage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *new_marker)
+			log.Warn(
+				"AzStorage::StreamDir : next-marker %s but current list is empty. Need to retry listing",
+				*new_marker,
+			)
 			options.Token = *new_marker
 			return az.StreamDir(options)
 		}
