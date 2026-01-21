@@ -1188,112 +1188,13 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		return err
 	}
 
-	var partNumber int32 = 1
-	parts := make([]types.CompletedPart, 0)
-	var data []byte
-
-	for _, blk := range bol.BlockList {
-		if blk.Truncated() {
-			data = make([]byte, blk.EndIndex-blk.StartIndex)
-			blk.Flags.Clear(common.TruncatedBlock)
-		} else {
-			data = blk.Data
-		}
-
-		var err error
-		var eTag *string
-		var checksumCRC32 *string
-		var checksumCRC32C *string
-		var checksumSHA256 *string
-		var checksumSHA1 *string
-		if blk.Dirty() || len(data) > 0 {
-			// This block has data that is not yet in the bucket
-			uploadPartInput := &s3.UploadPartInput{
-				Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
-				Key:        aws.String(key),
-				PartNumber: &partNumber,
-				UploadId:   &uploadID,
-				Body:       bytes.NewReader(data),
-			}
-
-			if cl.Config.enableChecksum {
-				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
-			}
-
-			var partResp *s3.UploadPartOutput
-			partResp, err = cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
-			if err != nil {
-				return err
-			}
-
-			eTag = partResp.ETag
-			blk.Flags.Clear(common.DirtyBlock)
-
-			// Collect the checksums
-			// It is easier to just collect all checksums and then upload them together
-			// as ones that are not used will just be nil and an object can only ever
-			// have one valid checksum
-			checksumCRC32 = partResp.ChecksumCRC32
-			checksumCRC32C = partResp.ChecksumCRC32C
-			checksumSHA1 = partResp.ChecksumSHA1
-			checksumSHA256 = partResp.ChecksumSHA256
-		} else {
-			// This block is already in the bucket, so we need to copy this part
-			var partResp *s3.UploadPartCopyOutput
-			partResp, err = cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
-				Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
-				Key:             aws.String(key),
-				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key)),
-				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
-				PartNumber:      &partNumber,
-				UploadId:        &uploadID,
-			})
-			if err != nil {
-				return err
-			}
-
-			eTag = partResp.CopyPartResult.ETag
-
-			// Collect the checksums
-			// It is easier to just collect all checksums and then upload them together
-			// as ones that are not used will just be nil and an object can only ever
-			// have one valid checksum
-			checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
-			checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
-			checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
-			checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
-		}
-
-		if err != nil {
-			log.Info(
-				"Client::StageAndCommit : Attempting to abort upload due to error: ",
-				err.Error(),
-			)
-			abortErr := cl.abortMultipartUpload(key, uploadID)
-			return errors.Join(err, abortErr)
-		}
-
-		// copy etag and part number to verify later
-		if eTag != nil {
-			partNum := partNumber
-			etag := strings.Trim(*eTag, "\"")
-			cPart := types.CompletedPart{
-				ETag:       &etag,
-				PartNumber: &partNum,
-			}
-			if cl.Config.enableChecksum {
-				cPart.ChecksumCRC32 = checksumCRC32
-				cPart.ChecksumCRC32C = checksumCRC32C
-				cPart.ChecksumSHA1 = checksumSHA1
-				cPart.ChecksumSHA256 = checksumSHA256
-			}
-			parts = append(parts, cPart)
-		}
-
-		partNumber++
+	parts, err := cl.uploadPartsParallel(ctx, key, uploadID, bol)
+	if err != nil {
+		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+		abortErr := cl.abortMultipartUpload(key, uploadID)
+		return errors.Join(err, abortErr)
 	}
 
-	// complete the upload
 	_, err = cl.AwsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
 		Key:      aws.String(key),
@@ -1311,6 +1212,205 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	return nil
 }
 
+// partUploadResult holds the result of a single part upload
+type partUploadResult struct {
+	partNumber     int32
+	eTag           *string
+	checksumCRC32  *string
+	checksumCRC32C *string
+	checksumSHA1   *string
+	checksumSHA256 *string
+	err            error
+}
+
+// partUploadWork represents work to be done for uploading a part
+type partUploadWork struct {
+	partNumber int32
+	blk        *common.Block
+	data       []byte
+	isDirty    bool
+}
+
+// uploadPartsParallel uploads all parts in parallel using a worker pool pattern.
+func (cl *Client) uploadPartsParallel(
+	ctx context.Context,
+	key string,
+	uploadID string,
+	bol *common.BlockOffsetList,
+) ([]types.CompletedPart, error) {
+	numParts := len(bol.BlockList)
+	if numParts == 0 {
+		return nil, nil
+	}
+
+	maxWorkers := cl.Config.concurrency
+	if maxWorkers <= 0 {
+		maxWorkers = DefaultConcurrency
+	}
+	if maxWorkers > numParts {
+		maxWorkers = numParts
+	}
+
+	log.Debug("Client::uploadPartsParallel : Uploading %d parts with %d parallel workers", numParts, maxWorkers)
+
+	// Create channels for work distribution and result collection
+	workChan := make(chan *partUploadWork, numParts)
+	resultChan := make(chan *partUploadResult, numParts)
+
+	// Start worker goroutines
+	var wg sync.WaitGroup
+	for w := 0; w < maxWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cl.partUploadWorker(ctx, key, uploadID, workChan, resultChan)
+		}()
+	}
+
+	// Send work to workers
+	for i, blk := range bol.BlockList {
+		partNumber := int32(i + 1)
+		var data []byte
+
+		if blk.Truncated() {
+			data = make([]byte, blk.EndIndex-blk.StartIndex)
+		} else {
+			data = blk.Data
+		}
+
+		isDirty := blk.Dirty() || len(data) > 0
+
+		workChan <- &partUploadWork{
+			partNumber: partNumber,
+			blk:        blk,
+			data:       data,
+			isDirty:    isDirty,
+		}
+	}
+	close(workChan)
+
+	// Wait for all workers to complete in a separate goroutine
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results
+	results := make([]*partUploadResult, numParts)
+	var firstErr error
+	for result := range resultChan {
+		if result.err != nil && firstErr == nil {
+			firstErr = result.err
+		}
+		results[result.partNumber-1] = result
+	}
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+
+	// Build completed parts list in order
+	parts := make([]types.CompletedPart, 0, numParts)
+	for i, result := range results {
+		if result == nil {
+			return nil, fmt.Errorf("missing result for part %d", i+1)
+		}
+		if result.eTag == nil {
+			continue // Skip parts without etags
+		}
+
+		partNum := result.partNumber
+		etag := strings.Trim(*result.eTag, "\"")
+		cPart := types.CompletedPart{
+			ETag:       &etag,
+			PartNumber: &partNum,
+		}
+		if cl.Config.enableChecksum {
+			cPart.ChecksumCRC32 = result.checksumCRC32
+			cPart.ChecksumCRC32C = result.checksumCRC32C
+			cPart.ChecksumSHA1 = result.checksumSHA1
+			cPart.ChecksumSHA256 = result.checksumSHA256
+		}
+		parts = append(parts, cPart)
+
+		// Clear dirty flag on the block
+		if int(result.partNumber)-1 < len(bol.BlockList) {
+			bol.BlockList[result.partNumber-1].Flags.Clear(common.DirtyBlock)
+			if bol.BlockList[result.partNumber-1].Truncated() {
+				bol.BlockList[result.partNumber-1].Flags.Clear(common.TruncatedBlock)
+			}
+		}
+	}
+
+	return parts, nil
+}
+
+// partUploadWorker is a worker goroutine that processes part upload work items
+func (cl *Client) partUploadWorker(
+	ctx context.Context,
+	key string,
+	uploadID string,
+	workChan <-chan *partUploadWork,
+	resultChan chan<- *partUploadResult,
+) {
+	for work := range workChan {
+		result := &partUploadResult{
+			partNumber: work.partNumber,
+		}
+
+		if work.isDirty {
+			// This block has data that is not yet in the bucket
+			uploadPartInput := &s3.UploadPartInput{
+				Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
+				Key:        aws.String(key),
+				PartNumber: &work.partNumber,
+				UploadId:   &uploadID,
+				Body:       bytes.NewReader(work.data),
+			}
+
+			if cl.Config.enableChecksum {
+				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+			}
+
+			partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
+			if err != nil {
+				result.err = fmt.Errorf("failed to upload part %d: %w", work.partNumber, err)
+				resultChan <- result
+				continue
+			}
+
+			result.eTag = partResp.ETag
+			result.checksumCRC32 = partResp.ChecksumCRC32
+			result.checksumCRC32C = partResp.ChecksumCRC32C
+			result.checksumSHA1 = partResp.ChecksumSHA1
+			result.checksumSHA256 = partResp.ChecksumSHA256
+		} else {
+			// This block is already in the bucket, so we need to copy this part
+			partResp, err := cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
+				Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
+				Key:             aws.String(key),
+				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key)),
+				CopySourceRange: aws.String("bytes=" + fmt.Sprint(work.blk.StartIndex) + "-" + fmt.Sprint(work.blk.EndIndex-1)),
+				PartNumber:      &work.partNumber,
+				UploadId:        &uploadID,
+			})
+			if err != nil {
+				result.err = fmt.Errorf("failed to copy part %d: %w", work.partNumber, err)
+				resultChan <- result
+				continue
+			}
+
+			result.eTag = partResp.CopyPartResult.ETag
+			result.checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
+			result.checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
+			result.checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
+			result.checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
+		}
+
+		resultChan <- result
+	}
+}
+
 // combineSmallBlocks will combine blocks in a blocklist, except for the last block, if the block is smaller
 // than the smallest size for a part in AWS, which is 5 MB. Blocks smaller than 5MB will be combined with the
 // next block in the list.
@@ -1318,6 +1418,96 @@ func (cl *Client) combineSmallBlocks(
 	name string,
 	blockList []*common.Block,
 ) ([]*common.Block, error) {
+	type blockFetch struct {
+		index      int
+		blk        *common.Block
+		data       []byte
+		err        error
+		needsFetch bool
+	}
+
+	// Collect blocks that need fetching
+	blocksToFetch := make([]*blockFetch, 0)
+	for i, blk := range blockList {
+		needsFetch := len(blk.Data) == 0 && !blk.Truncated() && blk.EndIndex-blk.StartIndex < 5*common.MbToBytes
+		blocksToFetch = append(blocksToFetch, &blockFetch{
+			index:      i,
+			blk:        blk,
+			needsFetch: needsFetch,
+		})
+	}
+
+	maxWorkers := cl.Config.concurrency
+	if maxWorkers <= 0 {
+		maxWorkers = DefaultConcurrency
+	}
+
+	fetchCount := 0
+	for _, bf := range blocksToFetch {
+		if bf.needsFetch {
+			fetchCount++
+		}
+	}
+
+	if fetchCount > 0 {
+		log.Debug("Client::combineSmallBlocks : Fetching %d blocks in parallel with %d workers", fetchCount, maxWorkers)
+
+		// Create work channel and results handling
+		workChan := make(chan *blockFetch, fetchCount)
+		var wg sync.WaitGroup
+
+		// Start workers
+		for w := 0; w < maxWorkers && w < fetchCount; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for bf := range workChan {
+					result, err := cl.getObject(getObjectOptions{
+						name:   name,
+						offset: bf.blk.StartIndex,
+						count:  bf.blk.EndIndex - bf.blk.StartIndex,
+					})
+					if err != nil {
+						bf.err = err
+						continue
+					}
+
+					data, err := io.ReadAll(result)
+					result.Close()
+					if err != nil {
+						bf.err = err
+						continue
+					}
+					bf.data = data
+				}
+			}()
+		}
+
+		// Send work to workers
+		for _, bf := range blocksToFetch {
+			if bf.needsFetch {
+				workChan <- bf
+			}
+		}
+		close(workChan)
+
+		// Wait for all workers to complete
+		wg.Wait()
+
+		// Check for any errors
+		for _, bf := range blocksToFetch {
+			if bf.err != nil {
+				log.Err("Client::combineSmallBlocks : Failed to fetch block at offset %d: %v", bf.blk.StartIndex, bf.err)
+				return nil, bf.err
+			}
+			// Update block data with fetched data
+			if bf.needsFetch && bf.data != nil {
+				bf.blk.Data = bf.data
+			}
+		}
+	}
+
+	// Now combine small blocks
 	newBlockList := []*common.Block{}
 	newBlockList = append(newBlockList, &common.Block{})
 	addIndex := 0
@@ -1335,24 +1525,8 @@ func (cl *Client) combineSmallBlocks(
 				beginNewBlock = false
 			}
 
-			var addData []byte
-			// If there is no data in the block and it is not truncated, we need to get it from the cloud. Otherwise we can just copy it.
-			if len(blk.Data) == 0 && !blk.Truncated() {
-				result, err := cl.getObject(getObjectOptions{name: name, offset: blk.StartIndex, count: blk.EndIndex - blk.StartIndex})
-				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
-					return nil, err
-				}
-
-				defer result.Close()
-				addData, err = io.ReadAll(result)
-				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: ", err.Error())
-					return nil, err
-				}
-			} else {
-				addData = blk.Data
-			}
+			// Data should already be available (either from original block or fetched in parallel)
+			addData := blk.Data
 
 			// Combine these two blocks
 			newBlockList[addIndex].Data = append(newBlockList[addIndex].Data, addData...)
