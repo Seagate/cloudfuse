@@ -258,7 +258,11 @@ func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 		freeDisk, err = strconv.Atoi(totalFreeBytesStr)
 		suite.assert.NoError(err)
 	} else {
-		cmd := exec.Command("bash", "-c", fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", suite.cache_path))
+		cmd := exec.Command(
+			"bash",
+			"-c",
+			fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", suite.cache_path),
+		)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err := cmd.Run()

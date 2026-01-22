@@ -318,7 +318,7 @@ nfpms:
       deb:
         dependencies:
           - fuse3
-          - libfuse3-3
+          - libfuse3-3 | libfuse3-4
           - libc6 (>= 2.24)
 
       rpm:
