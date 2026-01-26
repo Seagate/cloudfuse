@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.1
 	github.com/aws/smithy-go v1.24.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/gdamore/tcell/v2 v2.13.5
+	github.com/gdamore/tcell/v2 v2.13.7
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/golang/mock v1.6.0
 	github.com/montanaflynn/stats v0.7.1
