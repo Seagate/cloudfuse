@@ -55,7 +55,10 @@ func uninstallService(mountPath string) error {
 			)
 		}
 	} else if os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
+		return fmt.Errorf(
+			"failed to delete "+serviceName+" file from /etc/systemd/system [%s]",
+			err.Error(),
+		)
 	}
 	// reload daemon
 	systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")

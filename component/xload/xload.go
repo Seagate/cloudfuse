@@ -152,21 +152,32 @@ func (xl *Xload) Configure(_ bool) error {
 		mntPath := ""
 		err = config.UnmarshalKey("mount-path", &mntPath)
 		if err != nil {
-			log.Err("Xload::Configure : config error [unable to obtain Mount Path [%s]]", err.Error())
+			log.Err(
+				"Xload::Configure : config error [unable to obtain Mount Path [%s]]",
+				err.Error(),
+			)
 			return fmt.Errorf("config error in %s [%s]", xl.Name(), err.Error())
 		}
 
 		if xl.path == mntPath {
 			log.Err("Xload::Configure : config error [xload path is same as mount path]")
-			return fmt.Errorf("config error in %s error [xload path is same as mount path]", xl.Name())
+			return fmt.Errorf(
+				"config error in %s error [xload path is same as mount path]",
+				xl.Name(),
+			)
 		}
 
 		_, err = os.Stat(xl.path)
 		if os.IsNotExist(err) {
-			log.Info("Xload::Configure : config error [xload path does not exist, attempting to create path]")
+			log.Info(
+				"Xload::Configure : config error [xload path does not exist, attempting to create path]",
+			)
 			err := os.Mkdir(xl.path, os.FileMode(0755))
 			if err != nil {
-				log.Err("Xload::Configure : config error creating directory of xload path [%s]", err.Error())
+				log.Err(
+					"Xload::Configure : config error creating directory of xload path [%s]",
+					err.Error(),
+				)
 				return fmt.Errorf("config error in %s [%s]", xl.Name(), err.Error())
 			}
 		}

@@ -67,7 +67,7 @@ type AttrCacheOptions struct {
 	EnableSymlinks bool   `config:"enable-symlinks"  yaml:"enable-symlinks,omitempty"`
 	NoCacheDirs    bool   `config:"no-cache-dirs"    yaml:"no-cache-dirs,omitempty"`
 	// hidden option for backward compatibility
-	NoSymlinks bool `config:"no-symlinks"      yaml:"no-symlinks,omitempty"`
+	NoSymlinks bool `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
 
 	//maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`

@@ -74,7 +74,9 @@ func transformAccountEndpoint(potentialDfsEndpoint string) string {
 		return strings.ReplaceAll(potentialDfsEndpoint, ".dfs.", ".blob.")
 	} else {
 		// Should we just throw here?
-		log.Warn("Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.")
+		log.Warn(
+			"Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.",
+		)
 	}
 	return potentialDfsEndpoint
 }
@@ -214,7 +216,9 @@ func (dl *Datalake) TestPipeline() error {
 		if len(resp.Paths) > 0 {
 			if resp.Paths[0].Permissions == nil {
 				// This is to block FNS account being mounted as HNS account
-				return fmt.Errorf("Datalake::TestPipeline : Account is not HNS, kindly set correct account type")
+				return fmt.Errorf(
+					"Datalake::TestPipeline : Account is not HNS, kindly set correct account type",
+				)
 			}
 		}
 	}
@@ -352,7 +356,11 @@ func (dl *Datalake) DeleteDirectory(name string) (err error) {
 			log.Err("Datalake::DeleteDirectory : %s does not exist", name)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::DeleteDirectory : Failed to delete directory %s [%s]", name, err.Error())
+			log.Err(
+				"Datalake::DeleteDirectory : Failed to delete directory %s [%s]",
+				name,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -381,7 +389,12 @@ func (dl *Datalake) RenameFile(source string, target string, srcAttr *internal.O
 			log.Err("Datalake::RenameFile : %s does not exist", source)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::RenameFile : Failed to rename file %s to %s [%s]", source, target, err.Error())
+			log.Err(
+				"Datalake::RenameFile : Failed to rename file %s to %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -407,7 +420,12 @@ func (dl *Datalake) RenameDirectory(source string, target string) error {
 			log.Err("Datalake::RenameDirectory : %s does not exist", source)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]", source, target, err.Error())
+			log.Err(
+				"Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -474,7 +492,11 @@ func (dl *Datalake) GetAttr(name string) (blobAttr *internal.ObjAttr, err error)
 		} else {
 			mode, err := getFileModeFromACL(dl.Config.authConfig.ObjectID, *acl.ACL, *acl.Owner)
 			if err != nil {
-				log.Err("Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]", name, err.Error())
+				log.Err(
+					"Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]",
+					name,
+					err.Error(),
+				)
 			} else {
 				blobAttr.Mode = mode
 			}

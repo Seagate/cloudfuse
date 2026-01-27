@@ -501,7 +501,11 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 			)
 			return syscall.ENOENT
 		} else {
-			log.Err("BlockBlob::RenameDirectory : Failed to get source directory marker blob properties for %s [%s]", source, err.Error())
+			log.Err(
+				"BlockBlob::RenameDirectory : Failed to get source directory marker blob properties for %s [%s]",
+				source,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -992,7 +996,11 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 				CPKInfo: bb.blobCPKOpt,
 			})
 			if err != nil {
-				log.Warn("BlockBlob::ReadToFile : Failed to get properties of blob %s [%s]", name, err.Error())
+				log.Warn(
+					"BlockBlob::ReadToFile : Failed to get properties of blob %s [%s]",
+					name,
+					err.Error(),
+				)
 			} else {
 				blobMD5 := prop.ContentMD5
 				if blobMD5 == nil {
@@ -1162,7 +1170,10 @@ func (bb *BlockBlob) calculateBlockSize(name string, fileSize int64) (blockSize 
 
 			if blockSize > blockblob.MaxStageBlockBytes {
 				// After rounding off the blockSize has become bigger then max allowed blocks.
-				log.Err("BlockBlob::calculateBlockSize : blockSize exceeds max allowed block size for %s", name)
+				log.Err(
+					"BlockBlob::calculateBlockSize : blockSize exceeds max allowed block size for %s",
+					name,
+				)
 				err = errors.New("block-size is too large to upload to a block blob")
 				return 0, err
 			}
@@ -1404,7 +1415,9 @@ func (bb *BlockBlob) createNewBlocks(
 			}
 		}
 	} else if math.Ceil((float64)(numOfBlocks)+(float64)(length)/(float64)(blockSize)) > blockblob.MaxBlocks {
-		return 0, errors.New("cannot accommodate data within the block limit with configured block-size")
+		return 0, errors.New(
+			"cannot accommodate data within the block limit with configured block-size",
+		)
 	}
 
 	// BufferSize is the size of the buffer that will go beyond our current blob (appended)
@@ -1463,7 +1476,10 @@ func (bb *BlockBlob) createNewBlocksTruncate(
 		blocksNeeded := (length + blockSize - 1) / blockSize
 		// For user specified block size, validate if we can accommodate the data within the block limit
 		if numOfBlocks+blocksNeeded > blockblob.MaxBlocks {
-			return fmt.Errorf("cannot accommodate data within the block limit with configured block-size: %d", blockSize)
+			return fmt.Errorf(
+				"cannot accommodate data within the block limit with configured block-size: %d",
+				blockSize,
+			)
 		}
 
 		// if last block is not aligned to block size then adjust it
@@ -1480,9 +1496,19 @@ func (bb *BlockBlob) createNewBlocksTruncate(
 				// create the new block id for this block otherwise it would corrupt the state of the blob.
 				lastBlock.Id = common.GetBlockID(blockList.BlockIdLength)
 
-				err := bb.ReadInBuffer(options.Name, lastBlock.StartIndex, lastBlock.EndIndex-lastBlock.StartIndex, lastBlock.Data, nil)
+				err := bb.ReadInBuffer(
+					options.Name,
+					lastBlock.StartIndex,
+					lastBlock.EndIndex-lastBlock.StartIndex,
+					lastBlock.Data,
+					nil,
+				)
 				if err != nil {
-					log.Err("BlockBlob::createNewBlocksTruncate : Failed to adjust last block %s [%v]", options.Name, err)
+					log.Err(
+						"BlockBlob::createNewBlocksTruncate : Failed to adjust last block %s [%v]",
+						options.Name,
+						err,
+					)
 					return err
 				}
 			}
@@ -1734,8 +1760,11 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 	} else {
 		// If blob has blocks, we should validate the block list against the old size.
 		if ok := blob.ValidateBlockListAgainstFileSize(options.OldSize); !ok {
-			err = fmt.Errorf("Blob %v has blocks that do not match the old size %d bytes, inconsistent state",
-				options.Name, options.OldSize)
+			err = fmt.Errorf(
+				"Blob %v has blocks that do not match the old size %d bytes, inconsistent state",
+				options.Name,
+				options.OldSize,
+			)
 			log.Err("BlockBlob::TruncateFileUsingBlocks : %v", err)
 			return err
 		}
@@ -1754,7 +1783,11 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 	} else {
 		err = bb.createNewBlocksTruncate(blob, options)
 		if err != nil {
-			log.Err("BlockBlob::TruncateFileUsingBlocks : Failed to Create New Blocks for file %s[%v]", options.Name, err)
+			log.Err(
+				"BlockBlob::TruncateFileUsingBlocks : Failed to Create New Blocks for file %s[%v]",
+				options.Name,
+				err,
+			)
 			return err
 		}
 	}
@@ -1825,14 +1858,21 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 		// case 2: given offset is within the size of the blob - and the blob consists of multiple blocks
 		// case 3: new blocks need to be added
 	} else {
-		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(offset, length)
+		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(
+			offset,
+			length,
+		)
 		// keeps track of how much new data will be appended to the end of the file (applicable only to case 3)
 		newBufferSize := int64(0)
 		// case 3?
 		if exceedsFileBlocks {
 			newBufferSize, err = bb.createNewBlocks(fileOffsets, offset, length)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to create new blocks for file %s", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to create new blocks for file %s",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1840,9 +1880,19 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 		oldDataBuffer := make([]byte, oldDataSize+newBufferSize)
 		if !appendOnly {
 			// fetch the blocks that will be impacted by the new changes so we can overwrite them
-			err = bb.ReadInBuffer(name, fileOffsets.BlockList[index].StartIndex, oldDataSize, oldDataBuffer, nil)
+			err = bb.ReadInBuffer(
+				name,
+				fileOffsets.BlockList[index].StartIndex,
+				oldDataSize,
+				oldDataBuffer,
+				nil,
+			)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to read data in buffer %s [%s]",
+					name,
+					err.Error(),
+				)
 			}
 		}
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data

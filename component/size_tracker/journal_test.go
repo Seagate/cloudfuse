@@ -9,10 +9,8 @@ package size_tracker
 import (
 	"bufio"
 	"encoding/binary"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -154,10 +152,10 @@ func TestJournal_EpochBumpDiscardsDelta(t *testing.T) {
 	// File should reflect epoch=2 and size 999 (or timestamp changed).
 	content := readFileString(t, dir, jname)
 	require.Contains(t, content, "epoch=2")
-	require.True(
+	require.Contains(
 		t,
-		strings.Contains(content, "size_bytes=999"),
-		fmt.Sprintf("content: %s", content),
+		content, "size_bytes=999",
+		"content: %s", content,
 	)
 }
 
@@ -222,10 +220,10 @@ func TestJournal_HigherLocalEpochOverwritesFile(t *testing.T) {
 	// File should now reflect epoch=3 and size 150
 	content := readFileString(t, dir, jname)
 	require.Contains(t, content, "epoch=3")
-	require.True(
+	require.Contains(
 		t,
-		strings.Contains(content, "size_bytes=150"),
-		fmt.Sprintf("expected size_bytes=150 in content: %s", content),
+		content, "size_bytes=150",
+		"expected size_bytes=150 in content: %s", content,
 	)
 
 	// To further verify: write a file with lower epoch
@@ -251,9 +249,9 @@ func TestJournal_HigherLocalEpochOverwritesFile(t *testing.T) {
 	// File should show epoch=3 and size=175 (overwriting the epoch=2 file)
 	content = readFileString(t, dir, jname)
 	require.Contains(t, content, "epoch=3")
-	require.True(
+	require.Contains(
 		t,
-		strings.Contains(content, "size_bytes=175"),
-		fmt.Sprintf("expected size_bytes=175 in content: %s", content),
+		content, "size_bytes=175",
+		"expected size_bytes=175 in content: %s", content,
 	)
 }

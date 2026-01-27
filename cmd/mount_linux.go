@@ -29,6 +29,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"os"
@@ -156,7 +157,11 @@ retry:
 
 			buff, err := os.ReadFile(dmnCtx.LogFileName)
 			if err != nil {
-				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
+				log.Err(
+					"mount: failed to read child [%v] failure logs [%s]",
+					child.Pid,
+					err.Error(),
+				)
 				err = fmt.Errorf("failed to mount, please check logs [%s]", err.Error())
 			} else {
 				err = fmt.Errorf("%s", string(buff))
@@ -167,6 +172,8 @@ retry:
 			if rmErr != nil {
 				log.Err("mount : Failed to delete temp file: %s[%v]", traceFilePath, err)
 			}
+
+			return errors.Join(err, rmErr)
 
 		case <-time.After(options.WaitForMount):
 			log.Info("mount: Child [%v : %s] status check timeout", child.Pid, options.MountPath)
