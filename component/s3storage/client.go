@@ -54,7 +54,8 @@ import (
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	transfermanagerTypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -70,8 +71,7 @@ type Client struct {
 	Connection
 	AwsS3Client       *s3.Client // S3 client library supplied by AWS
 	blockLocks        common.KeyedMutex
-	downloader        *manager.Downloader
-	uploader          *manager.Uploader
+	transferManager   *transfermanager.Client
 	stagedBlocks      map[string]map[string][]byte // map[fileName]map[blockId]data
 	stagedBlocksMutex sync.RWMutex                 // Mutex to protect the cache
 }
@@ -276,15 +276,12 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// Create downloader and uploader to be reused for multipart downloads
-	cl.downloader = manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
-	})
-
-	cl.uploader = manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
+	// Create transfermanager client for uploads and downloads
+	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = cl.Config.partSize
+		o.Concurrency = cl.Config.concurrency
+		o.MultipartUploadThreshold = cl.Config.uploadCutoff
+		o.ChecksumAlgorithm = transfermanagerTypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
 	})
 
 	return nil
