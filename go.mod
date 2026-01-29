@@ -20,7 +20,6 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/golang/mock v1.6.0
 	github.com/montanaflynn/stats v0.7.1
-	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
 	github.com/robfig/cron/v3 v3.0.1

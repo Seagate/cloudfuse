@@ -3015,7 +3015,9 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 // TODO: Uncomment when stream is deprecated
 // func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
 
-// 	free := memory.FreeMemory()
+//  v, err := mem.VirtualMemory()
+//  suite.assert.Nil(err)
+//  free := v.Free
 // 	maxbuffers := max(1, free/_1MB-1)
 // 	common.IsStream = true
 // 	config := fmt.Sprintf("read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: %d\n  buffer-size-mb: 1\n", maxbuffers)
