@@ -44,7 +44,6 @@ var setKeyCmd = &cobra.Command{
 	Long:              "Update encrypted config by setting new value for the given config parameter",
 	SuggestFor:        []string{"s", "set"},
 	Example:           "cloudfuse secure set --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level --value=log_debug",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
 		if err != nil {

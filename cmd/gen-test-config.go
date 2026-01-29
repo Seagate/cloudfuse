@@ -51,7 +51,6 @@ var generateTestConfig = &cobra.Command{
 	SuggestFor:        []string{"conv test config", "convert test config"},
 	Hidden:            true,
 	Args:              cobra.ExactArgs(0),
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
 		var err error

@@ -66,7 +66,6 @@ var healthMonCmd = &cobra.Command{
 	SuggestFor:        []string{"cfusemon", "monitor health"},
 	Args:              cobra.ExactArgs(0),
 	Hidden:            true,
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		resetMonitorOptions()
 

@@ -69,7 +69,6 @@ var rootCmd = &cobra.Command{
 	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage.",
 	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage. It uses the FUSE protocol to communicate with the operating system, and implements filesystem operations using Azure or S3 cloud storage REST APIs.",
 	Version:           common.CloudfuseVersion,
-	FlagErrorHandling: cobra.ExitOnError,
 	SilenceUsage:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !disableVersionCheck {

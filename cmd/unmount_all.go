@@ -40,7 +40,6 @@ var umntAllCmd = &cobra.Command{
 	Short:             "Unmount all instances of Cloudfuse",
 	Long:              "Unmount all instances of Cloudfuse",
 	SuggestFor:        []string{"al", "all"},
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {

@@ -59,7 +59,6 @@ var serviceCmd = &cobra.Command{
 	Long:              "Manage cloudfuse startup process on Windows",
 	SuggestFor:        []string{"ser", "serv"},
 	Example:           "cloudfuse service install",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage")
 	},
@@ -71,7 +70,6 @@ var installCmd = &cobra.Command{
 	Long:              "Installs the startup process and Windows service for Cloudfuse. Required for remount flags to work. Requires running as admin.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create the registry for WinFsp
 		err := winservice.CreateWinFspRegistry()
@@ -113,7 +111,6 @@ var uninstallCmd = &cobra.Command{
 	Long:              "Uninstalls the startup process and Windows service for Cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Remove the cloudfuse startup registry entry
 		err := winservice.RemoveRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse")
@@ -151,7 +148,6 @@ var addRegistryCmd = &cobra.Command{
 	Long:              "Add registry information for WinFSP to launch cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"add"},
 	Example:           "cloudfuse service add-registry",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := winservice.CreateWinFspRegistry()
 		if err != nil {
@@ -167,7 +163,6 @@ var removeRegistryCmd = &cobra.Command{
 	Long:              "Remove registry information for WinFSP to launch cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"remove"},
 	Example:           "cloudfuse service remove-registry",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := winservice.RemoveWinFspRegistry()
 		if err != nil {

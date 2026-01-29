@@ -63,7 +63,6 @@ var mountAllCmd = &cobra.Command{
 	Long:              "Mounts all containers for a given cloud account as a filesystem",
 	SuggestFor:        []string{"mnta", "mout"},
 	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		exe, err := os.Executable()
 		if err != nil {

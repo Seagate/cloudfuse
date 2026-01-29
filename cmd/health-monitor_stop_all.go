@@ -40,7 +40,6 @@ var healthMonStopAll = &cobra.Command{
 	Short:             "Stop all health monitor binaries",
 	Long:              "Stop all health monitor binaries",
 	SuggestFor:        []string{"al", "all"},
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := stopAll()
 		if err != nil {

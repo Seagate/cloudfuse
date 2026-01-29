@@ -60,7 +60,6 @@ var secureCmd = &cobra.Command{
 	SuggestFor:        []string{"sec", "secre"},
 	Example:           "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
 	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
 		if err != nil {
@@ -76,7 +75,6 @@ var encryptCmd = &cobra.Command{
 	Long:              "Encrypt your config file",
 	SuggestFor:        []string{"en", "enc"},
 	Example:           "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
 		if err != nil {
@@ -98,7 +96,6 @@ var decryptCmd = &cobra.Command{
 	Long:              "Decrypt your config file",
 	SuggestFor:        []string{"de", "dec"},
 	Example:           "cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=PASSPHRASE",
-	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
 		if err != nil {
