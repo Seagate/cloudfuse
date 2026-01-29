@@ -285,7 +285,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// Get attributes
 	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if err != nil {
-		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
+		//log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
 		switch err {
 		case syscall.ENOENT:
 			return -fuse.ENOENT
@@ -714,7 +714,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
 	} else {
 		bytesRead, err = fuseFS.NextComponent().ReadInBuffer(
-			internal.ReadInBufferOptions{
+			&internal.ReadInBufferOptions{
 				Handle: handle,
 				Offset: int64(offset),
 				Data:   buff,
@@ -749,7 +749,7 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 	}
 
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
-		internal.WriteFileOptions{
+		&internal.WriteFileOptions{
 			Handle:   handle,
 			Offset:   ofst,
 			Data:     buff,
@@ -814,8 +814,13 @@ func (cf *CgofuseFS) Truncate(path string, size int64, fh uint64) int {
 	log.Trace("Libfuse::Truncate : %s size %d", name, size)
 	handle, _ := handlemap.Load(handlemap.HandleID(fh))
 
-	err := fuseFS.NextComponent().
-		TruncateFile(internal.TruncateFileOptions{Name: name, Size: size, Handle: handle})
+	err := fuseFS.NextComponent().TruncateFile(
+		internal.TruncateFileOptions{
+			Name:    name,
+			OldSize: -1,
+			NewSize: int64(size),
+			Handle:  handle,
+		})
 	if err != nil {
 		log.Err("Libfuse::Truncate : error truncating file %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {

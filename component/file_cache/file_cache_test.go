@@ -537,11 +537,11 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 	// Truncate causes these files to be written to fake storage
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, NewSize: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, NewSize: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, NewSize: 1024})
 	// Change the sizes directly in fake storage
 	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file1}) // Length is default 0
 	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file2})
@@ -586,9 +586,9 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 
 	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, NewSize: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, NewSize: 1024})
 
 	// Create the files in fake_storage and simulate different sizes
 	handle, _ := suite.loopback.CreateFile(
@@ -600,8 +600,8 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 		internal.CreateFileOptions{Name: file4, Mode: 0777},
 	) // Length is default 0
 	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 0})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, NewSize: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, NewSize: 0})
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -746,7 +746,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	suite.assert.FileExists(suite.cache_path + "/" + case3src)
 	// write and flush to cloud
 	initialData := []byte("initialData")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle3,
 		Data:   initialData,
 	})
@@ -791,7 +791,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	//
 	// Case 1
 	// write to file handle
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle1,
 		Data:   data,
 	})
@@ -802,7 +802,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, case1dst))
 	//
 	// Case 2
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle2,
 		Data:   data,
 	})
@@ -810,7 +810,7 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	suite.assert.Equal(len(data), n)
 	//
 	// Case 3
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle3,
 		Data:   data,
 		Offset: int64(len(initialData)),
@@ -1059,7 +1059,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	testData := "test data"
 	data := []byte(testData)
 
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	handle, loaded := handlemap.Load(handle.ID)
 	suite.assert.True(loaded)
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
@@ -1073,7 +1073,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	handle, err = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	suite.assert.NoError(err)
 	_, err = suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.True(handle.Dirty())
@@ -1154,7 +1154,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.loopback.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.loopback.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	handle, err := suite.fileCache.OpenFile(
@@ -1178,7 +1178,7 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	// Download is required
@@ -1319,7 +1319,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
 
 	data := make([]byte, 0)
 	length, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(0, length)
@@ -1333,13 +1333,13 @@ func (suite *fileCacheTestSuite) TestReadInBufferNoFlush() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, output)
@@ -1353,14 +1353,14 @@ func (suite *fileCacheTestSuite) TestReadInBuffer() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, output)
@@ -1372,7 +1372,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferErrorBadFd() {
 	// Setup
 	file := "file18"
 	handle := handlemap.NewHandle(file)
-	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle})
+	length, err := suite.fileCache.ReadInBuffer(&internal.ReadInBufferOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
 	suite.assert.Equal(0, length)
@@ -1390,7 +1390,7 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 	testData := "test data"
 	data := []byte(testData)
 	length, err := suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 
 	suite.assert.NoError(err)
@@ -1406,7 +1406,7 @@ func (suite *fileCacheTestSuite) TestWriteFileErrorBadFd() {
 	// Setup
 	file := "file20"
 	handle := handlemap.NewHandle(file)
-	len, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle})
+	len, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
 	suite.assert.Equal(0, len)
@@ -1437,7 +1437,7 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
@@ -1496,7 +1496,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	data := []byte("simple scheduled upload test data")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1556,7 +1556,7 @@ loopbackfs:
 	handle1, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.assert.NoError(err)
 	data1 := []byte("file created during scheduler ON window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle1, Data: data1})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle1, Data: data1})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle1})
 	suite.assert.NoError(err)
@@ -1579,7 +1579,7 @@ loopbackfs:
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.assert.NoError(err)
 	data2 := []byte("file created during scheduler OFF window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle2, Data: data2})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle2, Data: data2})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
@@ -1612,7 +1612,7 @@ loopbackfs:
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
 	data := []byte("testing default scheduler behavior")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -1677,7 +1677,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 	// Write new content to the file
 	modifiedContent := []byte("modified cloud file content")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   modifiedContent,
 		Offset: 0,
@@ -1721,7 +1721,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	data := []byte("file to be renamed while in scheduler OFF state")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1797,7 +1797,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	data := []byte("file to be deleted while in scheduler OFF state")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1909,7 +1909,7 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	_, err = suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Data: initialContent},
+		&internal.WriteFileOptions{Handle: handle, Data: initialContent},
 	)
 	suite.assert.NoError(err)
 
@@ -1934,7 +1934,7 @@ loopbackfs:
 	)
 	suite.assert.NoError(err)
 
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: newContent})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: newContent})
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -2034,7 +2034,7 @@ loopbackfs:
 	handle1, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.assert.NoError(err)
 	data1 := []byte("file created during first window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle1, Data: data1})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle1, Data: data1})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle1})
 	suite.assert.NoError(err)
@@ -2049,7 +2049,7 @@ loopbackfs:
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.assert.NoError(err)
 	data2 := []byte("file created during second window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle2, Data: data2})
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle2, Data: data2})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
@@ -2066,7 +2066,7 @@ loopbackfs:
 	})
 	suite.assert.NoError(err)
 	updatedData := []byte(" - updated in second window")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle1,
 		Data:   updatedData,
 		Offset: int64(len(data1)),
@@ -2118,7 +2118,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 	file := "file26"
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file, NewSize: 1024})
 	// Create the files in fake_storage and simulate different sizes
 	//suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777}) // Length is default 0
 
@@ -2153,7 +2153,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	data := make([]byte, size)
 
 	written, err := suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(size, written)
@@ -2319,7 +2319,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase1() {
 
 	// write to file handle
 	data := []byte("newdata")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   data,
 	})
@@ -2365,7 +2365,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase2() {
 
 	// write to file handle
 	data := []byte("newdata")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   data,
 	})
@@ -2400,7 +2400,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase3() {
 	suite.assert.FileExists(suite.cache_path + "/" + src)
 	// write to file handle
 	initialData := []byte("initialData")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err := suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   initialData,
 	})
@@ -2421,7 +2421,7 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase3() {
 	suite.assert.NoError(err)
 	// write to file handle
 	newData := []byte("newData")
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
 		Handle: handle,
 		Data:   newData,
 		Offset: int64(len(initialData)),
@@ -2454,7 +2454,9 @@ func (suite *fileCacheTestSuite) TestTruncateFileNotInCache() {
 
 	// Chmod
 	size := 1024
-	err := suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
+	err := suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: int64(size)},
+	)
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
@@ -2476,7 +2478,9 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase3() {
 
 	// Chmod
 	size := 1024
-	err := suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
+	err := suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: int64(size)},
+	)
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
 	info, _ := os.Stat(filepath.Join(suite.cache_path, path))
@@ -2492,7 +2496,9 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
 
 	size := 1024
-	err := suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
+	err := suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: int64(size)},
+	)
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache and size should be updated
@@ -2551,14 +2557,14 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
 	output := make([]byte, 9)
 	n, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
@@ -2593,7 +2599,7 @@ func (suite *fileCacheTestSuite) TestZZZZLazyWrite() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	data := make([]byte, 10*1024*1024)
 	_, _ = suite.fileCache.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	_ = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
@@ -2632,7 +2638,7 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 	file := "file41"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	data := make([]byte, 1024*1024)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	stat, ret, err := suite.fileCache.StatFs()
 	suite.assert.True(ret)
@@ -2669,7 +2675,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(byteArr), n)
@@ -2684,7 +2690,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
@@ -2700,7 +2706,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(15, n)
@@ -2760,7 +2766,9 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	f, err := suite.fileCache.CreateFile(options1)
 	suite.assert.NoError(err)
 	data = make([]byte, 1*MB)
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
+	n, err := suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: f, Offset: 0, Data: data},
+	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(1*MB, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
@@ -2771,18 +2779,22 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	f, err = suite.fileCache.CreateFile(options1)
 	suite.assert.NoError(err)
 	data = make([]byte, 3*MB)
-	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
+	n, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.Error(err)
 	suite.assert.Equal(0, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
 	// try opening small file
-	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: pathsmall, Size: 1 * MB})
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: pathsmall, NewSize: 1 * MB},
+	)
 	suite.assert.NoError(err)
 
 	// try opening small file
-	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: pathsmall, Size: 3 * MB})
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: pathsmall, NewSize: 3 * MB},
+	)
 	suite.assert.Error(err)
 }
 
@@ -2802,7 +2814,7 @@ func (suite *fileCacheTestSuite) TestHandleDataChange() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	n, err := suite.fileCache.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	handle, loaded := handlemap.Load(handle.ID)
 	suite.assert.True(loaded)
@@ -2984,7 +2996,7 @@ func (suite *fileCacheTestSuite) TestHardLimit() {
 	data := make([]byte, 1024*1024)
 	for i := range int64(5) {
 		suite.fileCache.WriteFile(
-			internal.WriteFileOptions{Handle: handle, Offset: i * 1024 * 1024, Data: data},
+			&internal.WriteFileOptions{Handle: handle, Offset: i * 1024 * 1024, Data: data},
 		)
 	}
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
