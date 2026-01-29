@@ -36,10 +36,10 @@ import (
 )
 
 var umntAllCmd = &cobra.Command{
-	Use:               "all",
-	Short:             "Unmount all instances of Cloudfuse",
-	Long:              "Unmount all instances of Cloudfuse",
-	SuggestFor:        []string{"al", "all"},
+	Use:        "all",
+	Short:      "Unmount all instances of Cloudfuse",
+	Long:       "Unmount all instances of Cloudfuse",
+	SuggestFor: []string{"al", "all"},
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {

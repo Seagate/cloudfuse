@@ -58,11 +58,11 @@ type containerListingOptions struct {
 var mountAllOpts containerListingOptions
 
 var mountAllCmd = &cobra.Command{
-	Use:               "all <mount path>",
-	Short:             "Mounts all containers for a given cloud account as a filesystem",
-	Long:              "Mounts all containers for a given cloud account as a filesystem",
-	SuggestFor:        []string{"mnta", "mout"},
-	Args:              cobra.ExactArgs(1),
+	Use:        "all <mount path>",
+	Short:      "Mounts all containers for a given cloud account as a filesystem",
+	Long:       "Mounts all containers for a given cloud account as a filesystem",
+	SuggestFor: []string{"mnta", "mout"},
+	Args:       cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		exe, err := os.Executable()
 		if err != nil {

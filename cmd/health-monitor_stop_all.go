@@ -36,10 +36,10 @@ import (
 )
 
 var healthMonStopAll = &cobra.Command{
-	Use:               "all",
-	Short:             "Stop all health monitor binaries",
-	Long:              "Stop all health monitor binaries",
-	SuggestFor:        []string{"al", "all"},
+	Use:        "all",
+	Short:      "Stop all health monitor binaries",
+	Long:       "Stop all health monitor binaries",
+	SuggestFor: []string{"al", "all"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := stopAll()
 		if err != nil {

@@ -36,8 +36,8 @@ import (
 var check bool
 
 var versionCmd = &cobra.Command{
-	Use:               "version",
-	Short:             "Print the current version and optionally check for latest version",
+	Use:   "version",
+	Short: "Print the current version and optionally check for latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
 		fmt.Println("git commit:", common.GitCommit)
