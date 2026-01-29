@@ -46,13 +46,12 @@ type genConfigParams struct {
 var optsGenCfg genConfigParams
 
 var generatedConfig = &cobra.Command{
-	Use:               "gen-config",
-	Short:             "Generate config file from template.",
-	Long:              "Generate config file from template.",
-	SuggestFor:        []string{"generate default config", "generate config"},
-	Hidden:            true,
-	Args:              cobra.ExactArgs(0),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "gen-config",
+	Short:      "Generate config file from template.",
+	Long:       "Generate config file from template.",
+	SuggestFor: []string{"generate default config", "generate config"},
+	Hidden:     true,
+	Args:       cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
 

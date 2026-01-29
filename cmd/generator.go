@@ -34,13 +34,12 @@ import (
 )
 
 var generateCmd = &cobra.Command{
-	Use:               "generate <component name>",
-	Hidden:            true,
-	Short:             "Generate a new component for Cloudfuse",
-	Long:              "Generate a new component for Cloudfuse",
-	SuggestFor:        []string{"gen", "gener"},
-	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "generate <component name>",
+	Hidden:     true,
+	Short:      "Generate a new component for Cloudfuse",
+	Long:       "Generate a new component for Cloudfuse",
+	SuggestFor: []string{"gen", "gener"},
+	Args:       cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		componentName := args[0]
 		script := exec.Command("./cmd/componentGenerator.sh", componentName)
