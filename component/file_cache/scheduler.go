@@ -35,7 +35,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-	"github.com/robfig/cron/v3"
+	"github.com/netresearch/go-cron"
 )
 
 type UploadWindow struct {
