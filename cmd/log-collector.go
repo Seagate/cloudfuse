@@ -87,7 +87,7 @@ var gatherLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
-		logType, logPath, err := getLogInfo(gatherLogOpts.logConfigFile)
+		logType, logPath, err := getLogInfo(gatherLogOpts.logConfigFile, cmd.ErrOrStderr())
 		if err != nil {
 			return fmt.Errorf("cannot use this config file [%s]", err.Error())
 		}
@@ -171,7 +171,7 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
 			case "windows":
-				fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
+				cmd.PrintErrln("Please refer to the windows event viewer for your cloudfuse logs")
 				return fmt.Errorf(
 					"no log files to collect. system logging for windows are stored in the event viewer",
 				)
@@ -197,12 +197,12 @@ func checkPath(outPath string) error {
 }
 
 // getLogInfo returns the logType, and logPath values that are found in the config file.
-func getLogInfo(configFile string) (string, string, error) {
+func getLogInfo(configFile string, errWriter io.Writer) (string, string, error) {
 	logPath := common.ExpandPath(filepath.Join(common.GetDefaultWorkDir(), ".cloudfuse/"))
 	logType := "base"
 	var err error
 	if _, err = os.Stat(configFile); errors.Is(err, fs.ErrNotExist) {
-		fmt.Println("Warning, the config file was not found. Defaults will be used")
+		fmt.Fprintln(errWriter, "Warning, the config file was not found. Defaults will be used")
 		return logType, logPath, nil
 	}
 
@@ -212,8 +212,8 @@ func getLogInfo(configFile string) (string, string, error) {
 	}
 
 	if !config.IsSet("logging") {
-		fmt.Printf(
-			"Warning, the config file does not have a logging section. Defaults will be used\n",
+		fmt.Fprintln(errWriter,
+			"Warning, the config file does not have a logging section. Defaults will be used",
 		)
 		return logType, logPath, nil
 	}

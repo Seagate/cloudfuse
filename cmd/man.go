@@ -43,8 +43,13 @@ var manCmd = &cobra.Command{
 	Use:    "man",
 	Hidden: true,
 	Short:  "Generates man page for Cloudfuse",
-	Long:   "Generates man page for Cloudfuse",
+	Long:   "Generates Unix man pages for all cloudfuse commands.\nOutputs one man page file per command to the specified location.",
 	Args:   cobra.NoArgs,
+	Example: `  # Generate man pages to default location
+  cloudfuse man
+
+  # Generate man pages to custom directory
+  cloudfuse man --output-location=/usr/local/share/man/man1`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// verify the output location
 		f, err := os.Stat(manCmdInput.outputLocation)

@@ -62,7 +62,7 @@ func resetMonitorOptions() {
 var healthMonCmd = &cobra.Command{
 	Use:        "health-monitor",
 	Short:      "Monitor cloudfuse mount",
-	Long:       "Monitor cloudfuse mount",
+	Long:       "Monitor a cloudfuse mount point for health and performance.\nThis command is typically spawned by the mount command when health monitoring is enabled.",
 	SuggestFor: []string{"cfusemon", "monitor health"},
 	Args:       cobra.ExactArgs(0),
 	Hidden:     true,

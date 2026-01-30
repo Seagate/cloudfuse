@@ -37,9 +37,10 @@ var generateCmd = &cobra.Command{
 	Use:        "generate <component name>",
 	Hidden:     true,
 	Short:      "Generate a new component for Cloudfuse",
-	Long:       "Generate a new component for Cloudfuse",
+	Long:       "Generate a new cloudfuse component with boilerplate code.\nRuns the componentGenerator.sh script to scaffold the component structure.",
 	SuggestFor: []string{"gen", "gener"},
 	Args:       cobra.ExactArgs(1),
+	Example:    "  cloudfuse generate mycomponent",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		componentName := args[0]
 		script := exec.Command("./cmd/componentGenerator.sh", componentName)

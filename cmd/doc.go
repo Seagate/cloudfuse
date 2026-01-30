@@ -42,8 +42,13 @@ var docCmd = &cobra.Command{
 	Use:    "doc",
 	Hidden: true,
 	Short:  "Generates documentation for the tool in Markdown format",
-	Long:   "Generates documentation for the tool in Markdown format, and stores them in the designated location",
+	Long:   "Generates Markdown documentation for all cloudfuse commands.\nOutputs one file per command to the specified location.",
 	Args:   cobra.NoArgs,
+	Example: `  # Generate docs to default location
+  cloudfuse doc
+
+  # Generate docs to custom directory
+  cloudfuse doc --output-location=/path/to/docs`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// verify the output location
 		f, err := os.Stat(docCmdInput.outputLocation)

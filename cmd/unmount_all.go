@@ -38,9 +38,14 @@ import (
 var umntAllCmd = &cobra.Command{
 	Use:        "all",
 	Short:      "Unmount all instances of Cloudfuse",
-	Long:       "Unmount all instances of Cloudfuse",
+	Long:       "Unmount all cloudfuse mount points at once.\nReturns a summary of how many mounts were successfully unmounted.",
 	SuggestFor: []string{"al"},
 	Args:       cobra.NoArgs,
+	Example: `  # Unmount all cloudfuse mounts
+  cloudfuse unmount all
+
+  # Lazy unmount all (Linux only)
+  cloudfuse unmount all --lazy`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {
@@ -73,9 +78,9 @@ var umntAllCmd = &cobra.Command{
 		}
 
 		if mountfound == 0 {
-			fmt.Println("Nothing to unmount")
+			cmd.Println("Nothing to unmount")
 		} else {
-			fmt.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
+			cmd.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
 		}
 
 		if unmounted < mountfound {

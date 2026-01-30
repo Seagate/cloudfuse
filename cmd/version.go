@@ -26,8 +26,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/spf13/cobra"
@@ -48,11 +46,11 @@ var versionCmd = &cobra.Command{
   # Check for updates
   cloudfuse version --check`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
-		fmt.Println("git commit:", common.GitCommit)
-		fmt.Println("commit date:", common.CommitDate)
-		fmt.Println("go version:", common.GoVersion)
-		fmt.Println("OS/Arch:", common.OsArch)
+		cmd.Println("cloudfuse version:", common.CloudfuseVersion)
+		cmd.Println("git commit:", common.GitCommit)
+		cmd.Println("commit date:", common.CommitDate)
+		cmd.Println("go version:", common.GoVersion)
+		cmd.Println("OS/Arch:", common.OsArch)
 		if check {
 			return VersionCheck()
 		}

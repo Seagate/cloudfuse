@@ -98,7 +98,7 @@ var updateCmd = &cobra.Command{
 			return errors.New("unsupported OS, only Linux and Windows are supported")
 		}
 
-		if err := installUpdate(context.Background(), &opt); err != nil {
+		if err := installUpdate(context.Background(), &opt, command.OutOrStdout()); err != nil {
 			return fmt.Errorf("update failed: %w", err)
 		}
 		return nil
@@ -106,14 +106,14 @@ var updateCmd = &cobra.Command{
 }
 
 // installUpdate performs the self-update
-func installUpdate(ctx context.Context, opt *Options) error {
+func installUpdate(ctx context.Context, opt *Options, out io.Writer) error {
 	relInfo, err := getRelease(ctx, opt.Version)
 	if err != nil {
 		return fmt.Errorf("unable to detect new version: %w", err)
 	}
 
 	if relInfo.Version == common.CloudfuseVersion {
-		fmt.Println("cloudfuse is up to date")
+		fmt.Fprintln(out, "cloudfuse is up to date")
 		return nil
 	}
 
@@ -156,7 +156,7 @@ func installUpdate(ctx context.Context, opt *Options) error {
 	}
 
 	if runtime.GOOS == "windows" {
-		return runWindowsInstaller(fileName)
+		return runWindowsInstaller(fileName, out)
 	}
 
 	return runLinuxInstaller(fileName)
@@ -181,7 +181,7 @@ func hasCommand(command string) bool {
 }
 
 // runWindowsInstaller runs the Windows executable installer. Requires the user to restart the machine to apply changes.
-func runWindowsInstaller(fileName string) error {
+func runWindowsInstaller(fileName string, out io.Writer) error {
 	absPath, err := filepath.Abs(fileName)
 	if err != nil {
 		return fmt.Errorf("unable to get absolute path: %w", err)
@@ -203,7 +203,7 @@ func runWindowsInstaller(fileName string) error {
 		return fmt.Errorf("failed to run installer: %w", err)
 	}
 
-	fmt.Println(
+	fmt.Fprintln(out,
 		"Cloudfuse was successfully updated. Please restart the machine to apply the changes.",
 	)
 
