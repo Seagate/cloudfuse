@@ -31,6 +31,7 @@ cloudfuse mount <mount path> [flags]
       --disable-kernel-cache         Disable kerneel cache, but keep blobfuse cache. Default value false.
       --dry-run                      Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.
       --enable-remount-system        Remount container on server restart. Mount will restart on reboot.
+      --enable-remount-user          Remount container on server restart for current user. Mount will restart on current user log in.
   -f, --foreground                   Mount the system in foreground mode. Default value false.
   -h, --help                         help for mount
       --lazy-write                   Async write to storage container after file handle is closed.
@@ -38,6 +39,7 @@ cloudfuse mount <mount path> [flags]
       --log-level string             Enables logs written to syslog. Set to LOG_WARNING by default. Allowed values are LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG (default "LOG_WARNING")
       --log-type string              Type of logger to be used by the system. Set to base by default. Allowed values are silent|syslog|base. (default "base")
   -p, --passphrase string            Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
+      --passphrase-pipe string       Specifies a named pipe to read the passphrase from.
       --read-only                    Mount the system in read only mode. Default value false.
       --remount-system-user string   User that the service remount will run as.
       --secure-config                Encrypt auto generated config file for each container

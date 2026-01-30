@@ -24,6 +24,7 @@ cloudfuse [flags]
 * [cloudfuse gather-logs](cloudfuse_gather-logs.md)	 - Collect cloudfuse logs into an archive
 * [cloudfuse mount](cloudfuse_mount.md)	 - Mount the container as a filesystem
 * [cloudfuse secure](cloudfuse_secure.md)	 - Encrypt / Decrypt your config file
+* [cloudfuse service](cloudfuse_service.md)	 - Manage cloudfuse startup process on Windows
 * [cloudfuse unmount](cloudfuse_unmount.md)	 - Unmount container
 * [cloudfuse update](cloudfuse_update.md)	 - Update the cloudfuse binary.
 * [cloudfuse version](cloudfuse_version.md)	 - Print the current version and optionally check for latest version
