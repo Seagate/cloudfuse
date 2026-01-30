@@ -26,41 +26,35 @@
 package cmd
 
 import (
-	"github.com/Seagate/cloudfuse/common"
+	"testing"
 
-	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-var check bool
-
-var versionCmd = &cobra.Command{
-	Use:     "version",
-	Short:   "Print the current version and optionally check for latest version",
-	Long:    "Display cloudfuse version information including git commit, build date, and Go version.",
-	Aliases: []string{"ver"},
-	GroupID: groupUtil,
-	Args:    cobra.NoArgs,
-	Example: `  # Show version info
-  cloudfuse version
-
-  # Check for updates
-  cloudfuse version --check`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Println("cloudfuse version:", common.CloudfuseVersion)
-		cmd.Println("git commit:", common.GitCommit)
-		cmd.Println("commit date:", common.CommitDate)
-		cmd.Println("go version:", common.GoVersion)
-		cmd.Println("OS/Arch:", common.OsArch)
-		if check {
-			return VersionCheck()
-		}
-		return nil
-	},
+type unmountAllTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
 }
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
+func (suite *unmountAllTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+}
 
-	versionCmd.Flags().
-		BoolVar(&check, "check", false, "To check whether latest version exists or not")
+func (suite *unmountAllTestSuite) cleanupTest() {
+	resetCLIFlags(*unmountCmd)
+	resetCLIFlags(*umntAllCmd)
+}
+
+func TestUnmountAllCommand(t *testing.T) {
+	suite.Run(t, new(unmountAllTestSuite))
+}
+
+// TestUnmountAllHelp tests that help is displayed correctly
+func (suite *unmountAllTestSuite) TestUnmountAllHelp() {
+	defer suite.cleanupTest()
+
+	output, _ := executeCommandC(rootCmd, "unmount", "all", "--help")
+	suite.assert.Contains(output, "Unmount all")
+	suite.assert.Contains(output, "cloudfuse unmount all")
 }

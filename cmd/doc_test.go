@@ -114,6 +114,28 @@ func (suite *docTestSuite) TestOutputDirIsFileError() {
 	suite.assert.Contains(op, "output location is invalid as it is pointing to a file")
 }
 
+// TestDocHelp tests doc command help output
+func (suite *docTestSuite) TestDocHelp() {
+	defer suite.cleanupTest()
+
+	op, err := executeCommandC(rootCmd, "doc", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "Generates Markdown documentation")
+	suite.assert.Contains(op, "output-location")
+}
+
+// TestDocNoArgs tests doc command without args (should still work with defaults)
+func (suite *docTestSuite) TestDocNoArgs() {
+	defer suite.cleanupTest()
+
+	// Create temp dir for default output
+	opDir := "/tmp/docs_" + randomString(6)
+	defer os.RemoveAll(opDir)
+
+	_, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
+	suite.assert.NoError(err)
+}
+
 func TestDocCommand(t *testing.T) {
 	suite.Run(t, new(docTestSuite))
 }

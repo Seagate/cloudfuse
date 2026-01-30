@@ -46,13 +46,14 @@ type genConfigParams struct {
 var optsGenCfg genConfigParams
 
 var generatedConfig = &cobra.Command{
-	Use:               "gen-config",
-	Short:             "Generate config file from template.",
-	Long:              "Generate config file from template.",
-	SuggestFor:        []string{"generate default config", "generate config"},
-	Hidden:            true,
-	Args:              cobra.ExactArgs(0),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "gen-config",
+	Short:      "Generate config file from template.",
+	Long:       "Generate a cloudfuse configuration file from a template.\nReplaces placeholder values with provided parameters.",
+	SuggestFor: []string{"generate default config", "generate config"},
+	Hidden:     true,
+	Args:       cobra.ExactArgs(0),
+	Example: `  # Generate config from template
+  cloudfuse gen-config --config-file=template.yaml --output-file=config.yaml --temp-path=/tmp/cloudfuse`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
 
