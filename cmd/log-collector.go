@@ -57,10 +57,19 @@ const (
 
 var gatherLogsCmd = &cobra.Command{
 	Use:        "gather-logs",
-	Short:      "interface to gather and review cloudfuse logs",
-	Long:       "interface to gather and review cloudfuse logs",
-	SuggestFor: []string{"gather", "gather-log", "gather-logs"},
-	Example:    "cloudfuse gather-logs --output-path=/path/to/archive --config-file=/path/to/config.yaml",
+	Short:      "Collect cloudfuse logs into an archive",
+	Long:       "Gather cloudfuse logs into a compressed archive for troubleshooting.\nCreates a .tar.gz archive on Linux or .zip on Windows.",
+	Aliases:    []string{"logs", "collect-logs"},
+	SuggestFor: []string{"gather", "gather-log"},
+	GroupID:    groupUtil,
+	Example: `  # Collect logs using default config location
+  cloudfuse gather-logs
+
+  # Collect logs with custom output path
+  cloudfuse gather-logs --output-path=/tmp/debug
+
+  # Collect logs using specific config file
+  cloudfuse gather-logs --config-file=/path/to/config.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := checkPath(gatherLogOpts.outputPath)
 		if err != nil {
@@ -473,6 +482,9 @@ func init() {
 	curDir, _ := os.Getwd()
 	gatherLogsCmd.Flags().
 		StringVar(&gatherLogOpts.outputPath, "output-path", curDir, "Input archive creation path")
+	_ = gatherLogsCmd.MarkFlagDirname("output-path")
+
 	gatherLogsCmd.Flags().
 		StringVar(&gatherLogOpts.logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
+	_ = gatherLogsCmd.MarkFlagFilename("config-file", "yaml")
 }

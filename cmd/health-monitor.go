@@ -208,4 +208,5 @@ func init() {
 	healthMonCmd.Flags().StringVar(&configFile, "config-file", "config.yaml",
 		"Configures the path for the file where the account credentials are provided. Default is config.yaml")
 	_ = healthMonCmd.MarkFlagRequired("config-file")
+	_ = healthMonCmd.MarkFlagFilename("config-file", "yaml")
 }

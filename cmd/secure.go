@@ -56,25 +56,31 @@ var encryptedPassphrase *memguard.Enclave
 var secureCmd = &cobra.Command{
 	Use:        "secure",
 	Short:      "Encrypt / Decrypt your config file",
-	Long:       "Encrypt / Decrypt your config file",
-	SuggestFor: []string{"sec", "secre"},
-	Example:    "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
-	Args:       cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-		return nil
-	},
+	Long:       "Encrypt or decrypt configuration files containing sensitive credentials.\nEncrypted config files use the .aes extension.",
+	Aliases:    []string{"sec"},
+	SuggestFor: []string{"secre", "encrypt", "decrypt"},
+	GroupID:    groupConfig,
+	Example: `  # Encrypt a config file
+  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET
+
+  # Decrypt a config file
+  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET
+
+  # Get a key from encrypted config
+  cloudfuse secure get --config-file=config.yaml.aes --passphrase=SECRET --key=azstorage.account-name`,
 }
 
 var encryptCmd = &cobra.Command{
 	Use:        "encrypt",
 	Short:      "Encrypt your config file",
-	Long:       "Encrypt your config file",
+	Long:       "Encrypt a YAML configuration file using AES encryption.\nThe output file will have a .aes extension.",
 	SuggestFor: []string{"en", "enc"},
-	Example:    "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
+	Example: `  # Encrypt config file (creates config.yaml.aes)
+  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET
+
+  # Encrypt to a specific output file
+  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET --output-file=secure.aes`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
 		if err != nil {
@@ -93,9 +99,14 @@ var encryptCmd = &cobra.Command{
 var decryptCmd = &cobra.Command{
 	Use:        "decrypt",
 	Short:      "Decrypt your config file",
-	Long:       "Decrypt your config file",
+	Long:       "Decrypt an AES-encrypted configuration file back to plain YAML.",
 	SuggestFor: []string{"de", "dec"},
-	Example:    "cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=PASSPHRASE",
+	Example: `  # Decrypt config file
+  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET
+
+  # Decrypt to a specific output file
+  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET --output-file=config.yaml`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
 		if err != nil {
@@ -223,13 +234,18 @@ func init() {
 	setKeyCmd.Flags().StringVar(&secOpts.Value, "value", "",
 		"New value for the given config key to be set in ecrypted config file")
 
+	// For setKeyCmd, both key and value are required together (Cobra v1.5.0+)
+	setKeyCmd.MarkFlagsRequiredTogether("key", "value")
+
 	// Flags that needs to be accessible at all subcommand level shall be defined in persistentflags only
 	secureCmd.PersistentFlags().StringVar(&secOpts.ConfigFile, "config-file", "",
 		"Configuration file to be encrypted / decrypted")
+	_ = secureCmd.MarkPersistentFlagFilename("config-file", "yaml", "aes")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",
 		"Path and name for the output file")
+	_ = secureCmd.MarkPersistentFlagFilename("output-file", "yaml", "aes")
 }

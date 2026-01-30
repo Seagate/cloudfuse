@@ -60,9 +60,19 @@ type asset struct {
 }
 
 var updateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "Update the cloudfuse binary.",
-	Long:  "Update the cloudfuse binary.",
+	Use:     "update",
+	Short:   "Update the cloudfuse binary.",
+	Long:    "Update cloudfuse to the latest version or a specific version.\nRequires appropriate permissions (sudo on Linux, admin on Windows).",
+	Aliases: []string{"upgrade"},
+	GroupID: groupUtil,
+	Example: `  # Update to the latest version
+  sudo cloudfuse update
+
+  # Update to a specific version
+  sudo cloudfuse update --version=2.3.0
+
+  # Download update without installing
+  cloudfuse update --output=/tmp/cloudfuse-update`,
 	RunE: func(command *cobra.Command, args []string) error {
 		if opt.Package == "" {
 			packageFormat, err := determinePackageFormat()
@@ -331,8 +341,27 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.PersistentFlags().
 		StringVar(&opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
+	_ = updateCmd.MarkPersistentFlagDirname("output")
+
 	updateCmd.PersistentFlags().
 		StringVar(&opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
 	updateCmd.PersistentFlags().
 		StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm|zip|exe (default: automatically detect package format)")
+
+	_ = updateCmd.RegisterFlagCompletionFunc(
+		"package",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if runtime.GOOS == "windows" {
+				return []string{
+					cobra.CompletionWithDesc("exe", "Windows installer"),
+					cobra.CompletionWithDesc("zip", "Portable ZIP archive"),
+				}, cobra.ShellCompDirectiveNoFileComp
+			}
+			return []string{
+				cobra.CompletionWithDesc("deb", "Debian/Ubuntu package"),
+				cobra.CompletionWithDesc("rpm", "RedHat/Fedora package"),
+				cobra.CompletionWithDesc("tar", "Portable tarball archive"),
+			}, cobra.ShellCompDirectiveNoFileComp
+		},
+	)
 }

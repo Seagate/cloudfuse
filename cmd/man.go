@@ -82,4 +82,5 @@ func init() {
 	rootCmd.AddCommand(manCmd)
 	manCmd.PersistentFlags().StringVar(&manCmdInput.outputLocation, "output-location", "./doc",
 		"where to put the generated man files")
+	_ = manCmd.MarkPersistentFlagDirname("output-location")
 }

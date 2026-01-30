@@ -42,9 +42,19 @@ import (
 var unmountCmd = &cobra.Command{
 	Use:        "unmount <mount path>",
 	Short:      "Unmount container",
-	Long:       "Unmount container",
-	SuggestFor: []string{"unmount", "unmnt"},
+	Long:       "Unmount a cloudfuse mount point. Supports wildcards to unmount multiple mounts.",
+	Aliases:    []string{"umount", "umnt"},
+	SuggestFor: []string{"unmnt", "dismount"},
+	GroupID:    groupCore,
 	Args:       cobra.ExactArgs(1),
+	Example: `  # Unmount a specific mount point
+  cloudfuse unmount ~/mycontainer
+
+  # Lazy unmount (Linux only)
+  cloudfuse unmount ~/mycontainer --lazy
+
+  # Unmount all mounts matching a pattern
+  cloudfuse unmount "~/container*"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mountPath := common.ExpandPath(args[0])
 
@@ -88,12 +98,16 @@ var unmountCmd = &cobra.Command{
 		}
 		return nil
 	},
-	ValidArgsFunction: func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if toComplete == "" {
-			mntPts, _ := common.ListMountPoints()
-			return mntPts, cobra.ShellCompDirectiveNoFileComp
+	ValidArgsFunction: func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Only complete the first argument (mount path)
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return nil, cobra.ShellCompDirectiveDefault
+		mntPts, _ := common.ListMountPoints()
+		if len(mntPts) == 0 {
+			return []string{"No active cloudfuse mounts"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return mntPts, cobra.ShellCompDirectiveNoFileComp
 	},
 }
 

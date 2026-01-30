@@ -36,8 +36,16 @@ import (
 var check bool
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the current version and optionally check for latest version",
+	Use:     "version",
+	Short:   "Print the current version and optionally check for latest version",
+	Long:    "Display cloudfuse version information including git commit, build date, and Go version.",
+	Aliases: []string{"ver"},
+	GroupID: groupUtil,
+	Example: `  # Show version info
+  cloudfuse version
+
+  # Check for updates
+  cloudfuse version --check`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
 		fmt.Println("git commit:", common.GitCommit)
