@@ -46,7 +46,10 @@ var umntAllCmd = &cobra.Command{
 			return fmt.Errorf("failed to list mount points [%s]", err.Error())
 		}
 
-		lazy, _ := cmd.Flags().GetBool("lazy")
+		lazy, err := cmd.Flags().GetBool("lazy")
+		if err != nil && runtime.GOOS != "windows" {
+			return fmt.Errorf("failed to get lazy flag: %w", err)
+		}
 		mountfound := 0
 		unmounted := 0
 		errMsg := "failed to unmount - \n"
@@ -83,10 +86,5 @@ var umntAllCmd = &cobra.Command{
 }
 
 func init() {
-	if runtime.GOOS == "windows" {
-		umntAllCmd.Flags().
-			Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
-		umntAllCmd.Flags().
-			Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
-	}
+	// Flags are inherited from parent unmount command
 }

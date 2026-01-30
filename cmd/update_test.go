@@ -66,7 +66,7 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {
 
 	_, err := executeCommandC(rootCmd, "update", "--version=1.8.0")
 	suite.assert.Error(err)
-	suite.assert.Equal("error: .deb and .rpm requires elevated privileges", err.Error())
+	suite.assert.Equal("update failed: .deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
@@ -77,7 +77,7 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
 
 	_, err := executeCommandC(rootCmd, "update", "--package=deb", "--version=1.8.0")
 	suite.assert.Error(err)
-	suite.assert.Equal("error: .deb and .rpm requires elevated privileges", err.Error())
+	suite.assert.Equal("update failed: .deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateWithOutputDebLinux() {

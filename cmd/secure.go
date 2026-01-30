@@ -61,13 +61,17 @@ var secureCmd = &cobra.Command{
 	SuggestFor: []string{"secre", "encrypt", "decrypt"},
 	GroupID:    groupConfig,
 	Example: `  # Encrypt a config file
-  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET
+  cloudfuse secure encrypt -c config.yaml -p SECRET
 
   # Decrypt a config file
-  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET
 
   # Get a key from encrypted config
-  cloudfuse secure get --config-file=config.yaml.aes --passphrase=SECRET --key=azstorage.account-name`,
+  cloudfuse secure get -c config.yaml.aes -p SECRET -k azstorage.account-name`,
+	// PersistentPreRunE validates options for all subcommands
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return validateOptions()
+	},
 }
 
 var encryptCmd = &cobra.Command{
@@ -76,20 +80,16 @@ var encryptCmd = &cobra.Command{
 	Long:       "Encrypt a YAML configuration file using AES encryption.\nThe output file will have a .aes extension.",
 	SuggestFor: []string{"en", "enc"},
 	Example: `  # Encrypt config file (creates config.yaml.aes)
-  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET
+  cloudfuse secure encrypt -c config.yaml -p SECRET
 
   # Encrypt to a specific output file
-  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET --output-file=secure.aes`,
+  cloudfuse secure encrypt -c config.yaml -p SECRET -o secure.aes`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
+		// Validation handled by PersistentPreRunE
+		_, err := encryptConfigFile(true)
 		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
-		_, err = encryptConfigFile(true)
-		if err != nil {
-			return fmt.Errorf("failed to encrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to encrypt config file: %w", err)
 		}
 
 		return nil
@@ -102,20 +102,16 @@ var decryptCmd = &cobra.Command{
 	Long:       "Decrypt an AES-encrypted configuration file back to plain YAML.",
 	SuggestFor: []string{"de", "dec"},
 	Example: `  # Decrypt config file
-  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET
 
   # Decrypt to a specific output file
-  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET --output-file=config.yaml`,
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET -o config.yaml`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
+		// Validation handled by PersistentPreRunE
+		_, err := decryptConfigFile(true)
 		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
-		_, err = decryptConfigFile(true)
-		if err != nil {
-			return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to decrypt config file: %w", err)
 		}
 
 		return nil
@@ -226,10 +222,11 @@ func init() {
 	secureCmd.AddCommand(getKeyCmd)
 	secureCmd.AddCommand(setKeyCmd)
 
-	getKeyCmd.Flags().StringVar(&secOpts.Key, "key", "",
+	getKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
 		"Config key to be searched in encrypted config file")
+	_ = getKeyCmd.MarkFlagRequired("key")
 
-	setKeyCmd.Flags().StringVar(&secOpts.Key, "key", "",
+	setKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
 		"Config key to be updated in encrypted config file")
 	setKeyCmd.Flags().StringVar(&secOpts.Value, "value", "",
 		"New value for the given config key to be set in ecrypted config file")
@@ -238,14 +235,14 @@ func init() {
 	setKeyCmd.MarkFlagsRequiredTogether("key", "value")
 
 	// Flags that needs to be accessible at all subcommand level shall be defined in persistentflags only
-	secureCmd.PersistentFlags().StringVar(&secOpts.ConfigFile, "config-file", "",
+	secureCmd.PersistentFlags().StringVarP(&secOpts.ConfigFile, "config-file", "c", "",
 		"Configuration file to be encrypted / decrypted")
 	_ = secureCmd.MarkPersistentFlagFilename("config-file", "yaml", "aes")
 
-	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
+	secureCmd.PersistentFlags().StringVarP(&secOpts.PassPhrase, "passphrase", "p", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
-	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",
+	secureCmd.PersistentFlags().StringVarP(&secOpts.OutputFile, "output-file", "o", "",
 		"Path and name for the output file")
 	_ = secureCmd.MarkPersistentFlagFilename("output-file", "yaml", "aes")
 }

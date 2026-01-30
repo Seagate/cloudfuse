@@ -58,9 +58,15 @@ var unmountCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mountPath := common.ExpandPath(args[0])
 
-		disableRemountSystem, _ := cmd.Flags().GetBool("disable-remount-system")
+		disableRemountSystem, err := cmd.Flags().GetBool("disable-remount-system")
+		if err != nil {
+			return fmt.Errorf("failed to get disable-remount-system flag: %w", err)
+		}
 		if runtime.GOOS == "windows" {
-			disableRemountUser, _ := cmd.Flags().GetBool("disable-remount-user")
+			disableRemountUser, err := cmd.Flags().GetBool("disable-remount-user")
+			if err != nil {
+				return fmt.Errorf("failed to get disable-remount-user flag: %w", err)
+			}
 			mountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 			return unmountCloudfuseWindows(mountPath, disableRemountUser, disableRemountSystem)
 		}
@@ -76,7 +82,10 @@ var unmountCmd = &cobra.Command{
 			}
 		}
 
-		lazy, _ := cmd.Flags().GetBool("lazy")
+		lazy, err := cmd.Flags().GetBool("lazy")
+		if err != nil {
+			return fmt.Errorf("failed to get lazy flag: %w", err)
+		}
 		if strings.Contains(args[0], "*") {
 			mntPathPrefix := args[0]
 
@@ -156,10 +165,10 @@ func init() {
 	}
 
 	if runtime.GOOS == "windows" {
-		unmountCmd.Flags().
+		unmountCmd.PersistentFlags().
 			Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
 	}
 
-	unmountCmd.Flags().
+	unmountCmd.PersistentFlags().
 		Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
 }

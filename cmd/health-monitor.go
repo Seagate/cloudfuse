@@ -72,14 +72,14 @@ var healthMonCmd = &cobra.Command{
 		err := validateHMonOptions()
 		if err != nil {
 			log.Err("health-monitor : failed to validate options [%s]", err.Error())
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
+			return fmt.Errorf("failed to validate options: %w", err)
 		}
 
 		options.ConfigFile = configFile
 		err = parseConfig()
 		if err != nil {
 			log.Err("health-monitor : failed to parse config [%s]", err.Error())
-			return err
+			return fmt.Errorf("failed to parse config: %w", err)
 		}
 
 		err = config.UnmarshalKey("file_cache", &cacheMonitorOptions)
@@ -88,7 +88,7 @@ var healthMonCmd = &cobra.Command{
 				"health-monitor : file_cache config error (invalid config attributes) [%s]",
 				err.Error(),
 			)
-			return fmt.Errorf("invalid file_cache config [%s]", err.Error())
+			return fmt.Errorf("invalid file_cache config: %w", err)
 		}
 
 		err = config.UnmarshalKey("health_monitor", &options.MonitorOpt)
@@ -97,7 +97,7 @@ var healthMonCmd = &cobra.Command{
 				"health-monitor : health_monitor config error (invalid config attributes) [%s]",
 				err.Error(),
 			)
-			return fmt.Errorf("invalid health_monitor config [%s]", err.Error())
+			return fmt.Errorf("invalid health_monitor config: %w", err)
 		}
 
 		cliParams := buildCliParamForMonitor()
@@ -108,7 +108,7 @@ var healthMonCmd = &cobra.Command{
 		if runtime.GOOS == "windows" {
 			path, err := filepath.Abs(hmcommon.CfuseMon + ".exe")
 			if err != nil {
-				return fmt.Errorf("failed to start health monitor [%s]", err.Error())
+				return fmt.Errorf("failed to start health monitor: %w", err)
 			}
 			hmcmd = exec.Command(path, cliParams...)
 		} else {
@@ -122,7 +122,7 @@ var healthMonCmd = &cobra.Command{
 		if err != nil {
 			common.EnableMonitoring = false
 			log.Err("health-monitor : failed to start health monitor [%s]", err.Error())
-			return fmt.Errorf("failed to start health monitor [%s]", err.Error())
+			return fmt.Errorf("failed to start health monitor: %w", err)
 		}
 
 		return nil

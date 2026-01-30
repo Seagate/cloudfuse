@@ -98,7 +98,7 @@ var updateCmd = &cobra.Command{
 		}
 
 		if err := installUpdate(context.Background(), &opt); err != nil {
-			return fmt.Errorf("error: %v", err)
+			return fmt.Errorf("update failed: %w", err)
 		}
 		return nil
 	},

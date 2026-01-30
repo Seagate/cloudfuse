@@ -43,22 +43,18 @@ var setKeyCmd = &cobra.Command{
 	Short:      "Update encrypted config by setting new value for the given config parameter",
 	Long:       "Update encrypted config by setting new value for the given config parameter",
 	SuggestFor: []string{"s", "set"},
-	Example:    "cloudfuse secure set --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level --value=log_debug",
+	Example:    "cloudfuse secure set -c config.yaml -p PASSPHRASE -k logging.log_level --value=log_debug",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
+		// Validation handled by parent's PersistentPreRunE
 		plainText, err := decryptConfigFile(false)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to decrypt config file: %w", err)
 		}
 
 		viper.SetConfigType("yaml")
 		err = viper.ReadConfig(strings.NewReader(string(plainText)))
 		if err != nil {
-			return fmt.Errorf("failed to load config [%s]", err.Error())
+			return fmt.Errorf("failed to load config: %w", err)
 		}
 
 		value := viper.Get(secOpts.Key)
@@ -80,16 +76,16 @@ var setKeyCmd = &cobra.Command{
 		allConf := viper.AllSettings()
 		confStream, err := yaml.Marshal(allConf)
 		if err != nil {
-			return fmt.Errorf("failed to marshal config [%s]", err.Error())
+			return fmt.Errorf("failed to marshal config: %w", err)
 		}
 
 		cipherText, err := common.EncryptData(confStream, encryptedPassphrase)
 		if err != nil {
-			return fmt.Errorf("failed to encrypt config [%s]", err.Error())
+			return fmt.Errorf("failed to encrypt config: %w", err)
 		}
 
 		if err = saveToFile(secOpts.ConfigFile, cipherText, false); err != nil {
-			return fmt.Errorf("failed save config file [%s]", err.Error())
+			return fmt.Errorf("failed save config file: %w", err)
 		}
 
 		return nil

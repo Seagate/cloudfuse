@@ -828,7 +828,7 @@ func init() {
 	mountCmd.PersistentFlags().BoolVar(&options.SecureConfig, "secure-config", false,
 		"Encrypt auto generated config file for each container")
 
-	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
+	mountCmd.PersistentFlags().StringVarP(&options.PassPhrase, "passphrase", "p", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	mountCmd.PersistentFlags().
