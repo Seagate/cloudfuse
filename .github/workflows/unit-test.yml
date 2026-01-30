@@ -61,7 +61,7 @@ jobs:
     env:
       cgo: "1"
       go: "1.25"
-      zig: 0.15.1
+      zig: 0.15.2
       containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
