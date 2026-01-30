@@ -69,7 +69,7 @@ func (fc *FileCache) SetupScheduler() error {
 }
 
 func isValidCronExpression(expr string) bool {
-	parser := cron.NewParser(
+	parser := cron.MustNewParser(
 		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
 	)
 	_, err := parser.Parse(expr)
