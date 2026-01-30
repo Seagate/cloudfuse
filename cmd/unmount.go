@@ -95,7 +95,7 @@ var unmountCmd = &cobra.Command{
 				if match {
 					err := unmountCloudfuse(mntPath, lazy, false)
 					if err != nil {
-						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
+						return fmt.Errorf("failed to unmount %s: %w", mntPath, err)
 					}
 				}
 			}
@@ -159,7 +159,7 @@ func unmountCloudfuse(mntPath string, lazy bool, silent bool) error {
 
 func init() {
 	rootCmd.AddCommand(unmountCmd)
-	unmountCmd.AddCommand(umntAllCmd)
+
 	if runtime.GOOS != "windows" {
 		unmountCmd.PersistentFlags().BoolP("lazy", "z", false, "Use lazy unmount")
 	}

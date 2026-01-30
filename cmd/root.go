@@ -281,14 +281,13 @@ func parseArgs(cmdArgs []string) []string {
 	}
 
 	// Check for /etc/fstab style inputs
-	args := make([]string, 0)
+	args := make([]string, 0, len(cmdArgs))
 	for i := 0; i < len(cmdArgs); i++ {
 		// /etc/fstab will give everything in comma separated list with -o option
 		if cmdArgs[i] == "-o" {
 			i++
 			if i < len(cmdArgs) {
-				bfuseArgs := make([]string, 0)
-				lfuseArgs := make([]string, 0)
+				var bfuseArgs, lfuseArgs []string
 
 				// Check if ',' exists in arguments or not. If so we assume it might be coming from /etc/fstab
 				opts := strings.SplitSeq(cmdArgs[i], ",")

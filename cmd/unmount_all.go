@@ -39,11 +39,12 @@ var umntAllCmd = &cobra.Command{
 	Use:        "all",
 	Short:      "Unmount all instances of Cloudfuse",
 	Long:       "Unmount all instances of Cloudfuse",
-	SuggestFor: []string{"al", "all"},
+	SuggestFor: []string{"al"},
+	Args:       cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {
-			return fmt.Errorf("failed to list mount points [%s]", err.Error())
+			return fmt.Errorf("failed to list mount points: %w", err)
 		}
 
 		lazy, err := cmd.Flags().GetBool("lazy")
@@ -86,5 +87,6 @@ var umntAllCmd = &cobra.Command{
 }
 
 func init() {
+	unmountCmd.AddCommand(umntAllCmd)
 	// Flags are inherited from parent unmount command
 }

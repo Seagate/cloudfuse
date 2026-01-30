@@ -192,12 +192,14 @@ func (suite *hmonTestSuite) TestHmonStopAllFailure() {
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidEmpty() {
+	defer suite.cleanupTest()
 	op, err := executeCommandC(rootCmd, "health-monitor", "stop", "--pid=")
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "pid of cloudfuse process not given")
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidInvalid() {
+	defer suite.cleanupTest()
 	op, err := executeCommandC(
 		rootCmd,
 		"health-monitor",

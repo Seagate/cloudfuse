@@ -39,11 +39,12 @@ var healthMonStopAll = &cobra.Command{
 	Use:        "all",
 	Short:      "Stop all health monitor binaries",
 	Long:       "Stop all health monitor binaries",
-	SuggestFor: []string{"al", "all"},
+	SuggestFor: []string{"al"},
+	Args:       cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := stopAll()
 		if err != nil {
-			return fmt.Errorf("failed to stop all health monitor binaries [%s]", err.Error())
+			return fmt.Errorf("failed to stop all health monitor binaries: %w", err)
 		}
 		return nil
 	},
@@ -64,8 +65,11 @@ func stopAll() error {
 	_, err := cliOut.Output()
 	if err != nil {
 		return err
-	} else {
-		fmt.Println("Successfully stopped all health monitor binaries.")
-		return nil
 	}
+	fmt.Println("Successfully stopped all health monitor binaries.")
+	return nil
+}
+
+func init() {
+	healthMonStop.AddCommand(healthMonStopAll)
 }

@@ -818,12 +818,15 @@ func init() {
 
 	options = mountOptions{}
 
-	mountCmd.AddCommand(mountListCmd)
-	mountCmd.AddCommand(mountAllCmd)
-
 	mountCmd.PersistentFlags().StringVarP(&options.ConfigFile, "config-file", "c", "",
 		"Configures the path for the file where the account credentials are provided. Default is config.yaml in current directory.")
-	_ = mountCmd.MarkPersistentFlagFilename("config-file", "yaml")
+	_ = mountCmd.MarkPersistentFlagFilename("config-file", "yaml", "yml", "aes")
+	_ = mountCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 
 	mountCmd.PersistentFlags().BoolVar(&options.SecureConfig, "secure-config", false,
 		"Encrypt auto generated config file for each container")

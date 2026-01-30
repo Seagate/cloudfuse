@@ -477,3 +477,7 @@ func buildCliParamForMount() []string {
 func ignoreCliParam(opt string) bool {
 	return strings.HasPrefix(opt, "--config-file")
 }
+
+func init() {
+	mountCmd.AddCommand(mountAllCmd)
+}

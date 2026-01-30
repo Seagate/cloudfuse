@@ -41,6 +41,7 @@ var versionCmd = &cobra.Command{
 	Long:    "Display cloudfuse version information including git commit, build date, and Go version.",
 	Aliases: []string{"ver"},
 	GroupID: groupUtil,
+	Args:    cobra.NoArgs,
 	Example: `  # Show version info
   cloudfuse version
 

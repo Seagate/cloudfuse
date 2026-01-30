@@ -43,16 +43,17 @@ var docCmd = &cobra.Command{
 	Hidden: true,
 	Short:  "Generates documentation for the tool in Markdown format",
 	Long:   "Generates documentation for the tool in Markdown format, and stores them in the designated location",
+	Args:   cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// verify the output location
 		f, err := os.Stat(docCmdInput.outputLocation)
 		if err != nil && os.IsNotExist(err) {
 			// create the output location if it does not exist yet
 			if err = os.MkdirAll(docCmdInput.outputLocation, os.ModePerm); err != nil {
-				return fmt.Errorf("failed to create output location [%s]", err.Error())
+				return fmt.Errorf("failed to create output location: %w", err)
 			}
 		} else if err != nil {
-			return fmt.Errorf("cannot access output location [%s]", err.Error())
+			return fmt.Errorf("cannot access output location: %w", err)
 		} else if !f.IsDir() {
 			return fmt.Errorf("output location is invalid as it is pointing to a file")
 		}
@@ -62,8 +63,8 @@ var docCmd = &cobra.Command{
 		err = doc.GenMarkdownTree(rootCmd, docCmdInput.outputLocation)
 		if err != nil {
 			return fmt.Errorf(
-				"cannot generate command tree [%s]. Please contact the dev team",
-				err.Error(),
+				"cannot generate command tree: %w",
+				err,
 			)
 		}
 		return nil

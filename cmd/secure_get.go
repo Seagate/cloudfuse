@@ -38,8 +38,10 @@ var getKeyCmd = &cobra.Command{
 	Use:        "get",
 	Short:      "Get value of requested config parameter from your encrypted config file",
 	Long:       "Get value of requested config parameter from your encrypted config file",
-	SuggestFor: []string{"g", "get"},
-	Example:    "cloudfuse secure get -c config.yaml -p PASSPHRASE -k logging.log_level",
+	SuggestFor: []string{"g"},
+	Args:       cobra.NoArgs,
+	Example: `  # Get a specific key from encrypted config
+  cloudfuse secure get -c config.yaml.aes -p SECRET -k logging.log_level`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validation handled by parent's PersistentPreRunE
 		plainText, err := decryptConfigFile(false)
@@ -70,4 +72,12 @@ var getKeyCmd = &cobra.Command{
 		cmd.Println(secOpts.Key, "=", value)
 		return nil
 	},
+}
+
+func init() {
+	secureCmd.AddCommand(getKeyCmd)
+
+	getKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
+		"Config key to be searched in encrypted config file")
+	_ = getKeyCmd.MarkFlagRequired("key")
 }

@@ -219,25 +219,17 @@ func init() {
 	rootCmd.AddCommand(secureCmd)
 	secureCmd.AddCommand(encryptCmd)
 	secureCmd.AddCommand(decryptCmd)
-	secureCmd.AddCommand(getKeyCmd)
-	secureCmd.AddCommand(setKeyCmd)
-
-	getKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
-		"Config key to be searched in encrypted config file")
-	_ = getKeyCmd.MarkFlagRequired("key")
-
-	setKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
-		"Config key to be updated in encrypted config file")
-	setKeyCmd.Flags().StringVar(&secOpts.Value, "value", "",
-		"New value for the given config key to be set in ecrypted config file")
-
-	// For setKeyCmd, both key and value are required together (Cobra v1.5.0+)
-	setKeyCmd.MarkFlagsRequiredTogether("key", "value")
-
 	// Flags that needs to be accessible at all subcommand level shall be defined in persistentflags only
 	secureCmd.PersistentFlags().StringVarP(&secOpts.ConfigFile, "config-file", "c", "",
 		"Configuration file to be encrypted / decrypted")
 	_ = secureCmd.MarkPersistentFlagFilename("config-file", "yaml", "aes")
+	_ = secureCmd.MarkPersistentFlagRequired("config-file")
+	_ = secureCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 
 	secureCmd.PersistentFlags().StringVarP(&secOpts.PassPhrase, "passphrase", "p", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
@@ -245,4 +237,10 @@ func init() {
 	secureCmd.PersistentFlags().StringVarP(&secOpts.OutputFile, "output-file", "o", "",
 		"Path and name for the output file")
 	_ = secureCmd.MarkPersistentFlagFilename("output-file", "yaml", "aes")
+	_ = secureCmd.RegisterFlagCompletionFunc(
+		"output-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 }

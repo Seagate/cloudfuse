@@ -65,6 +65,7 @@ var updateCmd = &cobra.Command{
 	Long:    "Update cloudfuse to the latest version or a specific version.\nRequires appropriate permissions (sudo on Linux, admin on Windows).",
 	Aliases: []string{"upgrade"},
 	GroupID: groupUtil,
+	Args:    cobra.NoArgs,
 	Example: `  # Update to the latest version
   sudo cloudfuse update
 

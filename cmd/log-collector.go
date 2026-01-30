@@ -62,6 +62,7 @@ var gatherLogsCmd = &cobra.Command{
 	Aliases:    []string{"logs", "collect-logs"},
 	SuggestFor: []string{"gather", "gather-log"},
 	GroupID:    groupUtil,
+	Args:       cobra.NoArgs,
 	Example: `  # Collect logs using default config location
   cloudfuse gather-logs
 
@@ -486,5 +487,11 @@ func init() {
 
 	gatherLogsCmd.Flags().
 		StringVar(&gatherLogOpts.logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
-	_ = gatherLogsCmd.MarkFlagFilename("config-file", "yaml")
+	_ = gatherLogsCmd.MarkFlagFilename("config-file", "yaml", "aes")
+	_ = gatherLogsCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 }

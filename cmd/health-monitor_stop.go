@@ -38,25 +38,40 @@ import (
 var cloudfusePid string
 
 var healthMonStop = &cobra.Command{
-	Use:        "stop",
-	Short:      "Stops the health monitor binary associated with a given Cloudfuse pid",
-	Long:       "Stops the health monitor binary associated with a given Cloudfuse pid",
+	Use:   "stop",
+	Short: "Stops health monitor binaries",
+	Long: `Stops health monitor binaries.
+
+Use 'stop --pid=<cloudfuse-pid>' to stop a specific monitor,
+or 'stop all' to stop all running monitors.`,
 	SuggestFor: []string{"stp", "st"},
+	Example: `  # Stop a specific health monitor by cloudfuse pid
+  cloudfuse health-monitor stop --pid=12345
+
+  # Stop all health monitors
+  cloudfuse health-monitor stop all`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cloudfusePid = strings.TrimSpace(cloudfusePid)
 
 		if len(cloudfusePid) == 0 {
-			return fmt.Errorf("pid of cloudfuse process not given")
+			return fmt.Errorf(
+				"pid of cloudfuse process not given. Use --pid flag or 'stop all' subcommand",
+			)
 		}
 
 		pid, err := getPid(cloudfusePid)
 		if err != nil {
-			return fmt.Errorf("failed to get health monitor pid")
+			return fmt.Errorf(
+				"failed to get health monitor pid for cloudfuse pid %s: %w",
+				cloudfusePid,
+				err,
+			)
 		}
 
 		err = stop(pid)
 		if err != nil {
-			return fmt.Errorf("failed to stop health monitor")
+			return fmt.Errorf("failed to stop health monitor: %w", err)
 		}
 
 		return nil
@@ -130,17 +145,14 @@ func stop(pid string) error {
 	_, err := cliOut.Output()
 	if err != nil {
 		return err
-	} else {
-		fmt.Println("Successfully stopped health monitor binary.")
-		return nil
 	}
+	fmt.Println("Successfully stopped health monitor binary.")
+	return nil
 }
 
 func init() {
 	healthMonCmd.AddCommand(healthMonStop)
-	healthMonStop.AddCommand(healthMonStopAll)
 
 	healthMonStop.Flags().
 		StringVar(&cloudfusePid, "pid", "", "Cloudfuse PID associated with the health monitor that should be stopped")
-	_ = healthMonStop.MarkFlagRequired("pid")
 }

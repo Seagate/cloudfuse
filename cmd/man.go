@@ -44,16 +44,17 @@ var manCmd = &cobra.Command{
 	Hidden: true,
 	Short:  "Generates man page for Cloudfuse",
 	Long:   "Generates man page for Cloudfuse",
+	Args:   cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// verify the output location
 		f, err := os.Stat(manCmdInput.outputLocation)
 		if err != nil && os.IsNotExist(err) {
 			// create the output location if it does not exist yet
 			if err = os.MkdirAll(manCmdInput.outputLocation, os.ModePerm); err != nil {
-				return fmt.Errorf("failed to create output location [%s]", err.Error())
+				return fmt.Errorf("failed to create output location: %w", err)
 			}
 		} else if err != nil {
-			return fmt.Errorf("cannot access output location [%s]", err.Error())
+			return fmt.Errorf("cannot access output location: %w", err)
 		} else if !f.IsDir() {
 			return fmt.Errorf("output location is invalid as it is pointing to a file")
 		}
@@ -70,8 +71,8 @@ var manCmd = &cobra.Command{
 		err = doc.GenManTree(rootCmd, header, manCmdInput.outputLocation)
 		if err != nil {
 			return fmt.Errorf(
-				"cannot generate man pages [%s]. Please contact the dev team",
-				err.Error(),
+				"cannot generate man pages: %w",
+				err,
 			)
 		}
 		return nil
