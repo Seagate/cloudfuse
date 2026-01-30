@@ -27,6 +27,7 @@ package cmd
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -56,6 +57,9 @@ func (suite *mountListTestSuite) cleanupTest() {
 }
 
 func (suite *mountListTestSuite) TestMountListNoMounts() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping mount list test on Windows")
+	}
 	defer suite.cleanupTest()
 
 	// When no mounts exist, should print message
