@@ -11,22 +11,22 @@ Encrypted config files use the .aes extension.
 
 ```
   # Encrypt a config file
-  cloudfuse secure encrypt --config-file=config.yaml --passphrase=SECRET
+  cloudfuse secure encrypt -c config.yaml -p SECRET
 
   # Decrypt a config file
-  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET
 
   # Get a key from encrypted config
-  cloudfuse secure get --config-file=config.yaml.aes --passphrase=SECRET --key=azstorage.account-name
+  cloudfuse secure get -c config.yaml.aes -p SECRET -k azstorage.account-name
 ```
 
 ### Options
 
 ```
-      --config-file string   Configuration file to be encrypted / decrypted
+  -c, --config-file string   Configuration file to be encrypted / decrypted
   -h, --help                 help for secure
-      --output-file string   Path and name for the output file
-      --passphrase string    Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
+  -o, --output-file string   Path and name for the output file
+  -p, --passphrase string    Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
 ```
 
 ### Options inherited from parent commands

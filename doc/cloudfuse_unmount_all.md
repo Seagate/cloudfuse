@@ -4,10 +4,21 @@ Unmount all instances of Cloudfuse
 
 ### Synopsis
 
-Unmount all instances of Cloudfuse
+Unmount all cloudfuse mount points at once.
+Returns a summary of how many mounts were successfully unmounted.
 
 ```
 cloudfuse unmount all [flags]
+```
+
+### Examples
+
+```
+  # Unmount all cloudfuse mounts
+  cloudfuse unmount all
+
+  # Lazy unmount all (Linux only)
+  cloudfuse unmount all --lazy
 ```
 
 ### Options
@@ -19,8 +30,9 @@ cloudfuse unmount all [flags]
 ### Options inherited from parent commands
 
 ```
-      --disable-version-check   To disable version check that is performed automatically
-  -z, --lazy                    Use lazy unmount
+      --disable-remount-system   Disable remounting this mount on server restart as system.
+      --disable-version-check    To disable version check that is performed automatically
+  -z, --lazy                     Use lazy unmount
 ```
 
 ### SEE ALSO

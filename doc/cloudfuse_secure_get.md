@@ -13,23 +13,24 @@ cloudfuse secure get [flags]
 ### Examples
 
 ```
-cloudfuse secure get --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level
+  # Get a specific key from encrypted config
+  cloudfuse secure get -c config.yaml.aes -p SECRET -k logging.log_level
 ```
 
 ### Options
 
 ```
   -h, --help         help for get
-      --key string   Config key to be searched in encrypted config file
+  -k, --key string   Config key to be searched in encrypted config file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --config-file string      Configuration file to be encrypted / decrypted
+  -c, --config-file string      Configuration file to be encrypted / decrypted
       --disable-version-check   To disable version check that is performed automatically
-      --output-file string      Path and name for the output file
-      --passphrase string       Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
+  -o, --output-file string      Path and name for the output file
+  -p, --passphrase string       Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
 ```
 
 ### SEE ALSO

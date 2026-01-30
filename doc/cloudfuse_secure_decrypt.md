@@ -14,10 +14,10 @@ cloudfuse secure decrypt [flags]
 
 ```
   # Decrypt config file
-  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET
 
   # Decrypt to a specific output file
-  cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=SECRET --output-file=config.yaml
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET -o config.yaml
 ```
 
 ### Options
@@ -29,10 +29,10 @@ cloudfuse secure decrypt [flags]
 ### Options inherited from parent commands
 
 ```
-      --config-file string      Configuration file to be encrypted / decrypted
+  -c, --config-file string      Configuration file to be encrypted / decrypted
       --disable-version-check   To disable version check that is performed automatically
-      --output-file string      Path and name for the output file
-      --passphrase string       Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
+  -o, --output-file string      Path and name for the output file
+  -p, --passphrase string       Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
 ```
 
 ### SEE ALSO

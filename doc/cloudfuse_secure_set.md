@@ -13,24 +13,25 @@ cloudfuse secure set [flags]
 ### Examples
 
 ```
-cloudfuse secure set --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level --value=log_debug
+  # Update a key in encrypted config
+  cloudfuse secure set -c config.yaml.aes -p SECRET -k logging.log_level --value=LOG_DEBUG
 ```
 
 ### Options
 
 ```
   -h, --help           help for set
-      --key string     Config key to be updated in encrypted config file
-      --value string   New value for the given config key to be set in ecrypted config file
+  -k, --key string     Config key to be updated in encrypted config file
+      --value string   New value for the given config key to be set in encrypted config file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --config-file string      Configuration file to be encrypted / decrypted
+  -c, --config-file string      Configuration file to be encrypted / decrypted
       --disable-version-check   To disable version check that is performed automatically
-      --output-file string      Path and name for the output file
-      --passphrase string       Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
+  -o, --output-file string      Path and name for the output file
+  -p, --passphrase string       Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
 ```
 
 ### SEE ALSO
