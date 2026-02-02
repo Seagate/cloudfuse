@@ -11,8 +11,8 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.7
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.21.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.1
+	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.2
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/smithy-go v1.24.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gdamore/tcell/v2 v2.13.7
@@ -22,7 +22,6 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
-	github.com/robfig/cron/v3 v3.0.1
 	github.com/sevlyar/go-daemon v0.1.7-0.20251110065050-63665fab0d07
 	github.com/shirou/gopsutil/v4 v4.25.12
 	github.com/spf13/cobra v1.10.2
@@ -33,7 +32,7 @@ require (
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
 	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
-  go.uber.org/mock v0.6.0
+	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.47.0
 	golang.org/x/sys v0.40.0
