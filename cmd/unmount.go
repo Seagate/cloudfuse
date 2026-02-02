@@ -40,12 +40,11 @@ import (
 )
 
 var unmountCmd = &cobra.Command{
-	Use:               "unmount <mount path>",
-	Short:             "Unmount container",
-	Long:              "Unmount container",
-	SuggestFor:        []string{"unmount", "unmnt"},
-	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "unmount <mount path>",
+	Short:      "Unmount container",
+	Long:       "Unmount container",
+	SuggestFor: []string{"unmount", "unmnt"},
+	Args:       cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mountPath := common.ExpandPath(args[0])
 

@@ -34,12 +34,11 @@ import (
 )
 
 var mountListCmd = &cobra.Command{
-	Use:               "list",
-	Short:             "List all cloudfuse mountpoints",
-	Long:              "List all cloudfuse mountpoints",
-	SuggestFor:        []string{"lst", "list"},
-	Example:           "cloudfuse mount list",
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "list",
+	Short:      "List all cloudfuse mountpoints",
+	Long:       "List all cloudfuse mountpoints",
+	SuggestFor: []string{"lst", "list"},
+	Example:    "cloudfuse mount list",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {

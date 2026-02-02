@@ -38,11 +38,10 @@ import (
 var cloudfusePid string
 
 var healthMonStop = &cobra.Command{
-	Use:               "stop",
-	Short:             "Stops the health monitor binary associated with a given Cloudfuse pid",
-	Long:              "Stops the health monitor binary associated with a given Cloudfuse pid",
-	SuggestFor:        []string{"stp", "st"},
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "stop",
+	Short:      "Stops the health monitor binary associated with a given Cloudfuse pid",
+	Long:       "Stops the health monitor binary associated with a given Cloudfuse pid",
+	SuggestFor: []string{"stp", "st"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cloudfusePid = strings.TrimSpace(cloudfusePid)
 
