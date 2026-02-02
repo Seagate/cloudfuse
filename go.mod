@@ -1,6 +1,6 @@
 module github.com/Seagate/cloudfuse
 
-go 1.25.4
+go 1.25.6
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0
@@ -18,13 +18,13 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gdamore/tcell/v2 v2.13.7
 	github.com/go-viper/mapstructure/v2 v2.5.0
-	github.com/golang/mock v1.6.0
 	github.com/montanaflynn/stats v0.7.1
+	github.com/netresearch/go-cron v0.9.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sevlyar/go-daemon v0.1.7-0.20240723083326-c2a11b2b57fc
+	github.com/sevlyar/go-daemon v0.1.7-0.20251110065050-63665fab0d07
 	github.com/shirou/gopsutil/v4 v4.25.12
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.10
@@ -34,6 +34,7 @@ require (
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
 	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
+  go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.47.0
 	golang.org/x/sys v0.40.0
@@ -43,7 +44,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.6.0 // indirect
-	github.com/awnumar/memcall v0.4.0 // indirect
+	github.com/awnumar/memcall v0.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.17 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.17 // indirect
