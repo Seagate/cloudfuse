@@ -1,0 +1,117 @@
+name: Fuzz Tests
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # Run extended fuzzing weekly on Sunday at 2am UTC
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      fuzz_time:
+        description: "Fuzz duration per test (e.g., 30s, 5m)"
+        type: string
+        required: false
+        default: "1m"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz-tests:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      go: "1.25"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+
+      - name: Restore fuzz corpus
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: |
+            ~/.cache/go-build/fuzz
+            **/testdata/fuzz
+          key: fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go') }}
+          restore-keys: |
+            fuzz-corpus-${{ runner.os }}-
+
+      - name: Set fuzz duration
+        id: fuzz-config
+        env:
+          INPUT_FUZZ_TIME: ${{ github.event.inputs.fuzz_time }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ -n "$INPUT_FUZZ_TIME" ]; then
+            echo "FUZZ_TIME=$INPUT_FUZZ_TIME" >> $GITHUB_ENV
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            echo "FUZZ_TIME=2m" >> $GITHUB_ENV
+          elif [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+            echo "FUZZ_TIME=30s" >> $GITHUB_ENV
+          else
+            # For PRs, just validate seed corpus (no extended fuzzing)
+            echo "FUZZ_TIME=0" >> $GITHUB_ENV
+          fi
+
+      - name: Validate seed corpus (PRs only)
+        if: env.FUZZ_TIME == '0'
+        run: |
+          echo "Validating fuzz test seed corpus..."
+          go test -run='^Fuzz' -tags=unittest ./common/
+
+      - name: Run fuzz tests
+        if: env.FUZZ_TIME != '0'
+        run: |
+          echo "Running fuzz tests for $FUZZ_TIME per target..."
+
+          # Run encryption fuzz tests (security-critical)
+          echo "=== FuzzEncryptDecryptRoundTrip ==="
+          go test -run='^$' -fuzz=FuzzEncryptDecryptRoundTrip -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+
+          echo "=== FuzzDecryptMalformed ==="
+          go test -run='^$' -fuzz=FuzzDecryptMalformed -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+
+          # Run path fuzz tests
+          echo "=== FuzzNormalizeObjectName ==="
+          go test -run='^$' -fuzz=FuzzNormalizeObjectName -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+
+          echo "=== FuzzJoinUnixFilepath ==="
+          go test -run='^$' -fuzz=FuzzJoinUnixFilepath -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+
+      - name: Save fuzz corpus
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: |
+            ~/.cache/go-build/fuzz
+            **/testdata/fuzz
+          key: fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go') }}-${{ github.run_id }}
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: fuzz-crash-artifacts-${{ github.sha }}
+          path: |
+            **/testdata/fuzz/*/crash-*
+            **/testdata/fuzz/*/leak-*
+          if-no-files-found: ignore
+          retention-days: 30
