@@ -24,7 +24,7 @@ require (
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sevlyar/go-daemon v0.1.7-0.20240723083326-c2a11b2b57fc
+	github.com/sevlyar/go-daemon v0.1.7-0.20251110065050-63665fab0d07
 	github.com/shirou/gopsutil/v4 v4.25.12
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.10
@@ -43,7 +43,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.6.0 // indirect
-	github.com/awnumar/memcall v0.4.0 // indirect
+	github.com/awnumar/memcall v0.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.17 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.17 // indirect
