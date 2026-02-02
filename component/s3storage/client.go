@@ -55,7 +55,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	transfermanagerTypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -281,7 +281,7 @@ func (cl *Client) Configure(cfg Config) error {
 		o.PartSizeBytes = cl.Config.partSize
 		o.Concurrency = cl.Config.concurrency
 		o.MultipartUploadThreshold = cl.Config.uploadCutoff
-		o.ChecksumAlgorithm = transfermanagerTypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
+		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
 	})
 
 	return nil
