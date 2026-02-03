@@ -271,8 +271,25 @@ var mountCmd = &cobra.Command{
 	Use:        "mount <mount path>",
 	Short:      "Mount the container as a filesystem",
 	Long:       "Mount the container as a filesystem",
-	SuggestFor: []string{"mnt", "mout"},
+	Aliases:    []string{"mnt"},
+	SuggestFor: []string{"mout"},
+	GroupID:    groupCore,
 	Args:       cobra.ExactArgs(1),
+	Example: `  # Mount with a config file
+  cloudfuse mount ~/mycontainer --config-file=config.yaml
+
+  # Mount in foreground mode for debugging
+  cloudfuse mount ~/mycontainer --config-file=config.yaml --foreground
+
+  # Dry run to test configuration
+  cloudfuse mount ~/mycontainer --config-file=config.yaml --dry-run`,
+	// Directory completion for mount path argument
+	ValidArgsFunction: func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveFilterDirs
+	},
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.inputMountPath = args[0]
 		options.MountPath = common.ExpandPath(args[0])
@@ -641,9 +658,6 @@ var mountCmd = &cobra.Command{
 		}
 		return nil
 	},
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return nil, cobra.ShellCompDirectiveDefault
-	},
 }
 
 func ignoreFuseOptions(opt string) bool {
@@ -804,17 +818,20 @@ func init() {
 
 	options = mountOptions{}
 
-	mountCmd.AddCommand(mountListCmd)
-	mountCmd.AddCommand(mountAllCmd)
-
-	mountCmd.PersistentFlags().StringVar(&options.ConfigFile, "config-file", "",
+	mountCmd.PersistentFlags().StringVarP(&options.ConfigFile, "config-file", "c", "",
 		"Configures the path for the file where the account credentials are provided. Default is config.yaml in current directory.")
-	_ = mountCmd.MarkPersistentFlagFilename("config-file", "yaml")
+	_ = mountCmd.MarkPersistentFlagFilename("config-file", "yaml", "yml", "aes")
+	_ = mountCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 
 	mountCmd.PersistentFlags().BoolVar(&options.SecureConfig, "secure-config", false,
 		"Encrypt auto generated config file for each container")
 
-	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
+	mountCmd.PersistentFlags().StringVarP(&options.PassPhrase, "passphrase", "p", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	mountCmd.PersistentFlags().
@@ -823,7 +840,11 @@ func init() {
 	_ = mountCmd.RegisterFlagCompletionFunc(
 		"log-type",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{
+				cobra.CompletionWithDesc("silent", "No logging output"),
+				cobra.CompletionWithDesc("base", "Log to file (default)"),
+				cobra.CompletionWithDesc("syslog", "Log to system log"),
+			}, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
 
@@ -839,13 +860,13 @@ func init() {
 		"log-level",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{
-				"LOG_OFF",
-				"LOG_CRIT",
-				"LOG_ERR",
-				"LOG_WARNING",
-				"LOG_INFO",
-				"LOG_TRACE",
-				"LOG_DEBUG",
+				cobra.CompletionWithDesc("LOG_OFF", "Disable all logging"),
+				cobra.CompletionWithDesc("LOG_CRIT", "Critical errors only"),
+				cobra.CompletionWithDesc("LOG_ERR", "Errors and above"),
+				cobra.CompletionWithDesc("LOG_WARNING", "Warnings and above (default)"),
+				cobra.CompletionWithDesc("LOG_INFO", "Info and above"),
+				cobra.CompletionWithDesc("LOG_TRACE", "Trace and above"),
+				cobra.CompletionWithDesc("LOG_DEBUG", "All messages including debug"),
 			}, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
@@ -856,7 +877,7 @@ func init() {
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
 	mountCmd.PersistentFlags().
-		Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
+		BoolP("foreground", "f", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
 	mountCmd.PersistentFlags().
@@ -905,12 +926,17 @@ func init() {
 		mountCmd.Flags().
 			StringVar(&options.PassphrasePipe, "passphrase-pipe", "", "Specifies a named pipe to read the passphrase from.")
 		config.BindPFlag("passphrase-pipe", mountCmd.Flags().Lookup("passphrase-pipe"))
+
+		mountCmd.MarkFlagsMutuallyExclusive("passphrase", "passphrase-pipe")
 	}
 
 	if runtime.GOOS == "linux" {
 		mountCmd.Flags().
 			StringVar(&options.ServiceUser, "remount-system-user", "", "User that the service remount will run as.")
 		config.BindPFlag("remount-system-user", mountCmd.Flags().Lookup("remount-system-user"))
+
+		// When enabling remount as system on Linux, the service user is required
+		mountCmd.MarkFlagsRequiredTogether("enable-remount-system", "remount-system-user")
 	}
 
 	mountCmd.PersistentFlags().

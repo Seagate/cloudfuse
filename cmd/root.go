@@ -64,6 +64,13 @@ type Blob struct {
 
 var disableVersionCheck bool
 
+// Command group IDs for organizing help output (Cobra v1.6.0+)
+const (
+	groupCore   = "core"
+	groupConfig = "config"
+	groupUtil   = "util"
+)
+
 var rootCmd = &cobra.Command{
 	Use:          "cloudfuse",
 	Short:        "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage.",
@@ -244,7 +251,7 @@ func VersionCheck() error {
 
 // ignoreCommand : There are command implicitly added by cobra itself, while parsing we need to ignore these commands
 func ignoreCommand(cmdArgs []string) bool {
-	ignoreCmds := []string{"completion", "help"}
+	ignoreCmds := []string{"completion", "help", "__complete", "__completeNoDesc"}
 	if len(cmdArgs) > 0 {
 		if slices.Contains(ignoreCmds, cmdArgs[0]) {
 			return true
@@ -274,14 +281,13 @@ func parseArgs(cmdArgs []string) []string {
 	}
 
 	// Check for /etc/fstab style inputs
-	args := make([]string, 0)
+	args := make([]string, 0, len(cmdArgs))
 	for i := 0; i < len(cmdArgs); i++ {
 		// /etc/fstab will give everything in comma separated list with -o option
 		if cmdArgs[i] == "-o" {
 			i++
 			if i < len(cmdArgs) {
-				bfuseArgs := make([]string, 0)
-				lfuseArgs := make([]string, 0)
+				var bfuseArgs, lfuseArgs []string
 
 				// Check if ',' exists in arguments or not. If so we assume it might be coming from /etc/fstab
 				opts := strings.SplitSeq(cmdArgs[i], ",")
@@ -329,4 +335,16 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().
 		BoolVar(&disableVersionCheck, "disable-version-check", false, "To disable version check that is performed automatically")
+
+	rootCmd.SetErrPrefix("cloudfuse error:")
+
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupCore, Title: "Core Commands:"},
+		&cobra.Group{ID: groupConfig, Title: "Configuration Commands:"},
+		&cobra.Group{ID: groupUtil, Title: "Utility Commands:"},
+	)
+
+	// Set the group for the built-in help and completion commands
+	rootCmd.SetHelpCommandGroupID(groupUtil)
+	rootCmd.SetCompletionCommandGroupID(groupUtil)
 }

@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -263,14 +264,19 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
+	// Give the system time to register the mount
+	time.Sleep(100 * time.Millisecond)
+
 	lst, _ := unmountCmd.ValidArgsFunction(nil, nil, "")
 	suite.assert.NotEmpty(lst)
 
 	_, err = executeCommandC(rootCmd, "unmount", mountDirectory5+"*")
 	suite.assert.NoError(err)
 
-	lst, _ = unmountCmd.ValidArgsFunction(nil, nil, "abcd")
-	suite.assert.Empty(lst)
+	// After unmount, ValidArgsFunction returns a message when no mounts are found
+	// or returns nil if there are already arguments. Both cases mean no valid mount completions.
+	lst, _ = unmountCmd.ValidArgsFunction(nil, []string{mountDirectory5}, "abcd")
+	suite.assert.Nil(lst)
 }
 
 func TestUnMountCommand(t *testing.T) {

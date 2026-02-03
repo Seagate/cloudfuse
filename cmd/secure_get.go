@@ -38,23 +38,21 @@ var getKeyCmd = &cobra.Command{
 	Use:        "get",
 	Short:      "Get value of requested config parameter from your encrypted config file",
 	Long:       "Get value of requested config parameter from your encrypted config file",
-	SuggestFor: []string{"g", "get"},
-	Example:    "cloudfuse secure get --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level",
+	SuggestFor: []string{"g"},
+	Args:       cobra.NoArgs,
+	Example: `  # Get a specific key from encrypted config
+  cloudfuse secure get -c config.yaml.aes -p SECRET -k logging.log_level`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
+		// Validation handled by parent's PersistentPreRunE
 		plainText, err := decryptConfigFile(false)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to decrypt config file: %w", err)
 		}
 
 		viper.SetConfigType("yaml")
 		err = viper.ReadConfig(strings.NewReader(string(plainText)))
 		if err != nil {
-			return fmt.Errorf("failed to load config [%s]", err.Error())
+			return fmt.Errorf("failed to load config: %w", err)
 		}
 
 		value := viper.Get(secOpts.Key)
@@ -74,4 +72,12 @@ var getKeyCmd = &cobra.Command{
 		cmd.Println(secOpts.Key, "=", value)
 		return nil
 	},
+}
+
+func init() {
+	secureCmd.AddCommand(getKeyCmd)
+
+	getKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
+		"Config key to be searched in encrypted config file")
+	_ = getKeyCmd.MarkFlagRequired("key")
 }

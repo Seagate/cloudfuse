@@ -168,6 +168,30 @@ func (suite *genConfig) TestNoPath() {
 	suite.assert.Error(err)
 }
 
+// TestGenConfigHelp tests the help output
+func (suite *genConfig) TestGenConfigHelp() {
+	defer suite.cleanupTest()
+
+	output, err := executeCommandC(rootCmd, "gen-config", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "gen-config")
+	suite.assert.Contains(output, "temp-path")
+	suite.assert.Contains(output, "config-file")
+}
+
+// TestValidateGenConfigOptionsInvalidConfigFile tests validation with invalid config file
+func (suite *genConfig) TestValidateGenConfigOptionsInvalidConfigFile() {
+	defer suite.cleanupTest()
+
+	_, err := executeCommandC(
+		rootCmd,
+		"gen-config",
+		"--config-file=/nonexistent/path/config.yaml",
+		"--temp-path=/tmp",
+	)
+	suite.assert.Error(err)
+}
+
 func TestGenConfig(t *testing.T) {
 	suite.Run(t, new(genConfig))
 }

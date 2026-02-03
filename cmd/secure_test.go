@@ -560,3 +560,69 @@ func (suite *secureConfigTestSuite) TestSecureConfigSet() {
 	)
 	suite.assert.NoError(err)
 }
+
+// TestValidateOptionsPassphraseFromEnv tests that passphrase can be read from environment variable
+func (suite *secureConfigTestSuite) TestValidateOptionsPassphraseFromEnv() {
+	defer suite.cleanupTest()
+
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := "12312312312312312312312312312312"
+
+	defer os.Remove(confFile.Name())
+	defer os.Remove(outFile.Name())
+
+	_, err := confFile.WriteString(testPlainTextConfig)
+	suite.assert.NoError(err)
+	confFile.Close()
+
+	// Set passphrase via environment variable
+	os.Setenv(SecureConfigEnvName, passphrase)
+	defer os.Unsetenv(SecureConfigEnvName)
+
+	_, err = executeCommandSecure(
+		rootCmd,
+		"secure",
+		"encrypt",
+		fmt.Sprintf("--config-file=%s", confFile.Name()),
+		fmt.Sprintf("--output-file=%s", outFile.Name()),
+	)
+	suite.assert.NoError(err)
+}
+
+// TestSecureEncryptSubcommandHelp tests help for encrypt subcommand
+func (suite *secureConfigTestSuite) TestSecureEncryptSubcommandHelp() {
+	defer suite.cleanupTest()
+	output, err := executeCommandSecure(rootCmd, "secure", "encrypt", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "Encrypt")
+	suite.assert.Contains(output, "config-file")
+}
+
+// TestSecureDecryptSubcommandHelp tests help for decrypt subcommand
+func (suite *secureConfigTestSuite) TestSecureDecryptSubcommandHelp() {
+	defer suite.cleanupTest()
+	output, err := executeCommandSecure(rootCmd, "secure", "decrypt", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "Decrypt")
+	suite.assert.Contains(output, "config-file")
+}
+
+// TestSecureGetSubcommandHelp tests help for get subcommand
+func (suite *secureConfigTestSuite) TestSecureGetSubcommandHelp() {
+	defer suite.cleanupTest()
+	output, err := executeCommandSecure(rootCmd, "secure", "get", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "Get")
+	suite.assert.Contains(output, "key")
+}
+
+// TestSecureSetSubcommandHelp tests help for set subcommand
+func (suite *secureConfigTestSuite) TestSecureSetSubcommandHelp() {
+	defer suite.cleanupTest()
+	output, err := executeCommandSecure(rootCmd, "secure", "set", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "Update encrypted config")
+	suite.assert.Contains(output, "key")
+	suite.assert.Contains(output, "value")
+}

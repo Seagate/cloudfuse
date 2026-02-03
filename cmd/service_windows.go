@@ -125,7 +125,7 @@ var uninstallCmd = &cobra.Command{
 
 		err = stopService()
 		if err != nil {
-			fmt.Printf("Attempted to stop service but failed, now attempting to remove service. Here's why: %v", err)
+			cmd.PrintErrf("Attempted to stop service but failed, now attempting to remove service. Here's why: %v", err)
 		}
 
 		err = removeService()

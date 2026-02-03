@@ -57,10 +57,20 @@ const (
 
 var gatherLogsCmd = &cobra.Command{
 	Use:        "gather-logs",
-	Short:      "interface to gather and review cloudfuse logs",
-	Long:       "interface to gather and review cloudfuse logs",
-	SuggestFor: []string{"gather", "gather-log", "gather-logs"},
-	Example:    "cloudfuse gather-logs --output-path=/path/to/archive --config-file=/path/to/config.yaml",
+	Short:      "Collect cloudfuse logs into an archive",
+	Long:       "Gather cloudfuse logs into a compressed archive for troubleshooting.\nCreates a .tar.gz archive on Linux or .zip on Windows.",
+	Aliases:    []string{"logs", "collect-logs"},
+	SuggestFor: []string{"gather", "gather-log"},
+	GroupID:    groupUtil,
+	Args:       cobra.NoArgs,
+	Example: `  # Collect logs using default config location
+  cloudfuse gather-logs
+
+  # Collect logs with custom output path
+  cloudfuse gather-logs --output-path=/tmp/debug
+
+  # Collect logs using specific config file
+  cloudfuse gather-logs --config-file=/path/to/config.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := checkPath(gatherLogOpts.outputPath)
 		if err != nil {
@@ -77,7 +87,7 @@ var gatherLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
-		logType, logPath, err := getLogInfo(gatherLogOpts.logConfigFile)
+		logType, logPath, err := getLogInfo(gatherLogOpts.logConfigFile, cmd.ErrOrStderr())
 		if err != nil {
 			return fmt.Errorf("cannot use this config file [%s]", err.Error())
 		}
@@ -161,7 +171,7 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
 			case "windows":
-				fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
+				cmd.PrintErrln("Please refer to the windows event viewer for your cloudfuse logs")
 				return fmt.Errorf(
 					"no log files to collect. system logging for windows are stored in the event viewer",
 				)
@@ -187,12 +197,12 @@ func checkPath(outPath string) error {
 }
 
 // getLogInfo returns the logType, and logPath values that are found in the config file.
-func getLogInfo(configFile string) (string, string, error) {
+func getLogInfo(configFile string, errWriter io.Writer) (string, string, error) {
 	logPath := common.ExpandPath(filepath.Join(common.GetDefaultWorkDir(), ".cloudfuse/"))
 	logType := "base"
 	var err error
 	if _, err = os.Stat(configFile); errors.Is(err, fs.ErrNotExist) {
-		fmt.Println("Warning, the config file was not found. Defaults will be used")
+		fmt.Fprintln(errWriter, "Warning, the config file was not found. Defaults will be used")
 		return logType, logPath, nil
 	}
 
@@ -202,8 +212,8 @@ func getLogInfo(configFile string) (string, string, error) {
 	}
 
 	if !config.IsSet("logging") {
-		fmt.Printf(
-			"Warning, the config file does not have a logging section. Defaults will be used\n",
+		fmt.Fprintln(errWriter,
+			"Warning, the config file does not have a logging section. Defaults will be used",
 		)
 		return logType, logPath, nil
 	}
@@ -473,6 +483,15 @@ func init() {
 	curDir, _ := os.Getwd()
 	gatherLogsCmd.Flags().
 		StringVar(&gatherLogOpts.outputPath, "output-path", curDir, "Input archive creation path")
+	_ = gatherLogsCmd.MarkFlagDirname("output-path")
+
 	gatherLogsCmd.Flags().
 		StringVar(&gatherLogOpts.logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
+	_ = gatherLogsCmd.MarkFlagFilename("config-file", "yaml", "aes")
+	_ = gatherLogsCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 }

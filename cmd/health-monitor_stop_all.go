@@ -38,13 +38,17 @@ import (
 var healthMonStopAll = &cobra.Command{
 	Use:        "all",
 	Short:      "Stop all health monitor binaries",
-	Long:       "Stop all health monitor binaries",
-	SuggestFor: []string{"al", "all"},
+	Long:       "Stop all running cloudfuse health monitor processes.\nUses taskkill on Windows and killall on Linux.",
+	SuggestFor: []string{"al"},
+	Args:       cobra.NoArgs,
+	Example: `  # Stop all health monitors
+  cloudfuse health-monitor stop all`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := stopAll()
 		if err != nil {
-			return fmt.Errorf("failed to stop all health monitor binaries [%s]", err.Error())
+			return fmt.Errorf("failed to stop all health monitor binaries: %w", err)
 		}
+		cmd.Println("Successfully stopped all health monitor binaries.")
 		return nil
 	},
 }
@@ -57,15 +61,16 @@ func stopAll() error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Successfully stopped all health monitor binaries.")
 		return nil
 	}
 	cliOut := exec.Command("killall", hmcommon.CfuseMon)
 	_, err := cliOut.Output()
 	if err != nil {
 		return err
-	} else {
-		fmt.Println("Successfully stopped all health monitor binaries.")
-		return nil
 	}
+	return nil
+}
+
+func init() {
+	healthMonStop.AddCommand(healthMonStopAll)
 }
