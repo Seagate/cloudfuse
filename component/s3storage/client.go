@@ -1331,7 +1331,10 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		},
 	})
 	if err != nil {
-		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: %s", err.Error())
+		log.Info(
+			"Client::StageAndCommit : Attempting to abort upload due to error: %s",
+			err.Error(),
+		)
 		abortErr := cl.abortMultipartUpload(key, uploadID)
 		return errors.Join(err, abortErr)
 	}
@@ -1374,14 +1377,20 @@ func (cl *Client) combineSmallBlocks(
 					},
 				)
 				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to get object with error: %s", err.Error())
+					log.Err(
+						"Client::combineSmallBlocks : Unable to get object with error: %s",
+						err.Error(),
+					)
 					return nil, err
 				}
 
 				defer result.Close()
 				addData, err = io.ReadAll(result)
 				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: %s", err.Error())
+					log.Err(
+						"Client::combineSmallBlocks : Unable to read bytes from object with error: %s",
+						err.Error(),
+					)
 					return nil, err
 				}
 			} else {

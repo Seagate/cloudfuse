@@ -103,11 +103,24 @@ func (suite *mountTestSuite) TestForegroundMountDirDoesExist() {
 	tempDir := filepath.Join(mntDir, "tempdir")
 	err = os.MkdirAll(tempDir, 0777)
 
-	op, err := executeCommandC(rootCmd, "mount", tempDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		tempDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount directory already exists")
 
-	op, err = executeCommandC(rootCmd, "mount", "all", tempDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
+	op, err = executeCommandC(
+		rootCmd,
+		"mount",
+		"all",
+		tempDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount directory already exists")
 }
@@ -124,11 +137,25 @@ func (suite *mountTestSuite) TestForegroundMountDirNotEmpty() {
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount directory already exists")
 
-	op, err = executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "-o", "nonempty", "--foreground=true")
+	op, err = executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"-o",
+		"nonempty",
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount directory already exists")
 }
@@ -137,11 +164,24 @@ func (suite *mountTestSuite) TestForegroundMountDirNotEmpty() {
 func (suite *mountTestSuite) TestForegroundMountPathNotProvided() {
 	defer suite.cleanupTest()
 
-	op, err := executeCommandC(rootCmd, "mount", "", fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		"",
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount path not provided")
 
-	op, err = executeCommandC(rootCmd, "mount", "all", "", fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
+	op, err = executeCommandC(
+		rootCmd,
+		"mount",
+		"all",
+		"",
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount path not provided")
 }
@@ -163,7 +203,13 @@ func (suite *mountTestSuite) TestForegroundConfigFileTypeUnsupported() {
 
 	mntDir := "mntdir"
 
-	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=cfgInvalid.yam", "--foreground=true")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		"--config-file=cfgInvalid.yam",
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
 	suite.assert.Contains(op, "Unsupported Config Type")
@@ -175,12 +221,25 @@ func (suite *mountTestSuite) TestForegroundConfigFileNotFound() {
 
 	mntDir := "mntdir"
 
-	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=cfgNotFound.yaml", "--foreground=true")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		"--config-file=cfgNotFound.yaml",
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
 	suite.assert.Contains(op, "cannot find the file specified")
 
-	op, err = executeCommandC(rootCmd, "mount", "all", mntDir, "--config-file=cfgNotFound.yaml", "--foreground=true")
+	op, err = executeCommandC(
+		rootCmd,
+		"mount",
+		"all",
+		mntDir,
+		"--config-file=cfgNotFound.yaml",
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
 	suite.assert.Contains(op, "cannot find the file specified")
@@ -233,7 +292,14 @@ func (suite *mountTestSuite) TestForegroundInvalidLogLevel() {
 
 	mntDir := "mntdir"
 
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--log-level=debug", "--foreground=true")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--log-level=debug",
+		"--foreground=true",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid log level")
 }
@@ -245,9 +311,21 @@ func (suite *mountTestSuite) TestForegroundInvalidUmaskValue() {
 	mntDir := "mntdir"
 
 	// incorrect umask value
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true",
-		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
-		"-o ro", "-o allow_root", "-o default_permissions", "-o umask=abcd")
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--foreground=true",
+		"-o allow_other",
+		"-o attr_timeout=120",
+		"-o entry_timeout=120",
+		"-o negative_timeout=120",
+		"-o ro",
+		"-o allow_root",
+		"-o default_permissions",
+		"-o umask=abcd",
+	)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to parse umask")
 }

@@ -1323,7 +1323,11 @@ func (bb *BlockBlob) GetFileBlockOffsets(name string) (*common.BlockOffsetList, 
 	)
 
 	if err != nil {
-		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]", name, err.Error())
+		log.Err(
+			"BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]",
+			name,
+			err.Error(),
+		)
 		return &common.BlockOffsetList{}, err
 	}
 
@@ -1505,7 +1509,11 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 	if size < blockblob.MaxUploadBlobBytes {
 		data, err := bb.HandleSmallFile(name, size, attr.Size)
 		if err != nil {
-			log.Err("BlockBlob::TruncateFile : Failed to read small file %s [%s]", name, err.Error())
+			log.Err(
+				"BlockBlob::TruncateFile : Failed to read small file %s [%s]",
+				name,
+				err.Error(),
+			)
 			return err
 		}
 		err = bb.WriteFromBuffer(name, nil, data)
@@ -1530,12 +1538,20 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 		if bol.SmallFile() {
 			data, err := bb.HandleSmallFile(name, size, attr.Size)
 			if err != nil {
-				log.Err("BlockBlob::TruncateFile : Failed to read small file %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::TruncateFile : Failed to read small file %s [%s]",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 			err = bb.WriteFromBuffer(name, nil, data)
 			if err != nil {
-				log.Err("BlockBlob::TruncateFile : Failed to write from buffer file %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::TruncateFile : Failed to write from buffer file %s [%s]",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		} else {
@@ -1548,13 +1564,21 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 					size-attr.Size,
 				)
 				if err != nil {
-					log.Err("BlockBlob::TruncateFile : Failed to create new blocks for file %s [%s]", name, err.Error())
+					log.Err(
+						"BlockBlob::TruncateFile : Failed to create new blocks for file %s [%s]",
+						name,
+						err.Error(),
+					)
 					return err
 				}
 			}
 			err = bb.StageAndCommit(name, bol)
 			if err != nil {
-				log.Err("BlockBlob::TruncateFile : Failed to stage and commit file %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::TruncateFile : Failed to stage and commit file %s [%s]",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1569,12 +1593,20 @@ func (bb *BlockBlob) HandleSmallFile(name string, size int64, originalSize int64
 	if size > originalSize {
 		err = bb.ReadInBuffer(name, 0, 0, data, nil)
 		if err != nil {
-			log.Err("BlockBlob::TruncateFile : Failed to read small file %s [%s]", name, err.Error())
+			log.Err(
+				"BlockBlob::TruncateFile : Failed to read small file %s [%s]",
+				name,
+				err.Error(),
+			)
 		}
 	} else {
 		err = bb.ReadInBuffer(name, 0, size, data, nil)
 		if err != nil {
-			log.Err("BlockBlob::TruncateFile : Failed to read small file %s [%s]", name, err.Error())
+			log.Err(
+				"BlockBlob::TruncateFile : Failed to read small file %s [%s]",
+				name,
+				err.Error(),
+			)
 		}
 	}
 	return data, err
@@ -1642,7 +1674,11 @@ func (bb *BlockBlob) Write(options internal.WriteFileOptions) error {
 		if exceedsFileBlocks {
 			newBufferSize, err = bb.createNewBlocks(fileOffsets, offset, length)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to create new blocks for file %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to create new blocks for file %s [%s]",
+					name,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1836,7 +1872,11 @@ func (bb *BlockBlob) GetCommittedBlockList(name string) (*internal.CommittedBloc
 	)
 
 	if err != nil {
-		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]", name, err.Error())
+		log.Err(
+			"BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]",
+			name,
+			err.Error(),
+		)
 		return nil, err
 	}
 

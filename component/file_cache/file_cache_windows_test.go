@@ -60,17 +60,29 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
 	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.cache_path,
+			err,
+		)
 	}
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.fake_storage_path,
+			err,
+		)
 	}
 	suite.setupTestHelper(defaultConfig)
 }
@@ -99,11 +111,19 @@ func (suite *fileCacheWindowsTestSuite) cleanupTest() {
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.cache_path,
+			err,
+		)
 	}
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.fake_storage_path,
+			err,
+		)
 	}
 }
 
@@ -131,7 +151,9 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file"
-	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	createHandle, _ := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0777},
+	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 

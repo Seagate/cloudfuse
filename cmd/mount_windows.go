@@ -40,7 +40,14 @@ import (
 
 // Create dummy function so that mount.go code can compile
 // This function is used only on Linux, so it creates an empty context here
-func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
+func createDaemon(
+	pipeline *internal.Pipeline,
+	ctx context.Context,
+	pidFileName string,
+	pidFilePerm os.FileMode,
+	umask int,
+	fname string,
+) error {
 	return nil
 }
 
@@ -103,7 +110,10 @@ func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, err
 		// We will retry until the timeout expires.
 		if err == windows.ERROR_PIPE_BUSY {
 			if time.Now().After(deadline) {
-				return "", fmt.Errorf("timed out waiting for pipe '%s' to become available", pipeName)
+				return "", fmt.Errorf(
+					"timed out waiting for pipe '%s' to become available",
+					pipeName,
+				)
 			}
 			time.Sleep(50 * time.Millisecond)
 			continue

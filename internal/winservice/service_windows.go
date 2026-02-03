@@ -81,7 +81,18 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		)
 		defer buff.Destroy()
 	} else {
-		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
+		_, err = winFspCommand(
+			writeCommandToUtf16(
+				startCmd,
+				SvcName,
+				instanceName,
+				mountPath,
+				configFile,
+				fmt.Sprint(userId),
+				fmt.Sprint(groupId),
+				"",
+			),
+		)
 	}
 	return err
 }

@@ -64,11 +64,19 @@ func (cfs *CloudfuseStats) statsReader() error {
 		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 		err = windows.ConnectNamedPipe(handle, nil)
 		if err == windows.ERROR_PIPE_CONNECTED {
-			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying... [%v]", cfs.transferPipe, err)
+			log.Err(
+				"StatsReader::statsReader : There is a process at other end of pipe %s: retrying... [%v]",
+				cfs.transferPipe,
+				err,
+			)
 			windows.Close(handle)
 			time.Sleep(1 * time.Second)
 		} else if err != nil {
-			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", cfs.transferPipe, err)
+			log.Err(
+				"StatsReader::statsReader : unable to connect to named pipe %s: [%v]",
+				cfs.transferPipe,
+				err,
+			)
 			windows.Close(handle)
 			return err
 		}
@@ -148,13 +156,20 @@ func (cfs *CloudfuseStats) statsPoll() {
 		windows.Close(hPipe)
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Err("StatsReader::statsReader : Named pipe %s not found, retrying...", cfs.pollingPipe)
+			log.Err(
+				"StatsReader::statsReader : Named pipe %s not found, retrying...",
+				cfs.pollingPipe,
+			)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
 			log.Err("StatsReader::statsReader : Pipe instances are busy, retrying...")
 			time.Sleep(1 * time.Second)
 		} else {
-			log.Err("StatsReader::statsReader : Unable to open pipe %s with error [%v]", cfs.pollingPipe, err)
+			log.Err(
+				"StatsReader::statsReader : Unable to open pipe %s with error [%v]",
+				cfs.pollingPipe,
+				err,
+			)
 			return
 		}
 	}
@@ -169,7 +184,10 @@ func (cfs *CloudfuseStats) statsPoll() {
 
 	for t := range ticker.C {
 		_, err = writer.WriteString(fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
-		log.Debug("stats_manager::statsDumper : writing to polling pipe file: %s", fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
+		log.Debug(
+			"stats_manager::statsDumper : writing to polling pipe file: %s",
+			fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)),
+		)
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
 			break
