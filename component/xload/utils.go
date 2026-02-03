@@ -27,15 +27,13 @@ package xload
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
-	"reflect"
-
+	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common/log"
-
-	"github.com/JeffreyRichter/enum/enum"
 )
 
 const (
@@ -87,16 +85,33 @@ func (Mode) SYNC() Mode {
 	return Mode(3)
 }
 
+var modeNames = map[Mode]string{
+	Mode(0): "INVALID_MODE",
+	Mode(1): "PRELOAD",
+	Mode(2): "UPLOAD",
+	Mode(3): "SYNC",
+}
+
+var modeValues = map[string]Mode{
+	"INVALID_MODE": Mode(0),
+	"PRELOAD":      Mode(1),
+	"UPLOAD":       Mode(2),
+	"SYNC":         Mode(3),
+}
+
 func (m Mode) String() string {
-	return enum.StringInt(m, reflect.TypeFor[Mode]())
+	if name, ok := modeNames[m]; ok {
+		return name
+	}
+	return "INVALID_MODE"
 }
 
 func (m *Mode) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeFor[*Mode](), s, true, false)
-	if enumVal != nil {
-		*m = enumVal.(Mode)
+	if val, ok := modeValues[strings.ToUpper(s)]; ok {
+		*m = val
+		return nil
 	}
-	return err
+	return fmt.Errorf("invalid Mode: %s", s)
 }
 
 func RoundFloat(val float64, precision int) float64 {

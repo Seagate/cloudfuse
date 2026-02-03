@@ -26,6 +26,7 @@
 package s3storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -44,6 +45,8 @@ import (
 	"github.com/Seagate/cloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -87,16 +90,17 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
 
-	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		Key:    aws.String(key),
+	downloadInput := &transfermanager.DownloadObjectInput{
+		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
+		Key:      aws.String(key),
+		WriterAt: fi,
 	}
 
 	if cl.Config.enableChecksum {
-		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
+		downloadInput.ChecksumMode = tmtypes.ChecksumModeEnabled
 	}
 
-	_, err := cl.downloader.Download(context.Background(), fi, getObjectInput)
+	_, err := cl.transferManager.DownloadObject(context.Background(), downloadInput)
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
@@ -163,26 +167,27 @@ func (cl *Client) putObject(options putObjectOptions) error {
 	key := cl.getKey(options.name, options.isSymLink, options.isDir)
 	log.Trace("Client::putObject : putting object %s", key)
 	ctx := context.Background()
-	var err error
 
-	putObjectInput := &s3.PutObjectInput{
+	// Handle nil body by providing an empty reader
+	body := options.objectData
+	if body == nil {
+		body = bytes.NewReader([]byte{})
+	}
+
+	uploadInput := &transfermanager.UploadObjectInput{
 		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
 		Key:         aws.String(key),
-		Body:        options.objectData,
+		Body:        body,
 		ContentType: aws.String(getContentType(key)),
 	}
 
 	if cl.Config.enableChecksum {
-		putObjectInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+		uploadInput.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(
+			cl.Config.checksumAlgorithm,
+		)
 	}
 
-	// If the object is small, just do a normal put object.
-	// If not, then use a multipart upload
-	if options.size < cl.Config.uploadCutoff {
-		_, err = cl.AwsS3Client.PutObject(ctx, putObjectInput)
-	} else {
-		_, err = cl.uploader.Upload(ctx, putObjectInput)
-	}
+	_, err := cl.transferManager.UploadObject(ctx, uploadInput)
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
 	return parseS3Err(err, attemptedAction)

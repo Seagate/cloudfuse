@@ -54,38 +54,42 @@ var encryptedPassphrase *memguard.Enclave
 
 // Section defining all the command that we have in secure feature
 var secureCmd = &cobra.Command{
-	Use:               "secure",
-	Short:             "Encrypt / Decrypt your config file",
-	Long:              "Encrypt / Decrypt your config file",
-	SuggestFor:        []string{"sec", "secre"},
-	Example:           "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
-	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-		return nil
+	Use:        "secure",
+	Short:      "Encrypt / Decrypt your config file",
+	Long:       "Encrypt or decrypt configuration files containing sensitive credentials.\nEncrypted config files use the .aes extension.",
+	Aliases:    []string{"sec"},
+	SuggestFor: []string{"secre", "encrypt", "decrypt"},
+	GroupID:    groupConfig,
+	Example: `  # Encrypt a config file
+  cloudfuse secure encrypt -c config.yaml -p SECRET
+
+  # Decrypt a config file
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET
+
+  # Get a key from encrypted config
+  cloudfuse secure get -c config.yaml.aes -p SECRET -k azstorage.account-name`,
+	// PersistentPreRunE validates options for all subcommands
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return validateOptions()
 	},
 }
 
 var encryptCmd = &cobra.Command{
-	Use:               "encrypt",
-	Short:             "Encrypt your config file",
-	Long:              "Encrypt your config file",
-	SuggestFor:        []string{"en", "enc"},
-	Example:           "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
+	Use:        "encrypt",
+	Short:      "Encrypt your config file",
+	Long:       "Encrypt a YAML configuration file using AES encryption.\nThe output file will have a .aes extension.",
+	SuggestFor: []string{"en", "enc"},
+	Example: `  # Encrypt config file (creates config.yaml.aes)
+  cloudfuse secure encrypt -c config.yaml -p SECRET
 
-		_, err = encryptConfigFile(true)
+  # Encrypt to a specific output file
+  cloudfuse secure encrypt -c config.yaml -p SECRET -o secure.aes`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validation handled by PersistentPreRunE
+		_, err := encryptConfigFile(true)
 		if err != nil {
-			return fmt.Errorf("failed to encrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to encrypt config file: %w", err)
 		}
 
 		return nil
@@ -93,21 +97,21 @@ var encryptCmd = &cobra.Command{
 }
 
 var decryptCmd = &cobra.Command{
-	Use:               "decrypt",
-	Short:             "Decrypt your config file",
-	Long:              "Decrypt your config file",
-	SuggestFor:        []string{"de", "dec"},
-	Example:           "cloudfuse secure decrypt --config-file=config.yaml.aes --passphrase=PASSPHRASE",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
+	Use:        "decrypt",
+	Short:      "Decrypt your config file",
+	Long:       "Decrypt an AES-encrypted configuration file back to plain YAML.",
+	SuggestFor: []string{"de", "dec"},
+	Example: `  # Decrypt config file
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET
 
-		_, err = decryptConfigFile(true)
+  # Decrypt to a specific output file
+  cloudfuse secure decrypt -c config.yaml.aes -p SECRET -o config.yaml`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validation handled by PersistentPreRunE
+		_, err := decryptConfigFile(true)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to decrypt config file: %w", err)
 		}
 
 		return nil
@@ -215,24 +219,28 @@ func init() {
 	rootCmd.AddCommand(secureCmd)
 	secureCmd.AddCommand(encryptCmd)
 	secureCmd.AddCommand(decryptCmd)
-	secureCmd.AddCommand(getKeyCmd)
-	secureCmd.AddCommand(setKeyCmd)
-
-	getKeyCmd.Flags().StringVar(&secOpts.Key, "key", "",
-		"Config key to be searched in encrypted config file")
-
-	setKeyCmd.Flags().StringVar(&secOpts.Key, "key", "",
-		"Config key to be updated in encrypted config file")
-	setKeyCmd.Flags().StringVar(&secOpts.Value, "value", "",
-		"New value for the given config key to be set in ecrypted config file")
-
 	// Flags that needs to be accessible at all subcommand level shall be defined in persistentflags only
-	secureCmd.PersistentFlags().StringVar(&secOpts.ConfigFile, "config-file", "",
+	secureCmd.PersistentFlags().StringVarP(&secOpts.ConfigFile, "config-file", "c", "",
 		"Configuration file to be encrypted / decrypted")
+	_ = secureCmd.MarkPersistentFlagFilename("config-file", "yaml", "aes")
+	_ = secureCmd.MarkPersistentFlagRequired("config-file")
+	_ = secureCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 
-	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
+	secureCmd.PersistentFlags().StringVarP(&secOpts.PassPhrase, "passphrase", "p", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
-	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",
+	secureCmd.PersistentFlags().StringVarP(&secOpts.OutputFile, "output-file", "o", "",
 		"Path and name for the output file")
+	_ = secureCmd.MarkPersistentFlagFilename("output-file", "yaml", "aes")
+	_ = secureCmd.RegisterFlagCompletionFunc(
+		"output-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 }

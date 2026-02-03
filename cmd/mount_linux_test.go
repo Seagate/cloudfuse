@@ -762,6 +762,70 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 	}
 }
 
+// TestValidateMountOptionsInvalidLogLevel tests validation with invalid log level
+func (suite *mountTestSuite) TestValidateMountOptionsInvalidLogLevel() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(mntDir)
+
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--log-level=invalid_level",
+	)
+	suite.assert.Error(err)
+	suite.assert.Contains(op, "invalid log level")
+}
+
+// TestMountWithDefaultWorkingDir tests mount with custom default working directory
+func (suite *mountTestSuite) TestMountWithDefaultWorkingDir() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(mntDir)
+
+	workDir, err := os.MkdirTemp("", "workdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(workDir)
+
+	// This will still fail because the pipeline can't initialize,
+	// but it tests the working directory setup code path
+	_, err = executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		fmt.Sprintf("--default-working-dir=%s", workDir),
+	)
+	// Error is expected because of invalid storage config
+	suite.assert.Error(err)
+}
+
+// TestMountHelp tests mount help output
+func (suite *mountTestSuite) TestMountHelp() {
+	defer suite.cleanupTest()
+
+	op, err := executeCommandC(rootCmd, "mount", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "mount")
+	suite.assert.Contains(op, "config-file")
+}
+
+// TestMountAllHelp tests mount all help output
+func (suite *mountTestSuite) TestMountAllHelp() {
+	defer suite.cleanupTest()
+
+	op, err := executeCommandC(rootCmd, "mount", "all", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "mount")
+	suite.assert.Contains(op, "all")
+}
+
 func TestMountCommand(t *testing.T) {
 	confFile, err := os.CreateTemp("", "conf*.yaml")
 	if err != nil {

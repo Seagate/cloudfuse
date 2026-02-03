@@ -661,7 +661,13 @@ func (suite *xloadTestSuite) validateMD5WithOpenFile(localPath string, remotePat
 		} else {
 			relPath, err := filepath.Rel(suite.local_path, localFilePath)
 			suite.assert.NoError(err)
-			fh, err := suite.xload.OpenFile(internal.OpenFileOptions{Name: relPath, Flags: os.O_RDONLY, Mode: common.DefaultFilePermissionBits})
+			fh, err := suite.xload.OpenFile(
+				internal.OpenFileOptions{
+					Name:  relPath,
+					Flags: os.O_RDONLY,
+					Mode:  common.DefaultFilePermissionBits,
+				},
+			)
 			suite.assert.NoError(err)
 			suite.assert.NotNil(fh)
 

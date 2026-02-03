@@ -53,7 +53,8 @@ import (
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -69,8 +70,7 @@ type Client struct {
 	Connection
 	AwsS3Client       *s3.Client // S3 client library supplied by AWS
 	blockLocks        common.KeyedMutex
-	downloader        *manager.Downloader
-	uploader          *manager.Uploader
+	transferManager   *transfermanager.Client
 	stagedBlocks      map[string]map[string][]byte // map[fileName]map[blockId]data
 	stagedBlocksMutex sync.RWMutex                 // Mutex to protect the cache
 }
@@ -275,15 +275,12 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// Create downloader and uploader to be reused for multipart downloads
-	cl.downloader = manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
-	})
-
-	cl.uploader = manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
+	// Create transfermanager client for uploads and downloads
+	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = cl.Config.partSize
+		o.Concurrency = cl.Config.concurrency
+		o.MultipartUploadThreshold = cl.Config.uploadCutoff
+		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
 	})
 
 	return nil
@@ -431,7 +428,11 @@ func (cl *Client) DeleteFile(name string) error {
 		log.Err("Client::DeleteFile : %s does not exist", name)
 		return syscall.ENOENT
 	} else if err != nil {
-		log.Err("Client::DeleteFile : Failed to getFileAttr for object %s. Here's why: %v", name, err)
+		log.Err(
+			"Client::DeleteFile : Failed to getFileAttr for object %s. Here's why: %v",
+			name,
+			err,
+		)
 		return err
 	}
 
@@ -495,7 +496,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 					)
 				}
 			} else {
-				objectsToDelete = append(objectsToDelete, object) //consider just object instead of object.path to pass down attributes that come from list.
+				objectsToDelete = append(
+					objectsToDelete,
+					object,
+				) //consider just object instead of object.path to pass down attributes that come from list.
 			}
 		}
 		// Delete the collected files
@@ -578,7 +582,11 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			if srcObject.IsDir() {
 				err = cl.RenameDirectory(srcPath, dstPath)
 			} else {
-				err = cl.RenameFile(srcPath, dstPath, srcObject.IsSymlink()) //use sourceObjects to pass along symLink bool
+				err = cl.RenameFile(
+					srcPath,
+					dstPath,
+					srcObject.IsSymlink(),
+				) //use sourceObjects to pass along symLink bool
 			}
 			if err != nil {
 				log.Err(
@@ -950,7 +958,12 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 		objectData = objectData[:size]
 	} else if int64(len(objectData)) < size {
 		// pad the data with zeros
-		log.Warn("Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.", name, len(objectData), size)
+		log.Warn(
+			"Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.",
+			name,
+			len(objectData),
+			size,
+		)
 		oldObjectData := objectData
 		newObjectData := make([]byte, size)
 		copy(newObjectData, oldObjectData)
@@ -1027,7 +1040,10 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		// case 2: given offset is within the size of the object - and the object consists of multiple parts
 		// case 3: new parts need to be added
 
-		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(offset, length)
+		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(
+			offset,
+			length,
+		)
 		// keeps track of how much new data will be appended to the end of the file (applicable only to case 3)
 		newBufferSize := int64(0)
 		// case 3?
@@ -1038,9 +1054,18 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		oldDataBuffer := make([]byte, oldDataSize+newBufferSize)
 		if !appendOnly {
 			// fetch the parts that will be impacted by the new changes so we can overwrite them
-			err = cl.ReadInBuffer(name, fileOffsets.BlockList[index].StartIndex, oldDataSize, oldDataBuffer)
+			err = cl.ReadInBuffer(
+				name,
+				fileOffsets.BlockList[index].StartIndex,
+				oldDataSize,
+				oldDataBuffer,
+			)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to read data in buffer %s [%s]",
+					name,
+					err.Error(),
+				)
 			}
 		}
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
@@ -1240,12 +1265,16 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
 			partResp, err = cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
-				Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
-				Key:             aws.String(key),
-				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key)),
-				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
-				PartNumber:      &partNumber,
-				UploadId:        &uploadID,
+				Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+				Key:    aws.String(key),
+				CopySource: aws.String(
+					fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key),
+				),
+				CopySourceRange: aws.String(
+					"bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1),
+				),
+				PartNumber: &partNumber,
+				UploadId:   &uploadID,
 			})
 			if err != nil {
 				return err
@@ -1337,7 +1366,13 @@ func (cl *Client) combineSmallBlocks(
 			var addData []byte
 			// If there is no data in the block and it is not truncated, we need to get it from the cloud. Otherwise we can just copy it.
 			if len(blk.Data) == 0 && !blk.Truncated() {
-				result, err := cl.getObject(getObjectOptions{name: name, offset: blk.StartIndex, count: blk.EndIndex - blk.StartIndex})
+				result, err := cl.getObject(
+					getObjectOptions{
+						name:   name,
+						offset: blk.StartIndex,
+						count:  blk.EndIndex - blk.StartIndex,
+					},
+				)
 				if err != nil {
 					log.Err("Client::combineSmallBlocks : Unable to get object with error: %s", err.Error())
 					return nil, err

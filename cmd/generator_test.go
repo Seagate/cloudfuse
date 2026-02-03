@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -25,57 +23,52 @@
    SOFTWARE
 */
 
-package block_cache
+package cmd
 
 import (
-	"bytes"
-	"os"
+	"testing"
 
-	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/log"
-	"golang.org/x/sys/unix"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-// setBlockChecksum sets the checksum as an xattr on Linux.
-func setBlockChecksum(localPath string, data []byte, n int) error {
-	hash := common.GetCRC64(data, n)
-	return unix.Setxattr(localPath, "user.md5sum", hash, 0)
+type generatorTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
 }
 
-func checkBlockConsistency(
-	blockCache *BlockCache,
-	item *workItem,
-	numberOfBytes int,
-	localPath, fileName string,
-) bool {
-	if !blockCache.consistency {
-		return true
-	}
-	// Calculate MD5 checksum of the read data
-	actualHash := common.GetCRC64(item.block.data, numberOfBytes)
+func (suite *generatorTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+}
 
-	// Retrieve MD5 checksum from xattr
-	xattrHash := make([]byte, 8)
-	_, err := unix.Getxattr(localPath, "user.md5sum", xattrHash)
-	if err != nil {
-		log.Err(
-			"BlockCache::download : Failed to get md5sum for file %s [%v]",
-			fileName,
-			err.Error(),
-		)
-	} else {
-		// Compare checksums
-		if !bytes.Equal(actualHash, xattrHash) {
-			log.Err(
-				"BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v",
-				fileName,
-				xattrHash,
-				actualHash,
-			)
-			_ = os.Remove(localPath)
-			return false
-		}
-	}
+func (suite *generatorTestSuite) cleanupTest() {
+	resetCLIFlags(*generateCmd)
+}
 
-	return true
+func TestGeneratorCommand(t *testing.T) {
+	suite.Run(t, new(generatorTestSuite))
+}
+
+// TestGeneratorRequiresArg tests that generate command requires exactly one argument
+func (suite *generatorTestSuite) TestGeneratorRequiresArg() {
+	defer suite.cleanupTest()
+
+	output, _ := executeCommandC(rootCmd, "generate")
+	suite.assert.Contains(output, "accepts 1 arg(s)")
+}
+
+// TestGeneratorIsHidden tests that the generate command is hidden
+func (suite *generatorTestSuite) TestGeneratorIsHidden() {
+	defer suite.cleanupTest()
+
+	suite.assert.True(generateCmd.Hidden, "generate command should be hidden")
+}
+
+// TestGeneratorHelp tests that help is displayed correctly
+func (suite *generatorTestSuite) TestGeneratorHelp() {
+	defer suite.cleanupTest()
+
+	output, _ := executeCommandC(rootCmd, "generate", "--help")
+	suite.assert.Contains(output, "Generate a new cloudfuse component")
+	suite.assert.Contains(output, "cloudfuse generate mycomponent")
 }

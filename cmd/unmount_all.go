@@ -37,18 +37,26 @@ import (
 )
 
 var umntAllCmd = &cobra.Command{
-	Use:               "all",
-	Short:             "Unmount all instances of Cloudfuse",
-	Long:              "Unmount all instances of Cloudfuse",
-	SuggestFor:        []string{"al", "all"},
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "all",
+	Short:      "Unmount all instances of Cloudfuse",
+	Long:       "Unmount all cloudfuse mount points at once.\nReturns a summary of how many mounts were successfully unmounted.",
+	SuggestFor: []string{"al"},
+	Args:       cobra.NoArgs,
+	Example: `  # Unmount all cloudfuse mounts
+  cloudfuse unmount all
+
+  # Lazy unmount all (Linux only)
+  cloudfuse unmount all --lazy`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {
-			return fmt.Errorf("failed to list mount points [%s]", err.Error())
+			return fmt.Errorf("failed to list mount points: %w", err)
 		}
 
-		lazy, _ := cmd.Flags().GetBool("lazy")
+		lazy, err := cmd.Flags().GetBool("lazy")
+		if err != nil && runtime.GOOS != "windows" {
+			return fmt.Errorf("failed to get lazy flag: %w", err)
+		}
 		mountfound := 0
 		unmounted := 0
 		var errMsg strings.Builder
@@ -72,9 +80,9 @@ var umntAllCmd = &cobra.Command{
 		}
 
 		if mountfound == 0 {
-			fmt.Println("Nothing to unmount")
+			cmd.Println("Nothing to unmount")
 		} else {
-			fmt.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
+			cmd.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
 		}
 
 		if unmounted < mountfound {
@@ -86,10 +94,6 @@ var umntAllCmd = &cobra.Command{
 }
 
 func init() {
-	if runtime.GOOS == "windows" {
-		umntAllCmd.Flags().
-			Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
-		umntAllCmd.Flags().
-			Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
-	}
+	unmountCmd.AddCommand(umntAllCmd)
+	// Flags are inherited from parent unmount command
 }

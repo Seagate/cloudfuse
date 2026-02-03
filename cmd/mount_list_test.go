@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -25,57 +23,63 @@
    SOFTWARE
 */
 
-package block_cache
+package cmd
 
 import (
-	"bytes"
-	"os"
+	"fmt"
+	"runtime"
+	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
-	"golang.org/x/sys/unix"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-// setBlockChecksum sets the checksum as an xattr on Linux.
-func setBlockChecksum(localPath string, data []byte, n int) error {
-	hash := common.GetCRC64(data, n)
-	return unix.Setxattr(localPath, "user.md5sum", hash, 0)
+type mountListTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
 }
 
-func checkBlockConsistency(
-	blockCache *BlockCache,
-	item *workItem,
-	numberOfBytes int,
-	localPath, fileName string,
-) bool {
-	if !blockCache.consistency {
-		return true
-	}
-	// Calculate MD5 checksum of the read data
-	actualHash := common.GetCRC64(item.block.data, numberOfBytes)
-
-	// Retrieve MD5 checksum from xattr
-	xattrHash := make([]byte, 8)
-	_, err := unix.Getxattr(localPath, "user.md5sum", xattrHash)
+func (suite *mountListTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		log.Err(
-			"BlockCache::download : Failed to get md5sum for file %s [%v]",
-			fileName,
-			err.Error(),
-		)
-	} else {
-		// Compare checksums
-		if !bytes.Equal(actualHash, xattrHash) {
-			log.Err(
-				"BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v",
-				fileName,
-				xattrHash,
-				actualHash,
-			)
-			_ = os.Remove(localPath)
-			return false
-		}
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
+}
 
-	return true
+func (suite *mountListTestSuite) cleanupTest() {
+	resetCLIFlags(*mountListCmd)
+	resetCLIFlags(*mountCmd)
+	resetCLIFlags(*rootCmd)
+}
+
+func (suite *mountListTestSuite) TestMountListNoMounts() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping mount list test on Windows")
+	}
+	defer suite.cleanupTest()
+
+	// When no mounts exist, should print message
+	output, err := executeCommandC(rootCmd, "mount", "list")
+	suite.assert.NoError(err)
+	// Either no mounts or lists some mounts - both are valid
+	suite.assert.True(
+		len(output) > 0,
+		"Expected output from mount list command",
+	)
+}
+
+func (suite *mountListTestSuite) TestMountListHelp() {
+	defer suite.cleanupTest()
+
+	output, err := executeCommandC(rootCmd, "mount", "list", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "List all cloudfuse mountpoints")
+}
+
+func TestMountListCommand(t *testing.T) {
+	suite.Run(t, new(mountListTestSuite))
 }

@@ -35,7 +35,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-	"github.com/robfig/cron/v3"
+	"github.com/netresearch/go-cron"
 )
 
 type UploadWindow struct {
@@ -69,7 +69,7 @@ func (fc *FileCache) SetupScheduler() error {
 }
 
 func isValidCronExpression(expr string) bool {
-	parser := cron.NewParser(
+	parser := cron.MustNewParser(
 		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
 	)
 	_, err := parser.Parse(expr)
@@ -261,7 +261,11 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		// open the cached file
 		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
 		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
+			log.Err(
+				"FileCache::uploadPendingFile : %s failed to open file. Here's why: %v",
+				name,
+				err,
+			)
 			return err
 		}
 		// write handle attributes
@@ -274,7 +278,9 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 
 		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true, AsyncUpload: true})
+		err = fc.flushFileInternal(
+			internal.FlushFileOptions{Handle: handle, CloseInProgress: true, AsyncUpload: true},
+		)
 		f.Close()
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Cause: %v", name, err)

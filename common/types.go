@@ -31,17 +31,15 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/JeffreyRichter/enum/enum"
 )
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "2.0.2"
+	cloudfuseVersion_ = "2.0.3"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -161,16 +159,41 @@ func (LogLevel) LOG_DEBUG() LogLevel {
 	return LogLevel(7)
 }
 
+var logLevelNames = map[LogLevel]string{
+	LogLevel(0): "INVALID",
+	LogLevel(1): "LOG_OFF",
+	LogLevel(2): "LOG_CRIT",
+	LogLevel(3): "LOG_ERR",
+	LogLevel(4): "LOG_WARNING",
+	LogLevel(5): "LOG_INFO",
+	LogLevel(6): "LOG_TRACE",
+	LogLevel(7): "LOG_DEBUG",
+}
+
+var logLevelValues = map[string]LogLevel{
+	"INVALID":     LogLevel(0),
+	"LOG_OFF":     LogLevel(1),
+	"LOG_CRIT":    LogLevel(2),
+	"LOG_ERR":     LogLevel(3),
+	"LOG_WARNING": LogLevel(4),
+	"LOG_INFO":    LogLevel(5),
+	"LOG_TRACE":   LogLevel(6),
+	"LOG_DEBUG":   LogLevel(7),
+}
+
 func (l LogLevel) String() string {
-	return enum.StringInt(l, reflect.TypeFor[LogLevel]())
+	if name, ok := logLevelNames[l]; ok {
+		return name
+	}
+	return "INVALID"
 }
 
 func (l *LogLevel) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeFor[*LogLevel](), s, true, false)
-	if enumVal != nil {
-		*l = enumVal.(LogLevel)
+	if val, ok := logLevelValues[strings.ToUpper(s)]; ok {
+		*l = val
+		return nil
 	}
-	return err
+	return fmt.Errorf("invalid LogLevel: %s", s)
 }
 
 type LogConfig struct {
