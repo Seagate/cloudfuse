@@ -162,7 +162,6 @@ func selectPackageAsset(assets []asset, ext string) (*asset, error) {
 		fuseVersion = common.FuseVersion
 	}
 
-	// First pass: try to find an asset with the FUSE version (for newer releases)
 	for _, asset := range assets {
 		if strings.HasPrefix(asset.Name, "cloudfuse") &&
 			strings.Contains(asset.Name, osName) &&
