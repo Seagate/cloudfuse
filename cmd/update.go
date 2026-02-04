@@ -212,20 +212,19 @@ func runWindowsInstaller(fileName string, out io.Writer) error {
 
 // runLinuxInstaller installs the deb or rpm package
 func runLinuxInstaller(fileName string) error {
-	var packageCommand string
+	var cmd *exec.Cmd
 	if strings.HasSuffix(fileName, "deb") {
-		packageCommand = "apt"
+		cmd = exec.Command("apt", "install", fileName)
 	} else if strings.HasSuffix(fileName, "rpm") {
-		packageCommand = "rpm"
+		cmd = exec.Command("rpm", "-i", fileName)
 	} else {
 		return errors.New("unsupported package format")
 	}
 
-	cmd := exec.Command(packageCommand, "-i", fileName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to run %s: %v", packageCommand, err)
+		return fmt.Errorf("failed to install package: %v", err)
 	}
 	return nil
 }
