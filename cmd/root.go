@@ -156,11 +156,19 @@ func selectPackageAsset(assets []asset, ext string) (*asset, error) {
 		ext = "tar.gz"
 	}
 
+	// For Linux, we need to match the FUSE version as well
+	fuseVersion := ""
+	if osName == "linux" {
+		fuseVersion = common.FuseVersion
+	}
+
+	// First pass: try to find an asset with the FUSE version (for newer releases)
 	for _, asset := range assets {
 		if strings.HasPrefix(asset.Name, "cloudfuse") &&
 			strings.Contains(asset.Name, osName) &&
 			strings.Contains(asset.Name, arch) &&
-			strings.HasSuffix(asset.Name, ext) {
+			strings.HasSuffix(asset.Name, ext) &&
+			(fuseVersion == "" || strings.Contains(asset.Name, fuseVersion)) {
 			return &asset, nil
 		}
 	}
