@@ -45,7 +45,7 @@ var home_dir, _ = os.UserHomeDir()
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -54,15 +54,15 @@ type utilTestSuite struct {
 	assert *assert.Assertions
 }
 
-func (suite *utilTestSuite) SetupTest() {
-	suite.assert = assert.New(suite.T())
+func (s *utilTestSuite) SetupTest() {
+	s.assert = assert.New(s.T())
 }
 
 func TestUtil(t *testing.T) {
 	suite.Run(t, new(utilTestSuite))
 }
 
-func (suite *utilTestSuite) TestIsMountActiveNoMount() {
+func (s *utilTestSuite) TestIsMountActiveNoMount() {
 	// Only test on Linux
 	if runtime.GOOS == "windows" {
 		return
@@ -71,14 +71,14 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 	cmd := exec.Command("../cloudfuse", "unmount", "all")
 	cmd.Stdout = &out
 	err := cmd.Run()
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 	cmd = exec.Command("pidof", "cloudfuse")
 	cmd.Stdout = &out
 	err = cmd.Run()
-	suite.assert.Equal("exit status 1", err.Error())
+	s.assert.Equal("exit status 1", err.Error())
 	res, err := IsMountActive("/mnt/cloudfuse")
-	suite.assert.NoError(err)
-	suite.assert.False(res)
+	s.assert.NoError(err)
+	s.assert.False(res)
 }
 
 // TODO: Fix broken test
@@ -89,7 +89,7 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 // 	fileName := "config.yaml"
 
 // 	lbpath := filepath.Join(home_dir, "lbpath")
-// 	os.MkdirAll(lbpath, 0777)
+// 	_ = os.MkdirAll(lbpath, 0777)
 // 	defer os.RemoveAll(lbpath)
 
 // 	content := "components:\n" +
@@ -99,7 +99,7 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 // 		"  path: " + lbpath + "\n\n"
 
 // 	mntdir := filepath.Join(home_dir, "mountdir")
-// 	os.MkdirAll(mntdir, 0777)
+// 	_ = os.MkdirAll(mntdir, 0777)
 // 	defer os.RemoveAll(mntdir)
 
 // 	dir, err := os.Getwd()
@@ -142,7 +142,7 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 func (suite *typesTestSuite) TestDirectoryExists() {
 	rand := randomString(8)
 	dir := filepath.Join(home_dir, "dir"+rand)
-	os.MkdirAll(dir, 0777)
+	_ = os.MkdirAll(dir, 0777)
 	defer os.RemoveAll(dir)
 
 	exists := DirectoryExists(dir)
@@ -160,12 +160,12 @@ func (suite *typesTestSuite) TestDirectoryDoesNotExist() {
 func (suite *typesTestSuite) TestDecryptBadKey() {
 	// Generate a random key
 	key := make([]byte, 20)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 
 	_, err := DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
@@ -175,13 +175,13 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 // 	// Generate a random key
 // 	key := make([]byte, 36)
 // 	encodedKey := make([]byte, 48)
-// 	rand.Read(key)
+// 	_, _ = rand.Read(key)
 // 	base64.StdEncoding.Encode(encodedKey, key)
 
 // 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 // 	data := make([]byte, 1024)
-// 	rand.Read(data)
+// 	_, _ = rand.Read(data)
 
 // 	_, err := EncryptData(data, encryptedPassphrase)
 // 	suite.assert.Error(err)
@@ -191,13 +191,13 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 	// Generate a random key
 	key := make([]byte, 36)
 	encodedKey := make([]byte, 48)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 
 	_, err := DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
@@ -208,13 +208,13 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 // 	// Generate a random key
 // 	key := make([]byte, 16)
 // 	encodedKey := make([]byte, 24)
-// 	rand.Read(key)
+// 	_, _ = rand.Read(key)
 // 	base64.StdEncoding.Encode(encodedKey, key)
 
 // 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 // 	data := make([]byte, 1024)
-// 	rand.Read(data)
+// 	_, _ = rand.Read(data)
 
 // 	cipher, err := EncryptData(data, encryptedPassphrase)
 // 	suite.assert.NoError(err)
@@ -228,13 +228,13 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 // 	// Generate a random key
 // 	key := make([]byte, 24)
 // 	encodedKey := make([]byte, 32)
-// 	rand.Read(key)
+// 	_, _ = rand.Read(key)
 // 	base64.StdEncoding.Encode(encodedKey, key)
 
 // 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 // 	data := make([]byte, 1024)
-// 	rand.Read(data)
+// 	_, _ = rand.Read(data)
 
 // 	cipher, err := EncryptData(data, encryptedPassphrase)
 // 	suite.assert.NoError(err)
@@ -248,13 +248,13 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 // 	// Generate a random key
 // 	key := make([]byte, 32)
 // 	encodedKey := make([]byte, 44)
-// 	rand.Read(key)
+// 	_, _ = rand.Read(key)
 // 	base64.StdEncoding.Encode(encodedKey, key)
 
 // 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 // 	data := make([]byte, 1024)
-// 	rand.Read(data)
+// 	_, _ = rand.Read(data)
 
 // 	cipher, err := EncryptData(data, encryptedPassphrase)
 // 	suite.assert.NoError(err)
@@ -267,12 +267,12 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 func (suite *typesTestSuite) TestEncryptDecrypt4() {
 	// Generate a random key
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -285,12 +285,12 @@ func (suite *typesTestSuite) TestEncryptDecrypt4() {
 func (suite *typesTestSuite) TestEncryptDecrypt5() {
 	// Generate a random key
 	key := make([]byte, 64)
-	rand.Read(key)
+	_, _ = rand.Read(key)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -300,12 +300,12 @@ func (suite *typesTestSuite) TestEncryptDecrypt5() {
 	suite.assert.Equal(data, d)
 }
 
-func (suite *utilTestSuite) TestMonitorCfs() {
+func (s *utilTestSuite) TestMonitorCfs() {
 	monitor := MonitorCfs()
-	suite.assert.False(monitor)
+	s.assert.False(monitor)
 }
 
-func (suite *utilTestSuite) TestExpandPath() {
+func (s *utilTestSuite) TestExpandPath() {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return
@@ -320,95 +320,95 @@ func (suite *utilTestSuite) TestExpandPath() {
 
 	path := "~/a/b/c/d"
 	expandedPath := ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, path[2:])
-	suite.assert.Contains(expandedPath, homeDir)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, path[2:])
+	s.assert.Contains(expandedPath, homeDir)
 
 	path = "$HOME/a/b/c/d"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, path[5:])
-	suite.assert.Contains(expandedPath, homeDir)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, path[5:])
+	s.assert.Contains(expandedPath, homeDir)
 
 	path = "/a/b/c/d"
 	expandedPath = ExpandPath(path)
 	if runtime.GOOS != "windows" {
-		suite.assert.Equal(expandedPath, path)
+		s.assert.Equal(expandedPath, path)
 	}
 
 	path = "./a"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, pwd)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, pwd)
 
 	path = "./a/../a/b/c/d/../../../a/b/c/d/.././a"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, pwd)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, pwd)
 
 	path = "~/a/../$HOME/a/b/c/d/../../../a/b/c/d/.././a"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, homeDir)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, homeDir)
 
 	path = "$HOME/a/b/c/d/../../../a/b/c/d/.././a"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, homeDir)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, homeDir)
 
 	path = "/$HOME/a/b/c/d/../../../a/b/c/d/.././a"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(expandedPath, homeDir)
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(expandedPath, homeDir)
 
 	path = ""
 	expandedPath = ExpandPath(path)
-	suite.assert.Equal(expandedPath, path)
+	s.assert.Equal(expandedPath, path)
 
 	path = "$HOME/.cloudfuse/config_$web.yaml"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(path, "$web")
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(path, "$web")
 
 	path = "$HOME/.cloudfuse/$web"
 	expandedPath = ExpandPath(path)
-	suite.assert.NotEqual(expandedPath, path)
-	suite.assert.Contains(path, "$web")
+	s.assert.NotEqual(expandedPath, path)
+	s.assert.Contains(path, "$web")
 }
 
-func (suite *utilTestSuite) TestExpandPathDriveLetter() {
+func (s *utilTestSuite) TestExpandPathDriveLetter() {
 	path := "D:"
 	expandedPath := ExpandPath(path)
-	suite.assert.Equal(path, expandedPath)
+	s.assert.Equal(path, expandedPath)
 
 	path = "x:"
 	expandedPath = ExpandPath(path)
-	suite.assert.Equal(path, expandedPath)
+	s.assert.Equal(path, expandedPath)
 }
 
-func (suite *utilTestSuite) TestIsDriveLetter() {
+func (s *utilTestSuite) TestIsDriveLetter() {
 	path := "D:"
 	match := IsDriveLetter(path)
-	suite.assert.True(match)
+	s.assert.True(match)
 
 	path = "x:"
 	match = IsDriveLetter(path)
-	suite.assert.True(match)
+	s.assert.True(match)
 
 	path = "D"
 	match = IsDriveLetter(path)
-	suite.assert.False(match)
+	s.assert.False(match)
 
 	path = "C/folder"
 	match = IsDriveLetter(path)
-	suite.assert.False(match)
+	s.assert.False(match)
 
 	path = "C:\\Users"
 	match = IsDriveLetter(path)
-	suite.assert.False(match)
+	s.assert.False(match)
 }
 
-func (suite *utilTestSuite) TestGetUSage() {
+func (s *utilTestSuite) TestGetUSage() {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return
@@ -416,24 +416,24 @@ func (suite *utilTestSuite) TestGetUSage() {
 
 	dirName := filepath.Join(pwd, "util_test")
 	err = os.Mkdir(dirName, 0777)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	data := make([]byte, 1024*1024)
 	err = os.WriteFile(dirName+"/1.txt", data, 0777)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	err = os.WriteFile(dirName+"/2.txt", data, 0777)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	usage, err := GetUsage(dirName)
-	suite.assert.NoError(err)
-	suite.assert.GreaterOrEqual(int(usage), 2)
-	suite.assert.LessOrEqual(int(usage), 4)
+	s.assert.NoError(err)
+	s.assert.GreaterOrEqual(int(usage), 2)
+	s.assert.LessOrEqual(int(usage), 4)
 
 	_ = os.RemoveAll(dirName)
 }
 
-func (suite *utilTestSuite) TestGetDiskUsage() {
+func (s *utilTestSuite) TestGetDiskUsage() {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return
@@ -441,52 +441,52 @@ func (suite *utilTestSuite) TestGetDiskUsage() {
 
 	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
 	err = os.MkdirAll(dirName, 0777)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)
-	suite.assert.NoError(err)
-	suite.assert.NotEqual(0, usage)
-	suite.assert.NotEqual(0, usagePercent)
-	suite.assert.NotEqual(100, usagePercent)
+	s.assert.NoError(err)
+	s.assert.NotEqual(0, usage)
+	s.assert.NotEqual(0, usagePercent)
+	s.assert.NotEqual(100, usagePercent)
 	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
 }
 
-func (suite *utilTestSuite) TestDirectoryCleanup() {
+func (s *utilTestSuite) TestDirectoryCleanup() {
 	dirName := "./TestDirectoryCleanup"
 
 	// Directory does not exists
 	exists := DirectoryExists(dirName)
-	suite.assert.False(exists)
+	s.assert.False(exists)
 
 	err := TempCacheCleanup(dirName)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	// Directory exists but is empty
 	_ = os.MkdirAll(dirName, 0777)
 	exists = DirectoryExists(dirName)
-	suite.assert.True(exists)
+	s.assert.True(exists)
 
 	empty := IsDirectoryEmpty(dirName)
-	suite.assert.True(empty)
+	s.assert.True(empty)
 
 	err = TempCacheCleanup(dirName)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	// Directory exists and is not empty
 	_ = os.MkdirAll(dirName+"/A", 0777)
 	exists = DirectoryExists(dirName)
-	suite.assert.True(exists)
+	s.assert.True(exists)
 
 	empty = IsDirectoryEmpty(dirName)
-	suite.assert.False(empty)
+	s.assert.False(empty)
 
 	err = TempCacheCleanup(dirName)
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	_ = os.RemoveAll(dirName)
 }
 
-func (suite *utilTestSuite) TestWriteToFile() {
+func (s *utilTestSuite) TestWriteToFile() {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error getting home directory:", err)
@@ -499,25 +499,25 @@ func (suite *utilTestSuite) TestWriteToFile() {
 	defer os.Remove(filePath)
 
 	err = WriteToFile(filePath, content, WriteToFileOptions{})
-	suite.assert.NoError(err)
+	s.assert.NoError(err)
 
 	// Check if file exists
-	suite.assert.FileExists(filePath)
+	s.assert.FileExists(filePath)
 
 	// Check the content of the file
 	data, err := os.ReadFile(filePath)
-	suite.assert.NoError(err)
-	suite.assert.Equal(content, string(data))
+	s.assert.NoError(err)
+	s.assert.Equal(content, string(data))
 }
 
-func (suite *utilTestSuite) TestCRC64() {
+func (s *utilTestSuite) TestCRC64() {
 	data := []byte("Hello World")
 	crc := GetCRC64(data, len(data))
 
 	data = []byte("Hello World!")
 	crc1 := GetCRC64(data, len(data))
 
-	suite.assert.NotEqual(crc, crc1)
+	s.assert.NotEqual(crc, crc1)
 }
 
 func (s *utilTestSuite) TestGetMD5() {

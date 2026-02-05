@@ -78,7 +78,7 @@ type testObj struct {
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -109,7 +109,7 @@ func setupPipeline(cfg string) (*testObj, error) {
 		cfg = fmt.Sprintf("%s\n\nloopbackfs:\n  path: %s\n", cfg, tobj.fake_storage_path)
 	}
 
-	config.ReadConfigFromReader(strings.NewReader(cfg))
+	_ = config.ReadConfigFromReader(strings.NewReader(cfg))
 	config.Set("mount-path", mountpoint)
 	tobj.loopback = loopback.NewLoopbackFSComponent()
 	err := tobj.loopback.Configure(true)
@@ -170,7 +170,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 	}
 	emptyConfig := "read-only: true"
 	tobj, err := setupPipeline(emptyConfig)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
@@ -185,9 +185,10 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 	cores, err := strconv.Atoi(coresStr)
 	suite.assert.NoError(err)
 	suite.assert.Equal(tobj.blockCache.workers, uint32(3*cores))
-	suite.assert.EqualValues(
+	suite.assert.InEpsilon(
 		tobj.blockCache.prefetch,
 		math.Max((MIN_PREFETCH*2)+1, float64(2*cores)),
+		0.0001,
 	)
 	suite.assert.False(tobj.blockCache.noPrefetch)
 	suite.assert.NotNil(tobj.blockCache.blockPool)
@@ -200,7 +201,7 @@ func (suite *blockCacheTestSuite) TestMemory() {
 	}
 	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
 	tobj, err := setupPipeline(emptyConfig)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
@@ -229,7 +230,7 @@ func (suite *blockCacheTestSuite) TestFreeDiskSpace() {
 		disk_cache_path,
 	)
 	tobj, err := setupPipeline(config)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
@@ -258,7 +259,7 @@ func (suite *blockCacheTestSuite) TestStatfsMemory() {
 	}
 	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
 	tobj, err := setupPipeline(emptyConfig)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
@@ -291,7 +292,7 @@ func (suite *blockCacheTestSuite) TestStatfsDisk() {
 		disk_cache_path,
 	)
 	tobj, err := setupPipeline(config)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
@@ -321,7 +322,7 @@ func (suite *blockCacheTestSuite) TestStatfsDisk() {
 func (suite *blockCacheTestSuite) TestInvalidPrefetchCount() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 8\n  parallelism: 10\n  path: abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "invalid prefetch count")
@@ -330,7 +331,7 @@ func (suite *blockCacheTestSuite) TestInvalidPrefetchCount() {
 func (suite *blockCacheTestSuite) TestInvalidMemoryLimitPrefetchCount() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 320\n  prefetch: 50\n  parallelism: 10\n  path: abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "[memory limit too low for configured prefetch")
@@ -339,7 +340,7 @@ func (suite *blockCacheTestSuite) TestInvalidMemoryLimitPrefetchCount() {
 func (suite *blockCacheTestSuite) TestNoPrefetchConfig() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 1\n  mem-size-mb: 500\n  prefetch: 0\n  parallelism: 10\n  path: abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -353,7 +354,7 @@ func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
 
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 12\n  parallelism: 10\n  path: /abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "permission denied")
@@ -392,7 +393,7 @@ func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
 func (suite *blockCacheTestSuite) TestManualConfig() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 12\n  parallelism: 10\n  path: abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
@@ -409,7 +410,7 @@ func (suite *blockCacheTestSuite) TestManualConfig() {
 
 func (suite *blockCacheTestSuite) TestOpenFileFail() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -428,7 +429,7 @@ func (suite *blockCacheTestSuite) TestOpenFileFail() {
 
 func (suite *blockCacheTestSuite) TestFileOpenClose() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -437,7 +438,7 @@ func (suite *blockCacheTestSuite) TestFileOpenClose() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(storagePath, data, 0777)
+	_ = os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -447,7 +448,7 @@ func (suite *blockCacheTestSuite) TestFileOpenClose() {
 	suite.assert.NotNil(h.Buffers.Cooked)
 	suite.assert.NotNil(h.Buffers.Cooking)
 
-	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 }
@@ -455,14 +456,14 @@ func (suite *blockCacheTestSuite) TestFileOpenClose() {
 func (suite *blockCacheTestSuite) TestValidateBlockList() {
 	config := "read-only: true\n\nblock_cache:\n  block-size-mb: 20"
 	tobj, err := setupPipeline(config)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 	suite.assert.Equal(20*_1MB, tobj.blockCache.blockSize)
 
 	fileName := getTestFileName(suite.T().Name())
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
-	os.WriteFile(storagePath, []byte("Hello, World!"), 0777)
+	_ = os.WriteFile(storagePath, []byte("Hello, World!"), 0777)
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
@@ -547,7 +548,7 @@ func (suite *blockCacheTestSuite) TestValidateBlockList() {
 
 func (suite *blockCacheTestSuite) TestFileReadTotalBytes() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -599,7 +600,7 @@ func (suite *blockCacheTestSuite) TestFileReadTotalBytes() {
 
 func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -698,7 +699,7 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 
 func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -707,7 +708,7 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(storagePath, data, 0777)
+	_ = os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -735,14 +736,14 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	cnt := h.Buffers.Cooked.Len() + h.Buffers.Cooking.Len()
 	suite.assert.Equal(12, cnt)
 
-	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 }
 
 func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -751,7 +752,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(storagePath, data, 0777)
+	_ = os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -762,9 +763,9 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	suite.assert.NotNil(h.Buffers.Cooking)
 
 	data = make([]byte, 100)
-	max := int64(100 * _1MB)
+	maxSize := int64(100 * _1MB)
 	for range 50 {
-		offset := mrand.Int64N(max)
+		offset := mrand.Int64N(maxSize)
 		n, _ := tobj.blockCache.ReadInBuffer(
 			internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data},
 		)
@@ -774,14 +775,14 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	cnt := h.Buffers.Cooked.Len() + h.Buffers.Cooking.Len()
 	suite.assert.LessOrEqual(cnt, 8)
 
-	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 }
 
 func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -794,7 +795,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(storagePath, data, 0777)
+	_ = os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -805,9 +806,9 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	suite.assert.NotNil(h.Buffers.Cooking)
 
 	data = make([]byte, 100)
-	max := int64(100 * _1MB)
+	maxSize := int64(100 * _1MB)
 	for range 50 {
-		offset := mrand.Int64N(max)
+		offset := mrand.Int64N(maxSize)
 		n, _ := tobj.blockCache.ReadInBuffer(
 			internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data},
 		)
@@ -819,14 +820,14 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	cnt := h.Buffers.Cooked.Len() + h.Buffers.Cooking.Len()
 	suite.assert.Equal(1, cnt)
 
-	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 }
 
 func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -853,7 +854,7 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	}
 
 	for i := range 13 {
-		os.WriteFile(localfiles[i].name, data, 0777)
+		_ = os.WriteFile(localfiles[i].name, data, 0777)
 		usage, err := common.GetUsage(tobj.disk_cache_path)
 		suite.assert.NoError(err)
 		fmt.Printf(
@@ -890,7 +891,7 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 // Block-cache Writer related test cases
 func (suite *blockCacheTestSuite) TestCreateFile() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -918,7 +919,7 @@ func (suite *blockCacheTestSuite) TestCreateFile() {
 
 func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -927,7 +928,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(storagePath, data, 0777)
+	_ = os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -951,7 +952,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 
 func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresence() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -969,7 +970,7 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresence() {
 	)
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	_ = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
 
 	// Check file exists in disk_cache_path
 	diskCachePath := filepath.Join(tobj.disk_cache_path, fileName+"_0")
@@ -981,7 +982,7 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresence() {
 
 func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresenceInDir() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1006,7 +1007,7 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresenceInDir() {
 	)
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	_ = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
 
 	// Check file exists in disk_cache_path
 	diskCachePath := filepath.Join(tobj.disk_cache_path, dirName, fileName+"_0")
@@ -1018,7 +1019,7 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresenceInDir() {
 
 func (suite *blockCacheTestSuite) TestWriteFileSimple() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1085,7 +1086,7 @@ func (suite *blockCacheTestSuite) TestWriteFileSimple() {
 
 func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1125,7 +1126,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 
 func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1181,7 +1182,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 
 func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1256,7 +1257,7 @@ func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 
 func (suite *blockCacheTestSuite) TestWriteBlockOutOfRange() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1295,7 +1296,7 @@ func (suite *blockCacheTestSuite) TestWriteBlockOutOfRange() {
 
 func (suite *blockCacheTestSuite) TestDeleteAndRenameDirAndFile() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1369,7 +1370,7 @@ func (suite *blockCacheTestSuite) TestDeleteAndRenameDirAndFile() {
 
 func (suite *blockCacheTestSuite) TestTempCacheCleanup() {
 	tobj, _ := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	items, _ := os.ReadDir(tobj.disk_cache_path)
 	suite.assert.Empty(items)
@@ -1402,7 +1403,7 @@ func (suite *blockCacheTestSuite) TestTempCacheCleanup() {
 
 func (suite *blockCacheTestSuite) TestZZZZLazyWrite() {
 	tobj, _ := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	tobj.blockCache.lazyWrite = true
 
@@ -1437,7 +1438,7 @@ func computeMD5(fh *os.File) ([]byte, error) {
 func (suite *blockCacheTestSuite) TestRandomWriteSparseFile() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1534,7 +1535,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteSparseFile() {
 func (suite *blockCacheTestSuite) TestRandomWriteSparseFileWithPartialBlock() {
 	cfg := "block_cache:\n  block-size-mb: 4\n  mem-size-mb: 100\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1632,7 +1633,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteSparseFileWithPartialBlock() {
 func (suite *blockCacheTestSuite) TestRandomWriteSparseFileWithBlockOverlap() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1730,7 +1731,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteSparseFileWithBlockOverlap() {
 func (suite *blockCacheTestSuite) TestRandomWriteFileOneBlock() {
 	cfg := "block_cache:\n  block-size-mb: 8\n  mem-size-mb: 100\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1815,7 +1816,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteFileOneBlock() {
 func (suite *blockCacheTestSuite) TestRandomWriteFlushAndOverwrite() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -1933,7 +1934,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteUncommittedBlockValidation() {
 		prefetch,
 	)
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2041,7 +2042,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteUncommittedBlockValidation() {
 func (suite *blockCacheTestSuite) TestRandomWriteExistingFile() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2098,7 +2099,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteExistingFile() {
 func (suite *blockCacheTestSuite) TestPreventRaceCondition() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2180,7 +2181,7 @@ func (suite *blockCacheTestSuite) TestPreventRaceCondition() {
 func (suite *blockCacheTestSuite) TestBlockParallelUploadAndWrite() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2247,7 +2248,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelUploadAndWrite() {
 func (suite *blockCacheTestSuite) TestBlockParallelUploadAndWriteValidation() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2383,7 +2384,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelUploadAndWriteValidation() {
 func (suite *blockCacheTestSuite) TestBlockParallelReadAndWriteValidation() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2487,7 +2488,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelReadAndWriteValidation() {
 func (suite *blockCacheTestSuite) TestBlockOverwriteValidation() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2590,7 +2591,7 @@ func (suite *blockCacheTestSuite) TestBlockOverwriteValidation() {
 func (suite *blockCacheTestSuite) TestBlockFailOverwrite() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2642,7 +2643,7 @@ func (suite *blockCacheTestSuite) TestBlockFailOverwrite() {
 func (suite *blockCacheTestSuite) TestBlockDownloadOffsetGreaterThanFileSize() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2693,7 +2694,7 @@ func (suite *blockCacheTestSuite) TestBlockDownloadOffsetGreaterThanFileSize() {
 func (suite *blockCacheTestSuite) TestReadStagedBlock() {
 	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2743,7 +2744,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedBlockValidation() {
 		prefetch,
 	)
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2849,7 +2850,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedPrefetchedBlock() {
 		prefetch,
 	)
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -2934,7 +2935,7 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 		prefetch,
 	)
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -3020,7 +3021,7 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 // 	common.IsStream = true
 // 	config := fmt.Sprintf("read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: %d\n  buffer-size-mb: 1\n", maxbuffers)
 // 	tobj, err := setupPipeline(config)
-// 	defer tobj.cleanupPipeline()
+// 	defer func() { _ = tobj.cleanupPipeline() }()
 
 // 	suite.assert.Nil(err)
 // 	if err == nil {
@@ -3038,7 +3039,7 @@ func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	config := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 1"
 	tobj, err := setupPipeline(config)
 	suite.assert.NoError(err)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	path := getTestFileName(suite.T().Name())
 	storagePath := filepath.Join(tobj.fake_storage_path, path)
@@ -3115,7 +3116,7 @@ func (suite *blockCacheTestSuite) TestReadCommittedLastBlockAfterAppends() {
 		prefetch,
 	)
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -3162,7 +3163,7 @@ func (suite *blockCacheTestSuite) TestReadCommittedLastBlockAfterAppends() {
 	suite.assert.Equal(n, int(_1MB/2))
 	suite.assert.True(h.Dirty())
 
-	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	_ = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
@@ -3179,7 +3180,7 @@ func (suite *blockCacheTestSuite) TestReadCommittedLastBlocksOverwrite() {
 		prefetch,
 	)
 	tobj, err := setupPipeline(cfg)
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
@@ -3263,7 +3264,7 @@ func (suite *blockCacheTestSuite) TestReadCommittedLastBlocksOverwrite() {
 		suite.assert.True(h.Dirty())
 	}
 
-	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	_ = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)

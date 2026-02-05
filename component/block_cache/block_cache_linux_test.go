@@ -56,7 +56,7 @@ func (suite *blockCacheLinuxTestSuite) SetupTest() {
 
 func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	tobj, err := setupPipeline("")
-	defer tobj.cleanupPipeline()
+	defer func() { _ = tobj.cleanupPipeline() }()
 
 	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)

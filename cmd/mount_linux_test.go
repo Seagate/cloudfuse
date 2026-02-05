@@ -683,7 +683,7 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 	// Create a test directory
 	testDir := filepath.Join(os.TempDir(), "cleanup_test")
 	os.RemoveAll(testDir)
-	os.MkdirAll(testDir, 0755)
+	_ = os.MkdirAll(testDir, 0755)
 
 	defer func() {
 		os.RemoveAll(testDir)
@@ -692,9 +692,9 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 	testPath := filepath.Join(testDir, "dir1")
 	testPath2 := filepath.Join(testDir, "dir2")
 	testPath3 := filepath.Join(testDir, "dir3")
-	os.MkdirAll(testPath, 0755)
-	os.MkdirAll(testPath2, 0755)
-	os.MkdirAll(testPath3, 0755)
+	_ = os.MkdirAll(testPath, 0755)
+	_ = os.MkdirAll(testPath2, 0755)
+	_ = os.MkdirAll(testPath3, 0755)
 
 	createFilesInCacheDirs := func() {
 		// Create some test files

@@ -140,7 +140,7 @@ func (suite *mountSuite) TestMountCmd() {
 // or does exist on Windows
 func (suite *mountSuite) TestMountDirNotExists() {
 	if runtime.GOOS == "windows" {
-		os.Mkdir(mntDir, 0777)
+		_ = os.Mkdir(mntDir, 0777)
 		mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
 		var errb bytes.Buffer
 		mountCmd.Stderr = &errb
@@ -289,7 +289,7 @@ func (suite *mountSuite) TestConfigFileNotProvided() {
 // mount failure test where config file is not provided and environment variables have incorrect credentials
 func (suite *mountSuite) TestEnvVarMountFailure() {
 	tempDir := filepath.Join(mntDir, "..", "tempdir")
-	os.Mkdir(tempDir, 0777)
+	_ = os.Mkdir(tempDir, 0777)
 
 	// create environment variables
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "myAccount")
@@ -303,11 +303,11 @@ func (suite *mountSuite) TestEnvVarMountFailure() {
 		"--tmp-path="+tempDir,
 		"--container-name=myContainer",
 	)
-	cliOut, err := mountCmd.Output()
+	_, err := mountCmd.Output()
 	suite.Error(err)
 
 	// list cloudfuse mounted directories
-	cliOut = listCloudfuseMounts(suite)
+	cliOut := listCloudfuseMounts(suite)
 	suite.Empty(cliOut)
 
 	// unmount
@@ -333,7 +333,7 @@ func (suite *mountSuite) TestEnvVarMount() {
 	suite.NoError(err)
 
 	viper.SetConfigType("yaml")
-	viper.ReadConfig(bytes.NewBuffer(configData))
+	_ = viper.ReadConfig(bytes.NewBuffer(configData))
 
 	// create environment variables
 	os.Setenv("AZURE_STORAGE_ACCOUNT", viper.GetString("azstorage.account-name"))
@@ -421,7 +421,7 @@ func (suite *mountSuite) TestEnvVarMount() {
 // 	suite.Equal(nil, err)
 
 // 	viper.SetConfigType("yaml")
-// 	viper.ReadConfig(bytes.NewBuffer(configData))
+// 	_ = viper.ReadConfig(bytes.NewBuffer(configData))
 
 // 	// create environment variables
 // 	os.Setenv("AZURE_STORAGE_ACCOUNT", viper.GetString("azstorage.account-name"))
@@ -497,7 +497,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 
 	// write to file in the local directory
 	buff := make([]byte, 200)
-	rand.Read(buff)
+	_, _ = rand.Read(buff)
 	err := os.WriteFile(remoteFilePath, buff, 0777)
 	suite.NoError(err)
 
@@ -566,7 +566,7 @@ func TestMain(m *testing.M) {
 
 	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.
 	if runtime.GOOS != "windows" {
-		os.Mkdir(mntDir, 0777)
+		_ = os.Mkdir(mntDir, 0777)
 	}
 
 	m.Run()

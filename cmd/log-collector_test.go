@@ -225,7 +225,7 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	baseDefaultDir := common.GetDefaultWorkDir() + "/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
 	if !common.DirectoryExists(baseDefaultDir) {
-		os.Mkdir(baseDefaultDir, os.FileMode(0760))
+		_ = os.Mkdir(baseDefaultDir, os.FileMode(0760))
 	}
 	var logFile *os.File
 	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
@@ -453,7 +453,7 @@ func (suite *logCollectTestSuite) TestArchivePath() {
 	baseDefaultDir := common.GetDefaultWorkDir() + "/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
 	if !common.DirectoryExists(baseDefaultDir) {
-		os.Mkdir(baseDefaultDir, os.FileMode(0760))
+		_ = os.Mkdir(baseDefaultDir, os.FileMode(0760))
 	}
 	var logFile *os.File
 	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")

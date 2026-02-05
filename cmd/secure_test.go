@@ -71,7 +71,7 @@ func executeCommandSecure(root *cobra.Command, args ...string) (output string, e
 func resetSecureCLIFlags() {
 	secureCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
-		f.Value.Set(f.DefValue)
+		_ = f.Value.Set(f.DefValue)
 	})
 }
 

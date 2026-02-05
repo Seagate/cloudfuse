@@ -92,10 +92,10 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 func (suite *fileCacheLinuxTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.loopback = newLoopbackFS()
 	suite.fileCache = newTestFileCache(suite.loopback)
-	suite.loopback.Start(context.Background())
+	_ = suite.loopback.Start(context.Background())
 	err := suite.fileCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
@@ -104,7 +104,7 @@ func (suite *fileCacheLinuxTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheLinuxTestSuite) cleanupTest() {
-	suite.loopback.Stop()
+	_ = suite.loopback.Stop()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
@@ -133,7 +133,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	defer suite.cleanupTest()
 	// Setup - create file directly in fake storage
 	path := "file33"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	_, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -155,7 +155,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0666},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -173,7 +173,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(0755, info.Mode())
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
@@ -222,7 +222,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file36"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	_, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -249,7 +249,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0777},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -273,7 +273,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
@@ -281,7 +281,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file38"
 	oldMode := os.FileMode(0511)
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	_, _ = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
 	info, _ := os.Stat(suite.cache_path + "/" + path)
 	stat := info.Sys().(*syscall.Stat_t)
 	oldOwner := stat.Uid

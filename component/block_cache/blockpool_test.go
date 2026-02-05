@@ -49,8 +49,9 @@ func (suite *blockpoolTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *blockpoolTestSuite) cleanupTest() {
-}
+// Unused: cleanupTest
+// func (suite *blockpoolTestSuite) cleanupTest() {
+// }
 
 func validateNullData(b *Block) bool {
 	for i := 0; i < len(b.data); i++ {

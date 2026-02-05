@@ -1751,7 +1751,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	suite.setupTestHelper(
 		config,
 	) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-	suite.assert.EqualValues(cacheTimeout, suite.attrCache.cacheTimeout)
+	suite.assert.InEpsilon(cacheTimeout, suite.attrCache.cacheTimeout, 0.0001)
 
 	path := "a"
 	options := internal.GetAttrOptions{Name: path}
@@ -1787,7 +1787,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	cacheTimeout := 2
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
-	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.assert.InEpsilon(suite.attrCache.cacheTimeout, cacheTimeout, 0.0001)
 
 	path1 := "file1"
 	path2 := "file2"
@@ -1875,7 +1875,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupDuringBulkCaching() {
 	cacheTimeout := 3   // Use a longer timeout for this test
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
-	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.assert.InEpsilon(suite.attrCache.cacheTimeout, cacheTimeout, 0.0001)
 
 	// Add some items to cache manually with old timestamps
 	path1 := "oldfile1"

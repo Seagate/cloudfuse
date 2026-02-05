@@ -103,7 +103,7 @@ func (suite *utilsTestSuite) TestRoundFloat() {
 	}
 
 	for _, v := range values {
-		suite.assert.Equal(RoundFloat(v.val, v.precision), v.res)
+		suite.assert.InEpsilon(v.res, RoundFloat(v.val, v.precision), 0.0001)
 	}
 }
 

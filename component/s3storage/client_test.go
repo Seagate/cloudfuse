@@ -156,7 +156,7 @@ func (s *clientTestSuite) SetupTest() {
 	}
 
 	cfgFile.Close()
-	s.setupTestHelper("", true)
+	_ = s.setupTestHelper("", true)
 }
 
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) error {
@@ -196,7 +196,7 @@ func (s *clientTestSuite) setupTestHelper(configuration string, create bool) err
 }
 
 // TODO: do we need s3StatsCollector for this test suite?
-// func (s *clientTestSuite) tearDownTestHelper(delete bool) {
+// func (s *clientTestSuite) tearDownTestHelper(shouldDelete bool) {
 // 	_ = s.s3.Stop()
 // }
 
@@ -1149,7 +1149,7 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	storageTestConfigurationParameters.DisableConcurrentDownload = true
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, false)
+	_ = s.setupTestHelper(vdConfig, false)
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()

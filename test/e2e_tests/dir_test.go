@@ -90,7 +90,7 @@ func initDirFlags() {
 
 func getTestDirName(n int) string {
 	b := make([]byte, n)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:n]
 }
 
@@ -629,7 +629,7 @@ func (suite *dirTestSuite) TestGitStash() {
 			suite.Contains(string(cliOut), "Changes not staged for commit")
 		}
 
-		os.Chdir(suite.testPath)
+		_ = os.Chdir(suite.testPath)
 
 		// As Tar is taking long time first to clone and then to tar just mixing both the test cases
 		cmd = exec.Command("tar", "-zcvf", tarName, dirName)
@@ -884,9 +884,9 @@ func TestDirTestSuite(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create test directory [%s]\n", err.Error())
 	}
-	rand.Read(dirTest.minBuff)
-	rand.Read(dirTest.medBuff)
-	rand.Read(dirTest.hugeBuff)
+	_, _ = rand.Read(dirTest.minBuff)
+	_, _ = rand.Read(dirTest.medBuff)
+	_, _ = rand.Read(dirTest.hugeBuff)
 
 	// Run the actual End to End test
 	suite.Run(t, &dirTest)

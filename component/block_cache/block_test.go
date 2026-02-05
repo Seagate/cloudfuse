@@ -48,8 +48,9 @@ func (suite *blockTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *blockTestSuite) cleanupTest() {
-}
+// Unused: cleanupTest
+// func (suite *blockTestSuite) cleanupTest() {
+// }
 
 func (suite *blockTestSuite) TestAllocate() {
 	suite.assert = assert.New(suite.T())
@@ -76,7 +77,7 @@ func (suite *blockTestSuite) TestAllocateBig() {
 	suite.assert.NotNil(b.data)
 	suite.assert.Equal(100*1024*1024, cap(b.data))
 
-	b.Delete()
+	_ = b.Delete()
 }
 
 func (suite *blockTestSuite) TestAllocateHuge() {

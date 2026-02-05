@@ -114,17 +114,6 @@ labels:
   app: pied-piper
 `
 
-var specconf = `
-replicas: 2
-selector:
-  matchLabels:
-    app: web
-template:
-  metadata:
-    labels:
-      app: web
-`
-
 // Function to test only config file reader: testcase 2
 func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 	defer suite.cleanupTest()
@@ -311,7 +300,7 @@ func (suite *ConfigTestSuite) TestConfigFileDescription() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	os.WriteFile("test.yaml", []byte(config2), 0644)
+	_ = os.WriteFile("test.yaml", []byte(config2), 0644)
 	plaintext, err := os.ReadFile("test.yaml")
 	assert.NoError(err)
 	assert.NotNil(plaintext)

@@ -49,8 +49,9 @@ func (suite *threadPoolTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *threadPoolTestSuite) cleanupTest() {
-}
+// Unused: cleanupTest
+// func (suite *threadPoolTestSuite) cleanupTest() {
+// }
 
 func (suite *threadPoolTestSuite) TestCreate() {
 	suite.assert = assert.New(suite.T())

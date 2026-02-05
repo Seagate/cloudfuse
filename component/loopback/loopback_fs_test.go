@@ -502,7 +502,7 @@ func (suite *LoopbackFSTestSuite) TestCommitNilDataToExistingFile() {
 	assert.NoError(err)
 	defer os.RemoveAll(lfs.path)
 	Filepath := filepath.Join(lfs.path, "testFile")
-	os.WriteFile(Filepath, []byte("hello"), 0777)
+	_ = os.WriteFile(Filepath, []byte("hello"), 0777)
 
 	blockList := []string{}
 	err = lfs.CommitData(internal.CommitDataOptions{Name: "testFile", List: blockList})

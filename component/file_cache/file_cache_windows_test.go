@@ -78,10 +78,10 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 func (suite *fileCacheWindowsTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.loopback = newLoopbackFS()
 	suite.fileCache = newTestFileCache(suite.loopback)
-	suite.loopback.Start(context.Background())
+	_ = suite.loopback.Start(context.Background())
 	err := suite.fileCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
@@ -90,7 +90,7 @@ func (suite *fileCacheWindowsTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheWindowsTestSuite) cleanupTest() {
-	suite.loopback.Stop()
+	_ = suite.loopback.Stop()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
@@ -112,7 +112,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	// Setup
 	path := "file"
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	_ = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -133,7 +133,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	path := "file"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -150,7 +150,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	suite.assert.FileExists(suite.cache_path + "/" + path)
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
 
 // In order for 'go test' to run this suite, we need to create

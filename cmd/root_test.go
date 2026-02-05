@@ -60,14 +60,14 @@ func resetCLIFlags(cmd cobra.Command) {
 	// reset all CLI flags before next test
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
-		f.Value.Set(f.DefValue)
+		_ = f.Value.Set(f.DefValue)
 	})
 	viper.Reset()
 }
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -133,11 +133,11 @@ func (suite *updateTestSuite) TestGetRelease() {
 	suite.assert.Equal(validVersion, resultVer.Version)
 
 	// When no version is passed, should get the latest version
-	resultVer, err = getRelease(ctx, "")
+	_, err = getRelease(ctx, "")
 	suite.assert.NoError(err)
 
 	invalidVersion := "1.1.10"
-	resultVer, err = getRelease(ctx, invalidVersion)
+	_, err = getRelease(ctx, invalidVersion)
 	suite.assert.Error(err)
 }
 
@@ -169,7 +169,7 @@ func (suite *rootCmdSuite) TestDetectNewVersionCurrentSame() {
 	suite.assert.Nil(msg)
 }
 
-func (suite *rootCmdSuite) testExecute() {
+func (suite *rootCmdSuite) TestExecute() {
 	suite.T().Helper()
 
 	defer suite.cleanupTest()

@@ -172,7 +172,7 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 	dirItem.baseDir = baseDir + "/" + name
 
 	var fileBuff = make([]byte, fileSize)
-	rand.Read(fileBuff)
+	_, _ = rand.Read(fileBuff)
 	//t.Log(fileBuff)
 
 	var fileItem workItem

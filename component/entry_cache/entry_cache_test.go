@@ -57,7 +57,7 @@ type entryCacheTestSuite struct {
 
 func newLoopbackFS() internal.Component {
 	loopback := loopback.NewLoopbackFSComponent()
-	loopback.Configure(true)
+	_ = loopback.Configure(true)
 
 	return loopback
 }
@@ -101,10 +101,10 @@ func (suite *entryCacheTestSuite) SetupTest() {
 func (suite *entryCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.loopback = newLoopbackFS()
 	suite.entryCache = newEntryCache(suite.loopback)
-	suite.loopback.Start(context.Background())
+	_ = suite.loopback.Start(context.Background())
 	err := suite.entryCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
@@ -113,7 +113,7 @@ func (suite *entryCacheTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *entryCacheTestSuite) cleanupTest() {
-	suite.loopback.Stop()
+	_ = suite.loopback.Stop()
 	err := suite.entryCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))

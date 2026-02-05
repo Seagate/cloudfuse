@@ -86,7 +86,7 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	defer suite.cleanupTest()
 
 	mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
-	os.MkdirAll(mountDirectory1, 0777)
+	_ = os.MkdirAll(mountDirectory1, 0777)
 	defer os.RemoveAll(mountDirectory1)
 
 	cmd := exec.Command(
@@ -125,7 +125,7 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 	for _, lazyFlag := range lazyFlags {
 		for _, flagPosition := range possibleFlagPositions {
 			mountDirectory6, _ := os.MkdirTemp("", "TestUnMountTemp")
-			os.MkdirAll(mountDirectory6, 0777)
+			_ = os.MkdirAll(mountDirectory6, 0777)
 			defer os.RemoveAll(mountDirectory6)
 
 			cmd := exec.Command(
@@ -172,7 +172,7 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	defer suite.cleanupTest()
 
 	mountDirectory2, _ := os.MkdirTemp("", "TestUnMountTemp")
-	os.MkdirAll(mountDirectory2, 0777)
+	_ = os.MkdirAll(mountDirectory2, 0777)
 	defer os.RemoveAll(mountDirectory2)
 
 	cmd := exec.Command(
@@ -200,7 +200,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 	defer suite.cleanupTest()
 
 	mountDirectory3, _ := os.MkdirTemp("", "TestUnMountTemp")
-	os.MkdirAll(mountDirectory3, 0777)
+	_ = os.MkdirAll(mountDirectory3, 0777)
 	defer os.RemoveAll(mountDirectory3)
 
 	cmd := exec.Command(
@@ -220,7 +220,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 	defer suite.cleanupTest()
 
 	mountDirectory4, _ := os.MkdirTemp("", "TestUnMountTemp")
-	os.MkdirAll(mountDirectory4, 0777)
+	_ = os.MkdirAll(mountDirectory4, 0777)
 	defer os.RemoveAll(mountDirectory4)
 
 	cmd := exec.Command(
@@ -252,7 +252,7 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	defer suite.cleanupTest()
 
 	mountDirectory5, _ := os.MkdirTemp("", "TestUnMountTemp")
-	os.MkdirAll(mountDirectory5, 0777)
+	_ = os.MkdirAll(mountDirectory5, 0777)
 	defer os.RemoveAll(mountDirectory5)
 
 	cmd := exec.Command(
