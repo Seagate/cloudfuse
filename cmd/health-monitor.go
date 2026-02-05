@@ -60,27 +60,26 @@ func resetMonitorOptions() {
 }
 
 var healthMonCmd = &cobra.Command{
-	Use:               "health-monitor",
-	Short:             "Monitor cloudfuse mount",
-	Long:              "Monitor cloudfuse mount",
-	SuggestFor:        []string{"cfusemon", "monitor health"},
-	Args:              cobra.ExactArgs(0),
-	Hidden:            true,
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "health-monitor",
+	Short:      "Monitor cloudfuse mount",
+	Long:       "Monitor a cloudfuse mount point for health and performance.\nThis command is typically spawned by the mount command when health monitoring is enabled.",
+	SuggestFor: []string{"cfusemon", "monitor health"},
+	Args:       cobra.ExactArgs(0),
+	Hidden:     true,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		resetMonitorOptions()
 
 		err := validateHMonOptions()
 		if err != nil {
 			log.Err("health-monitor : failed to validate options [%s]", err.Error())
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
+			return fmt.Errorf("failed to validate options: %w", err)
 		}
 
 		options.ConfigFile = configFile
 		err = parseConfig()
 		if err != nil {
 			log.Err("health-monitor : failed to parse config [%s]", err.Error())
-			return err
+			return fmt.Errorf("failed to parse config: %w", err)
 		}
 
 		err = config.UnmarshalKey("file_cache", &cacheMonitorOptions)
@@ -89,7 +88,7 @@ var healthMonCmd = &cobra.Command{
 				"health-monitor : file_cache config error (invalid config attributes) [%s]",
 				err.Error(),
 			)
-			return fmt.Errorf("invalid file_cache config [%s]", err.Error())
+			return fmt.Errorf("invalid file_cache config: %w", err)
 		}
 
 		err = config.UnmarshalKey("health_monitor", &options.MonitorOpt)
@@ -98,7 +97,7 @@ var healthMonCmd = &cobra.Command{
 				"health-monitor : health_monitor config error (invalid config attributes) [%s]",
 				err.Error(),
 			)
-			return fmt.Errorf("invalid health_monitor config [%s]", err.Error())
+			return fmt.Errorf("invalid health_monitor config: %w", err)
 		}
 
 		cliParams := buildCliParamForMonitor()
@@ -109,7 +108,7 @@ var healthMonCmd = &cobra.Command{
 		if runtime.GOOS == "windows" {
 			path, err := filepath.Abs(hmcommon.CfuseMon + ".exe")
 			if err != nil {
-				return fmt.Errorf("failed to start health monitor [%s]", err.Error())
+				return fmt.Errorf("failed to start health monitor: %w", err)
 			}
 			hmcmd = exec.Command(path, cliParams...)
 		} else {
@@ -123,7 +122,7 @@ var healthMonCmd = &cobra.Command{
 		if err != nil {
 			common.EnableMonitoring = false
 			log.Err("health-monitor : failed to start health monitor [%s]", err.Error())
-			return fmt.Errorf("failed to start health monitor [%s]", err.Error())
+			return fmt.Errorf("failed to start health monitor: %w", err)
 		}
 
 		return nil
@@ -209,4 +208,5 @@ func init() {
 	healthMonCmd.Flags().StringVar(&configFile, "config-file", "config.yaml",
 		"Configures the path for the file where the account credentials are provided. Default is config.yaml")
 	_ = healthMonCmd.MarkFlagRequired("config-file")
+	_ = healthMonCmd.MarkFlagFilename("config-file", "yaml")
 }

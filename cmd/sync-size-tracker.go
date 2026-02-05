@@ -48,6 +48,9 @@ var syncCmd = &cobra.Command{
 	Hidden: true,
 	Short:  "Update the size tracker journal with the size of the configured S3 subdirectory",
 	Long:   "Reads s3storage.subdirectory from the provided config file, calculates the total size of all objects under it, and updates the size tracker journal.",
+	Args:   cobra.NoArgs,
+	Example: `  # Sync size tracker with config file
+  cloudfuse sync-size-tracker --config-file=config.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if options.ConfigFile == "" {
 			_, err := os.Stat(common.DefaultConfigFilePath)
