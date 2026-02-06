@@ -38,10 +38,6 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 )
 
-// Uses format of Time.UnixDate with addition of milliseconds.
-// See https://pkg.go.dev/time#UnixDate
-const unixDateMilli = "Mon Jan _2 15:04:05.000 MST 2006"
-
 // LogConfig : Configuration to be provided to logging infra
 type LogFileConfig struct {
 	LogFile        string

@@ -92,11 +92,17 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 func (suite *fileCacheLinuxTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	err := config.ReadConfigFromReader(strings.NewReader(configuration))
+	if err != nil {
+		panic(fmt.Sprintf("Unable to read config: %v", err))
+	}
 	suite.loopback = newLoopbackFS()
 	suite.fileCache = newTestFileCache(suite.loopback)
-	suite.loopback.Start(context.Background())
-	err := suite.fileCache.Start(context.Background())
+	err = suite.loopback.Start(context.Background())
+	if err != nil {
+		panic(fmt.Sprintf("Unable to start loopback: %v", err))
+	}
+	err = suite.fileCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
@@ -104,8 +110,11 @@ func (suite *fileCacheLinuxTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheLinuxTestSuite) cleanupTest() {
-	suite.loopback.Stop()
-	err := suite.fileCache.Stop()
+	err := suite.loopback.Stop()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to stop loopback [%s]", err.Error()))
+	}
+	err = suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
 	}
@@ -133,13 +142,14 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	defer suite.cleanupTest()
 	// Setup - create file directly in fake storage
 	path := "file33"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	_, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chmod
-	err := suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
@@ -155,7 +165,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0666},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
+	err := suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
+	suite.assert.NoError(err)
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -163,7 +174,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chmod
-	err := suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0755)})
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0755)})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
 	info, err := os.Stat(suite.cache_path + "/" + path)
@@ -173,7 +184,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(0755, info.Mode())
 
-	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
@@ -222,7 +234,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file36"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	_, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -230,7 +243,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	// Chown
 	owner := os.Getuid()
 	group := os.Getgid()
-	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
@@ -249,7 +262,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0777},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
+	err := suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
+	suite.assert.NoError(err)
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -259,7 +273,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Chown
 	owner := os.Getuid()
 	group := os.Getgid()
-	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
 	info, err := os.Stat(suite.cache_path + "/" + path)
@@ -273,7 +287,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 
-	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
@@ -281,7 +296,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file38"
 	oldMode := os.FileMode(0511)
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	_, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	suite.assert.NoError(err)
 	info, _ := os.Stat(suite.cache_path + "/" + path)
 	stat := info.Sys().(*syscall.Stat_t)
 	oldOwner := stat.Uid
@@ -289,7 +305,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 
 	owner := os.Getuid()
 	group := os.Getgid()
-	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.Error(err)
 	suite.assert.Equal(syscall.EIO, err)
 

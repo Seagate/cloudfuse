@@ -78,7 +78,10 @@ type testObj struct {
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -991,7 +994,8 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresence() {
 	)
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	suite.assert.NoError(err)
 
 	// Check file exists in disk_cache_path
 	diskCachePath := filepath.Join(tobj.disk_cache_path, fileName+"_0")
@@ -1028,7 +1032,8 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresenceInDir() {
 	)
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	suite.assert.NoError(err)
 
 	// Check file exists in disk_cache_path
 	diskCachePath := filepath.Join(tobj.disk_cache_path, dirName, fileName+"_0")

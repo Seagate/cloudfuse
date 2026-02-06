@@ -114,16 +114,16 @@ labels:
   app: pied-piper
 `
 
-var specconf = `
-replicas: 2
-selector:
-  matchLabels:
-    app: web
-template:
-  metadata:
-    labels:
-      app: web
-`
+// var specconf = `
+// replicas: 2
+// selector:
+//   matchLabels:
+//     app: web
+// template:
+//   metadata:
+//     labels:
+//       app: web
+// `
 
 // Function to test config reader when there is both env vars and cli flags that overlap config file.
 // func (suite *ConfigTestSuite) TestOverlapShadowConfigReader() {

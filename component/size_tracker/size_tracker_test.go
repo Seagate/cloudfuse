@@ -72,13 +72,19 @@ func generateFileName() string {
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprintf("%x", b)[:length]
 }
 
 func newLoopbackFS() internal.Component {
 	loopback := loopback.NewLoopbackFSComponent()
-	loopback.Configure(true)
+	err := loopback.Configure(true)
+	if err != nil {
+		panic(err)
+	}
 
 	return loopback
 }
@@ -584,12 +590,14 @@ func (suite *sizeTrackerTestSuite) TestSymlink() {
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
 	// Create symlink - symlink size is the length of the target path in bytes
-	suite.sizeTracker.CreateLink(internal.CreateLinkOptions{Name: symlink, Target: file})
+	err = suite.sizeTracker.CreateLink(internal.CreateLinkOptions{Name: symlink, Target: file})
+	suite.assert.NoError(err)
 	symlinkSize := len(file)
 	suite.assert.EqualValues(len(data)+symlinkSize, suite.sizeTracker.mountSize.GetSize())
 
 	// Delete symlink - should remove only the symlink's size
-	suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: symlink})
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: symlink})
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
 	// Delete the actual file - should go back to 0

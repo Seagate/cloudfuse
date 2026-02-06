@@ -156,7 +156,10 @@ func (s *clientTestSuite) SetupTest() {
 	}
 
 	cfgFile.Close()
-	s.setupTestHelper("", true)
+	err = s.setupTestHelper("", true)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) error {
@@ -1149,7 +1152,8 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	storageTestConfigurationParameters.DisableConcurrentDownload = true
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, false)
+	err := s.setupTestHelper(vdConfig, false)
+	s.assert.NoError(err)
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
@@ -1157,7 +1161,7 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	minBodyLen := 10
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),

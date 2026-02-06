@@ -126,7 +126,8 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 	for _, lazyFlag := range lazyFlags {
 		for _, flagPosition := range possibleFlagPositions {
 			mountDirectory6, _ := os.MkdirTemp("", "TestUnMountTemp")
-			os.MkdirAll(mountDirectory6, 0777)
+			err := os.MkdirAll(mountDirectory6, 0777)
+			suite.assert.NoError(err)
 			defer os.RemoveAll(mountDirectory6)
 
 			cmd := exec.Command(
@@ -135,7 +136,7 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 				mountDirectory6,
 				fmt.Sprintf("--config-file=%s", confFileUnMntTest),
 			)
-			_, err := cmd.Output()
+			_, err = cmd.Output()
 			suite.assert.NoError(err)
 
 			// move into the mount directory to cause busy error on regular unmount

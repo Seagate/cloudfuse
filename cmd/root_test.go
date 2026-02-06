@@ -60,14 +60,20 @@ func resetCLIFlags(cmd cobra.Command) {
 	// reset all CLI flags before next test
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
-		f.Value.Set(f.DefValue)
+		err := f.Value.Set(f.DefValue)
+		if err != nil {
+			panic(err)
+		}
 	})
 	viper.Reset()
 }
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -133,11 +139,11 @@ func (suite *updateTestSuite) TestGetRelease() {
 	suite.assert.Equal(validVersion, resultVer.Version)
 
 	// When no version is passed, should get the latest version
-	resultVer, err = getRelease(ctx, "")
+	_, err = getRelease(ctx, "")
 	suite.assert.NoError(err)
 
 	invalidVersion := "1.1.10"
-	resultVer, err = getRelease(ctx, invalidVersion)
+	_, err = getRelease(ctx, invalidVersion)
 	suite.assert.Error(err)
 }
 

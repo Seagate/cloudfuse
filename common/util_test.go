@@ -304,13 +304,14 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 	// Generate a random key
 	key := make([]byte, 36)
 	encodedKey := make([]byte, 48)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	_, err := rand.Read(data)
+	_, err = rand.Read(data)
 	suite.assert.NoError(err)
 
 	_, err = DecryptData(data, encryptedPassphrase)
@@ -381,12 +382,14 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 func (suite *typesTestSuite) TestEncryptDecrypt4() {
 	// Generate a random key
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -399,12 +402,14 @@ func (suite *typesTestSuite) TestEncryptDecrypt4() {
 func (suite *typesTestSuite) TestEncryptDecrypt5() {
 	// Generate a random key
 	key := make([]byte, 64)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)

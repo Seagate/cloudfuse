@@ -140,11 +140,12 @@ func (suite *mountSuite) TestMountCmd() {
 // or does exist on Windows
 func (suite *mountSuite) TestMountDirNotExists() {
 	if runtime.GOOS == "windows" {
-		os.Mkdir(mntDir, 0777)
+		err := os.Mkdir(mntDir, 0777)
+		suite.NoError(err)
 		mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
 		var errb bytes.Buffer
 		mountCmd.Stderr = &errb
-		_, err := mountCmd.Output()
+		_, err = mountCmd.Output()
 		suite.Error(err)
 		suite.NotEmpty(errb.String())
 		suite.Contains(errb.String(), "Cannot create WinFsp-FUSE file system")
@@ -304,11 +305,11 @@ func (suite *mountSuite) TestEnvVarMountFailure() {
 		"--tmp-path="+tempDir,
 		"--container-name=myContainer",
 	)
-	cliOut, err := mountCmd.Output()
+	_, err = mountCmd.Output()
 	suite.Error(err)
 
 	// list cloudfuse mounted directories
-	cliOut = listCloudfuseMounts(suite)
+	cliOut := listCloudfuseMounts(suite)
 	suite.Empty(cliOut)
 
 	// unmount
