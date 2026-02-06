@@ -114,7 +114,11 @@ func expandPath(path string) (string, error) {
 func TestMain(m *testing.M) {
 	mountpointsFlag := flag.String("mountpoints", "", "Comma-separated list of mountpoints")
 	// parse direct-io if enabled for mountpoint
-	directIOFlag := flag.Bool("mount-point-direct-io", false, "is direct I/O enabled for mountpoint?")
+	directIOFlag := flag.Bool(
+		"mount-point-direct-io",
+		false,
+		"is direct I/O enabled for mountpoint?",
+	)
 
 	flag.Parse()
 

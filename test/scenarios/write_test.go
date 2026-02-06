@@ -180,11 +180,17 @@ func TestRandSparseWriting(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 5, written)
 
-		written, err = file.WriteAt([]byte("World"), 12*1024*1024) // Write at 12MB offset, 2nd block
+		written, err = file.WriteAt(
+			[]byte("World"),
+			12*1024*1024,
+		) // Write at 12MB offset, 2nd block
 		assert.NoError(t, err)
 		assert.Equal(t, 5, written)
 
-		written, err = file.WriteAt([]byte("Cosmos"), 30*1024*1024) // Write at 30MB offset, 4th block
+		written, err = file.WriteAt(
+			[]byte("Cosmos"),
+			30*1024*1024,
+		) // Write at 30MB offset, 4th block
 		assert.NoError(t, err)
 		assert.Equal(t, 6, written)
 

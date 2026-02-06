@@ -52,7 +52,13 @@ type workItem struct {
 	fileData []byte
 }
 
-func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int, err chan<- struct{}) {
+func downloadWorker(
+	t *testing.T,
+	id int,
+	jobs <-chan string,
+	results chan<- int,
+	err chan<- struct{},
+) {
 	//var data []byte
 	for item := range jobs {
 		i := 0
@@ -77,7 +83,13 @@ func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int
 	}
 }
 
-func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int, err chan<- struct{}) {
+func uploadWorker(
+	t *testing.T,
+	id int,
+	jobs <-chan workItem,
+	results chan<- int,
+	err chan<- struct{},
+) {
 	for item := range jobs {
 		if item.optType == 1 {
 			errDir := os.MkdirAll(item.baseDir+"/"+item.dirName, 0755)

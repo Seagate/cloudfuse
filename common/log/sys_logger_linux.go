@@ -118,9 +118,33 @@ func (l *SysLogger) write(lvl string, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 
 	if l.logGoroutineID {
-		l.logger.Print("[", common.GetGoroutineID(), "][", common.MountPath, "] ", lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
+		l.logger.Print(
+			"[",
+			common.GetGoroutineID(),
+			"][",
+			common.MountPath,
+			"] ",
+			lvl,
+			" [",
+			filepath.Base(fn),
+			" (",
+			ln,
+			")]: ",
+			msg,
+		)
 	} else {
-		l.logger.Print("[", common.MountPath, "] ", lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
+		l.logger.Print(
+			"[",
+			common.MountPath,
+			"] ",
+			lvl,
+			" [",
+			filepath.Base(fn),
+			" (",
+			ln,
+			")]: ",
+			msg,
+		)
 	}
 }
 

@@ -425,7 +425,7 @@ func (suite *fileCacheTestSuite) TestConfigZero() {
 
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
-	suite.assert.EqualValues(int(suite.fileCache.cacheTimeout), minimumFileCacheTimeout)
+	suite.assert.Equal(minimumFileCacheTimeout, int(suite.fileCache.cacheTimeout))
 }
 
 func (suite *fileCacheTestSuite) TestDefaultFilePath() {

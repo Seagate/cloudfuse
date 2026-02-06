@@ -59,11 +59,11 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 		return silentLogger, nil
 	case "", "default", "base":
 		baseLogger, err := newBaseLogger(LogFileConfig{
-			LogFile:      config.FilePath,
-			LogLevel:     config.Level,
-			LogSize:      config.MaxFileSize * 1024 * 1024,
-			LogFileCount: int(config.FileCount),
-			LogTag:       config.Tag,
+			LogFile:        config.FilePath,
+			LogLevel:       config.Level,
+			LogSize:        config.MaxFileSize * 1024 * 1024,
+			LogFileCount:   int(config.FileCount),
+			LogTag:         config.Tag,
 			LogGoroutineID: config.LogGoroutineID,
 		})
 		if err != nil {

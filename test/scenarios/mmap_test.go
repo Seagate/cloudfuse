@@ -61,7 +61,13 @@ func TestMmapReadWrite(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Memory map the file
-		data, err := syscall.Mmap(int(file.Fd()), 0, len(content), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+		data, err := syscall.Mmap(
+			int(file.Fd()),
+			0,
+			len(content),
+			syscall.PROT_READ|syscall.PROT_WRITE,
+			syscall.MAP_SHARED,
+		)
 		assert.NoError(t, err)
 
 		// Read the mapped data
@@ -119,7 +125,13 @@ func TestMmapLargeFileRead(t *testing.T) {
 		stat, err := file.Stat()
 		assert.NoError(t, err)
 
-		data, err := syscall.Mmap(int(file.Fd()), 0, int(stat.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+		data, err := syscall.Mmap(
+			int(file.Fd()),
+			0,
+			int(stat.Size()),
+			syscall.PROT_READ,
+			syscall.MAP_SHARED,
+		)
 		assert.NoError(t, err)
 
 		// Read from different offsets
@@ -159,7 +171,13 @@ func TestMmapWithMsync(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Memory map the file
-		data, err := syscall.Mmap(int(file.Fd()), 0, len(content), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+		data, err := syscall.Mmap(
+			int(file.Fd()),
+			0,
+			len(content),
+			syscall.PROT_READ|syscall.PROT_WRITE,
+			syscall.MAP_SHARED,
+		)
 		assert.NoError(t, err)
 
 		// Close the file
@@ -211,7 +229,13 @@ func TestMmapAfterFileClose(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Memory map the file
-		data, err := syscall.Mmap(int(file.Fd()), 0, len(content), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+		data, err := syscall.Mmap(
+			int(file.Fd()),
+			0,
+			len(content),
+			syscall.PROT_READ|syscall.PROT_WRITE,
+			syscall.MAP_SHARED,
+		)
 		assert.NoError(t, err)
 
 		// Close the file

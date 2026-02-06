@@ -75,11 +75,21 @@ func TestFileTruncateShrink(t *testing.T) {
 		{fmt.Sprintf("%s_20_5_truncate", filename), 20, 5, truncate},
 		{fmt.Sprintf("%s_10M_5K_truncate", filename), 10 * 1024 * 1024, 5 * 1024, truncate},
 		{fmt.Sprintf("%s_20M_5K_truncate", filename), 20 * 1024 * 1024, 5 * 1024, truncate},
-		{fmt.Sprintf("%s_30M_20M_truncate", filename), 30 * 1024 * 1024, 20 * 1024 * 1024, truncate},
+		{
+			fmt.Sprintf("%s_30M_20M_truncate", filename),
+			30 * 1024 * 1024,
+			20 * 1024 * 1024,
+			truncate,
+		},
 		{fmt.Sprintf("%s_20_5_ftruncate", filename), 20, 5, ftruncate},
 		{fmt.Sprintf("%s_10M_5K_ftruncate", filename), 10 * 1024 * 1024, 5 * 1024, ftruncate},
 		{fmt.Sprintf("%s_20M_5K_ftruncate", filename), 20 * 1024 * 1024, 5 * 1024, ftruncate},
-		{fmt.Sprintf("%s_30M_20M_ftruncate", filename), 30 * 1024 * 1024, 20 * 1024 * 1024, ftruncate},
+		{
+			fmt.Sprintf("%s_30M_20M_ftruncate", filename),
+			30 * 1024 * 1024,
+			20 * 1024 * 1024,
+			ftruncate,
+		},
 	}
 
 	// Add the number of test cases to the WaitGroup
@@ -118,11 +128,21 @@ func TestFileTruncateExpand(t *testing.T) {
 		{fmt.Sprintf("%s_5_20_truncate", filename), 5, 20, truncate},
 		{fmt.Sprintf("%s_5K_10M_truncate", filename), 5 * 1024, 10 * 1024 * 1024, truncate},
 		{fmt.Sprintf("%s_5K_20M_truncate", filename), 5 * 1024, 20 * 1024 * 1024, truncate},
-		{fmt.Sprintf("%s_20M_30M_truncate", filename), 20 * 1024 * 1024, 30 * 1024 * 1024, truncate},
+		{
+			fmt.Sprintf("%s_20M_30M_truncate", filename),
+			20 * 1024 * 1024,
+			30 * 1024 * 1024,
+			truncate,
+		},
 		{fmt.Sprintf("%s_5_20_ftruncate", filename), 5, 20, ftruncate},
 		{fmt.Sprintf("%s_5K_10M_ftruncate", filename), 5 * 1024, 10 * 1024 * 1024, ftruncate},
 		{fmt.Sprintf("%s_5K_20M_ftruncate", filename), 5 * 1024, 20 * 1024 * 1024, ftruncate},
-		{fmt.Sprintf("%s_20M_30M_ftruncate", filename), 20 * 1024 * 1024, 30 * 1024 * 1024, ftruncate},
+		{
+			fmt.Sprintf("%s_20M_30M_ftruncate", filename),
+			20 * 1024 * 1024,
+			30 * 1024 * 1024,
+			ftruncate,
+		},
 	}
 
 	// Add the number of test cases to the WaitGroup
@@ -255,11 +275,31 @@ func TestWriteTruncateWriteClose(t *testing.T) {
 		{"testWriteTruncateWriteClose13M1M_truncate", 13 * 1024 * 1024, 1 * 1024 * 1024, truncate},
 		{"testWriteTruncateWriteClose20M1M_truncate", 20 * 1024 * 1024, 1 * 1024 * 1024, truncate},
 		{"testWriteTruncateWriteClose1M7M_ftruncate", 1 * 1024 * 1024, 7 * 1024 * 1024, ftruncate},
-		{"testWriteTruncateWriteClose1M13M_ftruncate", 1 * 1024 * 1024, 13 * 1024 * 1024, ftruncate},
-		{"testWriteTruncateWriteClose1M20M_ftruncate", 1 * 1024 * 1024, 20 * 1024 * 1024, ftruncate},
+		{
+			"testWriteTruncateWriteClose1M13M_ftruncate",
+			1 * 1024 * 1024,
+			13 * 1024 * 1024,
+			ftruncate,
+		},
+		{
+			"testWriteTruncateWriteClose1M20M_ftruncate",
+			1 * 1024 * 1024,
+			20 * 1024 * 1024,
+			ftruncate,
+		},
 		{"testWriteTruncateWriteClose7M1M_ftruncate", 7 * 1024 * 1024, 1 * 1024 * 1024, ftruncate},
-		{"testWriteTruncateWriteClose13M1M_ftruncate", 13 * 1024 * 1024, 1 * 1024 * 1024, ftruncate},
-		{"testWriteTruncateWriteClose20M1M_ftruncate", 20 * 1024 * 1024, 1 * 1024 * 1024, ftruncate},
+		{
+			"testWriteTruncateWriteClose13M1M_ftruncate",
+			13 * 1024 * 1024,
+			1 * 1024 * 1024,
+			ftruncate,
+		},
+		{
+			"testWriteTruncateWriteClose20M1M_ftruncate",
+			20 * 1024 * 1024,
+			1 * 1024 * 1024,
+			ftruncate,
+		},
 	}
 
 	WriteTruncateWriteClose := func(t *testing.T, filename string, writeSize int, truncSize int, call int) {
