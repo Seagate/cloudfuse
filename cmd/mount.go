@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -59,6 +59,7 @@ type LogOptions struct {
 	LogFilePath    string `config:"file-path"        yaml:"file-path,omitempty"`
 	MaxLogFileSize uint64 `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
 	LogFileCount   uint64 `config:"file-count"       yaml:"file-count,omitempty"`
+	LogGoroutineID bool   `config:"goroutine-id"     yaml:"goroutine-id,omitempty"`
 	TimeTracker    bool   `config:"track-time"       yaml:"track-time,omitempty"`
 }
 
@@ -474,14 +475,24 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("invalid log level [%s]", err.Error())
 		}
 
-		err = log.SetDefaultLogger(options.Logging.Type, common.LogConfig{
-			FilePath:    options.Logging.LogFilePath,
-			MaxFileSize: options.Logging.MaxLogFileSize,
-			FileCount:   options.Logging.LogFileCount,
-			Level:       logLevel,
-			TimeTracker: options.Logging.TimeTracker,
-		})
+		// If goroutine-id is not set in config file, then set it based on log level.
+		// For LOG_DEBUG level, enable goroutine-id by default.
+		if !config.IsSet("logging.goroutine-id") {
+			if logLevel >= common.ELogLevel.LOG_DEBUG() {
+				options.Logging.LogGoroutineID = true
+			} else {
+				options.Logging.LogGoroutineID = false
+			}
+		}
 
+		err = log.SetDefaultLogger(options.Logging.Type, common.LogConfig{
+			FilePath:       options.Logging.LogFilePath,
+			MaxFileSize:    options.Logging.MaxLogFileSize,
+			FileCount:      options.Logging.LogFileCount,
+			Level:          logLevel,
+			TimeTracker:    options.Logging.TimeTracker,
+			LogGoroutineID: options.Logging.LogGoroutineID,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
 		}
@@ -511,6 +522,7 @@ var mountCmd = &cobra.Command{
 		)
 		log.Info("Mount Command: %s", os.Args)
 		log.Crit("Logging level set to : %s", logLevel.String())
+		log.Crit("Log options: %+v", options.Logging)
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
 		if directIO {
@@ -549,18 +561,14 @@ var mountCmd = &cobra.Command{
 					"mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]",
 					err,
 				)
-				return Destroy(
-					fmt.Sprintf(
-						"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
-						err.Error(),
-					),
+				return fmt.Errorf(
+					"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
+					err.Error(),
 				)
 			}
 
 			log.Err("mount :  failed to initialize new pipeline [%v]", err)
-			return Destroy(
-				fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()),
-			)
+			return fmt.Errorf("mount : failed to initialize new pipeline [%s]", err.Error())
 		}
 
 		// Dry run ends here
@@ -686,16 +694,15 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	err := pipeline.Start(ctx)
 	if err != nil {
 		log.Err("mount: error unable to start pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to start pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to start pipeline [%s]", err.Error())
 	}
 
 	err = pipeline.Stop()
 	if err != nil {
 		log.Err("mount: error unable to stop pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to stop pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to stop pipeline [%s]", err.Error())
 	}
 
-	_ = log.Destroy()
 	return nil
 }
 
@@ -876,6 +883,10 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
+	mountCmd.PersistentFlags().Bool("log-goroutine-id",
+		false, "Enable logging of goroutine IDs. Default is true for LOG_DEBUG level, false otherwise.")
+	config.BindPFlag("logging.goroutine-id", mountCmd.PersistentFlags().Lookup("log-goroutine-id"))
+
 	mountCmd.PersistentFlags().
 		BoolP("foreground", "f", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
@@ -888,9 +899,10 @@ func init() {
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
-	mountCmd.PersistentFlags().
+	mountCmd.Flags().
 		Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
-	config.BindPFlag("lazy-write", mountCmd.PersistentFlags().Lookup("lazy-write"))
+	config.BindPFlag("lazy-write", mountCmd.Flags().Lookup("lazy-write"))
+	mountCmd.Flags().Lookup("lazy-write").Hidden = true
 
 	mountCmd.PersistentFlags().
 		String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
@@ -957,13 +969,4 @@ func init() {
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)
 	config.AddConfigChangeEventListener(config.ConfigChangeEventHandlerFunc(OnConfigChange))
-}
-
-func Destroy(message string) error {
-	_ = log.Destroy()
-	if message != "" {
-		return fmt.Errorf("%s", message)
-	}
-
-	return nil
 }

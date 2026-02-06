@@ -1,6 +1,6 @@
 logging:
   level: log_debug
-  file-path: "blobfuse2-logs.txt"
+  file-path: "cloudfuse-logs.txt"
   type: base
 
 components:
@@ -23,7 +23,7 @@ xload:
 
 attr_cache:
   timeout-sec: 3600
-  
+
 azstorage:
   type: { STO_ACC_TYPE }
   endpoint: { STO_ACC_ENDPOINT }

@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -118,10 +118,10 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
 		Return(&internal.ObjAttr{Path: file}, nil)
 	suite.mock.EXPECT().
-		WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
+		WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
 		Return(len(data), nil)
 	_, err = suite.sizeTracker.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 
@@ -175,10 +175,10 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
 		Return(&internal.ObjAttr{Path: file}, nil)
 	suite.mock.EXPECT().
-		WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
+		WriteFile(&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
 		Return(len(data), nil)
 	_, err = suite.sizeTracker.WriteFile(
-		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 work_dir="${1%/}"
-version="1.24.4"
+version="1.25.4"
 arch=$(hostnamectl | grep "Arch" | rev | cut -d " " -f 1 | rev)
 
 if [ "$arch" != "arm64" ]

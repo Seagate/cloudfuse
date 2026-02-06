@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -120,12 +120,12 @@ type AzConnection interface {
 
 	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
 	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
-	Write(options internal.WriteFileOptions) error
+	Write(options *internal.WriteFileOptions) error
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 
 	ChangeMod(string, os.FileMode) error
 	ChangeOwner(string, int, int) error
-	TruncateFile(string, int64) error
+	TruncateFile(options internal.TruncateFileOptions) error
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)

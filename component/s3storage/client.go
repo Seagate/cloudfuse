@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -899,7 +899,7 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 	// if file is smaller than the uploadCutoff it is small, otherwise it is a multipart
 	// upload
 	if result.Size < cutoff {
-		blockList.Flags.Set(common.SmallFile)
+		blockList.Flags.Set(common.BlobFlagHasNoBlocks)
 		return &blockList, nil
 	}
 
@@ -983,7 +983,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 }
 
 // Write : write data at given offset to an object
-func (cl *Client) Write(options internal.WriteFileOptions) error {
+func (cl *Client) Write(options *internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	data := options.Data
@@ -999,7 +999,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		return err
 	}
 
-	if fileOffsets.SmallFile() {
+	if fileOffsets.HasNoBlocks() {
 		// case 1: file consists of no parts (small file)
 
 		// get the existing object data
