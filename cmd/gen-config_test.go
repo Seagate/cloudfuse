@@ -164,7 +164,7 @@ func (suite *genConfig) TestGenConfigGet() {
 func (suite *genConfig) TestNoPath() {
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "gen-config", "--o", "./blobfuse2.yaml")
+	_, err := executeCommandC(rootCmd, "gen-config", "--o", "./cloudfuse.yaml")
 	suite.assert.Error(err)
 }
 

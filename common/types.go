@@ -204,7 +204,7 @@ type LogConfig struct {
 	FileCount      uint64
 	FilePath       string
 	TimeTracker    bool
-	Tag            string // logging tag which can be either blobfuse2 or bfusemon
+	Tag            string // logging tag which can be either cloudfuse or cfusemon
 	LogGoroutineID bool   // whether to log goroutine id in each log line
 }
 

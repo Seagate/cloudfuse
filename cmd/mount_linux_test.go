@@ -880,7 +880,7 @@ func (suite *mountTestSuite) TestLoggingGoroutineIDDefaultBehavior() {
 logging:
   type: syslog
   level: log_debug
-default-working-dir: /tmp/blobfuse2
+default-working-dir: /tmp/cloudfuse
 file_cache:
   path: /tmp/fileCachePath
 libfuse:
@@ -904,7 +904,7 @@ components:
 logging:
   type: syslog
   level: log_info
-default-working-dir: /tmp/blobfuse2
+default-working-dir: /tmp/cloudfuse
 file_cache:
   path: /tmp/fileCachePath
 libfuse:
