@@ -59,6 +59,7 @@ type LogOptions struct {
 	LogFilePath    string `config:"file-path"        yaml:"file-path,omitempty"`
 	MaxLogFileSize uint64 `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
 	LogFileCount   uint64 `config:"file-count"       yaml:"file-count,omitempty"`
+	LogGoroutineID bool   `config:"goroutine-id"     yaml:"goroutine-id,omitempty"`
 	TimeTracker    bool   `config:"track-time"       yaml:"track-time,omitempty"`
 }
 
@@ -474,12 +475,23 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("invalid log level [%s]", err.Error())
 		}
 
+		// If goroutine-id is not set in config file, then set it based on log level.
+		// For LOG_DEBUG level, enable goroutine-id by default.
+		if !config.IsSet("logging.goroutine-id") {
+			if logLevel >= common.ELogLevel.LOG_DEBUG() {
+				options.Logging.LogGoroutineID = true
+			} else {
+				options.Logging.LogGoroutineID = false
+			}
+		}
+
 		err = log.SetDefaultLogger(options.Logging.Type, common.LogConfig{
-			FilePath:    options.Logging.LogFilePath,
-			MaxFileSize: options.Logging.MaxLogFileSize,
-			FileCount:   options.Logging.LogFileCount,
-			Level:       logLevel,
-			TimeTracker: options.Logging.TimeTracker,
+			FilePath:       options.Logging.LogFilePath,
+			MaxFileSize:    options.Logging.MaxLogFileSize,
+			FileCount:      options.Logging.LogFileCount,
+			Level:          logLevel,
+			TimeTracker:    options.Logging.TimeTracker,
+			LogGoroutineID: options.Logging.LogGoroutineID,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
@@ -510,6 +522,7 @@ var mountCmd = &cobra.Command{
 		)
 		log.Info("Mount Command: %s", os.Args)
 		log.Crit("Logging level set to : %s", logLevel.String())
+		log.Crit("Log options: %+v", options.Logging)
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
 		if directIO {
@@ -870,6 +883,10 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
+	mountCmd.PersistentFlags().Bool("log-goroutine-id",
+		false, "Enable logging of goroutine IDs. Default is true for LOG_DEBUG level, false otherwise.")
+	config.BindPFlag("logging.goroutine-id", mountCmd.PersistentFlags().Lookup("log-goroutine-id"))
+
 	mountCmd.PersistentFlags().
 		BoolP("foreground", "f", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
@@ -882,9 +899,10 @@ func init() {
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
-	mountCmd.PersistentFlags().
+	mountCmd.Flags().
 		Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
-	config.BindPFlag("lazy-write", mountCmd.PersistentFlags().Lookup("lazy-write"))
+	config.BindPFlag("lazy-write", mountCmd.Flags().Lookup("lazy-write"))
+	mountCmd.Flags().Lookup("lazy-write").Hidden = true
 
 	mountCmd.PersistentFlags().
 		String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")

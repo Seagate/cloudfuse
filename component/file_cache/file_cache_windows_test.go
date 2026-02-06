@@ -112,7 +112,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	// Setup
 	path := "file"
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -133,7 +133,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	path := "file"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -150,7 +150,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	suite.assert.FileExists(suite.cache_path + "/" + path)
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
 }
 
 // In order for 'go test' to run this suite, we need to create

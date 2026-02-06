@@ -156,9 +156,9 @@ func (base *BaseComponent) OpenFile(options OpenFileOptions) (*handlemap.Handle,
 	return nil, nil
 }
 
-func (base *BaseComponent) CloseFile(options CloseFileOptions) error {
+func (base *BaseComponent) ReleaseFile(options ReleaseFileOptions) error {
 	if base.next != nil {
-		return base.next.CloseFile(options)
+		return base.next.ReleaseFile(options)
 	}
 	return nil
 }

@@ -36,7 +36,7 @@ import (
 
 // Flags represented in BitMap for various flags in the attr cache item
 const (
-	AttrFlagUnknown uint16 = iota
+	AttrFlagUnknown uint64 = iota
 	AttrFlagExists
 	AttrFlagValid
 	// when using S3, directories with no objects are not represented in cloud storage
@@ -55,7 +55,7 @@ type attrCacheItem struct {
 	attr      *internal.ObjAttr
 	cachedAt  time.Time
 	listCache map[string]listCacheSegment
-	attrFlag  common.BitMap16
+	attrFlag  common.BitMap64
 	children  map[string]*attrCacheItem
 	parent    *attrCacheItem
 }

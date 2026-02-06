@@ -379,8 +379,8 @@ func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, nil
 }
 
-func (s3 *S3Storage) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("S3Storage::CloseFile : %s", options.Handle.Path)
+func (s3 *S3Storage) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("S3Storage::ReleaseFile : %s", options.Handle.Path)
 
 	// decrement open file handles count
 	s3StatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))

@@ -81,7 +81,7 @@ func (s *datalakeTestSuite) SetupTest() {
 		FileCount:   10,
 		Level:       common.ELogLevel.LOG_DEBUG(),
 	}
-	log.SetDefaultLogger("base", cfg)
+	_ = log.SetDefaultLogger("base", cfg)
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -123,7 +123,7 @@ func (s *datalakeTestSuite) setupTestHelper(configuration string, container stri
 	s.assert = assert.New(s.T())
 
 	s.az, _ = newTestAzStorage(configuration)
-	s.az.Start(
+	_ = s.az.Start(
 		ctx,
 	) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
 	// We could create the container before but that requires rewriting the code to new up a service client.
@@ -131,20 +131,21 @@ func (s *datalakeTestSuite) setupTestHelper(configuration string, container stri
 	s.serviceClient = s.az.storage.(*Datalake).Service // Grab the service client to do some validation
 	s.containerClient = s.serviceClient.NewFileSystemClient(s.container)
 	if create {
-		s.containerClient.Create(ctx, nil)
+		_, _ = s.containerClient.Create(ctx, nil)
 	}
 }
 
-func (s *datalakeTestSuite) tearDownTestHelper(delete bool) {
-	s.az.Stop()
-	if delete {
-		s.containerClient.Delete(ctx, nil)
+func (s *datalakeTestSuite) tearDownTestHelper(deleteContainer bool) {
+	_ = s.az.Stop()
+	if deleteContainer {
+		_, _ = s.containerClient.Delete(ctx, nil)
 	}
 }
 
 func (s *datalakeTestSuite) cleanupTest() {
 	s.tearDownTestHelper(true)
-	log.Destroy()
+	err := log.Destroy()
+	s.assert.NoError(err)
 }
 
 func (s *datalakeTestSuite) TestDefault() {
@@ -259,8 +260,11 @@ func (s *datalakeTestSuite) TestListContainers() {
 	prefix := generateContainerName()
 	for i := range num {
 		f := s.serviceClient.NewFileSystemClient(prefix + fmt.Sprint(i))
-		f.Create(ctx, nil)
-		defer f.Delete(ctx, nil)
+		_, err := f.Create(ctx, nil)
+		s.assert.NoError(err)
+		defer func() {
+			_, _ = f.Delete(ctx, nil)
+		}()
 	}
 
 	containers, err := s.az.ListContainers()
@@ -379,9 +383,10 @@ func (s *datalakeTestSuite) TestDeleteDir() {
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			s.az.CreateDir(internal.CreateDirOptions{Name: path})
+			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
+			s.assert.NoError(err)
 
-			err := s.az.DeleteDir(internal.DeleteDirOptions{Name: path})
+			err = s.az.DeleteDir(internal.DeleteDirOptions{Name: path})
 
 			s.assert.NoError(err)
 			// Directory should not be in the account
@@ -410,19 +415,26 @@ func (s *datalakeTestSuite) setupHierarchy(base string) (*list.List, *list.List,
 	// ab/
 	//  ab/c1
 	// ac
-	s.az.CreateDir(internal.CreateDirOptions{Name: base})
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: base})
+	s.assert.NoError(err)
 	c1 := base + "/c1"
-	s.az.CreateDir(internal.CreateDirOptions{Name: c1})
+	err = s.az.CreateDir(internal.CreateDirOptions{Name: c1})
+	s.assert.NoError(err)
 	gc1 := c1 + "/gc1"
-	s.az.CreateFile(internal.CreateFileOptions{Name: gc1})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: gc1})
+	s.assert.NoError(err)
 	c2 := base + "/c2"
-	s.az.CreateFile(internal.CreateFileOptions{Name: c2})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: c2})
+	s.assert.NoError(err)
 	abPath := base + "b"
-	s.az.CreateDir(internal.CreateDirOptions{Name: abPath})
+	err = s.az.CreateDir(internal.CreateDirOptions{Name: abPath})
+	s.assert.NoError(err)
 	abc1 := abPath + "/c1"
-	s.az.CreateFile(internal.CreateFileOptions{Name: abc1})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: abc1})
+	s.assert.NoError(err)
 	acPath := base + "c"
-	s.az.CreateFile(internal.CreateFileOptions{Name: acPath})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: acPath})
+	s.assert.NoError(err)
 
 	a, ab, ac := generateNestedDirectory(base)
 
@@ -470,7 +482,7 @@ func (s *datalakeTestSuite) TestDeleteSubDirPrefixPath() {
 	base := generateDirectoryName()
 	a, ab, ac := s.setupHierarchy(base)
 
-	s.az.storage.SetPrefixPath(base)
+	_ = s.az.storage.SetPrefixPath(base)
 
 	err := s.az.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
 	s.assert.NoError(err)
@@ -511,7 +523,8 @@ func (s *datalakeTestSuite) TestIsDirEmpty() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
@@ -529,9 +542,11 @@ func (s *datalakeTestSuite) TestIsDirEmptyFalse() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
 	file := name + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: file})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: file})
+	s.assert.NoError(err)
 
 	empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -560,9 +575,11 @@ func (s *datalakeTestSuite) TestStreamDir() {
 	// This tests the default listBlocked = 0. It should return the expected paths.
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
 	childName := name + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: childName})
+	s.assert.NoError(err)
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
@@ -655,7 +672,7 @@ func (s *datalakeTestSuite) TestStreamDirSubDirPrefixPath() {
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
-	s.az.storage.SetPrefixPath(base)
+	_ = s.az.storage.SetPrefixPath(base)
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/c1"})
@@ -737,9 +754,11 @@ func (s *datalakeTestSuite) TestStreamDirListBlocked() {
 	s.setupTestHelper(config, s.container, true)
 
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
 	childName := name + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: childName})
+	s.assert.NoError(err)
 
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
 	s.assert.NoError(err)
@@ -762,9 +781,10 @@ func (s *datalakeTestSuite) TestRenameDir() {
 	for _, input := range inputs {
 		s.Run(input.src+"->"+input.dst, func() {
 			// Setup
-			s.az.CreateDir(internal.CreateDirOptions{Name: input.src})
+			err := s.az.CreateDir(internal.CreateDirOptions{Name: input.src})
+			s.assert.NoError(err)
 
-			err := s.az.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
+			err = s.az.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
 			s.assert.NoError(err)
 			// Src should not be in the account
 			dir := s.containerClient.NewDirectoryClient(internal.TruncateDirName(input.src))
@@ -815,9 +835,10 @@ func (s *datalakeTestSuite) TestRenameDirWithCPKEnabled() {
 	for _, input := range inputs {
 		s.Run(input.src+"->"+input.dst, func() {
 			// Setup
-			s.az.CreateDir(internal.CreateDirOptions{Name: input.src})
+			err := s.az.CreateDir(internal.CreateDirOptions{Name: input.src})
+			s.assert.NoError(err)
 
-			err := s.az.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
+			err = s.az.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
 			s.assert.NoError(err)
 			// Src should not be in the account
 			dir := s.containerClient.NewDirectoryClient(internal.TruncateDirName(input.src))
@@ -879,7 +900,7 @@ func (s *datalakeTestSuite) TestRenameDirSubDirPrefixPath() {
 	aSrc, abSrc, acSrc := s.setupHierarchy(baseSrc)
 	baseDst := generateDirectoryName()
 
-	s.az.storage.SetPrefixPath(baseSrc)
+	_ = s.az.storage.SetPrefixPath(baseSrc)
 
 	err := s.az.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
 	s.assert.NoError(err)
@@ -998,9 +1019,9 @@ func (s *datalakeTestSuite) TestWriteSmallFile() {
 
 	output := make([]byte, len(data))
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.EqualValues(testData, output)
 	f.Close()
 }
@@ -1028,9 +1049,9 @@ func (s *datalakeTestSuite) TestOverwriteSmallFile() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1059,9 +1080,9 @@ func (s *datalakeTestSuite) TestOverwriteAndAppendToSmallFile() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1090,9 +1111,9 @@ func (s *datalakeTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1121,9 +1142,9 @@ func (s *datalakeTestSuite) TestAppendToSmallFile() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1161,9 +1182,9 @@ func (s *datalakeTestSuite) TestAppendBlocksToSmallFile() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1201,9 +1222,9 @@ func (s *datalakeTestSuite) TestOverwriteBlocks() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1241,8 +1262,8 @@ func (s *datalakeTestSuite) TestOverwriteAndAppendBlocks() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, _ := f.Read(output)
-	s.assert.Equal(dataLen, len)
+	bytesRead, _ := f.Read(output)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1279,8 +1300,8 @@ func (s *datalakeTestSuite) TestAppendBlocks() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, _ := f.Read(output)
-	s.assert.Equal(dataLen, len)
+	bytesRead, _ := f.Read(output)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1319,8 +1340,8 @@ func (s *datalakeTestSuite) TestAppendOffsetLargerThanSize() {
 	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
-	len, _ := f.Read(output)
-	s.assert.Equal(dataLen, len)
+	bytesRead, _ := f.Read(output)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.Equal(currentData, output)
 	f.Close()
 }
@@ -1329,7 +1350,8 @@ func (s *datalakeTestSuite) TestOpenFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
 	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.NoError(err)
@@ -1354,8 +1376,12 @@ func (s *datalakeTestSuite) TestOpenFileSize() {
 	// Setup
 	name := generateFileName()
 	size := 10
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
-	s.az.TruncateFile(internal.TruncateFileOptions{Name: name, OldSize: -1, NewSize: int64(size)})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
+	err = s.az.TruncateFile(
+		internal.TruncateFileOptions{Name: name, OldSize: -1, NewSize: int64(size)},
+	)
+	s.assert.NoError(err)
 
 	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.NoError(err)
@@ -1371,7 +1397,7 @@ func (s *datalakeTestSuite) TestCloseFile() {
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	// This method does nothing.
-	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	err := s.az.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	s.assert.NoError(err)
 }
 
@@ -1382,7 +1408,7 @@ func (s *datalakeTestSuite) TestCloseFileFakeHandle() {
 	h := handlemap.NewHandle(name)
 
 	// This method does nothing.
-	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	err := s.az.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	s.assert.NoError(err)
 }
 
@@ -1390,9 +1416,10 @@ func (s *datalakeTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
-	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
+	err = s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
 	s.assert.NoError(err)
 
 	// File should not be in the account
@@ -1449,10 +1476,11 @@ func (s *datalakeTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	s.assert.NoError(err)
 	dst := generateFileName()
 
-	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	err = s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	s.assert.NoError(err)
 
 	// Src should not be in the account
@@ -1524,13 +1552,14 @@ func (s *datalakeTestSuite) TestRenameFileWithCPKenabled() {
 	}
 
 	src := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	s.assert.NoError(err)
 	dst := generateFileName()
 
 	testData := "test data"
 	data := []byte(testData)
 
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx, bytes.NewReader(data),
 		int64(len(data)),
 		100,
@@ -1566,14 +1595,16 @@ func (s *datalakeTestSuite) TestRenameFileMetadataConservation() {
 	// Setup
 	src := generateFileName()
 	source := s.containerClient.NewFileClient(src)
-	s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	s.assert.NoError(err)
 	// Add srcMeta to source
 	srcMeta := make(map[string]*string)
 	srcMeta["foo"] = to.Ptr("bar")
-	source.SetMetadata(ctx, srcMeta, nil)
+	_, err = source.SetMetadata(ctx, srcMeta, nil)
+	s.assert.NoError(err)
 	dst := generateFileName()
 
-	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	err = s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	s.assert.NoError(err)
 
 	// Src should not be in the account
@@ -1613,13 +1644,16 @@ func (s *datalakeTestSuite) TestReadInBuffer() {
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
 
 	output := make([]byte, 5)
-	len, err := s.az.ReadInBuffer(&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	bytesRead, err := s.az.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+	)
 	s.assert.NoError(err)
-	s.assert.Equal(5, len)
+	s.assert.Equal(5, bytesRead)
 	s.assert.EqualValues(testData[:5], output)
 }
 
@@ -1638,7 +1672,7 @@ func (s *datalakeTestSuite) TestReadInBufferWithoutHandle() {
 	s.assert.Len(data, n)
 
 	output := make([]byte, 5)
-	len, err := s.az.ReadInBuffer(
+	bytesRead, err := s.az.ReadInBuffer(
 		&internal.ReadInBufferOptions{
 			Offset: 0,
 			Data:   output,
@@ -1647,7 +1681,7 @@ func (s *datalakeTestSuite) TestReadInBufferWithoutHandle() {
 		},
 	)
 	s.assert.NoError(err)
-	s.assert.Equal(5, len)
+	s.assert.Equal(5, bytesRead)
 	s.assert.EqualValues(testData[:5], output)
 }
 
@@ -1655,32 +1689,35 @@ func (s *datalakeTestSuite) TestReadInBufferEmptyPath() {
 	defer s.cleanupTest()
 
 	output := make([]byte, 5)
-	len, err := s.az.ReadInBuffer(&internal.ReadInBufferOptions{Offset: 0, Data: output, Size: 5})
+	bytesRead, err := s.az.ReadInBuffer(
+		&internal.ReadInBufferOptions{Offset: 0, Data: output, Size: 5},
+	)
 	s.assert.Error(err)
-	s.assert.Equal(0, len)
+	s.assert.Equal(0, bytesRead)
 	s.assert.Equal("path not given for download", err.Error())
 }
 
-func (suite *datalakeTestSuite) TestReadInBufferWithETAG() {
-	defer suite.cleanupTest()
+func (s *datalakeTestSuite) TestReadInBufferWithETAG() {
+	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	fileHandle, _ := suite.az.CreateFile(internal.CreateFileOptions{Name: name})
+	fileHandle, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
-	suite.az.WriteFile(&internal.WriteFileOptions{Handle: fileHandle, Offset: 0, Data: data})
-	fileHandle, _ = suite.az.OpenFile(internal.OpenFileOptions{Name: name})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: fileHandle, Offset: 0, Data: data})
+	s.assert.NoError(err)
+	fileHandle, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
 
 	output := make([]byte, 5)
 	var etag string
-	len, err := suite.az.ReadInBuffer(
+	bytesRead, err := s.az.ReadInBuffer(
 		&internal.ReadInBufferOptions{Handle: fileHandle, Offset: 0, Data: output, Etag: &etag},
 	)
-	suite.assert.NoError(err)
-	suite.assert.NotEmpty(etag)
-	suite.assert.Equal(5, len)
-	suite.assert.EqualValues(testData[:5], output)
-	_ = suite.az.CloseFile(internal.CloseFileOptions{Handle: fileHandle})
+	s.assert.NoError(err)
+	s.assert.NotEmpty(etag)
+	s.assert.Equal(5, bytesRead)
+	s.assert.EqualValues(testData[:5], output)
+	_ = s.az.ReleaseFile(internal.ReleaseFileOptions{Handle: fileHandle})
 }
 
 func (s *datalakeTestSuite) TestReadInBufferLargeBuffer() {
@@ -1690,13 +1727,16 @@ func (s *datalakeTestSuite) TestReadInBufferLargeBuffer() {
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
 
 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
-	len, err := s.az.ReadInBuffer(&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	bytesRead, err := s.az.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+	)
 	s.assert.NoError(err)
-	s.assert.EqualValues(h.Size, len)
+	s.assert.EqualValues(h.Size, bytesRead)
 	s.assert.EqualValues(testData, output[:h.Size])
 }
 
@@ -1707,9 +1747,11 @@ func (s *datalakeTestSuite) TestReadInBufferEmpty() {
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	output := make([]byte, 10)
-	len, err := s.az.ReadInBuffer(&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	bytesRead, err := s.az.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+	)
 	s.assert.NoError(err)
-	s.assert.Equal(0, len)
+	s.assert.Equal(0, bytesRead)
 }
 
 func (s *datalakeTestSuite) TestReadInBufferBadRange() {
@@ -1806,9 +1848,10 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmaller() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
-	err := s.az.TruncateFile(
+	err = s.az.TruncateFile(
 		internal.TruncateFileOptions{Name: name, OldSize: -1, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
@@ -1829,12 +1872,13 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileSmaller() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -1872,9 +1916,10 @@ func (s *datalakeTestSuite) TestTruncateSmallFileEqual() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 9
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
-	err := s.az.TruncateFile(
+	err = s.az.TruncateFile(
 		internal.TruncateFileOptions{Name: name, OldSize: -1, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
@@ -1894,12 +1939,13 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileEqual() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 9
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -1937,9 +1983,10 @@ func (s *datalakeTestSuite) TestTruncateSmallFileBigger() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 15
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
-	err := s.az.TruncateFile(
+	err = s.az.TruncateFile(
 		internal.TruncateFileOptions{Name: name, OldSize: -1, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
@@ -1959,12 +2006,13 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileBigger() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 15
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2012,18 +2060,19 @@ func (s *datalakeTestSuite) TestCopyToFile() {
 	testData := "test data"
 	data := []byte(testData)
 	dataLen := len(data)
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
-	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
 
 	output := make([]byte, len(data))
 	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
+	bytesRead, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.Equal(dataLen, len)
+	s.assert.Equal(dataLen, bytesRead)
 	s.assert.EqualValues(testData, output)
 	f.Close()
 }
@@ -2043,15 +2092,17 @@ func (s *datalakeTestSuite) TestCopyFromFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	homeDir, _ := os.UserHomeDir()
 	f, _ := os.CreateTemp(homeDir, name+".tmp")
 	defer os.Remove(f.Name())
-	f.Write(data)
+	_, err = f.Write(data)
+	s.assert.NoError(err)
 
-	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	err = s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 
 	s.assert.NoError(err)
 
@@ -2113,10 +2164,11 @@ func (s *datalakeTestSuite) TestCreateLink() {
 	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	s.assert.NoError(err)
 	name := generateFileName()
 
-	err := s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	err = s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 	s.assert.NoError(err)
 
 	// Link should be in the account
@@ -2159,9 +2211,11 @@ func (s *datalakeTestSuite) TestReadLink() {
 	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	s.assert.NoError(err)
 	name := generateFileName()
-	s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	err = s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.NoError(err)
 
 	read, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
 	s.assert.NoError(err)
@@ -2196,7 +2250,8 @@ func (s *datalakeTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.NoError(err)
@@ -2208,7 +2263,8 @@ func (s *datalakeTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.NoError(err)
@@ -2225,9 +2281,11 @@ func (s *datalakeTestSuite) TestGetAttrLink() {
 	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	s.assert.NoError(err)
 	name := generateFileName()
-	s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	err = s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.NoError(err)
@@ -2244,7 +2302,8 @@ func (s *datalakeTestSuite) TestGetAttrFileSize() {
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.NoError(err)
@@ -2264,7 +2323,8 @@ func (s *datalakeTestSuite) TestGetAttrFileTime() {
 	// h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	// testData := "test data"
 	// data := []byte(testData)
-	// s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	// _, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	// s.assert.NoError(err)
 
 	// before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
 	// s.assert.NoError(err)
@@ -2272,7 +2332,8 @@ func (s *datalakeTestSuite) TestGetAttrFileTime() {
 
 	// time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
-	// s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	// _, err = s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	// s.assert.NoError(err)
 	// time.Sleep(time.Second * 1)
 
 	// after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
@@ -2296,9 +2357,10 @@ func (s *datalakeTestSuite) TestChmod() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
-	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
+	err = s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
 	s.assert.NoError(err)
 
 	// File's ACL info should have changed
@@ -2324,9 +2386,10 @@ func (s *datalakeTestSuite) TestChown() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
-	err := s.az.Chown(internal.ChownOptions{Name: name, Owner: 6, Group: 5})
+	err = s.az.Chown(internal.ChownOptions{Name: name, Owner: 6, Group: 5})
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOTSUP, err)
 }
@@ -2345,9 +2408,10 @@ func (s *datalakeTestSuite) TestChownIgnore() {
 	)
 	s.setupTestHelper(config, s.container, true)
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
-	err := s.az.Chown(internal.ChownOptions{Name: name, Owner: 6, Group: 5})
+	err = s.az.Chown(internal.ChownOptions{Name: name, Owner: 6, Group: 5})
 	s.assert.NoError(err)
 }
 
@@ -2359,7 +2423,8 @@ func (s *datalakeTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
 	data := []byte(testData)
 
-	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
 	// GetFileBlockOffsets
 	offsetList, err := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
@@ -2372,12 +2437,13 @@ func (s *datalakeTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
 	data := []byte(testData)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx, bytes.NewReader(data),
 		int64(len(data)),
 		4,
@@ -2443,10 +2509,11 @@ func (s *datalakeTestSuite) TestFlushFileChunkedFile() {
 	name := generateFileName()
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2484,10 +2551,11 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	blockSize := 4 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2506,15 +2574,17 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	h.Size = 16 * MB
 
 	updatedBlock := make([]byte, 2*MB)
-	rand.Read(updatedBlock)
+	_, err = rand.Read(updatedBlock)
+	s.assert.NoError(err)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
-	s.az.storage.ReadInBuffer(
+	err = s.az.storage.ReadInBuffer(
 		name,
 		int64(blockSize),
 		int64(blockSize),
 		h.CacheObj.BlockOffsetList.BlockList[1].Data,
 		nil,
 	)
+	s.assert.NoError(err)
 	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
 	h.CacheObj.BlockList[1].Flags.Set(common.DirtyBlock)
 
@@ -2539,10 +2609,11 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	blockSize := 4 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2563,13 +2634,14 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	// truncate block
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSize + blockSize/2)
-	s.az.storage.ReadInBuffer(
+	err = s.az.storage.ReadInBuffer(
 		name,
 		int64(blockSize),
 		int64(blockSize)/2,
 		h.CacheObj.BlockOffsetList.BlockList[1].Data,
 		nil,
 	)
+	s.assert.NoError(err)
 	h.CacheObj.BlockList[1].Flags.Set(common.DirtyBlock)
 
 	// remove 2 blocks
@@ -2601,7 +2673,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.Size = 12 * MB
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err := rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
@@ -2613,7 +2686,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk1.Flags.Set(common.DirtyBlock)
 
 	data2 := make([]byte, blockSize)
-	rand.Read(data2)
+	_, err = rand.Read(data2)
+	s.assert.NoError(err)
 	blk2 := &common.Block{
 		StartIndex: int64(blockSize),
 		EndIndex:   2 * int64(blockSize),
@@ -2625,7 +2699,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk2.Flags.Set(common.DirtyBlock)
 
 	data3 := make([]byte, blockSize)
-	rand.Read(data3)
+	_, err = rand.Read(data3)
+	s.assert.NoError(err)
 	blk3 := &common.Block{
 		StartIndex: 2 * int64(blockSize),
 		EndIndex:   3 * int64(blockSize),
@@ -2638,7 +2713,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
 	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
-	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 6*MB)
@@ -2659,10 +2734,11 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2682,7 +2758,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err = rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
@@ -2694,7 +2771,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk1.Flags.Set(common.DirtyBlock)
 
 	data2 := make([]byte, blockSize)
-	rand.Read(data2)
+	_, err = rand.Read(data2)
+	s.assert.NoError(err)
 	blk2 := &common.Block{
 		StartIndex: int64(fileSize + blockSize),
 		EndIndex:   int64(fileSize + 2*blockSize),
@@ -2706,7 +2784,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk2.Flags.Set(common.DirtyBlock)
 
 	data3 := make([]byte, blockSize)
-	rand.Read(data3)
+	_, err = rand.Read(data3)
+	s.assert.NoError(err)
 	blk3 := &common.Block{
 		StartIndex: int64(fileSize + 2*blockSize),
 		EndIndex:   int64(fileSize + 3*blockSize),
@@ -2798,10 +2877,11 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2879,7 +2959,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.Size = int64(3 * blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err := rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
@@ -2912,7 +2993,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
 	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
-	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 3*blockSize)
@@ -2934,10 +3015,11 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx,
 		bytes.NewReader(data),
 		int64(len(data)),
@@ -2957,7 +3039,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err = rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
@@ -3008,12 +3091,13 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 func (s *datalakeTestSuite) TestUpdateConfig() {
 	defer s.cleanupTest()
 
-	s.az.storage.UpdateConfig(AzStorageConfig{
+	err := s.az.storage.UpdateConfig(AzStorageConfig{
 		blockSize:             7 * MB,
 		maxConcurrency:        4,
 		defaultTier:           to.Ptr(blob.AccessTierArchive),
 		ignoreAccessModifiers: true,
 	})
+	s.assert.NoError(err)
 
 	s.assert.EqualValues(7*MB, s.az.storage.(*Datalake).Config.blockSize)
 	s.assert.EqualValues(4, s.az.storage.(*Datalake).Config.maxConcurrency)
@@ -3048,11 +3132,12 @@ func (s *datalakeTestSuite) TestDownloadWithCPKEnabled() {
 		EncryptionAlgorithm: to.Ptr(blob.EncryptionAlgorithmTypeAES256),
 	}
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 
-	err := uploadReaderAtToBlockBlob(
+	err = uploadReaderAtToBlockBlob(
 		ctx, bytes.NewReader(data),
 		int64(len(data)),
 		100,
@@ -3181,7 +3266,7 @@ func (s *datalakeTestSuite) createFileWithData(name string, data []byte, mode os
 	err = s.az.Chmod(internal.ChmodOptions{Name: name, Mode: mode})
 	s.assert.NoError(err)
 
-	s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = s.az.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	s.assert.NoError(err)
 }
 
@@ -3444,9 +3529,10 @@ func (s *datalakeTestSuite) TestList() {
 // 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 // 	testData := "test data"
 // 	data := []byte(testData)
-// 	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+// err :=s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+// s.assert.NoError(err)
 // 	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
-// 	s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+// 	s.az.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 
 // 	// This can be flaky since it may take time to replicate the data. We could hardcode a container and file for this test
 // 	time.Sleep(time.Second * time.Duration(10))
@@ -3461,7 +3547,7 @@ func (s *datalakeTestSuite) TestList() {
 // 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
 // 	s.assert.Nil(err)
 // 	s.assert.EqualValues(testData, output)
-// 	s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+// 	s.az.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 // }
 
 // In order for 'go test' to run this suite, we need to create

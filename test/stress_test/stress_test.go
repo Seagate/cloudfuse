@@ -52,7 +52,7 @@ type workItem struct {
 	fileData []byte
 }
 
-func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int) {
+func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int, err chan<- struct{}) {
 	//var data []byte
 	for item := range jobs {
 		i := 0
@@ -69,8 +69,7 @@ func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int
 			}
 		}
 		if i == retryCount {
-			t.Error()
-			return
+			err <- struct{}{}
 		}
 
 		//t.Log("Opened File : %s/%s.tst \n", item.baseDir, item.fileName)
@@ -78,13 +77,12 @@ func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int
 	}
 }
 
-func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int) {
+func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int, err chan<- struct{}) {
 	for item := range jobs {
 		if item.optType == 1 {
 			errDir := os.MkdirAll(item.baseDir+"/"+item.dirName, 0755)
 			if errDir != nil {
-				t.Error()
-				return
+				err <- struct{}{}
 			}
 			//t.Log("#")
 			//t.Log("Created Directory : %s/%s \n", item.baseDir, item.dirName)
@@ -102,8 +100,7 @@ func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int
 			}
 
 			if i == retryCount {
-				t.Error()
-				return
+				err <- struct{}{}
 			}
 
 			//t.Log("Created File : %s/%s.tst \n", item.baseDir, item.fileName)
@@ -161,9 +158,10 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 
 	jobs := make(chan workItem, workItemCnt)
 	results := make(chan int, workItemCnt)
+	errSig := make(chan struct{}, 1)
 
 	for w := 1; w <= noOfWorkers; w++ {
-		go uploadWorker(t, w, jobs, results)
+		go uploadWorker(t, w, jobs, results, errSig)
 	}
 	t.Logf("Number of workders started : %d \n", noOfWorkers)
 
@@ -172,7 +170,7 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 	dirItem.baseDir = baseDir + "/" + name
 
 	var fileBuff = make([]byte, fileSize)
-	rand.Read(fileBuff)
+	_, _ = rand.Read(fileBuff)
 	//t.Log(fileBuff)
 
 	var fileItem workItem
@@ -187,7 +185,12 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 		jobs <- dirItem
 	}
 	for a := 1; a <= noOfDir; a++ {
-		<-results
+		select {
+		case <-results:
+			// do nothing
+		case <-errSig:
+			t.FailNow()
+		}
 	}
 
 	//  Create given number of files in each directory in parallel
@@ -239,9 +242,10 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 
 	jobs := make(chan string, workItemCnt)
 	results := make(chan int, workItemCnt)
+	errSig := make(chan struct{}, 1)
 
 	for w := 1; w <= noOfWorkers; w++ {
-		go downloadWorker(t, w, jobs, results)
+		go downloadWorker(t, w, jobs, results, errSig)
 	}
 
 	totalBytes := 0
@@ -266,7 +270,12 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 	}
 	close(jobs)
 	for a := 1; a <= (noOfDir * noOfFiles); a++ {
-		<-results
+		select {
+		case <-results:
+			// do nothing
+		case <-errSig:
+			t.FailNow()
+		}
 	}
 	close(results)
 

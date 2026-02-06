@@ -43,7 +43,7 @@ type StreamConnection interface {
 	TruncateFile(internal.TruncateFileOptions) error
 	FlushFile(internal.FlushFileOptions) error
 	GetAttr(internal.GetAttrOptions) (*internal.ObjAttr, error)
-	CloseFile(options internal.CloseFileOptions) error
+	ReleaseFile(options internal.ReleaseFileOptions) error
 	SyncFile(options internal.SyncFileOptions) error
 	Stop() error
 }

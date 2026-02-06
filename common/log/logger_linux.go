@@ -44,7 +44,7 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 
 	switch name {
 	case "syslog":
-		sysLogger, err := newSysLogger(config.Level, config.Tag)
+		sysLogger, err := newSysLogger(config.Level, config.Tag, config.LogGoroutineID)
 		if err != nil {
 			if err == ErrNoSyslogService {
 				// Syslog service does not exists on this system
@@ -64,6 +64,7 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 			LogSize:      config.MaxFileSize * 1024 * 1024,
 			LogFileCount: int(config.FileCount),
 			LogTag:       config.Tag,
+			LogGoroutineID: config.LogGoroutineID,
 		})
 		if err != nil {
 			return nil, err

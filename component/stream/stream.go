@@ -146,8 +146,8 @@ func (st *Stream) FlushFile(options internal.FlushFileOptions) error {
 	return st.cache.FlushFile(options)
 }
 
-func (st *Stream) CloseFile(options internal.CloseFileOptions) error {
-	return st.cache.CloseFile(options)
+func (st *Stream) ReleaseFile(options internal.ReleaseFileOptions) error {
+	return st.cache.ReleaseFile(options)
 }
 
 func (st *Stream) DeleteFile(options internal.DeleteFileOptions) error {

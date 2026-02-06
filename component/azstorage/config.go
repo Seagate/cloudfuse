@@ -111,15 +111,15 @@ type AccountType int
 
 var EAccountType = AccountType(0).INVALID_ACC()
 
-func (AccountType) INVALID_ACC() AccountType {
+func (a AccountType) INVALID_ACC() AccountType {
 	return AccountType(0)
 }
 
-func (AccountType) BLOCK() AccountType {
+func (a AccountType) BLOCK() AccountType {
 	return AccountType(1)
 }
 
-func (AccountType) ADLS() AccountType {
+func (a AccountType) ADLS() AccountType {
 	return AccountType(2)
 }
 

@@ -214,20 +214,28 @@ func (rw *ReadWriteFilenameCache) RenameFile(options internal.RenameFileOptions)
 	return nil
 }
 
-func (rw *ReadWriteFilenameCache) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("Stream::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+func (rw *ReadWriteFilenameCache) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 	// try to flush again to make sure it's cleaned up
 	err := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 	if err != nil {
-		log.Err("Stream::CloseFile : error flushing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error flushing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 		return err
 	}
 	if !rw.StreamOnly {
 		rw.purge(options.Handle.Path, true)
 	}
-	err = rw.NextComponent().CloseFile(options)
+	err = rw.NextComponent().ReleaseFile(options)
 	if err != nil {
-		log.Err("Stream::CloseFile : error closing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error releasing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	return err
 }

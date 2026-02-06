@@ -155,7 +155,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0666},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -173,7 +173,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(0755, info.Mode())
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
@@ -198,7 +198,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(info.Mode(), newMode)
 
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
 	suite.assert.NoError(err)
 
 	// loop until file does not exist - done due to async nature of eviction
@@ -249,7 +249,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0777},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -273,7 +273,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChownCase2() {

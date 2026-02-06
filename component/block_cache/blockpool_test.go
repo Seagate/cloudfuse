@@ -49,7 +49,7 @@ func (suite *blockpoolTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *blockpoolTestSuite) cleanupTest() {
+func (suite *blockpoolTestSuite) CleanupTest() {
 }
 
 func validateNullData(b *Block) bool {

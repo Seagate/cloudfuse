@@ -83,7 +83,7 @@ type OpenFileOptions struct {
 	Mode  os.FileMode
 }
 
-type CloseFileOptions struct {
+type ReleaseFileOptions struct {
 	Handle *handlemap.Handle
 }
 

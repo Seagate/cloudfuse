@@ -594,7 +594,7 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			for _, p := range aAttr {
 				checkItem, found := suite.attrCache.cache.get(p.Path)
 				suite.assert.True(found)
-				if !p.IsDir() {
+				if !checkItem.attr.IsDir() {
 					suite.assert.Equal(size, checkItem.attr.Size) // new size should be set
 					suite.assert.Equal(mode, checkItem.attr.Mode) // new mode should be set
 				}

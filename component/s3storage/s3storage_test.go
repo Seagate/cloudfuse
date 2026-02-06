@@ -1162,7 +1162,7 @@ func (s *s3StorageTestSuite) TestCloseFile() {
 	s.assert.NoError(err)
 
 	// This method does nothing.
-	err = s.s3Storage.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = s.s3Storage.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	s.assert.NoError(err)
 }
 
@@ -1173,7 +1173,7 @@ func (s *s3StorageTestSuite) TestCloseFileFakeHandle() {
 	h := handlemap.NewHandle(name)
 
 	// This method does nothing.
-	err := s.s3Storage.CloseFile(internal.CloseFileOptions{Handle: h})
+	err := s.s3Storage.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	s.assert.NoError(err)
 }
 

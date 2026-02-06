@@ -242,12 +242,12 @@ func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Ha
 	return handle, nil
 }
 
-func (lfs *LoopbackFS) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("LoopbackFS::CloseFile : name=%s", options.Handle.Path)
+func (lfs *LoopbackFS) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("LoopbackFS::ReleaseFile : name=%s", options.Handle.Path)
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
-		log.Err("LoopbackFS::CloseFile : error [file not available]")
+		log.Err("LoopbackFS::ReleaseFile : error [file not available]")
 		return syscall.EBADF
 	}
 

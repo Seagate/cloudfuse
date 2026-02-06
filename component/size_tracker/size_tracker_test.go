@@ -153,7 +153,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteDir() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(testData), suite.sizeTracker.mountSize.GetSize())
 
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.NoError(err)
@@ -187,7 +187,7 @@ func (suite *sizeTrackerTestSuite) TestRenameDir() {
 			&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 		)
 		suite.assert.NoError(err)
-		err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+		err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 		suite.assert.NoError(err)
 	}
 	suite.assert.EqualValues(5*len(testData), suite.sizeTracker.mountSize.GetSize())
@@ -209,7 +209,7 @@ func (suite *sizeTrackerTestSuite) TestCreateFile() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
@@ -230,7 +230,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteFile() {
 	)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(testData), suite.sizeTracker.mountSize.GetSize())
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
@@ -256,7 +256,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteFileNegative() {
 	suite.assert.NoError(err)
 
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
-	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
@@ -290,7 +290,7 @@ func (suite *sizeTrackerTestSuite) TestWriteFile() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
@@ -337,7 +337,7 @@ func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(4*len(data), int(suite.sizeTracker.mountSize.GetSize()))
 
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
@@ -424,7 +424,7 @@ func (suite *sizeTrackerTestSuite) TestRenameFile() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(testData), suite.sizeTracker.mountSize.GetSize())
 
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	// RenameFile
@@ -459,7 +459,7 @@ func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
 	suite.assert.NoError(err)
 
 	// Close file handle
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
@@ -508,7 +508,7 @@ func (suite *sizeTrackerTestSuite) TestRenameWriteFile() {
 	suite.assert.NoError(err)
 
 	// Close file handle
-	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	suite.assert.EqualValues(2*len(data), suite.sizeTracker.mountSize.GetSize())
@@ -524,7 +524,7 @@ func (suite *sizeTrackerTestSuite) TestTruncateFile() {
 	path := generateFileName()
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
 	suite.assert.NoError(err)
-	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	size := 1024
@@ -555,7 +555,7 @@ func (suite *sizeTrackerTestSuite) TestTruncateFileOpen() {
 
 	suite.assert.EqualValues(size, suite.sizeTracker.mountSize.GetSize())
 
-	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
@@ -624,7 +624,7 @@ func (suite *sizeTrackerTestSuite) TestStatFS() {
 	suite.assert.Equal(int64(4096), stat.Frsize)
 	suite.assert.Equal(uint64(255), stat.Namemax)
 
-	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)

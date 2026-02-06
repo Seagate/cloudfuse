@@ -86,7 +86,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	suite.assert.EqualValues(n, size)
 	suite.assert.Equal(h.Size, int64(size))
 
-	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
@@ -103,7 +103,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	_, _ = tobj.blockCache.ReadInBuffer(
 		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
-	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
@@ -126,7 +126,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	_, _ = tobj.blockCache.ReadInBuffer(
 		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
-	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)

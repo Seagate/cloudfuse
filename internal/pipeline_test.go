@@ -134,7 +134,7 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 	p, err := NewPipeline([]string{"ComponentA", "ComponentB"}, false)
 	s.assert.NoError(err)
 
-	err = p.Start(context.TODO())
+	err = p.Start(context.Background())
 	s.assert.NoError(err)
 
 	err = p.Stop()

@@ -49,7 +49,7 @@ func (suite *threadPoolTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *threadPoolTestSuite) cleanupTest() {
+func (suite *threadPoolTestSuite) CleanupTest() {
 }
 
 func (suite *threadPoolTestSuite) TestCreate() {

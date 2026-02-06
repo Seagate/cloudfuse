@@ -203,11 +203,15 @@ func (r *ReadCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, er
 	return r.copyCachedBlock(options.Handle, options.Offset, options.Data)
 }
 
-func (r *ReadCache) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("Stream::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
-	err := r.NextComponent().CloseFile(options)
+func (r *ReadCache) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+	err := r.NextComponent().ReleaseFile(options)
 	if err != nil {
-		log.Err("Stream::CloseFile : error closing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error releasing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	if !r.StreamOnly && !options.Handle.CacheObj.StreamOnly {
 		options.Handle.CacheObj.Lock()

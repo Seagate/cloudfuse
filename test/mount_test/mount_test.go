@@ -289,7 +289,8 @@ func (suite *mountSuite) TestConfigFileNotProvided() {
 // mount failure test where config file is not provided and environment variables have incorrect credentials
 func (suite *mountSuite) TestEnvVarMountFailure() {
 	tempDir := filepath.Join(mntDir, "..", "tempdir")
-	os.Mkdir(tempDir, 0777)
+	err := os.Mkdir(tempDir, 0777)
+	suite.NoError(err)
 
 	// create environment variables
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "myAccount")
@@ -333,7 +334,8 @@ func (suite *mountSuite) TestEnvVarMount() {
 	suite.NoError(err)
 
 	viper.SetConfigType("yaml")
-	viper.ReadConfig(bytes.NewBuffer(configData))
+	err = viper.ReadConfig(bytes.NewBuffer(configData))
+	suite.NoError(err)
 
 	// create environment variables
 	os.Setenv("AZURE_STORAGE_ACCOUNT", viper.GetString("azstorage.account-name"))
@@ -497,8 +499,9 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 
 	// write to file in the local directory
 	buff := make([]byte, 200)
-	rand.Read(buff)
-	err := os.WriteFile(remoteFilePath, buff, 0777)
+	_, err := rand.Read(buff)
+	suite.NoError(err)
+	err = os.WriteFile(remoteFilePath, buff, 0777)
 	suite.NoError(err)
 
 	// unmount
@@ -566,7 +569,10 @@ func TestMain(m *testing.M) {
 
 	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.
 	if runtime.GOOS != "windows" {
-		os.Mkdir(mntDir, 0777)
+		err = os.Mkdir(mntDir, 0777)
+		if err != nil {
+			fmt.Println("Could not create mount directory for testing")
+		}
 	}
 
 	m.Run()
