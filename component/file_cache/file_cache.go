@@ -45,6 +45,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	cron "github.com/netresearch/go-cron"
 )
 
 // Common structure for Component
@@ -84,6 +85,7 @@ type FileCache struct {
 	activeWindows      int
 	activeWindowsMutex *sync.Mutex
 	closeWindowCh      chan struct{}
+	cronScheduler      *cron.Cron
 }
 
 // Structure defining your config parameters
@@ -181,6 +183,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	log.Debug("Starting file cache stats collector")
 
 	fc.uploadNotifyCh = make(chan struct{}, 1)
+	fc.stopAsyncUpload = make(chan struct{})
 	err = fc.SetupScheduler()
 	if err != nil {
 		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
@@ -192,6 +195,18 @@ func (fc *FileCache) Start(ctx context.Context) error {
 // Stop : Stop the component functionality and kill all threads started
 func (fc *FileCache) Stop() error {
 	log.Trace("Stopping component : %s", fc.Name())
+
+	// Signal active upload windows to stop
+	if fc.stopAsyncUpload != nil {
+		close(fc.stopAsyncUpload)
+	}
+
+	// Stop the cron scheduler and wait for running jobs to complete
+	if fc.cronScheduler != nil {
+		log.Info("FileCache::Stop : Stopping cron scheduler")
+		<-fc.cronScheduler.Stop().Done()
+		log.Info("FileCache::Stop : Cron scheduler stopped")
+	}
 
 	// Wait for all async upload to complete if any
 	if fc.lazyWrite {
