@@ -63,6 +63,7 @@ func (fc *FileCache) SetupScheduler() error {
 	cronScheduler := cron.New(cron.WithSeconds())
 	fc.scheduleUploads(cronScheduler, fc.schedule)
 	cronScheduler.Start()
+	fc.cronScheduler = cronScheduler
 
 	log.Info("FileCache::SetupScheduler : Scheduler started successfully")
 	return nil
@@ -86,6 +87,11 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 		log.Info("FileCache::SetupScheduler : Upload window ended")
 		close(fc.closeWindowCh)
 	}
+
+	parser := cron.MustNewParser(
+		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
+	)
+
 	// start up the schedules
 	for _, config := range sched {
 		windowName := config.Name
@@ -94,9 +100,29 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 			log.Info("[%s] Invalid duration '%s': %v\n", windowName, config.Duration, err)
 			continue
 		}
-		var initialWindowEndTime time.Time
 
-		cronEntryId, err := c.AddFunc(config.CronExpr, func() {
+		// Determine if we're joining a window that's already active by
+		// finding the most recent scheduled start via Prev().
+		now := time.Now()
+		var initialWindowEndTime time.Time
+		var jobOpts []cron.JobOption
+
+		schedule, _ := parser.Parse(config.CronExpr)
+		if sp, ok := schedule.(cron.ScheduleWithPrev); ok {
+			prevStart := sp.Prev(now)
+			if !prevStart.IsZero() && prevStart.Add(duration).After(now) {
+				// We're inside an active window that started at prevStart.
+				initialWindowEndTime = prevStart.Add(duration)
+				// Run immediately to join the in-progress window with shortened duration.
+				jobOpts = append(jobOpts, cron.WithRunImmediately())
+				log.Info(
+					"FileCache::scheduleUploads : [%s] joining active window (started %s, ends %s)",
+					windowName, prevStart.Format(time.Kitchen), initialWindowEndTime.Format(time.Kitchen),
+				)
+			}
+		}
+
+		_, err = c.AddFunc(config.CronExpr, func() {
 			// Start a new window and track it
 			fc.activeWindowsMutex.Lock()
 			isFirstWindow := fc.activeWindows == 0
@@ -155,22 +181,11 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 					fc.servicePendingOps()
 				}
 			}
-		})
+		}, jobOpts...)
 		if err != nil {
 			log.Err("[%s] Failed to schedule cron job with expression '%s': %v\n",
 				windowName, config.CronExpr, err)
 			continue
-		}
-
-		// check if this schedule should already be active
-		// did this schedule have a start time within the last duration?
-		schedule := c.Entry(cronEntryId)
-		now := time.Now()
-		for t := schedule.Schedule.Next(now.Add(-duration)); now.After(t); t = schedule.Schedule.Next(t) {
-			initialWindowEndTime = t.Add(duration)
-		}
-		if !initialWindowEndTime.IsZero() {
-			go schedule.Job.Run()
 		}
 	}
 }
