@@ -73,9 +73,12 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 }
 
 func (suite *lruPolicyTestSuite) setupTestHelper(config cachePolicyConfig) {
+	err := os.MkdirAll(config.tmpPath, fs.FileMode(0777))
+	suite.assert.NoError(err)
+
 	suite.policy = NewLRUPolicy(config).(*lruPolicy)
 
-	err := suite.policy.StartPolicy()
+	err = suite.policy.StartPolicy()
 	suite.assert.NoError(err)
 }
 

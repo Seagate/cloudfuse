@@ -651,13 +651,12 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	suite.assert.NoError(err)
 	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	err = suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file3})
-	suite.assert.NoError(err)
-	handle, err = suite.loopback.CreateFile(
-		internal.CreateFileOptions{Name: file4, Mode: 0777},
-	) // Length is default 0
+	handle, err = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.assert.NoError(err)
 	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	_, err = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
 	suite.assert.NoError(err)
 	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, NewSize: 1024})
 	suite.assert.NoError(err)
@@ -1236,11 +1235,11 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-	_, err := suite.fileCache.WriteFile(
+	_, err := suite.loopback.WriteFile(
 		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
-	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	handle, err = suite.fileCache.OpenFile(
