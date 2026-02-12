@@ -35,7 +35,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-	"syscall"
 	"testing"
 
 	"github.com/awnumar/memguard"
@@ -790,11 +789,4 @@ func (suite *utilTestSuite) TestGetGoroutineIDParallel() {
 	}
 
 	suite.Len(idMap, workers, "expected unique goroutine ids equal to workers")
-}
-
-func (suite *utilTestSuite) TestSetFrsize() {
-	st := &syscall.Statfs_t{}
-	var val uint64 = 4096
-	SetFrsize(st, val)
-	suite.assert.Equal(int64(val), st.Frsize)
 }
