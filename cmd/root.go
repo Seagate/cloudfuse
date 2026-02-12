@@ -172,6 +172,18 @@ func selectPackageAsset(assets []asset, ext string) (*asset, error) {
 		}
 	}
 
+	// If no match, try to find asset without fuse version for Linux as fallback for older releases
+	if osName == "linux" {
+		for _, asset := range assets {
+			if strings.HasPrefix(asset.Name, "cloudfuse") &&
+				strings.Contains(asset.Name, osName) &&
+				strings.Contains(asset.Name, arch) &&
+				strings.HasSuffix(asset.Name, ext) {
+				return &asset, nil
+			}
+		}
+	}
+
 	return nil, errors.New("no suitable version of cloudfuse found for the current platform")
 }
 
