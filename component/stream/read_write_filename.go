@@ -34,12 +34,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/shirou/gopsutil/v4/mem"
-
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type ReadWriteFilenameCache struct {
@@ -391,7 +390,13 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 			if handle.CacheObj.SmallFile() {
 				v, err := mem.VirtualMemory()
 				if err != nil {
-					return err
+					log.Warn(
+						"ReadWriteFilenameCache::createFileCache : unable to read system memory info for %s [%v]; switching handle to stream-only mode",
+						handle.Path,
+						err,
+					)
+					handle.CacheObj.StreamOnly = true
+					return nil
 				}
 
 				if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {

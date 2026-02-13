@@ -448,7 +448,13 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 	if handle.CacheObj.SmallFile() {
 		v, err := mem.VirtualMemory()
 		if err != nil {
-			return err
+			log.Warn(
+				"ReadWriteCache::createHandleCache : unable to read system memory info for %s [%v]; switching handle to stream-only mode",
+				handle.Path,
+				err,
+			)
+			handle.CacheObj.StreamOnly = true
+			return nil
 		}
 
 		if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {

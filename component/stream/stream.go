@@ -101,10 +101,12 @@ func (st *Stream) Configure(_ bool) error {
 
 	v, err := mem.VirtualMemory()
 	if err != nil {
-		return err
-	}
-
-	if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > v.Free {
+		log.Warn(
+			"Stream::Configure : unable to read system memory info [%v]; falling back to stream-only mode",
+			err,
+		)
+		st.StreamOnly = true
+	} else if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > v.Free {
 		log.Err(
 			"Stream::Configure : config error, not enough free memory for provided configuration",
 		)
