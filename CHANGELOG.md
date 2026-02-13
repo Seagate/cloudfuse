@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **2.1.1** ##
+
+February 13th 2026
+This version is based on [blobfuse2 2.5.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.1) (upstream).
+
+### Bug Fixes ###
+
+- [#827](https://github.com/Seagate/cloudfuse/pull/827) Fix update command on Linux
+
 ## **2.1.0** ##
 
 February 3rd 2026
