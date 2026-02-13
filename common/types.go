@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -45,6 +45,8 @@ const (
 	DefaultLogFileCount   = 10
 	FileSystemName        = "cloudfuse"
 
+	UnixDateMillis = "Mon Jan _2 15:04:05.000 MST 2006"
+
 	DefaultConfigFilePath = "config.yaml"
 
 	MaxConcurrency     = 40
@@ -62,7 +64,7 @@ const (
 	CfuseStats        = "cloudfuse_stats"
 	BlockIDLength     = 16
 
-	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
+	FuseAllowedFlags = "Invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 
 	UserAgentHeader = "User-Agent"
 
@@ -197,17 +199,18 @@ func (l *LogLevel) Parse(s string) error {
 }
 
 type LogConfig struct {
-	Level       LogLevel
-	MaxFileSize uint64
-	FileCount   uint64
-	FilePath    string
-	TimeTracker bool
-	Tag         string // logging tag which can be either cloudfuse or cfusemon
+	Level          LogLevel
+	MaxFileSize    uint64
+	FileCount      uint64
+	FilePath       string
+	TimeTracker    bool
+	Tag            string // logging tag which can be either cloudfuse or cfusemon
+	LogGoroutineID bool   // whether to log goroutine id in each log line
 }
 
 // Flags for block
 const (
-	BlockFlagUnknown uint16 = iota
+	BlockFlagUnknown uint64 = iota
 	DirtyBlock
 	TruncatedBlock
 )
@@ -216,7 +219,7 @@ type Block struct {
 	sync.RWMutex
 	StartIndex int64
 	EndIndex   int64
-	Flags      BitMap16
+	Flags      BitMap64
 	Id         string
 	Data       []byte
 }
@@ -247,7 +250,7 @@ func (block *Block) Truncated() bool {
 
 // Flags for block offset list
 const (
-	BlobFlagUnknown     uint16 = iota
+	BlobFlagUnknown     uint64 = iota
 	BlobFlagHasNoBlocks        // set if the blob does not have any blocks
 	BlobFlagBlockListModified
 )
@@ -255,7 +258,7 @@ const (
 // list that holds blocks containing ids and corresponding offsets
 type BlockOffsetList struct {
 	BlockList     []*Block //blockId to offset mapping
-	Flags         BitMap16
+	Flags         BitMap64
 	BlockIdLength int64
 	Size          int64
 	Mtime         time.Time

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -411,8 +411,8 @@ func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, nil
 }
 
-func (az *AzStorage) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("AzStorage::CloseFile : %s", options.Handle.Path)
+func (az *AzStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("AzStorage::ReleaseFile : %s", options.Handle.Path)
 
 	// decrement open file handles count
 	azStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))

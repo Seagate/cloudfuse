@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -38,17 +38,19 @@ import (
 )
 
 type SysLogger struct {
-	level  common.LogLevel
-	tag    string
-	logger *log.Logger
+	level          common.LogLevel
+	tag            string
+	logGoroutineID bool
+	logger         *log.Logger
 }
 
 var NoSyslogService = errors.New("failed to create syslog object")
 
-func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
+func newSysLogger(lvl common.LogLevel, tag string, logGoroutineID bool) (*SysLogger, error) {
 	sysLog := &SysLogger{
-		level: lvl,
-		tag:   tag,
+		level:          lvl,
+		tag:            tag,
+		logGoroutineID: logGoroutineID,
 	}
 
 	err := sysLog.init() //sets up events..

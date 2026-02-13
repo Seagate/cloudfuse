@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,17 +38,14 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 )
 
-// Uses format of Time.UnixDate with addition of milliseconds.
-// See https://pkg.go.dev/time#UnixDate
-const unixDateMilli = "Mon Jan _2 15:04:05.000 MST 2006"
-
 // LogConfig : Configuration to be provided to logging infra
 type LogFileConfig struct {
-	LogFile      string
-	LogSize      uint64
-	LogFileCount int
-	LogLevel     common.LogLevel
-	LogTag       string
+	LogFile        string
+	LogSize        uint64
+	LogFileCount   int
+	LogLevel       common.LogLevel
+	LogTag         string
+	LogGoroutineID bool
 
 	currentLogSize uint64
 }
@@ -224,14 +221,23 @@ func (l *BaseLogger) logEvent(lvl string, format string, args ...any) {
 	// Only log if the log level matches the log request
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
-	msg = fmt.Sprintf("%s : %s[%d] : [%s] %s [%s (%d)]: %s",
-		time.Now().Format(unixDateMilli),
+
+	base := fmt.Sprintf("%s : %s[%d] : ",
+		time.Now().Format(common.UnixDateMillis),
 		l.fileConfig.LogTag,
-		l.procPID,
+		l.procPID)
+
+	remaining := fmt.Sprintf("[%s] %s [%s (%d)]: %s",
 		common.MountPath,
 		lvl,
 		filepath.Base(fn), ln,
 		msg)
+
+	if l.fileConfig.LogGoroutineID {
+		msg = fmt.Sprintf("%s[%d]%s", base, common.GetGoroutineID(), remaining)
+	} else {
+		msg = fmt.Sprintf("%s%s", base, remaining)
+	}
 
 	l.channel <- msg
 }

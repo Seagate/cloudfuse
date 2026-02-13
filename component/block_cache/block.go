@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@ import (
 
 // Various flags denoting state of a block
 const (
-	BlockFlagFresh       uint16 = iota
+	BlockFlagFresh       uint64 = iota
 	BlockFlagDownloading        // Block is being downloaded
 	BlockFlagUploading          // Block is being uploaded
 	BlockFlagDirty              // Block has been written and data is not persisted yet
@@ -54,7 +54,7 @@ type Block struct {
 	offset uint64          // Start offset of the data this block holds
 	id     int64           // Id of the block i.e. (offset / block size)
 	state  chan int        // Channel depicting data has been read for this block or not
-	flags  common.BitMap16 // Various states of the block
+	flags  common.BitMap64 // Various states of the block
 	data   []byte          // Data read from blob
 	node   *list.Element   // node representation of this block in the list inside handle
 }
