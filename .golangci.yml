@@ -34,6 +34,8 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - component/azstorage/config.go
+      - common/version.go
     rules:
       - path: component/libfuse/libfuse2_handler_test_wrapper.go
         text: "(\\w) (\\w+|\\(\\*\\w+\\)\\.\\w+) is unused"
