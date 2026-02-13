@@ -656,7 +656,9 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	_, err = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	handle, err = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	suite.assert.NoError(err)
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, NewSize: 1024})
 	suite.assert.NoError(err)
