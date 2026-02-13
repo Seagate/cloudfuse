@@ -141,9 +141,7 @@ func TestParallelFsyncCalls(t *testing.T) {
 		// for each 1MB writes trigger a flush call from another go routine.
 		trigger_flush := make(chan struct{}, 1)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				_, ok := <-trigger_flush
 				if !ok {
@@ -155,7 +153,7 @@ func TestParallelFsyncCalls(t *testing.T) {
 					fmt.Printf("%s", err.Error())
 				}
 			}
-		}()
+		})
 		// Write 40M data
 		for i := 0; i < 40*1024*1024; i += 4 * 1024 {
 			if i%(1*1024*1024) == 0 {
@@ -197,9 +195,7 @@ func TestParallelFsyncCallsByDuping(t *testing.T) {
 		// for each 1MB writes trigger a flush call from another go routine.
 		triggerFlush := make(chan struct{}, 1)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				_, ok := <-triggerFlush
 				if !ok {
@@ -208,7 +204,7 @@ func TestParallelFsyncCallsByDuping(t *testing.T) {
 				err := syscall.Fdatasync(fd1)
 				assert.NoError(t, err)
 			}
-		}()
+		})
 		// Write 40M data
 		for i := 0; i < 40*1024*1024; i += 4 * 1024 {
 			if i%(1*1024*1024) == 0 {

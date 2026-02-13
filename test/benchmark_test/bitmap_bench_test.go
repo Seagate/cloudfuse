@@ -122,8 +122,7 @@ func (bm *BitMap16) Reset() { *bm = 0 }
 func BenchmarkBitMap64_Set(b *testing.B) {
 	var bm BitMap64
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		// Restrict bit index to 0..63
 		bit := uint64(i & 63)
 		bm.Set(bit)
@@ -133,8 +132,7 @@ func BenchmarkBitMap64_Set(b *testing.B) {
 func BenchmarkBitMap16_Set(b *testing.B) {
 	var bm BitMap16
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		// Restrict bit index to 0..15
 		bit := uint16(i & 15)
 		bm.Set(bit)
@@ -146,12 +144,11 @@ func BenchmarkBitMap16_Set(b *testing.B) {
 func BenchmarkBitMap64_IsSet(b *testing.B) {
 	var bm BitMap64
 	// Pre-set some bits
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		bm.Set(uint64(i))
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		bit := uint64(i & 63)
 		_ = bm.IsSet(bit)
 	}
@@ -160,12 +157,11 @@ func BenchmarkBitMap64_IsSet(b *testing.B) {
 func BenchmarkBitMap16_IsSet(b *testing.B) {
 	var bm BitMap16
 	// Pre-set some bits
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		bm.Set(uint16(i))
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		bit := uint16(i & 15)
 		_ = bm.IsSet(bit)
 	}
@@ -176,12 +172,11 @@ func BenchmarkBitMap16_IsSet(b *testing.B) {
 func BenchmarkBitMap64_Clear(b *testing.B) {
 	var bm BitMap64
 	// Pre-set all bits
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		bm.Set(uint64(i))
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		bit := uint64(i & 63)
 		bm.Clear(bit)
 	}
@@ -190,12 +185,11 @@ func BenchmarkBitMap64_Clear(b *testing.B) {
 func BenchmarkBitMap16_Clear(b *testing.B) {
 	var bm BitMap16
 	// Pre-set all bits
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		bm.Set(uint16(i))
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		bit := uint16(i & 15)
 		bm.Clear(bit)
 	}
@@ -206,12 +200,11 @@ func BenchmarkBitMap16_Clear(b *testing.B) {
 func BenchmarkBitMap64_Reset(b *testing.B) {
 	var bm BitMap64
 	// Pre-set all bits once
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		bm.Set(uint64(i))
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		bm.Reset()
 	}
 }
@@ -219,12 +212,11 @@ func BenchmarkBitMap64_Reset(b *testing.B) {
 func BenchmarkBitMap16_Reset(b *testing.B) {
 	var bm BitMap16
 	// Pre-set all bits once
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		bm.Set(uint16(i))
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		bm.Reset()
 	}
 }

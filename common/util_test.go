@@ -116,12 +116,12 @@ func (suite *utilTestSuite) TestThreadSafeBitmap() {
 func (suite *utilTestSuite) TestBitmapSetIsSetClear() {
 	var bitmap BitMap64
 
-	for i := uint64(0); i < 1000; i++ {
+	for i := range uint64(1000) {
 		j := i % 64
 		ok := bitmap.Set(j)
 		// first time setting the bit should return true
 		suite.assert.True(ok)
-		for k := uint64(0); k < 64; k++ {
+		for k := range uint64(64) {
 			if k == j {
 				suite.assert.True(bitmap.IsSet(k))
 			} else {
@@ -143,7 +143,7 @@ func (suite *utilTestSuite) TestBitmapSetIsSetClear() {
 		suite.assert.False(ok)
 		suite.assert.False(bitmap.IsSet(j))
 
-		for k := uint64(0); k < 64; k++ {
+		for k := range uint64(64) {
 			suite.assert.False(bitmap.IsSet(k))
 		}
 	}
@@ -152,7 +152,7 @@ func (suite *utilTestSuite) TestBitmapSetIsSetClear() {
 func (suite *utilTestSuite) TestBitmapReset() {
 	var bitmap BitMap64
 
-	for i := uint64(0); i < 64; i++ {
+	for i := range uint64(64) {
 		bitmap.Set(i)
 	}
 
@@ -160,7 +160,7 @@ func (suite *utilTestSuite) TestBitmapReset() {
 	// Reset should return true if any bit was set
 	suite.assert.True(ok)
 
-	for i := uint64(0); i < 64; i++ {
+	for i := range uint64(64) {
 		suite.assert.False(bitmap.IsSet(i))
 	}
 
@@ -771,12 +771,10 @@ func (suite *utilTestSuite) TestGetGoroutineIDParallel() {
 	idsCh := make(chan uint64, workers)
 	var wg sync.WaitGroup
 
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			idsCh <- GetGoroutineID()
-		}()
+		})
 	}
 
 	wg.Wait()
