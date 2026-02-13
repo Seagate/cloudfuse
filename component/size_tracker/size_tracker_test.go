@@ -89,11 +89,13 @@ func newLoopbackFS() internal.Component {
 	return loopback
 }
 
-func newTestSizeTracker(next internal.Component, configuration string) *SizeTracker {
-	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
+func newTestSizeTracker(next internal.Component) *SizeTracker {
 	sizeTracker := NewSizeTrackerComponent()
 	sizeTracker.SetNextComponent(next)
-	_ = sizeTracker.Configure(true)
+	err := sizeTracker.Configure(true)
+	if err != nil {
+		panic(err)
+	}
 
 	return sizeTracker.(*SizeTracker)
 }
@@ -112,11 +114,12 @@ func (suite *sizeTrackerTestSuite) SetupTest() {
 	suite.setupTestHelper(cfg)
 }
 
-func (suite *sizeTrackerTestSuite) setupTestHelper(config string) {
+func (suite *sizeTrackerTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
+	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 
 	suite.loopback = newLoopbackFS()
-	suite.sizeTracker = newTestSizeTracker(suite.loopback, config)
+	suite.sizeTracker = newTestSizeTracker(suite.loopback)
 	_ = suite.loopback.Start(context.Background())
 	_ = suite.sizeTracker.Start(context.Background())
 }
