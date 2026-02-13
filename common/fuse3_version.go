@@ -1,3 +1,5 @@
+//go:build fuse3
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -23,44 +25,7 @@
    SOFTWARE
 */
 
-package cmd
+package common
 
-import (
-	"github.com/Seagate/cloudfuse/common"
-
-	"github.com/spf13/cobra"
-)
-
-var check bool
-
-var versionCmd = &cobra.Command{
-	Use:     "version",
-	Short:   "Print the current version and optionally check for latest version",
-	Long:    "Display cloudfuse version information including git commit, build date, and Go version.",
-	Aliases: []string{"ver"},
-	GroupID: groupUtil,
-	Args:    cobra.NoArgs,
-	Example: `  # Show version info
-  cloudfuse version
-
-  # Check for updates
-  cloudfuse version --check`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Println("cloudfuse version:", common.CloudfuseVersion)
-		cmd.Println("git commit:", common.GitCommit)
-		cmd.Println("commit date:", common.CommitDate)
-		cmd.Println("go version:", common.GoVersion)
-		cmd.Println("OS/Arch:", common.OsArch)
-		if check {
-			return VersionCheck()
-		}
-		return nil
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(versionCmd)
-
-	versionCmd.Flags().
-		BoolVar(&check, "check", false, "To check whether latest version exists or not")
-}
+// FuseVersion indicates the FUSE version this binary was compiled with
+const FuseVersion = "fuse3"

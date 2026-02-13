@@ -64,13 +64,19 @@ type Blob struct {
 
 var disableVersionCheck bool
 
+// Command group IDs for organizing help output (Cobra v1.6.0+)
+const (
+	groupCore   = "core"
+	groupConfig = "config"
+	groupUtil   = "util"
+)
+
 var rootCmd = &cobra.Command{
-	Use:               "cloudfuse",
-	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage.",
-	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage. It uses the FUSE protocol to communicate with the operating system, and implements filesystem operations using Azure or S3 cloud storage REST APIs.",
-	Version:           common.CloudfuseVersion,
-	FlagErrorHandling: cobra.ExitOnError,
-	SilenceUsage:      true,
+	Use:          "cloudfuse",
+	Short:        "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage.",
+	Long:         "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage. It uses the FUSE protocol to communicate with the operating system, and implements filesystem operations using Azure or S3 cloud storage REST APIs.",
+	Version:      common.CloudfuseVersion,
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !disableVersionCheck {
 			err := VersionCheck()
@@ -150,12 +156,31 @@ func selectPackageAsset(assets []asset, ext string) (*asset, error) {
 		ext = "tar.gz"
 	}
 
+	// For Linux, we need to match the FUSE version as well
+	fuseVersion := ""
+	if osName == "linux" {
+		fuseVersion = common.FuseVersion
+	}
+
 	for _, asset := range assets {
 		if strings.HasPrefix(asset.Name, "cloudfuse") &&
 			strings.Contains(asset.Name, osName) &&
 			strings.Contains(asset.Name, arch) &&
-			strings.HasSuffix(asset.Name, ext) {
+			strings.HasSuffix(asset.Name, ext) &&
+			(fuseVersion == "" || strings.Contains(asset.Name, fuseVersion)) {
 			return &asset, nil
+		}
+	}
+
+	// If no match, try to find asset without fuse version for Linux as fallback for older releases
+	if osName == "linux" {
+		for _, asset := range assets {
+			if strings.HasPrefix(asset.Name, "cloudfuse") &&
+				strings.Contains(asset.Name, osName) &&
+				strings.Contains(asset.Name, arch) &&
+				strings.HasSuffix(asset.Name, ext) {
+				return &asset, nil
+			}
 		}
 	}
 
@@ -245,7 +270,7 @@ func VersionCheck() error {
 
 // ignoreCommand : There are command implicitly added by cobra itself, while parsing we need to ignore these commands
 func ignoreCommand(cmdArgs []string) bool {
-	ignoreCmds := []string{"completion", "help"}
+	ignoreCmds := []string{"completion", "help", "__complete", "__completeNoDesc"}
 	if len(cmdArgs) > 0 {
 		if slices.Contains(ignoreCmds, cmdArgs[0]) {
 			return true
@@ -275,14 +300,13 @@ func parseArgs(cmdArgs []string) []string {
 	}
 
 	// Check for /etc/fstab style inputs
-	args := make([]string, 0)
+	args := make([]string, 0, len(cmdArgs))
 	for i := 0; i < len(cmdArgs); i++ {
 		// /etc/fstab will give everything in comma separated list with -o option
 		if cmdArgs[i] == "-o" {
 			i++
 			if i < len(cmdArgs) {
-				bfuseArgs := make([]string, 0)
-				lfuseArgs := make([]string, 0)
+				var bfuseArgs, lfuseArgs []string
 
 				// Check if ',' exists in arguments or not. If so we assume it might be coming from /etc/fstab
 				opts := strings.SplitSeq(cmdArgs[i], ",")
@@ -330,4 +354,16 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().
 		BoolVar(&disableVersionCheck, "disable-version-check", false, "To disable version check that is performed automatically")
+
+	rootCmd.SetErrPrefix("cloudfuse error:")
+
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupCore, Title: "Core Commands:"},
+		&cobra.Group{ID: groupConfig, Title: "Configuration Commands:"},
+		&cobra.Group{ID: groupUtil, Title: "Utility Commands:"},
+	)
+
+	// Set the group for the built-in help and completion commands
+	rootCmd.SetHelpCommandGroupID(groupUtil)
+	rootCmd.SetCompletionCommandGroupID(groupUtil)
 }

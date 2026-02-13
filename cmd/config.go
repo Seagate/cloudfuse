@@ -46,7 +46,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"go.yaml.in/yaml/v3"
 )
 
 // Top-level struct to hold application context, including tview application instance,
@@ -157,9 +157,14 @@ func newAppContext() *appContext {
 }
 
 var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Launch the interactive configuration tool.",
-	Long:  "Starts an interactive terminal-based UI to generate your Cloudfuse configuration file.",
+	Use:     "config",
+	Short:   "Launch the interactive configuration tool.",
+	Long:    "Starts an interactive terminal-based UI to generate your Cloudfuse configuration file.",
+	Aliases: []string{"configure", "cfg"},
+	GroupID: groupConfig,
+	Args:    cobra.NoArgs,
+	Example: `  # Launch the interactive configuration wizard
+  cloudfuse config`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tui := newAppContext()
 		if err := tui.run(); err != nil {

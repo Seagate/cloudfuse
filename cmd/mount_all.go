@@ -30,6 +30,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,7 +47,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"go.yaml.in/yaml/v3"
 )
 
 type containerListingOptions struct {
@@ -58,12 +59,19 @@ type containerListingOptions struct {
 var mountAllOpts containerListingOptions
 
 var mountAllCmd = &cobra.Command{
-	Use:               "all <mount path>",
-	Short:             "Mounts all containers for a given cloud account as a filesystem",
-	Long:              "Mounts all containers for a given cloud account as a filesystem",
-	SuggestFor:        []string{"mnta", "mout"},
-	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "all <mount path>",
+	Short:      "Mounts all containers for a given cloud account as a filesystem",
+	Long:       "Mounts all containers/buckets for a given cloud account.\nCreates a subdirectory for each container under the specified mount path.\nSupports both Azure Storage containers and S3 buckets.",
+	SuggestFor: []string{"mnta", "mout"},
+	Args:       cobra.ExactArgs(1),
+	Example: `  # Mount all containers with a config file
+  cloudfuse mount all ~/mounts --config-file=config.yaml
+
+  # Mount only specific containers
+  cloudfuse mount all ~/mounts --config-file=config.yaml --container-allowlist=container1,container2
+
+  # Mount all except specific containers
+  cloudfuse mount all ~/mounts --config-file=config.yaml --container-denylist=logs,backup`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		exe, err := os.Executable()
 		if err != nil {
@@ -76,7 +84,7 @@ var mountAllCmd = &cobra.Command{
 
 		mountAllOpts.cloudfuseBinPath = exe
 		options.MountPath = args[0]
-		return processCommand()
+		return processCommand(cmd.OutOrStdout(), cmd.ErrOrStderr())
 	},
 
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -84,7 +92,7 @@ var mountAllCmd = &cobra.Command{
 	},
 }
 
-func processCommand() error {
+func processCommand(out io.Writer, errOut io.Writer) error {
 	configFileExists := true
 
 	if options.ConfigFile == "" {
@@ -202,12 +210,14 @@ func processCommand() error {
 			options.ConfigFile,
 			options.MountPath,
 			configFileExists,
+			out,
+			errOut,
 		)
 		if err != nil {
 			return err
 		}
 	} else {
-		fmt.Println("No containers to mount from this account")
+		fmt.Fprintln(out, "No containers to mount from this account")
 	}
 	return nil
 }
@@ -322,6 +332,8 @@ func mountAllContainers(
 	configFile string,
 	mountPath string,
 	configFileExists bool,
+	out io.Writer,
+	errOut io.Writer,
 ) error {
 	// Now iterate filtered container list and prepare mount path, temp path, and config file for them
 	fileCachePath := ""
@@ -355,13 +367,18 @@ func mountAllContainers(
 		if err != nil {
 			err = os.MkdirAll(mountPath, 0755)
 			if err != nil {
-				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
+				fmt.Fprintf(
+					errOut,
+					"Failed to create directory %s : %s\n",
+					contMountPath,
+					err.Error(),
+				)
 				return err
 			}
 			root, err = os.OpenRoot(mountPath)
 		}
 		if err != nil {
-			fmt.Printf("Failed to open root directory %s : %s\n", mountPath, err.Error())
+			fmt.Fprintf(errOut, "Failed to open root directory %s : %s\n", mountPath, err.Error())
 			return err
 		}
 		defer root.Close()
@@ -369,7 +386,12 @@ func mountAllContainers(
 		if _, err := root.Stat(container); os.IsNotExist(err) {
 			err = root.Mkdir(container, 0777)
 			if err != nil {
-				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
+				fmt.Fprintf(
+					errOut,
+					"Failed to create directory %s : %s\n",
+					contMountPath,
+					err.Error(),
+				)
 			}
 		}
 
@@ -400,21 +422,21 @@ func mountAllContainers(
 		}
 
 		// Now that we have mount path and config file for this container fire a mount command for this one
-		fmt.Println("Mounting container :", container, "to path ", contMountPath)
+		fmt.Fprintln(out, "Mounting container :", container, "to path", contMountPath)
 		cmd := exec.Command(mountAllOpts.cloudfuseBinPath, cliParams...)
 
 		var errb bytes.Buffer
 		cmd.Stderr = &errb
 		cliOut, err := cmd.Output()
-		fmt.Println(string(cliOut))
+		fmt.Fprintln(out, string(cliOut))
 
 		if err != nil {
-			fmt.Printf("Failed to mount container %s : %s\n", container, errb.String())
+			fmt.Fprintf(errOut, "Failed to mount container %s : %s\n", container, errb.String())
 			failCount++
 		}
 	}
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"%d of %d containers were successfully mounted\n",
 		(len(containerList) - failCount),
 		len(containerList),
@@ -477,4 +499,8 @@ func buildCliParamForMount() []string {
 
 func ignoreCliParam(opt string) bool {
 	return strings.HasPrefix(opt, "--config-file")
+}
+
+func init() {
+	mountCmd.AddCommand(mountAllCmd)
 }

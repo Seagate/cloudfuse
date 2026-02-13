@@ -243,3 +243,53 @@ func (suite *rootCmdSuite) TestParseArgs() {
 func TestRootCmd(t *testing.T) {
 	suite.Run(t, new(rootCmdSuite))
 }
+
+// TestIgnoreCommand tests the ignoreCommand function
+func (suite *rootCmdSuite) TestIgnoreCommand() {
+	defer suite.cleanupTest()
+
+	// Commands that should be ignored
+	suite.assert.True(ignoreCommand([]string{"completion"}))
+	suite.assert.True(ignoreCommand([]string{"help"}))
+	suite.assert.True(ignoreCommand([]string{"__complete"}))
+	suite.assert.True(ignoreCommand([]string{"__completeNoDesc"}))
+
+	// Commands that should not be ignored
+	suite.assert.False(ignoreCommand([]string{"mount"}))
+	suite.assert.False(ignoreCommand([]string{"unmount"}))
+	suite.assert.False(ignoreCommand([]string{"version"}))
+	suite.assert.False(ignoreCommand([]string{"secure"}))
+
+	// Empty args should not be ignored
+	suite.assert.False(ignoreCommand([]string{}))
+	suite.assert.False(ignoreCommand(nil))
+}
+
+// TestRootCmdHelp tests that help output is displayed correctly
+func (suite *rootCmdSuite) TestRootCmdHelp() {
+	defer suite.cleanupTest()
+
+	out, err := executeCommandC(rootCmd, "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(out, "cloudfuse")
+	suite.assert.Contains(out, "mount")
+	suite.assert.Contains(out, "unmount")
+}
+
+// TestRootCmdVersion tests version flag
+func (suite *rootCmdSuite) TestRootCmdVersion() {
+	defer suite.cleanupTest()
+
+	out, err := executeCommandC(rootCmd, "version")
+	suite.assert.NoError(err)
+	suite.assert.Contains(out, "cloudfuse version")
+}
+
+// TestRootCmdUnknownCommand tests unknown command handling
+func (suite *rootCmdSuite) TestRootCmdUnknownCommand() {
+	defer suite.cleanupTest()
+
+	out, err := executeCommandC(rootCmd, "unknowncommand123")
+	suite.assert.Error(err)
+	suite.assert.Contains(out, "unknown command")
+}

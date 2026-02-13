@@ -35,31 +35,28 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"go.yaml.in/yaml/v3"
 )
 
 var setKeyCmd = &cobra.Command{
-	Use:               "set",
-	Short:             "Update encrypted config by setting new value for the given config parameter",
-	Long:              "Update encrypted config by setting new value for the given config parameter",
-	SuggestFor:        []string{"s", "set"},
-	Example:           "cloudfuse secure set --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level --value=log_debug",
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "set",
+	Short:      "Update encrypted config by setting new value for the given config parameter",
+	Long:       "Update encrypted config by setting new value for the given config parameter",
+	SuggestFor: []string{"s"},
+	Args:       cobra.NoArgs,
+	Example: `  # Update a key in encrypted config
+  cloudfuse secure set -c config.yaml.aes -p SECRET -k logging.log_level --value=LOG_DEBUG`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
+		// Validation handled by parent's PersistentPreRunE
 		plainText, err := decryptConfigFile(false)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
+			return fmt.Errorf("failed to decrypt config file: %w", err)
 		}
 
 		viper.SetConfigType("yaml")
 		err = viper.ReadConfig(strings.NewReader(string(plainText)))
 		if err != nil {
-			return fmt.Errorf("failed to load config [%s]", err.Error())
+			return fmt.Errorf("failed to load config: %w", err)
 		}
 
 		value := viper.Get(secOpts.Key)
@@ -81,18 +78,30 @@ var setKeyCmd = &cobra.Command{
 		allConf := viper.AllSettings()
 		confStream, err := yaml.Marshal(allConf)
 		if err != nil {
-			return fmt.Errorf("failed to marshal config [%s]", err.Error())
+			return fmt.Errorf("failed to marshal config: %w", err)
 		}
 
 		cipherText, err := common.EncryptData(confStream, encryptedPassphrase)
 		if err != nil {
-			return fmt.Errorf("failed to encrypt config [%s]", err.Error())
+			return fmt.Errorf("failed to encrypt config: %w", err)
 		}
 
 		if err = saveToFile(secOpts.ConfigFile, cipherText, false); err != nil {
-			return fmt.Errorf("failed save config file [%s]", err.Error())
+			return fmt.Errorf("failed save config file: %w", err)
 		}
 
 		return nil
 	},
+}
+
+func init() {
+	secureCmd.AddCommand(setKeyCmd)
+
+	setKeyCmd.Flags().StringVarP(&secOpts.Key, "key", "k", "",
+		"Config key to be updated in encrypted config file")
+	setKeyCmd.Flags().StringVar(&secOpts.Value, "value", "",
+		"New value for the given config key to be set in encrypted config file")
+
+	// For setKeyCmd, both key and value are required together
+	setKeyCmd.MarkFlagsRequiredTogether("key", "value")
 }
