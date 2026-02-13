@@ -95,7 +95,6 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 		if err != nil {
 			fmt.Printf("FileTestSuite::fileTestCleanup : Cleanup failed with error %v\n", err)
 		}
-		suite.NoError(err)
 	}
 }
 

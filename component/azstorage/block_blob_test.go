@@ -1695,7 +1695,11 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	s.assert.NoError(err)
 
 	err = s.az.TruncateFile(
-		internal.TruncateFileOptions{Name: windowsName, NewSize: int64(truncatedLength)},
+		internal.TruncateFileOptions{
+			Name:    windowsName,
+			OldSize: -1,
+			NewSize: int64(truncatedLength),
+		},
 	)
 	s.assert.NoError(err)
 
