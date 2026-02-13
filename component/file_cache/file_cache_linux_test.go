@@ -67,7 +67,7 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 		suite.cache_path,
 		suite.fake_storage_path,
 	)
-	log.Debug(defaultConfig)
+	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)

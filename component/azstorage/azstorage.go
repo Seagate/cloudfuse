@@ -38,8 +38,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // AzStorage Wrapper type around azure go-sdk (track-1)
@@ -133,13 +131,13 @@ func (az *AzStorage) OnConfigChange() {
 
 	err = ParseAndReadDynamicConfig(az, conf, true)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to reparse config", err.Error())
+		log.Err("AzStorage::OnConfigChange : failed to reparse config [%s]", err.Error())
 		return
 	}
 
 	err = az.storage.UpdateConfig(az.stConfig)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig", err.Error())
+		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig [%s]", err.Error())
 		return
 	}
 
@@ -310,7 +308,7 @@ func (az *AzStorage) StreamDir(
 	)
 
 	if new_marker == nil {
-		new_marker = to.Ptr("")
+		new_marker = new("")
 	} else if *new_marker != "" {
 		log.Debug("AzStorage::StreamDir : next-marker %s for Path %s", *new_marker, path)
 		if len(new_list) == 0 {

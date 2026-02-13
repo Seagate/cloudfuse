@@ -1,5 +1,4 @@
 //go:build !authtest
-// +build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -461,7 +460,7 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: obj_path})
 
@@ -491,7 +490,7 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: obj_path})
 			s.assert.NoError(err)
@@ -701,7 +700,7 @@ func (s *s3StorageTestSuite) TestIsDirEmpty() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -725,7 +724,7 @@ func (s *s3StorageTestSuite) TestIsDirEmptyNoDirectoryMarker() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -771,7 +770,7 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			// this only works if the test can create an empty test bucket
@@ -816,7 +815,7 @@ func (s *s3StorageTestSuite) TestStreamDirRoot() {
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			// ReadDir only reads the first level of the hierarchy
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
@@ -902,7 +901,7 @@ func (s *s3StorageTestSuite) TestStreamDirWindowsNameConvert() {
 	// Testing dir and dir/
 	var paths = []string{windowsDirName, windowsDirName + "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			s.assert.NoError(err)
@@ -2305,7 +2304,7 @@ func (s *s3StorageTestSuite) TestStreamDir() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, obj_path := range paths {
-		log.Debug(obj_path)
+		log.Debug("%s", obj_path)
 		s.Run(obj_path, func() {
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			s.assert.NoError(err)

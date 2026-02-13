@@ -377,7 +377,7 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 	var paths = []string{"a", "a/"}
 
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.SetupTest()
@@ -423,7 +423,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 	config := fmt.Sprintf("attr_cache:\n  no-cache-dirs: %t", noCacheDirs)
 
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(

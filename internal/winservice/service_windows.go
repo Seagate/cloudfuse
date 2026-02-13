@@ -81,7 +81,18 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		)
 		defer buff.Destroy()
 	} else {
-		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
+		_, err = winFspCommand(
+			writeCommandToUtf16(
+				startCmd,
+				SvcName,
+				instanceName,
+				mountPath,
+				configFile,
+				fmt.Sprint(userId),
+				fmt.Sprint(groupId),
+				"",
+			),
+		)
 	}
 	return err
 }
@@ -127,7 +138,7 @@ func StartMounts(useSystem bool) error {
 	for _, inst := range mounts.Mounts {
 		err := StartMount(inst.MountPath, inst.ConfigFile, nil)
 		if err != nil {
-			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
+			log.Err("Unable to start mount with mountpath: %s", inst.MountPath)
 		}
 	}
 
@@ -146,7 +157,7 @@ func StopMounts(useSystem bool) error {
 	for _, inst := range mounts.Mounts {
 		err := StopMount(inst.MountPath)
 		if err != nil {
-			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
+			log.Err("Unable to start mount with mountpath: %s", inst.MountPath)
 		}
 	}
 

@@ -114,8 +114,8 @@ func main() {
 			"Cloudfuse Stats poll interval: %v \n"+
 			"Health Stats poll interval: %v \n"+
 			"Cache Path: %v \n"+
-			"Max cache size in MB: %v \n",
-		"Output path: %v",
+			"Max cache size in MB: %v \n"+
+			"Output path: %v",
 		hmcommon.Pid,
 		common.TransferPipe,
 		common.PollingPipe,

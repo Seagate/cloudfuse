@@ -116,42 +116,42 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 	return err
 }
 
-func (sl *SysLogger) Debug(format string, args ...interface{}) {
+func (sl *SysLogger) Debug(format string, args ...any) {
 	if sl.level >= common.ELogLevel.LOG_DEBUG() {
 		msg := fmt.Sprintf(format, args...)
 		_ = sl.logEvent(common.ELogLevel.LOG_DEBUG(), msg)
 	}
 }
 
-func (sl *SysLogger) Trace(format string, args ...interface{}) {
+func (sl *SysLogger) Trace(format string, args ...any) {
 	if sl.level >= common.ELogLevel.LOG_TRACE() {
 		msg := fmt.Sprintf(format, args...)
 		_ = sl.logEvent(common.ELogLevel.LOG_TRACE(), msg)
 	}
 }
 
-func (sl *SysLogger) Info(format string, args ...interface{}) {
+func (sl *SysLogger) Info(format string, args ...any) {
 	if sl.level >= common.ELogLevel.LOG_INFO() {
 		msg := fmt.Sprintf(format, args...)
 		_ = sl.logEvent(common.ELogLevel.LOG_INFO(), msg)
 	}
 }
 
-func (sl *SysLogger) Warn(format string, args ...interface{}) {
+func (sl *SysLogger) Warn(format string, args ...any) {
 	if sl.level >= common.ELogLevel.LOG_WARNING() {
 		msg := fmt.Sprintf(format, args...)
 		_ = sl.logEvent(common.ELogLevel.LOG_WARNING(), msg)
 	}
 }
 
-func (sl *SysLogger) Err(format string, args ...interface{}) {
+func (sl *SysLogger) Err(format string, args ...any) {
 	if sl.level >= common.ELogLevel.LOG_ERR() {
 		msg := fmt.Sprintf(format, args...)
 		_ = sl.logEvent(common.ELogLevel.LOG_ERR(), msg)
 	}
 }
 
-func (sl *SysLogger) Crit(format string, args ...interface{}) {
+func (sl *SysLogger) Crit(format string, args ...any) {
 	if sl.level >= common.ELogLevel.LOG_CRIT() {
 		msg := fmt.Sprintf(format, args...)
 		_ = sl.logEvent(common.ELogLevel.LOG_CRIT(), msg)

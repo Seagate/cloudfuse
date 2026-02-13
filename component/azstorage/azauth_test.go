@@ -1,5 +1,4 @@
 //go:build !authtest && !azurite
-// +build !authtest,!azurite
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.

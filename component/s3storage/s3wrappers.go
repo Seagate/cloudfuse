@@ -39,7 +39,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -241,8 +240,8 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err(
 				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
-				result.Errors[i].Key,
-				result.Errors[i].Message,
+				*result.Errors[i].Key,
+				*result.Errors[i].Message,
 			)
 		}
 	}
@@ -354,7 +353,7 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 		},
 	)
 	if abortErr != nil {
-		log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
+		log.Err("Client::StageAndCommit : Error aborting multipart upload: %s", abortErr.Error())
 	}
 
 	// AWS states you need to call listparts to verify that multipart upload was properly aborted
@@ -365,10 +364,10 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 	})
 	if listErr != nil {
 		log.Err(
-			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ",
+			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: %v",
 			key,
 			uploadID,
-			abortErr.Error(),
+			abortErr,
 		)
 		return errors.Join(abortErr, listErr)
 	}
@@ -585,7 +584,7 @@ func createObjAttr(
 
 	if isSymLink {
 		attr.Flags.Set(internal.PropFlagSymlink)
-		attr.Metadata[symlinkKey] = to.Ptr("true")
+		attr.Metadata[symlinkKey] = new("true")
 	}
 
 	return attr

@@ -60,7 +60,7 @@ jobs:
 
     env:
       cgo: "1"
-      go: "1.25"
+      go: "1.26"
       zig: 0.15.2
       containerName: "test-cnt-ubn"
 
@@ -232,7 +232,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
-      go: "1.25"
+      go: "1.26"
       cgo: "0"
       containerName: "test-cnt-win"
 
@@ -267,7 +267,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: "1.25"
+      go: "1.26"
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

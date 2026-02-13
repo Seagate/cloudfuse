@@ -154,7 +154,7 @@ func processCommand(out io.Writer, errOut io.Writer) error {
 	if !disableVersionCheck {
 		err := VersionCheck()
 		if err != nil {
-			log.Err(err.Error())
+			log.Err("%s", err.Error())
 		}
 	}
 

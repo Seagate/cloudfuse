@@ -95,7 +95,7 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 		if encryptedKeyID == nil {
 			err := errors.New("unable to store key-id securely")
-			log.Err("S3Storage::Configure : ", err.Error())
+			log.Err("S3Storage::Configure : %s", err.Error())
 			return err
 		}
 		secrets.KeyID = encryptedKeyID
@@ -106,7 +106,7 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 		if encryptedSecretKey == nil {
 			err := errors.New("unable to store secret-key securely")
-			log.Err("S3Storage::Configure : ", err.Error())
+			log.Err("S3Storage::Configure : %s", err.Error())
 			return err
 		}
 		secrets.SecretKey = encryptedSecretKey
@@ -144,13 +144,13 @@ func (s3 *S3Storage) OnConfigChange() {
 
 	err = ParseAndReadDynamicConfig(s3, conf, true)
 	if err != nil {
-		log.Err("S3Storage::OnConfigChange : failed to reparse config", err.Error())
+		log.Err("S3Storage::OnConfigChange : failed to reparse config [%s]", err.Error())
 		return
 	}
 
 	err = s3.Storage.UpdateConfig(s3.stConfig)
 	if err != nil {
-		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig", err.Error())
+		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig [%s]", err.Error())
 		return
 	}
 }
