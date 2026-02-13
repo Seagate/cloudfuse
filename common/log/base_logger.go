@@ -208,6 +208,11 @@ func (l *BaseLogger) Destroy() error {
 	close(l.channel)
 	l.workerDone.Wait()
 
+	// Never close stdout/stderr
+	if l.logFileHandle == os.Stdout || l.logFileHandle == os.Stderr {
+		return nil
+	}
+
 	if err := l.logFileHandle.Close(); err != nil {
 		return err
 	}
