@@ -115,7 +115,7 @@ func (st *Stream) Configure(_ bool) error {
 	st.cache = NewStreamConnection(conf, st)
 
 	log.Info(
-		"Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v, StreamCacheMb %v, MaxBlocksPerFile %v",
+		"Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v",
 		conf.BufferSize,
 		conf.BlockSize,
 		conf.CachedObjLimit,
@@ -140,11 +140,11 @@ func (st *Stream) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle,
 	return st.cache.OpenFile(options)
 }
 
-func (st *Stream) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (st *Stream) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	return st.cache.ReadInBuffer(options)
 }
 
-func (st *Stream) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (st *Stream) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	return st.cache.WriteFile(options)
 }
 

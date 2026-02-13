@@ -182,8 +182,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
-	// log.Trace("SizeTracker::WriteFile : %s", options.Handle.Path)
+func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
@@ -212,7 +211,7 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 }
 
 func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("SizeTracker::TruncateFile : %s to %dB", options.Name, options.Size)
+	log.Trace("SizeTracker::TruncateFile : %s to %dB", options.Name, options.NewSize)
 	var origSize int64
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if getAttrErr == nil {
@@ -231,7 +230,7 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	}
 
 	// subtract difference in file size
-	st.mountSize.Add(options.Size - origSize)
+	st.mountSize.Add(options.NewSize - origSize)
 	return nil
 }
 

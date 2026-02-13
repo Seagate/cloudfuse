@@ -481,7 +481,6 @@ var mountCmd = &cobra.Command{
 			Level:       logLevel,
 			TimeTracker: options.Logging.TimeTracker,
 		})
-
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
 		}
@@ -489,7 +488,7 @@ var mountCmd = &cobra.Command{
 		if !disableVersionCheck {
 			err := VersionCheck()
 			if err != nil {
-				log.Err(err.Error())
+				log.Err("%s", err.Error())
 			}
 		}
 
@@ -549,18 +548,14 @@ var mountCmd = &cobra.Command{
 					"mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]",
 					err,
 				)
-				return Destroy(
-					fmt.Sprintf(
-						"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
-						err.Error(),
-					),
+				return fmt.Errorf(
+					"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
+					err.Error(),
 				)
 			}
 
 			log.Err("mount :  failed to initialize new pipeline [%v]", err)
-			return Destroy(
-				fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()),
-			)
+			return fmt.Errorf("mount : failed to initialize new pipeline [%s]", err.Error())
 		}
 
 		// Dry run ends here
@@ -686,16 +681,15 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	err := pipeline.Start(ctx)
 	if err != nil {
 		log.Err("mount: error unable to start pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to start pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to start pipeline [%s]", err.Error())
 	}
 
 	err = pipeline.Stop()
 	if err != nil {
 		log.Err("mount: error unable to stop pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to stop pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to stop pipeline [%s]", err.Error())
 	}
 
-	_ = log.Destroy()
 	return nil
 }
 
@@ -957,13 +951,4 @@ func init() {
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)
 	config.AddConfigChangeEventListener(config.ConfigChangeEventHandlerFunc(OnConfigChange))
-}
-
-func Destroy(message string) error {
-	_ = log.Destroy()
-	if message != "" {
-		return fmt.Errorf("%s", message)
-	}
-
-	return nil
 }

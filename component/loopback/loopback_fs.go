@@ -284,7 +284,7 @@ func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error
 	return strings.TrimPrefix(targetPath, prefix), nil
 }
 
-func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (lfs *LoopbackFS) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// if handle is nil, create a new handle
 	// added because after changes in xload, path and size can be passed in ReadInBufferOptions, where handle can be nil
 	if options.Handle == nil {
@@ -318,7 +318,7 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	return n, err
 }
 
-func (lfs *LoopbackFS) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (lfs *LoopbackFS) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	log.Trace("LoopbackFS::WriteFile : name=%s", options.Handle.Path)
 	f := options.Handle.GetFileObject()
 
@@ -336,8 +336,7 @@ func (lfs *LoopbackFS) WriteFile(options internal.WriteFileOptions) (int, error)
 func (lfs *LoopbackFS) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("LoopbackFS::TruncateFile : name=%s", options.Name)
 	fsPath := filepath.Join(lfs.path, options.Name)
-
-	return os.Truncate(fsPath, options.Size)
+	return os.Truncate(fsPath, options.NewSize)
 }
 
 func (lfs *LoopbackFS) FlushFile(options internal.FlushFileOptions) error {

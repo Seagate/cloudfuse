@@ -113,7 +113,7 @@ func (rw *ReadWriteCache) OpenFile(options internal.OpenFileOptions) (*handlemap
 	return handle, err
 }
 
-func (rw *ReadWriteCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (rw *ReadWriteCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// log.Trace("Stream::ReadInBuffer : name=%s, handle=%d, offset=%d", options.Handle.Path, options.Handle.ID, options.Offset)
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createHandleCache(options.Handle)
@@ -153,7 +153,7 @@ func (rw *ReadWriteCache) ReadInBuffer(options internal.ReadInBufferOptions) (in
 	return read, err
 }
 
-func (rw *ReadWriteCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (rw *ReadWriteCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	// log.Trace("Stream::WriteFile : name=%s, handle=%d, offset=%d", options.Handle.Path, options.Handle.ID, options.Offset)
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createHandleCache(options.Handle)
@@ -192,7 +192,7 @@ func (rw *ReadWriteCache) WriteFile(options internal.WriteFileOptions) (int, err
 }
 
 func (rw *ReadWriteCache) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("Stream::TruncateFile : name=%s, size=%d", options.Name, options.Size)
+	log.Trace("Stream::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 	// if !rw.StreamOnly {
 	// 	handleMap := handlemap.GetHandles()
 	// 	handleMap.Range(func(key, value interface{}) bool {
@@ -436,7 +436,7 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 	var err error
 	if handle.Size == 0 {
 		offsets = &common.BlockOffsetList{}
-		offsets.Flags.Set(common.SmallFile)
+		offsets.Flags.Set(common.BlobFlagHasNoBlocks)
 	} else {
 		offsets, err = rw.NextComponent().GetFileBlockOffsets(opts)
 		if err != nil {
@@ -445,7 +445,7 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 	}
 	handle.CacheObj.BlockOffsetList = offsets
 	// if its a small file then download the file in its entirety if there is memory available, otherwise stream only
-	if handle.CacheObj.SmallFile() {
+	if handle.CacheObj.HasNoBlocks() {
 		v, err := mem.VirtualMemory()
 		if err != nil {
 			log.Warn(
@@ -470,7 +470,7 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 		handle.CacheObj.BlockList = append(handle.CacheObj.BlockList, block)
 		handle.CacheObj.BlockIdLength = common.GetIdLength(block.Id)
 		// now consists of a block - clear the flag
-		handle.CacheObj.Flags.Clear(common.SmallFile)
+		handle.CacheObj.Flags.Clear(common.BlobFlagHasNoBlocks)
 	}
 	atomic.AddInt32(&rw.CachedObjects, 1)
 	return nil
@@ -503,7 +503,7 @@ func (rw *ReadWriteCache) getBlock(
 		if err != nil {
 			return block, false, err
 		}
-		options := internal.ReadInBufferOptions{
+		options := &internal.ReadInBufferOptions{
 			Handle: handle,
 			Offset: block.StartIndex,
 			Data:   block.Data,

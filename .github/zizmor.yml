@@ -3,3 +3,6 @@ rules:
     ignore:
       - unit-test.yml:47
       - unit-test.yml:55
+  template-injection:
+    ignore:
+      - publish-release.yml:97

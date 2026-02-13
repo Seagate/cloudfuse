@@ -60,7 +60,9 @@ var serviceCmd = &cobra.Command{
 	SuggestFor: []string{"ser", "serv"},
 	Example:    "cloudfuse service install",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage")
+		return errors.New(
+			"missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage",
+		)
 	},
 }
 
@@ -74,7 +76,10 @@ var installCmd = &cobra.Command{
 		// Create the registry for WinFsp
 		err := winservice.CreateWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("Failed to add Windows registry for WinFSP support. Here's why: [%v]", err)
+			return fmt.Errorf(
+				"Failed to add Windows registry for WinFSP support. Here's why: [%v]",
+				err,
+			)
 		}
 		// Add our startup process to the registry
 		var programPath string
@@ -83,7 +88,12 @@ var installCmd = &cobra.Command{
 			// If we can't determine our location, use a standard path
 			programFiles := os.Getenv("ProgramFiles")
 			if programFiles == "" {
-				programPath = filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
+				programPath = filepath.Join(
+					"C:",
+					"Program Files",
+					"Cloudfuse",
+					"windows-startup.exe",
+				)
 			} else {
 				programPath = filepath.Join(programFiles, "Cloudfuse", "windows-startup.exe")
 			}
@@ -91,7 +101,11 @@ var installCmd = &cobra.Command{
 			programPath = filepath.Join(filepath.Dir(exepath), "windows-startup.exe")
 		}
 
-		err = winservice.AddRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse", programPath)
+		err = winservice.AddRegistryValue(
+			`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`,
+			"Cloudfuse",
+			programPath,
+		)
 		if err != nil {
 			return fmt.Errorf("Failed to add startup registry value. Here's why: %v", err)
 		}
@@ -113,19 +127,31 @@ var uninstallCmd = &cobra.Command{
 	Example:    "cloudfuse service uninstall",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Remove the cloudfuse startup registry entry
-		err := winservice.RemoveRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse")
+		err := winservice.RemoveRegistryValue(
+			`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`,
+			"Cloudfuse",
+		)
 		if err != nil {
-			return fmt.Errorf("Failed to remove cloudfuse remount service from Windows startup registry. Here's why: %v", err)
+			return fmt.Errorf(
+				"Failed to remove cloudfuse remount service from Windows startup registry. Here's why: %v",
+				err,
+			)
 		}
 		// Remove the registry for WinFsp
 		err = winservice.RemoveWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
+			return fmt.Errorf(
+				"Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v",
+				err,
+			)
 		}
 
 		err = stopService()
 		if err != nil {
-			cmd.PrintErrf("Attempted to stop service but failed, now attempting to remove service. Here's why: %v", err)
+			cmd.PrintErrf(
+				"Attempted to stop service but failed, now attempting to remove service. Here's why: %v",
+				err,
+			)
 		}
 
 		err = removeService()

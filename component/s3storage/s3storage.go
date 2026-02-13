@@ -95,7 +95,7 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 		if encryptedKeyID == nil {
 			err := errors.New("unable to store key-id securely")
-			log.Err("S3Storage::Configure : ", err.Error())
+			log.Err("S3Storage::Configure : %s", err.Error())
 			return err
 		}
 		secrets.KeyID = encryptedKeyID
@@ -106,7 +106,7 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 		if encryptedSecretKey == nil {
 			err := errors.New("unable to store secret-key securely")
-			log.Err("S3Storage::Configure : ", err.Error())
+			log.Err("S3Storage::Configure : %s", err.Error())
 			return err
 		}
 		secrets.SecretKey = encryptedSecretKey
@@ -144,13 +144,13 @@ func (s3 *S3Storage) OnConfigChange() {
 
 	err = ParseAndReadDynamicConfig(s3, conf, true)
 	if err != nil {
-		log.Err("S3Storage::OnConfigChange : failed to reparse config", err.Error())
+		log.Err("S3Storage::OnConfigChange : failed to reparse config [%s]", err.Error())
 		return
 	}
 
 	err = s3.Storage.UpdateConfig(s3.stConfig)
 	if err != nil {
-		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig", err.Error())
+		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig [%s]", err.Error())
 		return
 	}
 }
@@ -418,7 +418,7 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 }
 
 // Read file data into the buffer given in options.Data.
-func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (s3 *S3Storage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
@@ -447,7 +447,7 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	return length, err
 }
 
-func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (s3 *S3Storage) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	err := s3.Storage.Write(options)
 	return len(options.Data), err
 }
@@ -460,14 +460,14 @@ func (s3 *S3Storage) GetFileBlockOffsets(
 }
 
 func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := s3.Storage.TruncateFile(options.Name, options.Size)
+	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.NewSize)
+	err := s3.Storage.TruncateFile(options.Name, options.NewSize)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
 			truncateFile,
 			options.Name,
-			map[string]any{size: options.Size},
+			map[string]any{size: options.NewSize},
 		)
 		s3StatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}

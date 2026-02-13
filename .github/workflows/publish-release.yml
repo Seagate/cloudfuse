@@ -16,7 +16,7 @@ jobs:
     name: Create Windows Installer
     runs-on: windows-latest
     env:
-      go: "1.25"
+      go: "1.26"
       cgo: "0"
       winfsp: winfsp-2.1.25156.msi
     steps:
@@ -109,7 +109,7 @@ jobs:
     needs: create-installer
     runs-on: ubuntu-latest
     env:
-      go: "1.25"
+      go: "1.26"
       zig: 0.15.2
     permissions:
       contents: write # Needed to create releases

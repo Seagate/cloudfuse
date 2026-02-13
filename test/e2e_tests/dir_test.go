@@ -1,5 +1,4 @@
 //go:build !unittest
-// +build !unittest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -602,7 +601,8 @@ func (suite *dirTestSuite) TestGitStash() {
 		suite.NoError(err)
 		suite.Equal(10, n)
 		suite.Equal("TestString", string(data))
-		_ = f.Close()
+		err = f.Close()
+		suite.NoError(err)
 
 		cmd = exec.Command("git", "status")
 		cliOut, err = cmd.Output()

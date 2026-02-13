@@ -38,8 +38,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // AzStorage Wrapper type around azure go-sdk (track-1)
@@ -104,7 +102,7 @@ reconfigure:
 	}
 
 	// If user has not specified the account type then detect it's HNS or FNS
-	if conf.AccountType == "" && az.storage.IsAccountADLS() {
+	if conf.AccountType == "" && !config.IsSet(compName+".use-adls") && az.storage.IsAccountADLS() {
 		log.Crit(
 			"AzStorage::Configure : Auto detected account type as adls, reconfiguring storage connection.",
 		)
@@ -133,13 +131,13 @@ func (az *AzStorage) OnConfigChange() {
 
 	err = ParseAndReadDynamicConfig(az, conf, true)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to reparse config", err.Error())
+		log.Err("AzStorage::OnConfigChange : failed to reparse config [%s]", err.Error())
 		return
 	}
 
 	err = az.storage.UpdateConfig(az.stConfig)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig", err.Error())
+		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig [%s]", err.Error())
 		return
 	}
 
@@ -310,7 +308,7 @@ func (az *AzStorage) StreamDir(
 	)
 
 	if new_marker == nil {
-		new_marker = to.Ptr("")
+		new_marker = new("")
 	} else if *new_marker != "" {
 		log.Debug("AzStorage::StreamDir : next-marker %s for Path %s", *new_marker, path)
 		if len(new_list) == 0 {
@@ -451,7 +449,7 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
+func (az *AzStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	var size int64
@@ -491,7 +489,7 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 	return
 }
 
-func (az *AzStorage) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (az *AzStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	err := az.storage.Write(options)
 	return len(options.Data), err
 }
@@ -504,11 +502,15 @@ func (az *AzStorage) GetFileBlockOffsets(
 }
 
 func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := az.storage.TruncateFile(options.Name, options.Size)
+	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.NewSize)
+	err := az.storage.TruncateFile(options)
 
 	if err == nil {
-		azStatsCollector.PushEvents(truncateFile, options.Name, map[string]any{size: options.Size})
+		azStatsCollector.PushEvents(
+			truncateFile,
+			options.Name,
+			map[string]any{size: options.NewSize},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
 	return err

@@ -412,7 +412,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-len %v",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
@@ -1551,7 +1551,7 @@ func (fc *FileCache) closeFileInternal(
 }
 
 // ReadInBuffer: Read the local file into a buffer
-func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::ReadInBuffer")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
@@ -1597,7 +1597,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 }
 
 // WriteFile: Write to the local file
-func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::WriteFile")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
@@ -2054,7 +2054,7 @@ func (fc *FileCache) renameOpenHandles(
 
 // TruncateFile: Update the file with its new size.
 func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.Size)
+	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 
 	if fc.diskHighWaterMark != 0 {
 		currSize, err := common.GetUsage(fc.tmpPath)
@@ -2064,7 +2064,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				err.Error(),
 			)
 		} else {
-			if (currSize + float64(options.Size)) > fc.diskHighWaterMark {
+			if (currSize + float64(options.NewSize)) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSize,
@@ -2073,6 +2073,33 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				return syscall.ENOSPC
 			}
 		}
+	}
+
+	if options.Handle != nil {
+		// The call is coming from an open handle, so we can just truncate the local file, and the change will be
+		// flushed to storage on close.
+		f := options.Handle.GetFileObject()
+		if f == nil {
+			log.Err(
+				"FileCache::TruncateFile : error [couldn't find fd in handle] %s",
+				options.Handle.Path,
+			)
+			return syscall.EBADF
+		}
+
+		err := f.Truncate(options.NewSize)
+		if err != nil {
+			log.Err(
+				"FileCache::TruncateFile : error truncating file %s [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
+			return err
+		}
+
+		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+
+		return nil
 	}
 
 	flock := fc.fileLocks.Get(options.Name)
@@ -2092,8 +2119,8 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	if err == nil || os.IsExist(err) {
 		fc.policy.CacheValid(localPath)
 
-		if info.Size() != options.Size {
-			err = os.Truncate(localPath, options.Size)
+		if info.Size() != options.NewSize {
+			err = os.Truncate(localPath, options.NewSize)
 			if err != nil {
 				log.Err(
 					"FileCache::TruncateFile : error truncating cached file %s [%s]",

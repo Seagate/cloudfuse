@@ -96,7 +96,7 @@ func (r *ReadCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handl
 		handlemap.CreateCacheObject(int64(r.BufferSize), handle)
 		if r.CachedObjects >= r.CachedObjLimit {
 			log.Trace(
-				"Stream::OpenFile : file handle limit exceeded - switch handle to stream only mode %s [%s]",
+				"Stream::OpenFile : file handle limit exceeded - switch handle to stream only mode %s [%v]",
 				options.Name,
 				handle.ID,
 			)
@@ -137,7 +137,7 @@ func (r *ReadCache) getBlock(handle *handlemap.Handle, offset int64) (*common.Bl
 		handle.CacheObj.Put(blockKeyObj, block)
 		handle.CacheObj.Unlock()
 		// if the block does not exist fetch it from the next component
-		options := internal.ReadInBufferOptions{
+		options := &internal.ReadInBufferOptions{
 			Handle: handle,
 			Offset: block.StartIndex,
 			Data:   block.Data,
@@ -187,7 +187,7 @@ func (r *ReadCache) copyCachedBlock(
 	return dataRead, nil
 }
 
-func (r *ReadCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (r *ReadCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// if we're only streaming then avoid using the cache
 	if r.StreamOnly || options.Handle.CacheObj.StreamOnly {
 		data, err := r.NextComponent().ReadInBuffer(options)
@@ -224,7 +224,7 @@ func (r *ReadCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr,
 	return r.NextComponent().GetAttr(options)
 }
 
-func (r *ReadCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (r *ReadCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	return 0, syscall.ENOTSUP
 }
 

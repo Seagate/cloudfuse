@@ -170,14 +170,14 @@ func (base *BaseComponent) RenameFile(options RenameFileOptions) error {
 	return nil
 }
 
-func (base *BaseComponent) ReadInBuffer(options ReadInBufferOptions) (int, error) {
+func (base *BaseComponent) ReadInBuffer(options *ReadInBufferOptions) (int, error) {
 	if base.next != nil {
 		return base.next.ReadInBuffer(options)
 	}
 	return 0, nil
 }
 
-func (base *BaseComponent) WriteFile(options WriteFileOptions) (int, error) {
+func (base *BaseComponent) WriteFile(options *WriteFileOptions) (int, error) {
 	if base.next != nil {
 		return base.next.WriteFile(options)
 	}
