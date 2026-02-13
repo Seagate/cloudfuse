@@ -1,5 +1,4 @@
 //go:build !authtest && !azurite
-// +build !authtest,!azurite
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -293,7 +292,7 @@ func (s *datalakeTestSuite) TestFNSOverHNS() {
 
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -315,7 +314,7 @@ func (s *datalakeTestSuite) TestCreateDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -352,7 +351,7 @@ func (s *datalakeTestSuite) TestCreateDirWithCPKEnabled() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName()}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -377,7 +376,7 @@ func (s *datalakeTestSuite) TestDeleteDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -516,7 +515,7 @@ func (s *datalakeTestSuite) TestIsDirEmpty() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -567,7 +566,7 @@ func (s *datalakeTestSuite) TestStreamDir() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.NoError(err)
@@ -607,7 +606,7 @@ func (s *datalakeTestSuite) TestStreamDirRoot() {
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
@@ -693,7 +692,7 @@ func (s *datalakeTestSuite) TestStreamDirWindowsNameConvert() {
 	// Testing dir and dir/
 	var paths = []string{windowsDirName, windowsDirName + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.NoError(err)
@@ -1569,7 +1568,7 @@ func (s *datalakeTestSuite) TestRenameFileMetadataConservation() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: src})
 	// Add srcMeta to source
 	srcMeta := make(map[string]*string)
-	srcMeta["foo"] = to.Ptr("bar")
+	srcMeta["foo"] = new("bar")
 	source.SetMetadata(ctx, srcMeta, nil)
 	dst := generateFileName()
 
@@ -3422,7 +3421,7 @@ func (s *datalakeTestSuite) TestList() {
 	s.assert.NotEqual(0, blobList[0].Mode)
 
 	// Test listing with marker
-	blobList, marker, err = s.az.storage.List(base, to.Ptr("invalid-marker"), 0)
+	blobList, marker, err = s.az.storage.List(base, new("invalid-marker"), 0)
 	s.assert.Error(err)
 	s.assert.Empty(blobList)
 	s.assert.Nil(marker)
