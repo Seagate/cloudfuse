@@ -40,15 +40,17 @@ import (
 type SysLogger struct {
 	level  common.LogLevel
 	tag    string
+	logGoroutineID bool
 	logger *log.Logger
 }
 
 var NoSyslogService = errors.New("failed to create syslog object")
 
-func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
+func newSysLogger(lvl common.LogLevel, tag string, logGoroutineID bool) (*SysLogger, error) {
 	sysLog := &SysLogger{
 		level: lvl,
 		tag:   tag,
+		logGoroutineID: logGoroutineID,
 	}
 
 	err := sysLog.init() //sets up events..
