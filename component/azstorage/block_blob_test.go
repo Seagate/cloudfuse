@@ -1619,7 +1619,7 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err := s.az.TruncateFile(
-		internal.TruncateFileOptions{Name: windowsName, NewSize: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: windowsName, OldSize: -1, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
