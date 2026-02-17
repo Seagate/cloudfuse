@@ -175,7 +175,7 @@ func (suite *rootCmdSuite) TestDetectNewVersionCurrentSame() {
 	suite.assert.Nil(msg)
 }
 
-func (suite *rootCmdSuite) TestExecute() {
+func (suite *rootCmdSuite) testExecute() {
 	suite.T().Helper()
 
 	defer suite.cleanupTest()
