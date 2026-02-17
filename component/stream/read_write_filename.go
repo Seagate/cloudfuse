@@ -38,8 +38,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-
-	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type ReadWriteFilenameCache struct {
@@ -397,7 +396,18 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 			atomic.StoreInt64(&handle.CacheObj.Size, handle.Size)
 			handle.CacheObj.Mtime = handle.Mtime
 			if handle.CacheObj.HasNoBlocks() {
-				if uint64(atomic.LoadInt64(&handle.Size)) > memory.FreeMemory() {
+				v, err := mem.VirtualMemory()
+				if err != nil {
+					log.Warn(
+						"ReadWriteFilenameCache::createFileCache : unable to read system memory info for %s [%v]; switching handle to stream-only mode",
+						handle.Path,
+						err,
+					)
+					handle.CacheObj.StreamOnly = true
+					return nil
+				}
+
+				if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {
 					handle.CacheObj.StreamOnly = true
 					return nil
 				}

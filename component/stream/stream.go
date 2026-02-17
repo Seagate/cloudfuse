@@ -34,8 +34,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-
-	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type Stream struct {
@@ -100,7 +99,14 @@ func (st *Stream) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", st.Name(), err.Error())
 	}
 
-	if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > memory.FreeMemory() {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		log.Warn(
+			"Stream::Configure : unable to read system memory info [%v]; falling back to stream-only mode",
+			err,
+		)
+		st.StreamOnly = true
+	} else if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > v.Free {
 		log.Err(
 			"Stream::Configure : config error, not enough free memory for provided configuration",
 		)
