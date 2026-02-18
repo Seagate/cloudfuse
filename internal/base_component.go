@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -156,9 +156,9 @@ func (base *BaseComponent) OpenFile(options OpenFileOptions) (*handlemap.Handle,
 	return nil, nil
 }
 
-func (base *BaseComponent) CloseFile(options CloseFileOptions) error {
+func (base *BaseComponent) ReleaseFile(options ReleaseFileOptions) error {
 	if base.next != nil {
-		return base.next.CloseFile(options)
+		return base.next.ReleaseFile(options)
 	}
 	return nil
 }

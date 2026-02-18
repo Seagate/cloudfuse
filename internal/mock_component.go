@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -107,18 +107,18 @@ func (mr *MockComponentMockRecorder) CloseDir(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseDir", reflect.TypeOf((*MockComponent)(nil).CloseDir), arg0)
 }
 
-// CloseFile mocks base method.
-func (m *MockComponent) CloseFile(arg0 CloseFileOptions) error {
+// ReleaseFile mocks base method.
+func (m *MockComponent) ReleaseFile(arg0 ReleaseFileOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CloseFile", arg0)
+	ret := m.ctrl.Call(m, "ReleaseFile", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CloseFile indicates an expected call of CloseFile.
-func (mr *MockComponentMockRecorder) CloseFile(arg0 interface{}) *gomock.Call {
+// ReleaseFile indicates an expected call of ReleaseFile.
+func (mr *MockComponentMockRecorder) ReleaseFile(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseFile", reflect.TypeOf((*MockComponent)(nil).CloseFile), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseFile", reflect.TypeOf((*MockComponent)(nil).ReleaseFile), arg0)
 }
 
 // Configure mocks base method.

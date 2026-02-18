@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -84,10 +84,10 @@ func (suite *streamTestSuite) TestStreamOnlyFilenameCloseFile() {
 	suite.setupTestHelper(config, false)
 
 	handle1 := &handlemap.Handle{Size: 2, Path: fileNames[0]}
-	closeFileOptions := internal.CloseFileOptions{Handle: handle1}
+	releaseFileOptions := internal.ReleaseFileOptions{Handle: handle1}
 
-	suite.mock.EXPECT().CloseFile(closeFileOptions).Return(nil)
-	_ = suite.stream.CloseFile(closeFileOptions)
+	suite.mock.EXPECT().ReleaseFile(releaseFileOptions).Return(nil)
+	_ = suite.stream.ReleaseFile(releaseFileOptions)
 	suite.assert.True(suite.stream.StreamOnly)
 }
 
@@ -489,8 +489,8 @@ func (suite *streamTestSuite) TestFilenamePurgeOnClose() {
 	assertNumberOfCachedFileBlocks(suite, 1, handle)
 	assertHandleNotStreamOnly(suite, handle)
 
-	suite.mock.EXPECT().CloseFile(internal.CloseFileOptions{Handle: handle}).Return(nil)
-	_ = suite.stream.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.mock.EXPECT().ReleaseFile(internal.ReleaseFileOptions{Handle: handle}).Return(nil)
+	_ = suite.stream.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assertBlockNotCached(suite, 0, handle)
 }
 
@@ -674,9 +674,9 @@ func (suite *streamTestSuite) TestFilenameStreamOnly2() {
 	assertHandleStreamOnly(suite, handle2)
 
 	//close the first handle
-	closeFileOptions := internal.CloseFileOptions{Handle: handle1}
-	suite.mock.EXPECT().CloseFile(closeFileOptions).Return(nil)
-	_ = suite.stream.CloseFile(closeFileOptions)
+	releaseFileOptions := internal.ReleaseFileOptions{Handle: handle1}
+	suite.mock.EXPECT().ReleaseFile(releaseFileOptions).Return(nil)
+	_ = suite.stream.ReleaseFile(releaseFileOptions)
 
 	// get block for second handle and confirm it gets cached
 	readInBufferOptions := &internal.ReadInBufferOptions{

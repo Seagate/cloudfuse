@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -60,14 +60,20 @@ func resetCLIFlags(cmd cobra.Command) {
 	// reset all CLI flags before next test
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
-		f.Value.Set(f.DefValue)
+		err := f.Value.Set(f.DefValue)
+		if err != nil {
+			panic(err)
+		}
 	})
 	viper.Reset()
 }
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -133,11 +139,11 @@ func (suite *updateTestSuite) TestGetRelease() {
 	suite.assert.Equal(validVersion, resultVer.Version)
 
 	// When no version is passed, should get the latest version
-	resultVer, err = getRelease(ctx, "")
+	_, err = getRelease(ctx, "")
 	suite.assert.NoError(err)
 
 	invalidVersion := "1.1.10"
-	resultVer, err = getRelease(ctx, invalidVersion)
+	_, err = getRelease(ctx, invalidVersion)
 	suite.assert.Error(err)
 }
 
@@ -169,19 +175,19 @@ func (suite *rootCmdSuite) TestDetectNewVersionCurrentSame() {
 	suite.assert.Nil(msg)
 }
 
-func (suite *rootCmdSuite) testExecute() {
-	suite.T().Helper()
+// func (suite *rootCmdSuite) testExecute() {
+// 	suite.T().Helper()
 
-	defer suite.cleanupTest()
-	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"--version"})
+// 	defer suite.cleanupTest()
+// 	buf := new(bytes.Buffer)
+// 	rootCmd.SetOut(buf)
+// 	rootCmd.SetErr(buf)
+// 	rootCmd.SetArgs([]string{"--version"})
 
-	err := Execute()
-	suite.assert.NoError(err)
-	suite.assert.Contains(buf.String(), "cloudfuse version")
-}
+// 	err := Execute()
+// 	suite.assert.NoError(err)
+// 	suite.assert.Contains(buf.String(), "cloudfuse version")
+// }
 
 func (suite *rootCmdSuite) TestParseArgs() {
 	defer suite.cleanupTest()

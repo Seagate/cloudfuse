@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -268,27 +268,35 @@ func (rw *ReadWriteCache) FlushFile(options internal.FlushFileOptions) error {
 	return nil
 }
 
-func (rw *ReadWriteCache) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("Stream::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+func (rw *ReadWriteCache) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 	// try to flush again to make sure it's cleaned up
 	err := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 	if err != nil {
-		log.Err("Stream::CloseFile : error flushing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error flushing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 		return err
 	}
 	if !rw.StreamOnly && !options.Handle.CacheObj.StreamOnly {
 		err = rw.purge(options.Handle, -1)
 		if err != nil {
 			log.Err(
-				"Stream::CloseFile : error purging file %s [%s]",
+				"Stream::ReleaseFile : error purging file %s [%s]",
 				options.Handle.Path,
 				err.Error(),
 			)
 		}
 	}
-	err = rw.NextComponent().CloseFile(options)
+	err = rw.NextComponent().ReleaseFile(options)
 	if err != nil {
-		log.Err("Stream::CloseFile : error closing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error releasing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	return err
 }

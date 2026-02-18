@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -172,7 +172,7 @@ func (suite *LoopbackFSTestSuite) TestCreateFile() {
 
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "CreateFile: Failed to close file")
 }
 
@@ -196,7 +196,7 @@ func (suite *LoopbackFSTestSuite) TestRenameFile() {
 	assert.NotNil(handle)
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TestRenameFile: Failed to close file")
 
 	err = suite.lfs.RenameFile(internal.RenameFileOptions{Src: fileEmpty, Dst: fileHello})
@@ -221,7 +221,7 @@ func (suite *LoopbackFSTestSuite) TestRenameOpenFile() {
 	assert.NotNil(handle)
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TestRenameOpenFile: Failed to close file")
 
 	handle, err = suite.lfs.OpenFile(
@@ -236,7 +236,7 @@ func (suite *LoopbackFSTestSuite) TestRenameOpenFile() {
 	assert.FileExists(filepath.Join(testPath, fileHello))
 	assert.NoFileExists(filepath.Join(testPath, fileEmpty))
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TestRenameOpenFile: Failed to close file")
 }
 
@@ -267,7 +267,7 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFile() {
 	assert.NoError(err)
 	assert.Equal(5, n, "TestRenameWriteFile: failed to write the specified number of bytes")
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TestRenameWriteFile: Failed to close file")
 
 	info, err := os.Stat(filepath.Join(testPath, fileHello))
@@ -310,7 +310,7 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFileGetAttr() {
 	assert.NoError(err)
 	assert.EqualValues(5, attr.Size)
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TestRenameWriteFile: Failed to close file")
 
 	info, err := os.Stat(filepath.Join(testPath, fileHello))
@@ -361,8 +361,8 @@ func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 		assert.Equal(testCase.data, testCase.truth)
 	}
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.NoError(err, "ReadInBuffer: Failed to close file")
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	assert.NoError(err)
 }
 
 func (suite *LoopbackFSTestSuite) TestWriteFile() {
@@ -395,7 +395,7 @@ func (suite *LoopbackFSTestSuite) TestWriteFile() {
 	assert.NoError(err)
 	assert.Len([]byte(quotesText)[5:], n, "WriteFile: failed to write specified number of bytes")
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "WriteFile: Failed to close file")
 
 	attr, err = suite.lfs.GetAttr(internal.GetAttrOptions{Name: fileQuotes})
@@ -419,7 +419,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateFile() {
 	assert.NoError(err, "TruncateFile: cannot stat file")
 	assert.Equal(int64(10), info.Size())
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TruncateFile: Failed to close file")
 }
 
@@ -433,7 +433,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateClosedFile() {
 	assert.NoError(err, "TruncateFile: failed to open file")
 	assert.NotNil(handle)
 
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	assert.NoError(err, "TruncateFile: Failed to close file")
 
 	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, NewSize: 10})
@@ -502,7 +502,8 @@ func (suite *LoopbackFSTestSuite) TestCommitNilDataToExistingFile() {
 	assert.NoError(err)
 	defer os.RemoveAll(lfs.path)
 	Filepath := filepath.Join(lfs.path, "testFile")
-	os.WriteFile(Filepath, []byte("hello"), 0777)
+	err = os.WriteFile(Filepath, []byte("hello"), 0777)
+	assert.NoError(err)
 
 	blockList := []string{}
 	err = lfs.CommitData(internal.CommitDataOptions{Name: "testFile", List: blockList})
