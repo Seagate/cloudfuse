@@ -113,7 +113,7 @@ The [Cloudfuse base configuration file](https://github.com/Seagate/cloudfuse/blo
 
 ### 12. Failed to mount in proxy setup [proxyconnect tcp: dial tcp: lookup : no such host]
 
-Make sure to set the proxy URL in the environment variable `https_proxy` or `http_proxy` and that it is accessible to Blobfuse2 process. If using private endpoint make sure that,
+Make sure to set the proxy URL in the environment variable `https_proxy` or `http_proxy` and that it is accessible to cloudfuse process. If using private endpoint make sure that,
 
 - It is pointing to the `endpoint` in `azstorage` section in config.
 - Or, have a DNS resolution where `account.blob.core.windows.net` can be resolved back to the private endpoint. In case of HNS account, make sure to have the private endpoint configured for both blob and dfs accounts.

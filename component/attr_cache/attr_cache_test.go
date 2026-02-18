@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -594,7 +594,7 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			for _, p := range aAttr {
 				checkItem, found := suite.attrCache.cache.get(p.Path)
 				suite.assert.True(found)
-				if !p.IsDir() {
+				if !checkItem.attr.IsDir() {
 					suite.assert.Equal(size, checkItem.attr.Size) // new size should be set
 					suite.assert.Equal(mode, checkItem.attr.Mode) // new mode should be set
 				}

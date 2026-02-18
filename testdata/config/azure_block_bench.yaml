@@ -2,7 +2,7 @@ config-version: 1.0.0
 
 logging:
   level: log_err
-  file-path: "./blobfuse2.log"
+  file-path: "./cloudfuse.log"
   type: base
 
 components:

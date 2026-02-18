@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -111,15 +111,15 @@ type AccountType int
 
 var EAccountType = AccountType(0).INVALID_ACC()
 
-func (AccountType) INVALID_ACC() AccountType {
+func (a AccountType) INVALID_ACC() AccountType {
 	return AccountType(0)
 }
 
-func (AccountType) BLOCK() AccountType {
+func (a AccountType) BLOCK() AccountType {
 	return AccountType(1)
 }
 
-func (AccountType) ADLS() AccountType {
+func (a AccountType) ADLS() AccountType {
 	return AccountType(2)
 }
 

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -57,7 +57,7 @@ type entryCacheTestSuite struct {
 
 func newLoopbackFS() internal.Component {
 	loopback := loopback.NewLoopbackFSComponent()
-	loopback.Configure(true)
+	_ = loopback.Configure(true)
 
 	return loopback
 }
@@ -101,11 +101,13 @@ func (suite *entryCacheTestSuite) SetupTest() {
 func (suite *entryCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	err := config.ReadConfigFromReader(strings.NewReader(configuration))
+	suite.assert.NoError(err)
 	suite.loopback = newLoopbackFS()
 	suite.entryCache = newEntryCache(suite.loopback)
-	suite.loopback.Start(context.Background())
-	err := suite.entryCache.Start(context.Background())
+	err = suite.loopback.Start(context.Background())
+	suite.assert.NoError(err)
+	err = suite.entryCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
@@ -113,8 +115,9 @@ func (suite *entryCacheTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *entryCacheTestSuite) cleanupTest() {
-	suite.loopback.Stop()
-	err := suite.entryCache.Stop()
+	err := suite.loopback.Stop()
+	suite.assert.NoError(err)
+	err = suite.entryCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
 	}

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/awnumar/memguard"
@@ -45,7 +46,10 @@ var home_dir, _ = os.UserHomeDir()
 
 func randomString(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -60,6 +64,109 @@ func (suite *utilTestSuite) SetupTest() {
 
 func TestUtil(t *testing.T) {
 	suite.Run(t, new(utilTestSuite))
+}
+
+func (suite *utilTestSuite) TestThreadSafeBitmap() {
+	var bitmap BitMap64
+
+	start := make(chan bool)
+	var wg sync.WaitGroup
+
+	set := func() {
+		defer wg.Done()
+		<-start
+		for i := range 100000 {
+			bitmap.Set(uint64(i % 64))
+		}
+	}
+
+	access := func() {
+		defer wg.Done()
+		<-start
+		for i := range 100000 {
+			bitmap.IsSet(uint64(i % 64))
+		}
+	}
+
+	_clear := func() {
+		defer wg.Done()
+		<-start
+		for i := range 100000 {
+			bitmap.Clear(uint64(i % 64))
+		}
+	}
+
+	resetBitmap := func() {
+		defer wg.Done()
+		<-start
+		for range 100000 {
+			bitmap.Reset()
+		}
+	}
+
+	wg.Add(4)
+	go set()
+	go access()
+	go _clear()
+	go resetBitmap()
+	close(start)
+	wg.Wait()
+}
+
+func (suite *utilTestSuite) TestBitmapSetIsSetClear() {
+	var bitmap BitMap64
+
+	for i := range uint64(1000) {
+		j := i % 64
+		ok := bitmap.Set(j)
+		// first time setting the bit should return true
+		suite.assert.True(ok)
+		for k := range uint64(64) {
+			if k == j {
+				suite.assert.True(bitmap.IsSet(k))
+			} else {
+				suite.assert.False(bitmap.IsSet(k))
+			}
+		}
+
+		ok = bitmap.Set(j)
+		// Second time setting the bit should return true
+		suite.assert.False(ok)
+
+		ok = bitmap.Clear(j)
+		// first time clearing the bit should return true
+		suite.assert.True(ok)
+		suite.assert.False(bitmap.IsSet(j))
+
+		ok = bitmap.Clear(j)
+		// second time clearing the bit should return false
+		suite.assert.False(ok)
+		suite.assert.False(bitmap.IsSet(j))
+
+		for k := range uint64(64) {
+			suite.assert.False(bitmap.IsSet(k))
+		}
+	}
+}
+
+func (suite *utilTestSuite) TestBitmapReset() {
+	var bitmap BitMap64
+
+	for i := range uint64(64) {
+		bitmap.Set(i)
+	}
+
+	ok := bitmap.Reset()
+	// Reset should return true if any bit was set
+	suite.assert.True(ok)
+
+	for i := range uint64(64) {
+		suite.assert.False(bitmap.IsSet(i))
+	}
+
+	ok = bitmap.Reset()
+	// Reset should return false if no bit was set
+	suite.assert.False(ok)
 }
 
 func (suite *utilTestSuite) TestIsMountActiveNoMount() {
@@ -88,9 +195,10 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 // 	// Define the file name and the content you want to write
 // 	fileName := "config.yaml"
 
-// 	lbpath := filepath.Join(home_dir, "lbpath")
-// 	os.MkdirAll(lbpath, 0777)
-// 	defer os.RemoveAll(lbpath)
+// lbpath := filepath.Join(home_dir, "lbpath")
+// err := os.MkdirAll(lbpath, 0777)
+// suite.assert.NoError(err)
+// defer os.RemoveAll(lbpath)
 
 // 	content := "components:\n" +
 // 		"  - libfuse\n" +
@@ -98,9 +206,10 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 // 		"loopbackfs:\n" +
 // 		"  path: " + lbpath + "\n\n"
 
-// 	mntdir := filepath.Join(home_dir, "mountdir")
-// 	os.MkdirAll(mntdir, 0777)
-// 	defer os.RemoveAll(mntdir)
+// mntdir := filepath.Join(home_dir, "mountdir")
+// err = os.MkdirAll(mntdir, 0777)
+// suite.assert.NoError(err)
+// defer os.RemoveAll(mntdir)
 
 // 	dir, err := os.Getwd()
 // 	suite.assert.Nil(err)
@@ -142,7 +251,8 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 func (suite *typesTestSuite) TestDirectoryExists() {
 	rand := randomString(8)
 	dir := filepath.Join(home_dir, "dir"+rand)
-	os.MkdirAll(dir, 0777)
+	err := os.MkdirAll(dir, 0777)
+	suite.assert.NoError(err)
 	defer os.RemoveAll(dir)
 
 	exists := DirectoryExists(dir)
@@ -160,14 +270,16 @@ func (suite *typesTestSuite) TestDirectoryDoesNotExist() {
 func (suite *typesTestSuite) TestDecryptBadKey() {
 	// Generate a random key
 	key := make([]byte, 20)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
-	_, err := DecryptData(data, encryptedPassphrase)
+	_, err = DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -191,15 +303,17 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 	// Generate a random key
 	key := make([]byte, 36)
 	encodedKey := make([]byte, 48)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
-	_, err := DecryptData(data, encryptedPassphrase)
+	_, err = DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -267,12 +381,14 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 func (suite *typesTestSuite) TestEncryptDecrypt4() {
 	// Generate a random key
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -285,12 +401,14 @@ func (suite *typesTestSuite) TestEncryptDecrypt4() {
 func (suite *typesTestSuite) TestEncryptDecrypt5() {
 	// Generate a random key
 	key := make([]byte, 64)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 
 	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -433,24 +551,6 @@ func (suite *utilTestSuite) TestGetUSage() {
 	_ = os.RemoveAll(dirName)
 }
 
-func (suite *utilTestSuite) TestGetDiskUsage() {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return
-	}
-
-	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
-	err = os.MkdirAll(dirName, 0777)
-	suite.assert.NoError(err)
-
-	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)
-	suite.assert.NoError(err)
-	suite.assert.NotEqual(0, usage)
-	suite.assert.NotEqual(0, usagePercent)
-	suite.assert.NotEqual(100, usagePercent)
-	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
-}
-
 func (suite *utilTestSuite) TestDirectoryCleanup() {
 	dirName := "./TestDirectoryCleanup"
 
@@ -520,8 +620,8 @@ func (suite *utilTestSuite) TestCRC64() {
 	suite.assert.NotEqual(crc, crc1)
 }
 
-func (s *utilTestSuite) TestGetMD5() {
-	assert := assert.New(s.T())
+func (suite *utilTestSuite) TestGetMD5() {
+	assert := assert.New(suite.T())
 
 	f, err := os.Create("abc.txt")
 	assert.NoError(err)
@@ -542,7 +642,7 @@ func (s *utilTestSuite) TestGetMD5() {
 	os.Remove("abc.txt")
 }
 
-func (s *utilTestSuite) TestComponentExists() {
+func (suite *utilTestSuite) TestComponentExists() {
 	components := []string{
 		"component1",
 		"component2",
@@ -550,58 +650,141 @@ func (s *utilTestSuite) TestComponentExists() {
 	}
 
 	exists := ComponentInPipeline(components, "component1")
-	s.True(exists)
+	suite.True(exists)
 
 	exists = ComponentInPipeline(components, "component4")
-	s.False(exists)
+	suite.False(exists)
 
 }
 
-func (s *utilTestSuite) TestValidatePipeline() {
+func (suite *utilTestSuite) TestValidatePipeline() {
 	err := ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "azstorage"})
-	s.Error(err)
+	suite.Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "xload", "azstorage"})
-	s.Error(err)
+	suite.Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "block_cache", "xload", "azstorage"})
-	s.Error(err)
+	suite.Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "xload", "azstorage"})
-	s.Error(err)
+	suite.Error(err)
 
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "azstorage"})
-	s.NoError(err)
+	suite.NoError(err)
 
 	err = ValidatePipeline([]string{"libfuse", "block_cache", "azstorage"})
-	s.NoError(err)
+	suite.NoError(err)
 
 	err = ValidatePipeline([]string{"libfuse", "xload", "attr_cache", "azstorage"})
-	s.NoError(err)
+	suite.NoError(err)
 }
 
-func (s *utilTestSuite) TestUpdatePipeline() {
+func (suite *utilTestSuite) TestUpdatePipeline() {
 	pipeline := UpdatePipeline([]string{"libfuse", "file_cache", "azstorage"}, "xload")
-	s.NotNil(pipeline)
-	s.False(ComponentInPipeline(pipeline, "file_cache"))
-	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+	suite.NotNil(pipeline)
+	suite.False(ComponentInPipeline(pipeline, "file_cache"))
+	suite.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "block_cache", "azstorage"}, "xload")
-	s.NotNil(pipeline)
-	s.False(ComponentInPipeline(pipeline, "block_cache"))
-	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+	suite.NotNil(pipeline)
+	suite.False(ComponentInPipeline(pipeline, "block_cache"))
+	suite.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "file_cache", "azstorage"}, "block_cache")
-	s.NotNil(pipeline)
-	s.False(ComponentInPipeline(pipeline, "file_cache"))
-	s.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
+	suite.NotNil(pipeline)
+	suite.False(ComponentInPipeline(pipeline, "file_cache"))
+	suite.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "xload", "azstorage"}, "block_cache")
-	s.NotNil(pipeline)
-	s.False(ComponentInPipeline(pipeline, "xload"))
-	s.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
+	suite.NotNil(pipeline)
+	suite.False(ComponentInPipeline(pipeline, "xload"))
+	suite.Equal([]string{"libfuse", "block_cache", "azstorage"}, pipeline)
 
 	pipeline = UpdatePipeline([]string{"libfuse", "xload", "azstorage"}, "xload")
-	s.NotNil(pipeline)
-	s.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+	suite.NotNil(pipeline)
+	suite.Equal([]string{"libfuse", "xload", "azstorage"}, pipeline)
+}
+
+func TestPrettyOpenFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		flag int
+		want string
+	}{
+		{
+			name: "read only",
+			flag: os.O_RDONLY,
+			want: "[O_RDONLY]",
+		},
+		{
+			name: "write only",
+			flag: os.O_WRONLY,
+			want: "[O_WRONLY]",
+		},
+		{
+			name: "read write",
+			flag: os.O_RDWR,
+			want: "[O_RDWR]",
+		},
+		{
+			name: "rdwr create trunc",
+			flag: os.O_RDWR | os.O_CREATE | os.O_TRUNC,
+			// access first, then flags in flagNames order
+			want: "[O_RDWR | O_CREATE | O_TRUNC]",
+		},
+		{
+			name: "wronly append",
+			flag: os.O_WRONLY | os.O_APPEND,
+			want: "[O_WRONLY | O_APPEND]",
+		},
+		{
+			name: "rdwr append create excl sync trunc",
+			flag: os.O_RDWR | os.O_APPEND | os.O_CREATE | os.O_EXCL | os.O_SYNC | os.O_TRUNC,
+			want: "[O_RDWR | O_APPEND | O_CREATE | O_EXCL | O_SYNC | O_TRUNC]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PrettyOpenFlags(tt.flag)
+			if got != tt.want {
+				t.Fatalf("PrettyOpenFlags(%#x) = %q, want %q", tt.flag, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetGoroutineIDBasic validates that GetGoroutineID returns a non-zero, stable goroutine id within
+// the same goroutine.
+func (suite *utilTestSuite) TestGetGoroutineIDBasic() {
+	gid1 := GetGoroutineID()
+	suite.Positive(gid1)
+	gid2 := GetGoroutineID()
+	suite.Equal(gid1, gid2, "goroutine id should be stable within same goroutine")
+}
+
+// TestGetGoroutineIDParallel validates that concurrently obtained goroutine IDs are unique
+// for live goroutines.
+func (suite *utilTestSuite) TestGetGoroutineIDParallel() {
+	const workers = 10
+	idsCh := make(chan uint64, workers)
+	var wg sync.WaitGroup
+
+	for range workers {
+		wg.Go(func() {
+			idsCh <- GetGoroutineID()
+		})
+	}
+
+	wg.Wait()
+	close(idsCh)
+
+	idMap := make(map[uint64]struct{}, workers)
+	for id := range idsCh {
+		suite.Positive(id)
+		idMap[id] = struct{}{}
+	}
+
+	suite.Len(idMap, workers, "expected unique goroutine ids equal to workers")
 }

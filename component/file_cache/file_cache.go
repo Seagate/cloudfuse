@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -66,7 +66,7 @@ type FileCache struct {
 	offloadIO       bool
 	syncToFlush     bool
 	syncToDelete    bool
-	maxCacheSize    float64
+	maxCacheSizeMB  float64
 
 	defaultPermission os.FileMode
 
@@ -214,7 +214,7 @@ func (fc *FileCache) GenConfig() string {
 	log.Info("FileCache::Configure : config generation started")
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\n%s:", fc.Name()))
+	fmt.Fprintf(&sb, "\n%s:", fc.Name())
 
 	tmpPath := ""
 	_ = config.UnmarshalKey("tmp-path", &tmpPath)
@@ -227,8 +227,8 @@ func (fc *FileCache) GenConfig() string {
 		timeout = 0
 	}
 
-	sb.WriteString(fmt.Sprintf("\n  path: %v", common.ExpandPath(tmpPath)))
-	sb.WriteString(fmt.Sprintf("\n  timeout-sec: %v", timeout))
+	fmt.Fprintf(&sb, "\n  path: %v", common.ExpandPath(tmpPath))
+	fmt.Fprintf(&sb, "\n  timeout-sec: %v", timeout)
 
 	return sb.String()
 }
@@ -268,7 +268,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	fc.refreshSec = conf.RefreshSec
-	fc.hardLimit = true
+	fc.hardLimit = conf.HardLimit
 
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
@@ -316,13 +316,22 @@ func (fc *FileCache) Configure(_ bool) error {
 			fc.Name(),
 			err.Error(),
 		)
-		fc.maxCacheSize = 4192
+		fc.maxCacheSizeMB = 4192
 	} else {
-		fc.maxCacheSize = 0.8 * float64(avail) / (MB)
+		fc.maxCacheSizeMB = 0.8 * float64(avail) / (MB)
 	}
 
 	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
-		fc.maxCacheSize = conf.MaxSizeMB
+		fc.maxCacheSizeMB = conf.MaxSizeMB
+	}
+
+	if fc.maxCacheSizeMB <= 0 {
+		log.Err("FileCache: config error [max-size-mb must be greater than 0]")
+		return fmt.Errorf(
+			"config error in %s error [max-size-mb: %f must be greater than 0]",
+			fc.Name(),
+			fc.maxCacheSizeMB,
+		)
 	}
 
 	if !isLocalDirEmpty(fc.tmpPath) && !fc.allowNonEmpty {
@@ -352,13 +361,10 @@ func (fc *FileCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
 	}
-	if config.IsSet(compName + ".hard-limit") {
-		fc.hardLimit = conf.HardLimit
-	}
 
 	fc.diskHighWaterMark = 0
-	if fc.hardLimit && fc.maxCacheSize != 0 {
-		fc.diskHighWaterMark = (((fc.maxCacheSize * MB) * float64(cacheConfig.highThreshold)) / 100)
+	if fc.hardLimit && fc.maxCacheSizeMB != 0 {
+		fc.diskHighWaterMark = (((fc.maxCacheSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
 	if config.IsSet(compName + ".schedule") {
@@ -416,7 +422,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
-		int(cacheConfig.maxSizeMB),
+		int(fc.maxCacheSizeMB),
 		int(cacheConfig.highThreshold),
 		int(cacheConfig.lowThreshold),
 		fc.refreshSec,
@@ -431,7 +437,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.syncToDelete,
 		fc.defaultPermission,
 		fc.diskHighWaterMark,
-		fc.maxCacheSize,
+		fc.maxCacheSizeMB,
 		fc.mountPath,
 		len(fc.schedule),
 	)
@@ -454,7 +460,9 @@ func (fc *FileCache) OnConfigChange() {
 	fc.cacheTimeout = max(float64(conf.Timeout), minimumFileCacheTimeout)
 	fc.policyTrace = conf.EnablePolicyTrace
 	fc.offloadIO = conf.OffloadIO
-	fc.maxCacheSize = conf.MaxSizeMB
+	if conf.MaxSizeMB > 0 {
+		fc.maxCacheSizeMB = conf.MaxSizeMB
+	}
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	_ = fc.policy.UpdateConfig(fc.GetPolicyConfig(conf))
@@ -478,7 +486,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
 		cacheTimeout:  uint32(fc.cacheTimeout),
-		maxSizeMB:     fc.maxCacheSize,
+		maxSizeMB:     fc.maxCacheSizeMB,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 	}
@@ -499,7 +507,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
 	// if cache size is set to 0 then we have the root mount usage
-	maxCacheSize := fc.maxCacheSize * MB
+	maxCacheSize := fc.maxCacheSizeMB * MB
 	if maxCacheSize == 0 {
 		log.Err("FileCache::StatFs : Not responding to StatFs because max cache size is zero")
 		return nil, false, nil
@@ -1336,7 +1344,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
 					log.Err(
 						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
-						fc.maxCacheSize,
+						fc.maxCacheSizeMB,
 						options.Name,
 					)
 					return nil, syscall.ENOSPC
@@ -1464,8 +1472,8 @@ func (fc *FileCache) isDownloadRequired(
 	return downloadRequired, cached, cloudAttr, err
 }
 
-// CloseFile: Flush the file and invalidate it from the cache.
-func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
+// ReleaseFile: Flush the file and invalidate it from the cache.
+func (fc *FileCache) ReleaseFile(options internal.ReleaseFileOptions) error {
 	// Lock the file so that while close is in progress no one can open the file again
 	flock := fc.fileLocks.Get(options.Handle.Path)
 	flock.Lock()
@@ -1475,25 +1483,25 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 
 	if !fc.lazyWrite {
 		// Sync close is called so wait till the upload completes
-		return fc.closeFileInternal(options, flock)
+		return fc.releaseFileInternal(options, flock)
 	}
 
-	go fc.closeFileInternal(options, flock) //nolint
+	go fc.releaseFileInternal(options, flock) //nolint
 	return nil
 }
 
 // flock must already be locked before calling this function
-func (fc *FileCache) closeFileInternal(
-	options internal.CloseFileOptions,
+func (fc *FileCache) releaseFileInternal(
+	options internal.ReleaseFileOptions,
 	flock *common.LockMapItem,
 ) error {
 	log.Trace(
-		"FileCache::closeFileInternal : name=%s, handle=%d",
+		"FileCache::releaseFileInternal : name=%s, handle=%d",
 		options.Handle.Path,
 		options.Handle.ID,
 	)
 
-	// Lock is acquired by CloseFile, at end of this method we need to unlock
+	// Lock is acquired by ReleaseFile, at end of this method we need to unlock
 	// If its async call file shall be locked till the upload completes.
 	defer flock.Unlock()
 	defer fc.fileCloseOpt.Done()
@@ -1507,14 +1515,14 @@ func (fc *FileCache) closeFileInternal(
 			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
 		) //nolint
 		if err != nil {
-			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
+			log.Err("FileCache::releaseFileInternal : failed to flush file %s", options.Handle.Path)
 			return err
 		}
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
 			log.Err(
-				"FileCache::closeFileInternal : error [missing fd in handle object] %s",
+				"FileCache::releaseFileInternal : error [missing fd in handle object] %s",
 				options.Handle.Path,
 			)
 			return syscall.EBADF
@@ -1523,7 +1531,7 @@ func (fc *FileCache) closeFileInternal(
 		err = f.Close()
 		if err != nil {
 			log.Err(
-				"FileCache::closeFileInternal : error closing file %s(%d) [%s]",
+				"FileCache::releaseFileInternal : error closing file %s(%d) [%s]",
 				options.Handle.Path,
 				int(f.Fd()),
 				err.Error(),
@@ -1541,7 +1549,7 @@ func (fc *FileCache) closeFileInternal(
 
 	// If it is an fsync op then purge the file
 	if options.Handle.Fsynced() {
-		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
+		log.Trace("FileCache::releaseFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CachePurge(localPath)
 		return nil
@@ -1629,7 +1637,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 			if (currSize + float64(len(options.Data))) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
-					fc.maxCacheSize,
+					fc.maxCacheSizeMB,
 					options.Handle.Path,
 				)
 				return 0, syscall.ENOSPC
@@ -2067,7 +2075,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			if (currSize + float64(options.NewSize)) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
-					fc.maxCacheSize,
+					fc.maxCacheSizeMB,
 					options.Name,
 				)
 				return syscall.ENOSPC

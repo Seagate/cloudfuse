@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -114,16 +114,59 @@ labels:
   app: pied-piper
 `
 
-var specconf = `
-replicas: 2
-selector:
-  matchLabels:
-    app: web
-template:
-  metadata:
-    labels:
-      app: web
-`
+// var specconf = `
+// replicas: 2
+// selector:
+//   matchLabels:
+//     app: web
+// template:
+//   metadata:
+//     labels:
+//       app: web
+// `
+
+// Function to test config reader when there is both env vars and cli flags that overlap config file.
+// func (suite *ConfigTestSuite) TestOverlapShadowConfigReader() {
+// 	defer suite.cleanupTest()
+// 	assert := assert.New(suite.T())
+
+// 	specOptsTruth := &Spec{
+// 		Replicas: 2,
+// 		Select: Selector{
+// 			Match: MatchLabels{
+// 				App: "bachmanity",
+// 			},
+// 		},
+// 		Templ: Template{
+// 			Meta: Metadata{
+// 				Label: Labels{
+// 					App: "prof. bighead",
+// 				},
+// 			},
+// 		},
+// 	}
+
+// 	err := os.Setenv("CF_TEST_MATCHLABELS_APP", specOptsTruth.Select.Match.App)
+// 	assert.NoError(err)
+// 	BindEnv("selector.matchLabels.app", "CF_TEST_MATCHLABELS_APP")
+
+// 	templAppFlag := AddStringFlag("template-flag", "defoval", "OJ")
+// 	err = templAppFlag.Value.Set(specOptsTruth.Templ.Meta.Label.App)
+// 	assert.NoError(err)
+// 	templAppFlag.Changed = true
+// 	BindPFlag("template.metadata.labels.app", templAppFlag)
+// 	err = os.Setenv("CF_TEST_TEMPLABELS_APP", "somethingthatshouldnotshowup")
+// 	assert.NoError(err)
+// 	BindEnv("template.metadata.labels.app", "CF_TEST_TEMPLABELS_APP")
+
+// 	err = ReadConfigFromReader(strings.NewReader(specconf))
+// 	assert.NoError(err)
+// 	specOpts := &Spec{}
+// 	err = Unmarshal(specOpts)
+// 	assert.NoError(err)
+// 	assert.Equal(specOptsTruth, specOpts)
+
+// }
 
 // Function to test only config file reader: testcase 2
 func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
@@ -311,7 +354,8 @@ func (suite *ConfigTestSuite) TestConfigFileDescription() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	os.WriteFile("test.yaml", []byte(config2), 0644)
+	err := os.WriteFile("test.yaml", []byte(config2), 0644)
+	assert.NoError(err)
 	plaintext, err := os.ReadFile("test.yaml")
 	assert.NoError(err)
 	assert.NotNil(plaintext)

@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -86,7 +86,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	suite.assert.EqualValues(n, size)
 	suite.assert.Equal(h.Size, int64(size))
 
-	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
@@ -103,7 +103,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	_, _ = tobj.blockCache.ReadInBuffer(
 		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
-	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
@@ -126,7 +126,7 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	_, _ = tobj.blockCache.ReadInBuffer(
 		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
 	)
-	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)

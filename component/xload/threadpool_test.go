@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -89,8 +89,10 @@ func (suite *threadPoolTestSuite) TestThreadPoolSchedule() {
 	suite.assert.NotNil(tp.priorityItems)
 	suite.assert.NotNil(tp.workItems)
 
-	tp.Schedule(&WorkItem{Priority: true})
-	tp.Schedule(&WorkItem{})
+	err := tp.Schedule(&WorkItem{Priority: true})
+	suite.assert.NoError(err)
+	err = tp.Schedule(&WorkItem{})
+	suite.assert.NoError(err)
 
 	time.Sleep(1 * time.Second)
 	tp.Stop()
@@ -115,9 +117,11 @@ func (suite *threadPoolTestSuite) TestPrioritySchedule() {
 
 	for i := range 100 {
 		if i < 20 {
-			tp.Schedule(&WorkItem{Priority: true})
+			err := tp.Schedule(&WorkItem{Priority: true})
+			suite.assert.NoError(err)
 		} else {
-			tp.Schedule(&WorkItem{})
+			err := tp.Schedule(&WorkItem{})
+			suite.assert.NoError(err)
 		}
 
 	}

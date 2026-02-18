@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -90,21 +90,29 @@ type Component interface {
 	DeleteFile(DeleteFileOptions) error
 
 	OpenFile(OpenFileOptions) (*handlemap.Handle, error)
-	CloseFile(CloseFileOptions) error
-
-	RenameFile(RenameFileOptions) error
 
 	ReadInBuffer(*ReadInBufferOptions) (int, error)
-
 	WriteFile(*WriteFileOptions) (int, error)
-	TruncateFile(TruncateFileOptions) error
+
+	SyncFile(SyncFileOptions) error
+	// Flush is called on each close() of a file descriptor, as opposed to release which is called on the close of the
+	// last file descriptor for a file.
+	//
+	// NOTE: The flush() method may be called more than once for each open().  This happens if more than one file
+	//       descriptor refers to an open file handle, e.g. due to dup(), dup2() or fork() calls.  It is not possible to
+	//       determine if a flush is final, so each flush should be treated equally. Multiple write-flush sequences are
+	//       relatively rare, so this shouldn't be a problem.
+	FlushFile(FlushFileOptions) error
+	// Release is called when there are no more references to an open file: all file descriptors are closed for this
+	// handle.
+	ReleaseFile(ReleaseFileOptions) error
+
+	RenameFile(RenameFileOptions) error
 
 	CopyToFile(CopyToFileOptions) error
 	CopyFromFile(CopyFromFileOptions) error
 
 	SyncDir(SyncDirOptions) error
-	SyncFile(SyncFileOptions) error
-	FlushFile(FlushFileOptions) error
 
 	// Symlink operations
 	CreateLink(CreateLinkOptions) error
@@ -116,8 +124,11 @@ type Component interface {
 	//2. must return valid nodeID that was passed with any create/update operations for eg: CreateFile, CreateDir etc
 	GetAttr(GetAttrOptions) (*ObjAttr, error)
 
+	// SetAttr is implemented by the following functions in libfuse High level API.
 	Chmod(ChmodOptions) error
 	Chown(ChownOptions) error
+	TruncateFile(TruncateFileOptions) error
+
 	GetFileBlockOffsets(options GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error)
 
 	FileUsed(name string) error

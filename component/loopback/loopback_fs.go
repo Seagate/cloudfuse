@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -242,12 +242,12 @@ func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Ha
 	return handle, nil
 }
 
-func (lfs *LoopbackFS) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("LoopbackFS::CloseFile : name=%s", options.Handle.Path)
+func (lfs *LoopbackFS) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("LoopbackFS::ReleaseFile : name=%s", options.Handle.Path)
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
-		log.Err("LoopbackFS::CloseFile : error [file not available]")
+		log.Err("LoopbackFS::ReleaseFile : error [file not available]")
 		return syscall.EBADF
 	}
 
