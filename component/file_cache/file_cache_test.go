@@ -2240,6 +2240,40 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 	suite.assert.EqualValues(1024, attr.Size)
 }
 
+func (suite *fileCacheTestSuite) TestGetAttrDirtyOpenHandle() {
+	defer suite.cleanupTest()
+
+	file := "file26_dirty"
+
+	// Create file in cloud storage so GetAttr has a baseline there.
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Open via file cache and write without flushing, leaving a dirty handle.
+	openHandle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: file, Flags: os.O_RDWR, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	handlemap.Add(openHandle)
+
+	data := []byte("dirty data")
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: openHandle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(attr)
+	suite.assert.Equal(file, attr.Path)
+	suite.assert.EqualValues(len(data), attr.Size)
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	suite.assert.NoError(err)
+}
+
 func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	defer suite.cleanupTest()
 

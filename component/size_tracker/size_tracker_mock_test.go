@@ -123,6 +123,40 @@ func (suite *sizeTrackerMockTestSuite) TestStateMachineNormalMode() {
 	suite.assert.EqualValues(0, stat.Blocks)
 }
 
+func (suite *sizeTrackerMockTestSuite) TestStatFsRefreshThrottle() {
+	suite.cleanupTest()
+
+	cfg := fmt.Sprintf(
+		"libfuse:\n  display-capacity-mb: 1\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 10\n  statfs-refresh-sec: 60",
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	bucketUsage := uint64(8 * 1024 * 1024)
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{
+		Blocks:  bucketUsage / 4096,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   4096,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  4096,
+		Namemax: 255,
+	}, true, nil).Times(1)
+
+	statA, retA, errA := suite.sizeTracker.StatFs()
+	suite.assert.True(retA)
+	suite.assert.NoError(errA)
+	suite.assert.NotNil(statA)
+
+	statB, retB, errB := suite.sizeTracker.StatFs()
+	suite.assert.True(retB)
+	suite.assert.NoError(errB)
+	suite.assert.NotNil(statB)
+	suite.assert.Equal(statA.Blocks, statB.Blocks)
+}
+
 // TestStateMachineTransitionToOveruse tests transition from Normal to Overuse mode
 func (suite *sizeTrackerMockTestSuite) TestStateMachineTransitionToOveruse() {
 	defer suite.cleanupTest()

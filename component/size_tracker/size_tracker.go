@@ -28,6 +28,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -48,6 +50,9 @@ type SizeTracker struct {
 	evictionMode        EvictionMode
 	bucketUsage         uint64
 	statSizeOffset      uint64
+	statfsRefresh       time.Duration
+	lastStatfsUpdate    time.Time
+	statfsMu            sync.Mutex
 }
 
 type EvictionMode int
@@ -61,6 +66,7 @@ const (
 type SizeTrackerOptions struct {
 	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
+	StatfsRefreshSec    uint32 `config:"statfs-refresh-sec"       yaml:"statfs-refresh-sec,omitempty"`
 }
 
 const compName = "size_tracker"
@@ -137,17 +143,23 @@ func (st *SizeTracker) Configure(_ bool) error {
 		st.serverCount = (st.totalBucketCapacity + st.displayCapacity/2) / st.displayCapacity
 	}
 
+	if conf.StatfsRefreshSec > 0 {
+		st.statfsRefresh = time.Duration(conf.StatfsRefreshSec) * time.Second
+	}
+
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
 		journalName = conf.JournalName
 	} else {
-		s3conf := s3storage.Options{}
-		if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
-			sanitizedName := common.SanitizeName(s3conf.BucketName + "-" + s3conf.PrefixPath)
-			if sanitizedName != "" {
-				journalName = sanitizedName + ".dat"
+		if config.IsSet("s3storage") {
+			s3conf := s3storage.Options{}
+			if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
+				sanitizedName := common.SanitizeName(s3conf.BucketName + "-" + s3conf.PrefixPath)
+				if sanitizedName != "" {
+					journalName = sanitizedName + ".dat"
+				}
 			}
-		} else {
+		} else if config.IsSet("azstorage") {
 			azconf := azstorage.AzStorageOptions{}
 			if err := config.UnmarshalKey("azstorage", &azconf); err == nil {
 				sanitizedName := common.SanitizeName(azconf.Container + "-" + azconf.PrefixPath)
@@ -168,6 +180,7 @@ func (st *SizeTracker) Priority() internal.ComponentPriority {
 
 // OnConfigChange : If component has registered, on config file change this method is called
 func (st *SizeTracker) OnConfigChange() {
+	log.Trace("SizeTracker::OnConfigChange : %s", st.Name())
 }
 
 func (st *SizeTracker) RenameDir(options internal.RenameDirOptions) error {
@@ -297,48 +310,76 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 	blocks := st.mountSize.GetSize() / uint64(blockSize)
 
 	if st.totalBucketCapacity != 0 {
-		stat, ret, err := st.NextComponent().StatFs()
+		now := time.Now()
+		shouldRefresh := true
+		var statSizeOffset uint64
 
-		if err == nil && ret {
-			// Custom logic for use with Nx Plugin
-			// The Nx VMS evicts data until utilization is at 90% (of display capacity)
-			// Use a size offset to show the Nx eviction threshold at our desired utilization
-			// Only update the offset when bucket usage is updated
-			returnedBucketUsage := stat.Blocks * uint64(blockSize)
-			isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
-			if isBucketUsageUpdated {
-				// record the updated usage
-				st.bucketUsage = returnedBucketUsage
-				// convert everything to float64
-				bucketCapacity := float64(st.totalBucketCapacity)
-				bucketUsage := float64(returnedBucketUsage)
-				displayCapacity := float64(st.displayCapacity)
-				serverUsage := float64(st.mountSize.GetSize())
-				serverCount := float64(st.serverCount)
-				sizeOffset := float64(st.statSizeOffset)
-				nxEvictionThreshold := targetUtilization * displayCapacity
-				intendedCapacity := bucketCapacity / serverCount
-				// Use a finite state machine. The evictionMode is the state.
-				// calculate bucket usage and update eviction mode accordingly
-				st.updateState(bucketUsage / bucketCapacity)
-				switch st.evictionMode {
-				case Normal:
-					// the server count starts as the bucket capacity divided by the display capacity
-					// if the server count has been incremented, offset the tracked size
-					sizeOffset = nxEvictionThreshold - targetUtilization*intendedCapacity
-				case Overuse:
-					// drive to a utilization target below the bucketNormalizedThreshold
-					normalizationTargetFactor := bucketNormalizedThreshold - hysteresisMargin
-					sizeOffset = nxEvictionThreshold - normalizationTargetFactor*intendedCapacity
-				case Emergency:
-					// just report the whole bucket usage
-					sizeOffset = bucketUsage - serverUsage
+		if st.statfsRefresh > 0 {
+			st.statfsMu.Lock()
+			if !st.lastStatfsUpdate.IsZero() && now.Sub(st.lastStatfsUpdate) < st.statfsRefresh {
+				shouldRefresh = false
+				statSizeOffset = st.statSizeOffset
+			}
+			st.statfsMu.Unlock()
+		}
+
+		if shouldRefresh {
+			stat, ret, err := st.NextComponent().StatFs()
+			if err != nil {
+				return nil, true, err
+			}
+
+			if ret {
+				// Custom logic for use with Nx Plugin
+				// The Nx VMS evicts data until utilization is at 90% (of display capacity)
+				// Use a size offset to show the Nx eviction threshold at our desired utilization
+				// Only update the offset when bucket usage is updated
+				returnedBucketUsage := stat.Blocks * uint64(blockSize)
+
+				st.statfsMu.Lock()
+				isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
+				if isBucketUsageUpdated {
+					// record the updated usage
+					st.bucketUsage = returnedBucketUsage
+					// convert everything to float64
+					bucketCapacity := float64(st.totalBucketCapacity)
+					bucketUsage := float64(returnedBucketUsage)
+					displayCapacity := float64(st.displayCapacity)
+					serverUsage := float64(st.mountSize.GetSize())
+					serverCount := float64(st.serverCount)
+					sizeOffset := float64(st.statSizeOffset)
+					nxEvictionThreshold := targetUtilization * displayCapacity
+					intendedCapacity := bucketCapacity / serverCount
+					// Use a finite state machine. The evictionMode is the state.
+					// calculate bucket usage and update eviction mode accordingly
+					st.updateState(bucketUsage / bucketCapacity)
+					switch st.evictionMode {
+					case Normal:
+						// the server count starts as the bucket capacity divided by the display capacity
+						// if the server count has been incremented, offset the tracked size
+						sizeOffset = nxEvictionThreshold - targetUtilization*intendedCapacity
+					case Overuse:
+						// drive to a utilization target below the bucketNormalizedThreshold
+						normalizationTargetFactor := bucketNormalizedThreshold - hysteresisMargin
+						sizeOffset = nxEvictionThreshold - normalizationTargetFactor*intendedCapacity
+					case Emergency:
+						// just report the whole bucket usage
+						sizeOffset = bucketUsage - serverUsage
+					}
+					st.statSizeOffset = uint64(max(0, sizeOffset))
 				}
-				st.statSizeOffset = uint64(max(0, sizeOffset))
+				st.lastStatfsUpdate = now
+				statSizeOffset = st.statSizeOffset
+				st.statfsMu.Unlock()
+			} else {
+				st.statfsMu.Lock()
+				statSizeOffset = st.statSizeOffset
+				st.statfsMu.Unlock()
 			}
 		}
+
 		// add the offset
-		blocks += st.statSizeOffset / uint64(blockSize)
+		blocks += statSizeOffset / uint64(blockSize)
 	}
 
 	stat := common.Statfs_t{

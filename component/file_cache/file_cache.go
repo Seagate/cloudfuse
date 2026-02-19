@@ -1901,6 +1901,20 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
 	flock.RLock()
 
+	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	if flock.Count() > 0 && fc.hasDirtyHandle(options.Name) {
+		info, err := os.Stat(localPath)
+		if err == nil && !info.IsDir() {
+			flock.RUnlock()
+			log.Trace(
+				"FileCache::GetAttr : serving %s attr from local cache because of dirty handle",
+				options.Name,
+			)
+			return newObjAttr(options.Name, info), nil
+		}
+	}
+
 	// To cover case 1, get attributes from storage
 	var exists bool
 	attrs, err := fc.NextComponent().GetAttr(options)
@@ -1917,7 +1931,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
 	flock.RUnlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
@@ -1942,6 +1955,20 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	return attrs, nil
+}
+
+func (fc *FileCache) hasDirtyHandle(path string) bool {
+	handleMap := handlemap.GetHandles()
+	dirty := false
+	handleMap.Range(func(_ any, value any) bool {
+		handle, ok := value.(*handlemap.Handle)
+		if ok && handle.Path == path && handle.Dirty() {
+			dirty = true
+			return false
+		}
+		return true
+	})
+	return dirty
 }
 
 // RenameFile: Invalidate the file in local cache.
