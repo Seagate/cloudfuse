@@ -660,21 +660,35 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// Try seartching for the object directly if supported
+	var (
+		objects  []*internal.ObjAttr
+		listErr  error
+		headAttr *internal.ObjAttr
+	)
 	if cl.Config.enableDirMarker {
-		attr, err := cl.headObject(dirName, false, true)
-		if err == nil {
-			return attr, err
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			headAttr, _ = cl.headObject(dirName, false, true)
+		}()
+		go func() {
+			defer wg.Done()
+			objects, _, listErr = cl.List(dirName, nil, 1)
+		}()
+		wg.Wait()
+		if headAttr != nil {
+			return headAttr, nil
 		}
+	} else {
+		objects, _, listErr = cl.List(dirName, nil, 1)
 	}
 
-	// Otherwise, the cloud does not support directory markers, so use list
-	// or the directory does exist but there is no marker for it, so look for an object
-	// in the directory
-	objects, _, err := cl.List(dirName, nil, 1)
-	if err != nil {
-		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
-		return nil, err
+	// Otherwise, the cloud does not support directory markers, or there is no
+	// marker, so look for an object in the directory.
+	if listErr != nil {
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
+		return nil, listErr
 	} else if len(objects) > 0 {
 		// create and return an objAttr for the directory
 		attr := internal.CreateObjAttrDir(dirName)

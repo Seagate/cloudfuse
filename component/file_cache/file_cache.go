@@ -1074,7 +1074,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// If an empty file is created in cloud storage then there is no need to upload if FlushFile is called immediately after CreateFile.
 	if !fc.createEmptyFile {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 	}
 
 	// update state
@@ -1317,7 +1317,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 
 	if flags&os.O_TRUNC != 0 {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 	}
 
 	inf, err := f.Stat()
@@ -1700,7 +1700,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(options.Handle)
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
@@ -1809,11 +1809,22 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// The local handle can still be used for read and write.
 		var orgMode fs.FileMode
 		modeChanged := false
-		notInCloud := fc.notInCloud(
-			options.Handle.Path,
-		)
+		uploadNow := options.AsyncUpload || fc.alwaysOn
+		if !uploadNow {
+			flock := fc.fileLocks.Get(options.Handle.Path)
+			flock.RLock()
+			syncPending := flock.SyncPending
+			flock.RUnlock()
+			if syncPending {
+				uploadNow = false
+			} else if _, scheduled := fc.scheduleOps.Load(options.Handle.Path); scheduled {
+				uploadNow = false
+			} else {
+				uploadNow = !fc.notInCloud(options.Handle.Path)
+			}
+		}
 		// Figure out if we should upload immediately or append to pending OPS
-		if options.AsyncUpload || !notInCloud || fc.alwaysOn {
+		if uploadNow {
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -1849,7 +1860,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			uploadHandle.Close()
 			if err == nil {
 				// Clear dirty flag since file was successfully uploaded
-				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+				fc.clearHandleDirty(options.Handle)
 			}
 
 			if err != nil {
@@ -1883,7 +1894,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
 			}
-			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+			fc.clearHandleDirty(options.Handle)
 
 		}
 
@@ -1937,13 +1948,21 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, localErr := os.Stat(localPath)
-	if flock.Count() > 0 && fc.hasDirtyHandle(options.Name) {
+	if flock.Count() > 0 && flock.DirtyCount() > 0 {
 		if localErr == nil && !info.IsDir() {
 			flock.RUnlock()
-			log.Trace(
-				"FileCache::GetAttr : serving %s attr from local cache because of dirty handle",
-				options.Name,
-			)
+			return newObjAttr(options.Name, info), nil
+		}
+	}
+
+	// If upload is deferred, local cache is the only source of truth until scheduler syncs it.
+	if localErr == nil && !info.IsDir() {
+		if flock.SyncPending {
+			flock.RUnlock()
+			return newObjAttr(options.Name, info), nil
+		}
+		if _, scheduled := fc.scheduleOps.Load(options.Name); scheduled {
+			flock.RUnlock()
 			return newObjAttr(options.Name, info), nil
 		}
 	}
@@ -1994,18 +2013,28 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	return attrs, nil
 }
 
-func (fc *FileCache) hasDirtyHandle(path string) bool {
-	handleMap := handlemap.GetHandles()
-	dirty := false
-	handleMap.Range(func(_ any, value any) bool {
-		handle, ok := value.(*handlemap.Handle)
-		if ok && handle.Path == path && handle.Dirty() {
-			dirty = true
-			return false
-		}
-		return true
-	})
-	return dirty
+func (fc *FileCache) setHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	alreadyDirty := handle.Dirty()
+	if !alreadyDirty {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if !alreadyDirty {
+		fc.fileLocks.Get(handle.Path).IncDirty()
+	}
+}
+
+func (fc *FileCache) clearHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	wasDirty := handle.Dirty()
+	if wasDirty {
+		handle.Flags.Clear(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if wasDirty {
+		fc.fileLocks.Get(handle.Path).DecDirty()
+	}
 }
 
 // RenameFile: Invalidate the file in local cache.
@@ -2174,7 +2203,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			return err
 		}
 
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(options.Handle)
 
 		return nil
 	}

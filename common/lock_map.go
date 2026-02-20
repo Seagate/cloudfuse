@@ -27,12 +27,14 @@ package common
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Lock item for each file
 type LockMapItem struct {
 	handleCount  uint32
+	dirtyCount   atomic.Uint32
 	mtx          sync.RWMutex
 	downloadTime time.Time
 	// track if file is in lazy open state
@@ -96,6 +98,29 @@ func (l *LockMapItem) Dec() {
 // Get the current handle count
 func (l *LockMapItem) Count() uint32 {
 	return l.handleCount
+}
+
+// Increment dirty-handle count.
+func (l *LockMapItem) IncDirty() {
+	l.dirtyCount.Add(1)
+}
+
+// Decrement dirty-handle count.
+func (l *LockMapItem) DecDirty() {
+	for {
+		current := l.dirtyCount.Load()
+		if current == 0 {
+			return
+		}
+		if l.dirtyCount.CompareAndSwap(current, current-1) {
+			return
+		}
+	}
+}
+
+// Get the current dirty-handle count.
+func (l *LockMapItem) DirtyCount() uint32 {
+	return l.dirtyCount.Load()
 }
 
 // Set the download time of the file

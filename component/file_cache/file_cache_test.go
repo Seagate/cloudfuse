@@ -2692,6 +2692,35 @@ func (suite *fileCacheTestSuite) TestTruncateFileHandleNoOpDoesNotSetDirty() {
 	suite.assert.NoError(err)
 }
 
+func (suite *fileCacheTestSuite) TestDirtyCountTracksWriteAndFlush() {
+	defer suite.cleanupTest()
+
+	suite.fileCache.createEmptyFile = true
+	path := "dirty_count_file"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.assert.NoError(err)
+
+	flock := suite.fileCache.fileLocks.Get(path)
+	suite.assert.EqualValues(0, flock.DirtyCount(), "handle should start clean")
+
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
+		Handle: handle,
+		Data:   []byte("abc"),
+		Offset: 0,
+	})
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+	suite.assert.EqualValues(1, flock.DirtyCount(), "dirty count should be updated after write")
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty())
+	suite.assert.EqualValues(0, flock.DirtyCount(), "dirty count should be cleared after flush")
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
 func (suite *fileCacheTestSuite) TestZZMountPathConflict() {
 	defer suite.cleanupTest()
 	configuration := fmt.Sprintf(
