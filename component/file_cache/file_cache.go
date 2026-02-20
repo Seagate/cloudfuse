@@ -1341,7 +1341,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 					err.Error(),
 				)
 			} else {
-				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
+				if float64(currSize*MB)+float64(fileSize) > fc.diskHighWaterMark {
 					log.Err(
 						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
 						fc.maxCacheSizeMB,
@@ -1634,7 +1634,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 		if err != nil {
 			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
 		} else {
-			if (currSize + float64(len(options.Data))) > fc.diskHighWaterMark {
+			if float64(currSize*MB)+float64(len(options.Data)) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,
@@ -1903,9 +1903,9 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
+	info, localErr := os.Stat(localPath)
 	if flock.Count() > 0 && fc.hasDirtyHandle(options.Name) {
-		info, err := os.Stat(localPath)
-		if err == nil && !info.IsDir() {
+		if localErr == nil && !info.IsDir() {
 			flock.RUnlock()
 			log.Trace(
 				"FileCache::GetAttr : serving %s attr from local cache because of dirty handle",
@@ -1915,26 +1915,30 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	}
 
+	flock.RUnlock()
+
 	// To cover case 1, get attributes from storage
 	var exists bool
-	attrs, err := fc.NextComponent().GetAttr(options)
-	if err != nil {
-		if err == syscall.ENOENT || os.IsNotExist(err) {
+	attrs, remoteErr := fc.NextComponent().GetAttr(options)
+	if remoteErr != nil {
+		if remoteErr == syscall.ENOENT || os.IsNotExist(remoteErr) {
 			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 			exists = false
 		} else {
-			log.Err("FileCache::GetAttr : Failed to get attr of %s [%s]", options.Name, err.Error())
-			return nil, err
+			log.Err(
+				"FileCache::GetAttr : Failed to get attr of %s [%s]",
+				options.Name,
+				remoteErr.Error(),
+			)
+			return nil, remoteErr
 		}
 	} else {
 		exists = true
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	info, err := os.Stat(localPath)
-	flock.RUnlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-	if err == nil && !info.IsDir() {
+	if localErr == nil && info != nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// attrs is a pointer returned by NextComponent
 			// modifying attrs could corrupt cached directory listings
@@ -2099,7 +2103,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				err.Error(),
 			)
 		} else {
-			if (currSize + float64(options.NewSize)) > fc.diskHighWaterMark {
+			if float64(currSize*MB)+float64(options.NewSize) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,
