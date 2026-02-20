@@ -2672,6 +2672,26 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 	// _, err = os.Stat(suite.fake_storage_path + "/" + path)
 }
 
+func (suite *fileCacheTestSuite) TestTruncateFileHandleNoOpDoesNotSetDirty() {
+	defer suite.cleanupTest()
+
+	suite.fileCache.createEmptyFile = true
+	path := "file32a"
+
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty(), "new handle should start clean when create-empty-file is enabled")
+
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: 0, Handle: handle},
+	)
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty(), "no-op truncate should not mark handle dirty")
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
 func (suite *fileCacheTestSuite) TestZZMountPathConflict() {
 	defer suite.cleanupTest()
 	configuration := fmt.Sprintf(

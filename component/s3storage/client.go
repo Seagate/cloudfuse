@@ -722,8 +722,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	}
 	// read object data
 	defer objectDataReader.Close()
-	objectData, err := io.ReadAll(objectDataReader)
-
+	_, err = io.Copy(fi, objectDataReader)
 	if err != nil {
 		if strings.Contains(err.Error(), "checksum did not match") {
 			// If count is 0 and offset is 0 then this is a real checksum error
@@ -742,14 +741,8 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 			return err
 		}
 	}
-	// write data to file
-	_, err = fi.Write(objectData)
-	if err != nil {
-		log.Err("Couldn't write to file %v. Here's why: %v", name, err)
-		return err
-	}
 
-	return err
+	return nil
 }
 
 // Download object with the given name and return the data as a byte array.
