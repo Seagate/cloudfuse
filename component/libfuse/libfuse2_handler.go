@@ -734,9 +734,6 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	}
 	if err != nil {
 		if isAccessDeniedFuseErr(err) {
-			handle.Lock()
-			handle.SetValue(handlemap.HandleValueReadAccessDeniedAt, time.Now())
-			handle.Unlock()
 			return -fuse.EACCES
 		}
 		log.Err(
