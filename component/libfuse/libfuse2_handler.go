@@ -924,29 +924,20 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 		log.Err("Libfuse::Rename : Failed to get attributes of %s [%s]", srcPath, srcErr.Error())
 		return -fuse.ENOENT
 	}
-	dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
-
-	// EISDIR
-	if dstErr == nil && dstAttr.IsDir() && !srcAttr.IsDir() {
-		log.Err(
-			"Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory",
-			dstPath,
-			srcPath,
-		)
-		return -fuse.EISDIR
-	}
-
-	// ENOTDIR
-	if dstErr == nil && !dstAttr.IsDir() && srcAttr.IsDir() {
-		log.Err(
-			"Libfuse::Rename : dst [%s] is an existing file but src [%s] is a directory",
-			dstPath,
-			srcPath,
-		)
-		return -fuse.ENOTDIR
-	}
 
 	if srcAttr.IsDir() {
+		dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
+
+		// ENOTDIR
+		if dstErr == nil && !dstAttr.IsDir() {
+			log.Err(
+				"Libfuse::Rename : dst [%s] is an existing file but src [%s] is a directory",
+				dstPath,
+				srcPath,
+			)
+			return -fuse.ENOTDIR
+		}
+
 		// ENOTEMPTY
 		if dstErr == nil {
 			empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: dstPath})
@@ -975,13 +966,24 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 
 	} else {
+		// Fast path for file renames: skip destination GetAttr unless rename fails.
+		// This avoids extra metadata round-trips when destination is usually a new file.
 		err := fuseFS.NextComponent().RenameFile(internal.RenameFileOptions{
 			Src:     srcPath,
 			Dst:     dstPath,
 			SrcAttr: srcAttr,
-			DstAttr: dstAttr,
 		})
 		if err != nil {
+			dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
+			if dstErr == nil && dstAttr.IsDir() {
+				log.Err(
+					"Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory",
+					dstPath,
+					srcPath,
+				)
+				return -fuse.EISDIR
+			}
+
 			log.Err(
 				"Libfuse::Rename : error renaming file %s -> %s [%s]",
 				srcPath,

@@ -2692,6 +2692,38 @@ func (suite *fileCacheTestSuite) TestTruncateFileHandleNoOpDoesNotSetDirty() {
 	suite.assert.NoError(err)
 }
 
+func (suite *fileCacheTestSuite) TestTruncateFileHandleReopenFallback() {
+	defer suite.cleanupTest()
+
+	path := "file32b"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.assert.NoError(err)
+
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
+		Handle: handle,
+		Data:   []byte("abc"),
+		Offset: 0,
+	})
+	suite.assert.NoError(err)
+
+	// Simulate a missing fd on an otherwise valid handle.
+	handle.SetFileObject(nil)
+	handle.UnixFD = 0
+
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: 1, Handle: handle},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(handle.GetFileObject(), "truncate should recover a missing file object")
+
+	info, statErr := os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.NoError(statErr)
+	suite.assert.EqualValues(1, info.Size())
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
 func (suite *fileCacheTestSuite) TestDirtyCountTracksWriteAndFlush() {
 	defer suite.cleanupTest()
 

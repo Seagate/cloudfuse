@@ -582,7 +582,7 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	// Check if there are any open handles to this file or not
-	if flock.Count() > 0 {
+	if flock.Count() > 0 || flock.SyncPending {
 		log.Warn("lruPolicy::DeleteItem : File in use %s", name)
 		p.CacheValid(name)
 		return

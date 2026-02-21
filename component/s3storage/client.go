@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -624,10 +625,11 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
+	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
 
 	// first let's suppose the caller is looking for a file
 	// so if this was called with a trailing slash, don't look for an object
-	if len(name) > 0 && name[len(name)-1] != '/' {
+	if !explicitDirLookup {
 		attr, err := cl.getFileAttr(name)
 		if err == nil {
 			return attr, err
@@ -640,7 +642,7 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	// ensure a trailing slash
 	dirName := internal.ExtendDirName(name)
 	// now search for that as a directory
-	return cl.getDirectoryAttr(dirName)
+	return cl.getDirectoryAttr(dirName, explicitDirLookup)
 }
 
 // Get attributes for the given file path.
@@ -657,47 +659,78 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	return object, err
 }
 
-func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
+func (cl *Client) getDirectoryAttr(dirName string, explicitDirLookup bool) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	var (
-		objects  []*internal.ObjAttr
-		listErr  error
-		headAttr *internal.ObjAttr
-	)
-	if cl.Config.enableDirMarker {
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			headAttr, _ = cl.headObject(dirName, false, true)
-		}()
-		go func() {
-			defer wg.Done()
-			objects, _, listErr = cl.List(dirName, nil, 1)
-		}()
-		wg.Wait()
-		if headAttr != nil {
-			return headAttr, nil
-		}
-	} else {
-		objects, _, listErr = cl.List(dirName, nil, 1)
-	}
+	objects, _, listErr := cl.List(dirName, nil, 1)
 
 	// Otherwise, the cloud does not support directory markers, or there is no
 	// marker, so look for an object in the directory.
 	if listErr != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
 		return nil, listErr
-	} else if len(objects) > 0 {
+	}
+	if len(objects) > 0 {
 		// create and return an objAttr for the directory
 		attr := internal.CreateObjAttrDir(dirName)
 		return attr, nil
 	}
 
+	// Only check for explicit empty directory markers when needed.
+	// For file-like names, this saves one extra HeadObject
+	// call on miss-heavy paths that are not directories.
+	if cl.Config.enableDirMarker && shouldProbeDirMarker(dirName, explicitDirLookup) {
+		headAttr, headErr := cl.headObject(dirName, false, true)
+		if headErr == nil {
+			return headAttr, nil
+		}
+		if headErr != syscall.ENOENT {
+			log.Err(
+				"Client::getDirectoryAttr : HeadObject(%s) failed. Here's why: %v",
+				dirName,
+				headErr,
+			)
+			return nil, headErr
+		}
+	}
+
 	// directory not found in bucket
 	log.Err("Client::getDirectoryAttr : not found: %s", dirName)
 	return nil, syscall.ENOENT
+}
+
+var knownFileLikeExtensions = map[string]struct{}{
+	".tmp":  {},
+	".ini":  {},
+	".inf":  {},
+	".db":   {},
+	".guid": {},
+	".nxdb": {},
+	".mkv":  {},
+	".mp4":  {},
+	".avi":  {},
+	".mov":  {},
+	".txt":  {},
+	".doc":  {},
+	".docx": {},
+	".xls":  {},
+	".xlsx": {},
+	".ppt":  {},
+	".pptx": {},
+}
+
+func shouldProbeDirMarker(dirName string, explicitDirLookup bool) bool {
+	if explicitDirLookup {
+		return true
+	}
+	trimmed := internal.TruncateDirName(dirName)
+	base := strings.ToLower(filepath.Base(trimmed))
+	ext := strings.ToLower(filepath.Ext(base))
+	if ext == "" {
+		return true
+	}
+	_, isFileLike := knownFileLikeExtensions[ext]
+	return !isFileLike
 }
 
 // Download object data to a file handle.

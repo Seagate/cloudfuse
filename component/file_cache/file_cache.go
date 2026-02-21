@@ -2179,12 +2179,41 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	if options.Handle != nil {
 		// The call is coming from an open handle, so we can just truncate the local file, and the change will be
 		// flushed to storage on close.
+		if !openCompleted(options.Handle) {
+			flock := fc.fileLocks.Get(options.Name)
+			flock.Lock()
+			err := fc.openFileInternal(options.Handle, flock)
+			flock.Unlock()
+			if err != nil {
+				return fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+			}
+		}
+
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			log.Err(
-				"FileCache::TruncateFile : error [couldn't find fd in handle] %s",
-				options.Handle.Path,
+			// Recover missing fd on valid handles by reopening the cached path.
+			// This avoids issues when truncate arrives before the handle has a live file object.
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			reopened, reopenErr := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
+			if reopenErr == nil {
+				options.Handle.UnixFD = uint64(reopened.Fd())
+				options.Handle.SetFileObject(reopened)
+				f = reopened
+			}
+		}
+
+		if f == nil {
+			log.Warn(
+				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
+				options.Name,
 			)
+			options.Handle = nil
+		}
+	}
+
+	if options.Handle != nil {
+		f := options.Handle.GetFileObject()
+		if f == nil {
 			return syscall.EBADF
 		}
 
