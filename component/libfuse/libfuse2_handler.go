@@ -467,6 +467,11 @@ func (cf *CgofuseFS) Readdir(
 	startOffset := offset
 	// fetch and serve directory contents back to the OS in a loop until their buffer is full
 	for {
+		if cacheInfo.lastPage && startOffset >= cacheInfo.eIndex {
+			// EOF for this directory stream.
+			return 0
+		}
+
 		// is the next offset we need already cached in our cacheInfo structure?
 		offsetCached := startOffset >= cacheInfo.sIndex && startOffset < cacheInfo.eIndex
 		fetchDataFromPipeline := !offsetCached
@@ -485,6 +490,9 @@ func (cf *CgofuseFS) Readdir(
 		}
 		// we can't get the requested data (validToken is probably false)
 		if startOffset >= cacheInfo.eIndex {
+			if cacheInfo.lastPage {
+				return 0
+			}
 			log.Warn("Libfuse::Readdir : %s offset=%d but last cached offset is %d (token=%s)",
 				path, startOffset, cacheInfo.eIndex, cacheInfo.token)
 			// If offset is still beyond the end index limit then we are done iterating
@@ -725,6 +733,12 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		err = nil
 	}
 	if err != nil {
+		if isAccessDeniedFuseErr(err) {
+			handle.Lock()
+			handle.SetValue(handlemap.HandleValueReadAccessDeniedAt, time.Now())
+			handle.Unlock()
+			return -fuse.EACCES
+		}
 		log.Err(
 			"Libfuse::Read : error reading file %s, handle: %d [%s]",
 			handle.Path,
@@ -735,6 +749,10 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	}
 
 	return bytesRead
+}
+
+func isAccessDeniedFuseErr(err error) bool {
+	return os.IsPermission(err) || errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EPERM)
 }
 
 // Write writes data to a file from the buffer with the given offset.
