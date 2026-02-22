@@ -311,21 +311,20 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 
 	if st.totalBucketCapacity != 0 {
 		now := time.Now()
-		shouldRefresh := true
 		var statSizeOffset uint64
 
-		if st.statfsRefresh > 0 {
-			st.statfsMu.Lock()
-			if !st.lastStatfsUpdate.IsZero() && now.Sub(st.lastStatfsUpdate) < st.statfsRefresh {
-				shouldRefresh = false
-				statSizeOffset = st.statSizeOffset
-			}
+		st.statfsMu.Lock()
+		if st.statfsRefresh > 0 &&
+			!st.lastStatfsUpdate.IsZero() &&
+			now.Sub(st.lastStatfsUpdate) < st.statfsRefresh {
+			statSizeOffset = st.statSizeOffset
 			st.statfsMu.Unlock()
-		}
-
-		if shouldRefresh {
+		} else {
+			// Keep the lock across refresh so concurrent statfs bursts don't fan out.
 			stat, ret, err := st.NextComponent().StatFs()
 			if err != nil {
+				st.lastStatfsUpdate = now
+				st.statfsMu.Unlock()
 				return nil, true, err
 			}
 
@@ -335,8 +334,6 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 				// Use a size offset to show the Nx eviction threshold at our desired utilization
 				// Only update the offset when bucket usage is updated
 				returnedBucketUsage := stat.Blocks * uint64(blockSize)
-
-				st.statfsMu.Lock()
 				isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
 				if isBucketUsageUpdated {
 					// record the updated usage
@@ -368,17 +365,12 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 					}
 					st.statSizeOffset = uint64(max(0, sizeOffset))
 				}
-				st.lastStatfsUpdate = now
-				statSizeOffset = st.statSizeOffset
-				st.statfsMu.Unlock()
-			} else {
-				st.statfsMu.Lock()
-				statSizeOffset = st.statSizeOffset
-				st.statfsMu.Unlock()
 			}
+			st.lastStatfsUpdate = now
+			statSizeOffset = st.statSizeOffset
+			st.statfsMu.Unlock()
 		}
 
-		// add the offset
 		blocks += statSizeOffset / uint64(blockSize)
 	}
 

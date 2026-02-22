@@ -626,6 +626,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
 	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
+	dirName := internal.ExtendDirName(name)
 
 	// first let's suppose the caller is looking for a file
 	// so if this was called with a trailing slash, don't look for an object
@@ -636,11 +637,12 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
+		} else if !shouldProbeDirMarker(dirName, explicitDirLookup) {
+			// For obvious file-like names, skip expensive directory probing on miss-heavy paths.
+			return nil, syscall.ENOENT
 		}
 	}
 
-	// ensure a trailing slash
-	dirName := internal.ExtendDirName(name)
 	// now search for that as a directory
 	return cl.getDirectoryAttr(dirName, explicitDirLookup)
 }
