@@ -1012,6 +1012,57 @@ func (s *clientTestSuite) TestGetAttrError() {
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
+func (s *clientTestSuite) TestShouldProbeDirMarker() {
+	defer s.cleanupTest()
+	cases := []struct {
+		name              string
+		dirName           string
+		explicitDirLookup bool
+		want              bool
+	}{
+		{
+			name:              "file-like-extension",
+			dirName:           internal.ExtendDirName("videos/clip.mkv"),
+			explicitDirLookup: false,
+			want:              false,
+		},
+		{
+			name:              "file-like-uppercase-extension",
+			dirName:           internal.ExtendDirName("videos/CLIP.MKV"),
+			explicitDirLookup: false,
+			want:              false,
+		},
+		{
+			name:              "file-like-nxdb-extension",
+			dirName:           internal.ExtendDirName("meta/cache/asset.nxdb"),
+			explicitDirLookup: false,
+			want:              false,
+		},
+		{
+			name:              "no-extension",
+			dirName:           internal.ExtendDirName("logs/2026/02/23"),
+			explicitDirLookup: false,
+			want:              true,
+		},
+		{
+			name:              "explicit-dir-lookup",
+			dirName:           internal.ExtendDirName("videos/clip.mkv"),
+			explicitDirLookup: true,
+			want:              true,
+		},
+		{
+			name:              "root-dir",
+			dirName:           internal.ExtendDirName(""),
+			explicitDirLookup: false,
+			want:              true,
+		},
+	}
+
+	for _, tc := range cases {
+		got := shouldProbeDirMarker(tc.dirName, tc.explicitDirLookup)
+		s.assert.Equal(tc.want, got, tc.name)
+	}
+}
 func (s *clientTestSuite) TestList() {
 	defer s.cleanupTest()
 	// setup

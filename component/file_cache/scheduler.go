@@ -275,7 +275,7 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		}
 		handle.UnixFD = uint64(f.Fd())
 		handle.SetFileObject(f)
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 
 		// upload the file
 		err = fc.flushFileInternal(

@@ -71,12 +71,11 @@ func totalSectors(path string) int64 {
 
 }
 
-// GetUsage: The current disk usage in MB
+// GetUsage: The current disk usage in bytes
 func GetUsage(path string) (float64, error) {
 	totalSectors := totalSectors(path)
 
 	totalBytes := float64(totalSectors * SectorSize)
-	totalBytes = totalBytes / MbToBytes
 
 	return totalBytes, nil
 }
