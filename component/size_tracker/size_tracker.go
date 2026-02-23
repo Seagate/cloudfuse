@@ -28,8 +28,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -50,9 +48,6 @@ type SizeTracker struct {
 	evictionMode        EvictionMode
 	bucketUsage         uint64
 	statSizeOffset      uint64
-	statfsRefresh       time.Duration
-	lastStatfsUpdate    time.Time
-	statfsMu            sync.Mutex
 }
 
 type EvictionMode int
@@ -66,7 +61,6 @@ const (
 type SizeTrackerOptions struct {
 	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
-	StatfsRefreshSec    uint32 `config:"statfs-refresh-sec"       yaml:"statfs-refresh-sec,omitempty"`
 }
 
 const compName = "size_tracker"
@@ -141,10 +135,6 @@ func (st *SizeTracker) Configure(_ bool) error {
 		// calculate server count
 		// round to the nearest whole number
 		st.serverCount = (st.totalBucketCapacity + st.displayCapacity/2) / st.displayCapacity
-	}
-
-	if conf.StatfsRefreshSec > 0 {
-		st.statfsRefresh = time.Duration(conf.StatfsRefreshSec) * time.Second
 	}
 
 	journalName := defaultJournalName
@@ -307,68 +297,48 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 	blocks := st.mountSize.GetSize() / uint64(blockSize)
 
 	if st.totalBucketCapacity != 0 {
-		now := time.Now()
-		var statSizeOffset uint64
+		stat, ret, err := st.NextComponent().StatFs()
 
-		st.statfsMu.Lock()
-		if st.statfsRefresh > 0 &&
-			!st.lastStatfsUpdate.IsZero() &&
-			now.Sub(st.lastStatfsUpdate) < st.statfsRefresh {
-			statSizeOffset = st.statSizeOffset
-			st.statfsMu.Unlock()
-		} else {
-			// Keep the lock across refresh so concurrent statfs bursts don't fan out.
-			stat, ret, err := st.NextComponent().StatFs()
-			if err != nil {
-				st.lastStatfsUpdate = now
-				st.statfsMu.Unlock()
-				return nil, true, err
-			}
-
-			if ret {
-				// Custom logic for use with Nx Plugin
-				// The Nx VMS evicts data until utilization is at 90% (of display capacity)
-				// Use a size offset to show the Nx eviction threshold at our desired utilization
-				// Only update the offset when bucket usage is updated
-				returnedBucketUsage := stat.Blocks * uint64(blockSize)
-				isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
-				if isBucketUsageUpdated {
-					// record the updated usage
-					st.bucketUsage = returnedBucketUsage
-					// convert everything to float64
-					bucketCapacity := float64(st.totalBucketCapacity)
-					bucketUsage := float64(returnedBucketUsage)
-					displayCapacity := float64(st.displayCapacity)
-					serverUsage := float64(st.mountSize.GetSize())
-					serverCount := float64(st.serverCount)
-					sizeOffset := float64(st.statSizeOffset)
-					nxEvictionThreshold := targetUtilization * displayCapacity
-					intendedCapacity := bucketCapacity / serverCount
-					// Use a finite state machine. The evictionMode is the state.
-					// calculate bucket usage and update eviction mode accordingly
-					st.updateState(bucketUsage / bucketCapacity)
-					switch st.evictionMode {
-					case Normal:
-						// the server count starts as the bucket capacity divided by the display capacity
-						// if the server count has been incremented, offset the tracked size
-						sizeOffset = nxEvictionThreshold - targetUtilization*intendedCapacity
-					case Overuse:
-						// drive to a utilization target below the bucketNormalizedThreshold
-						normalizationTargetFactor := bucketNormalizedThreshold - hysteresisMargin
-						sizeOffset = nxEvictionThreshold - normalizationTargetFactor*intendedCapacity
-					case Emergency:
-						// just report the whole bucket usage
-						sizeOffset = bucketUsage - serverUsage
-					}
-					st.statSizeOffset = uint64(max(0, sizeOffset))
+		if err == nil && ret {
+			// Custom logic for use with Nx Plugin
+			// The Nx VMS evicts data until utilization is at 90% (of display capacity)
+			// Use a size offset to show the Nx eviction threshold at our desired utilization
+			// Only update the offset when bucket usage is updated
+			returnedBucketUsage := stat.Blocks * uint64(blockSize)
+			isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
+			if isBucketUsageUpdated {
+				// record the updated usage
+				st.bucketUsage = returnedBucketUsage
+				// convert everything to float64
+				bucketCapacity := float64(st.totalBucketCapacity)
+				bucketUsage := float64(returnedBucketUsage)
+				displayCapacity := float64(st.displayCapacity)
+				serverUsage := float64(st.mountSize.GetSize())
+				serverCount := float64(st.serverCount)
+				sizeOffset := float64(st.statSizeOffset)
+				nxEvictionThreshold := targetUtilization * displayCapacity
+				intendedCapacity := bucketCapacity / serverCount
+				// Use a finite state machine. The evictionMode is the state.
+				// calculate bucket usage and update eviction mode accordingly
+				st.updateState(bucketUsage / bucketCapacity)
+				switch st.evictionMode {
+				case Normal:
+					// the server count starts as the bucket capacity divided by the display capacity
+					// if the server count has been incremented, offset the tracked size
+					sizeOffset = nxEvictionThreshold - targetUtilization*intendedCapacity
+				case Overuse:
+					// drive to a utilization target below the bucketNormalizedThreshold
+					normalizationTargetFactor := bucketNormalizedThreshold - hysteresisMargin
+					sizeOffset = nxEvictionThreshold - normalizationTargetFactor*intendedCapacity
+				case Emergency:
+					// just report the whole bucket usage
+					sizeOffset = bucketUsage - serverUsage
 				}
+				st.statSizeOffset = uint64(max(0, sizeOffset))
 			}
-			st.lastStatfsUpdate = now
-			statSizeOffset = st.statSizeOffset
-			st.statfsMu.Unlock()
 		}
-
-		blocks += statSizeOffset / uint64(blockSize)
+		// add the offset
+		blocks += st.statSizeOffset / uint64(blockSize)
 	}
 
 	stat := common.Statfs_t{
