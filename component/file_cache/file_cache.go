@@ -364,7 +364,7 @@ func (fc *FileCache) Configure(_ bool) error {
 
 	fc.diskHighWaterMark = 0
 	if fc.hardLimit && fc.maxCacheSizeMB != 0 {
-		fc.diskHighWaterMark = (((fc.maxCacheSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
+		fc.diskHighWaterMark = fc.maxCacheSizeMB * MB
 	}
 
 	if config.IsSet(compName + ".schedule") {
@@ -513,7 +513,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 		return nil, false, nil
 	}
 	usage, _ := common.GetUsage(fc.tmpPath)
-	available := maxCacheSize - usage*MB
+	available := maxCacheSize - usage
 
 	// how much space is available on the underlying file system?
 	availableOnCacheFS, err := fc.getAvailableSize()
@@ -1340,7 +1340,13 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 					err.Error(),
 				)
 			} else {
-				if float64(currSize*MB)+float64(fileSize) > fc.diskHighWaterMark {
+				// Subtract existing local file size to avoid double-counting
+				existingSize := int64(0)
+				if info, statErr := os.Stat(localPath); statErr == nil {
+					existingSize = info.Size()
+				}
+				additionalSpace := max(int64(0), fileSize-existingSize)
+				if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
 					log.Err(
 						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
 						fc.maxCacheSizeMB,
@@ -1633,7 +1639,14 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 		if err != nil {
 			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
 		} else {
-			if float64(currSize*MB)+float64(len(options.Data)) > fc.diskHighWaterMark {
+			// Calculate additional space needed beyond the file's current size
+			existingSize := int64(0)
+			if info, statErr := f.Stat(); statErr == nil {
+				existingSize = info.Size()
+			}
+			newEnd := options.Offset + int64(len(options.Data))
+			additionalSpace := max(int64(0), newEnd-existingSize)
+			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,
@@ -2108,7 +2121,14 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				err.Error(),
 			)
 		} else {
-			if float64(currSize*MB)+float64(options.NewSize) > fc.diskHighWaterMark {
+			// Only count the additional space beyond the file's current size
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			existingSize := int64(0)
+			if info, statErr := os.Stat(localPath); statErr == nil {
+				existingSize = info.Size()
+			}
+			additionalSpace := max(int64(0), options.NewSize-existingSize)
+			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,

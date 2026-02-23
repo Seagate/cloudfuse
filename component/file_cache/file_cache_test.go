@@ -2320,9 +2320,17 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.True(os.IsNotExist(err))
 
 	// open the file in parallel and try getting the size of file while open is on going
+	errCh := make(chan error, 1)
 	go func() {
-		_, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0666})
-		suite.assert.NoError(err)
+		openHandle, openErr := suite.fileCache.OpenFile(
+			internal.OpenFileOptions{Name: file, Mode: 0666},
+		)
+		if openErr == nil && openHandle != nil {
+			openErr = suite.fileCache.ReleaseFile(
+				internal.ReleaseFileOptions{Handle: openHandle},
+			)
+		}
+		errCh <- openErr
 	}()
 
 	// Read the Directory
@@ -2331,6 +2339,9 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.NotNil(attr)
 	suite.assert.Equal(file, attr.Path)
 	suite.assert.EqualValues(size, attr.Size)
+
+	openErr := <-errCh
+	suite.assert.NoError(openErr)
 }
 
 // func (suite *fileCacheTestSuite) TestGetAttrError() {
