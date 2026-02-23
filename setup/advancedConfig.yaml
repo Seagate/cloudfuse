@@ -141,7 +141,6 @@ attr_cache:
 size_tracker:
   journal-name: <custom name for the size journal file. Default - generated from container/bucket name>
   bucket-capacity-fallback: <total bucket capacity in MB for StatFs calculations. Used for display and eviction mode management. Default - not set>
-  statfs-refresh-sec: <time interval (in sec) to cache StatFs responses. Reduces backend calls during high-frequency queries. Default - 0 (no caching)>
 
 # Loopback configuration
 loopbackfs:
