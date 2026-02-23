@@ -2,13 +2,14 @@
 
 ## **2.1.1** ##
 
-February 18th 2026
+February 23rd 2026
 This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
 
 ### Bug Fixes ###
 
 - [#827](https://github.com/Seagate/cloudfuse/pull/827) Fix update command on Linux
 - [#780](https://github.com/Seagate/cloudfuse/pull/780) Improve merged server capacity logic
+- [#842](https://github.com/Seagate/cloudfuse/pull/842) Reduce calls to cloud, improve GetAttr, List performance
 
 ## **2.1.0** ##
 
