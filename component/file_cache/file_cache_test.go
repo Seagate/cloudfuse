@@ -2680,7 +2680,10 @@ func (suite *fileCacheTestSuite) TestTruncateFileHandleNoOpDoesNotSetDirty() {
 
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
 	suite.assert.NoError(err)
-	suite.assert.False(handle.Dirty(), "new handle should start clean when create-empty-file is enabled")
+	suite.assert.False(
+		handle.Dirty(),
+		"new handle should start clean when create-empty-file is enabled",
+	)
 
 	err = suite.fileCache.TruncateFile(
 		internal.TruncateFileOptions{Name: path, NewSize: 0, Handle: handle},

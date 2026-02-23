@@ -989,7 +989,8 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 			SrcAttr: srcAttr,
 		})
 		if err != nil {
-			dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
+			dstAttr, dstErr := fuseFS.NextComponent().
+				GetAttr(internal.GetAttrOptions{Name: dstPath})
 			if dstErr == nil && dstAttr.IsDir() {
 				log.Err(
 					"Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory",
