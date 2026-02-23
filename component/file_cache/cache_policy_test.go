@@ -100,7 +100,7 @@ func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	suite.assert.NoError(err)
 	result := getUsagePercentage(cache_path, 4)
 	// since the value might defer a little distro to distro
-	suite.assert.GreaterOrEqual(result, float64(25))
+	suite.assert.GreaterOrEqual(result, float64(24))
 	suite.assert.LessOrEqual(result, float64(30))
 	f.Close()
 

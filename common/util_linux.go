@@ -106,9 +106,6 @@ func GetUsage(path string) (float64, error) {
 		return 0, fmt.Errorf("failed to parse du output")
 	}
 
-	// du output includes the size of the directory itself, so we need to subtract that out
-	parsed = parsed - float64(4096)
-
 	return parsed, nil
 }
 

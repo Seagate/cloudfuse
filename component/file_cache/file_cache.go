@@ -2128,7 +2128,8 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				existingSize = info.Size()
 			}
 			additionalSpace := max(int64(0), options.NewSize-existingSize)
-			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
+			// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
+			if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
 				log.Err(
 					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,
