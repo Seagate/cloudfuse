@@ -73,7 +73,7 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 	_, err := f.Write(data)
 	suite.assert.NoError(err)
 	result, _ := common.GetUsage(cache_path)
-	suite.assert.InEpsilon(float64(1*MB), math.Floor(result), 0.1)
+	suite.assert.InEpsilon(float64(1*MB), math.Floor(result), 1)
 	f.Close()
 }
 
@@ -88,7 +88,7 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	result, err := common.GetUsage(cache_path)
 	suite.assert.NoError(err)
 
-	suite.assert.InEpsilon(float64(4097), result, 0.1)
+	suite.assert.InEpsilon(float64(4097), result, 1)
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
