@@ -36,7 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -661,7 +661,10 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	return object, err
 }
 
-func (cl *Client) getDirectoryAttr(dirName string, explicitDirLookup bool) (*internal.ObjAttr, error) {
+func (cl *Client) getDirectoryAttr(
+	dirName string,
+	explicitDirLookup bool,
+) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
 	objects, _, listErr := cl.List(dirName, nil, 1)
@@ -726,8 +729,8 @@ func shouldProbeDirMarker(dirName string, explicitDirLookup bool) bool {
 		return true
 	}
 	trimmed := internal.TruncateDirName(dirName)
-	base := strings.ToLower(filepath.Base(trimmed))
-	ext := strings.ToLower(filepath.Ext(base))
+	base := strings.ToLower(path.Base(trimmed))
+	ext := strings.ToLower(path.Ext(base))
 	if ext == "" {
 		return true
 	}
