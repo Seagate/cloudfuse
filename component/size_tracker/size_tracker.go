@@ -180,7 +180,6 @@ func (st *SizeTracker) Priority() internal.ComponentPriority {
 
 // OnConfigChange : If component has registered, on config file change this method is called
 func (st *SizeTracker) OnConfigChange() {
-	log.Trace("SizeTracker::OnConfigChange : %s", st.Name())
 }
 
 func (st *SizeTracker) RenameDir(options internal.RenameDirOptions) error {

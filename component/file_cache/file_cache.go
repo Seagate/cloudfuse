@@ -602,10 +602,6 @@ func (fc *FileCache) StreamDir(
 
 	i := 0 // Index for cloud
 	j := 0 // Index for local cache
-	remoteEntries := make(map[string]struct{}, len(attrs))
-	for _, attr := range attrs {
-		remoteEntries[attr.Name] = struct{}{}
-	}
 
 	// Iterate through attributes from cloud and local cache, adding the elements in order alphabetically
 	for i < len(attrs) && j < len(dirents) {
@@ -644,63 +640,33 @@ func (fc *FileCache) StreamDir(
 	// Case 2: file is only in local cache
 	if token == "" {
 		for _, entry := range dirents {
-			if entry.IsDir() {
-				continue
-			}
-			if _, found := remoteEntries[entry.Name()]; found {
-				continue
-			}
-
 			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-			flock := fc.fileLocks.Get(entryPath)
-			includeLocal := false
-			shouldProbeRemote := true
-
-			flock.RLock()
-			hasOpenHandles := flock.Count() > 0
-			syncPending := flock.SyncPending
-			flock.RUnlock()
-
-			// scheduleOps/SyncPending only apply to files that are expected to be local-only
-			// until a deferred upload is complete.
-			if syncPending {
-				includeLocal = true
-				shouldProbeRemote = false
-			} else if _, scheduled := fc.scheduleOps.Load(entryPath); scheduled {
-				includeLocal = true
-				shouldProbeRemote = false
-			} else if options.Token != "" && !hasOpenHandles {
-				// On the last page of paginated listings, local entries without pending writes are
-				// typically cloud-backed files already returned on earlier pages.
-				shouldProbeRemote = false
-			}
-
-			if shouldProbeRemote {
+			if !entry.IsDir() {
+				// This is an overhead for streamdir for now
+				// As list is paginated we have no way to know whether this particular item exists both in local cache
+				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
+				// If entry does not exists on storage then only return a local item here.
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
 				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
-					includeLocal = true
-				}
-			}
-
-			if includeLocal {
-				// get the lock on the file, to allow any pending operation to complete
-				flock.RLock()
-				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
-				info, err := os.Stat(
-					filepath.Join(localPath, entry.Name()),
-				) // Grab local cache attributes
-				flock.RUnlock()
-				// If local file is not locked then only use its attributes otherwise rely on container attributes
-				if err == nil {
-					// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
-					log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
-					attr := newObjAttr(entryPath, info)
-					attrs = append(attrs, attr)
+					// get the lock on the file, to allow any pending operation to complete
+					flock := fc.fileLocks.Get(entryPath)
+					flock.RLock()
+					// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
+					info, err := os.Stat(
+						filepath.Join(localPath, entry.Name()),
+					) // Grab local cache attributes
+					flock.RUnlock()
+					// If local file is not locked then only use its attributes otherwise rely on container attributes
+					if err == nil {
+						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
+						log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
+						attr := newObjAttr(entryPath, info)
+						attrs = append(attrs, attr)
+					}
 				}
 			}
 		}
 	}
-
 	return attrs, token, err
 }
 
@@ -1809,22 +1775,11 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// The local handle can still be used for read and write.
 		var orgMode fs.FileMode
 		modeChanged := false
-		uploadNow := options.AsyncUpload || fc.alwaysOn
-		if !uploadNow {
-			flock := fc.fileLocks.Get(options.Handle.Path)
-			flock.RLock()
-			syncPending := flock.SyncPending
-			flock.RUnlock()
-			if syncPending {
-				uploadNow = false
-			} else if _, scheduled := fc.scheduleOps.Load(options.Handle.Path); scheduled {
-				uploadNow = false
-			} else {
-				uploadNow = !fc.notInCloud(options.Handle.Path)
-			}
-		}
+		notInCloud := fc.notInCloud(
+			options.Handle.Path,
+		)
 		// Figure out if we should upload immediately or append to pending OPS
-		if uploadNow {
+		if options.AsyncUpload || !notInCloud || fc.alwaysOn {
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -1950,18 +1905,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	info, localErr := os.Stat(localPath)
 	if flock.Count() > 0 && flock.DirtyCount() > 0 {
 		if localErr == nil && !info.IsDir() {
-			flock.RUnlock()
-			return newObjAttr(options.Name, info), nil
-		}
-	}
-
-	// If upload is deferred, local cache is the only source of truth until scheduler syncs it.
-	if localErr == nil && !info.IsDir() {
-		if flock.SyncPending {
-			flock.RUnlock()
-			return newObjAttr(options.Name, info), nil
-		}
-		if _, scheduled := fc.scheduleOps.Load(options.Name); scheduled {
 			flock.RUnlock()
 			return newObjAttr(options.Name, info), nil
 		}
