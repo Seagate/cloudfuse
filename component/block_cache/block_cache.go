@@ -2296,7 +2296,7 @@ func (bc *BlockCache) diskEvict(node *list.Element) {
 // checkDiskUsage : Callback to check usage of disk and decide whether eviction is needed
 func (bc *BlockCache) checkDiskUsage() bool {
 	data, _ := common.GetUsage(bc.tmpPath)
-	usage := uint32((data * 100) / float64(bc.diskSize/_1MB))
+	usage := uint32((data * 100) / float64(bc.diskSize))
 
 	if bc.maxDiskUsageHit {
 		if usage >= MIN_POOL_USAGE {
@@ -2469,7 +2469,6 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	}
 
 	usage, _ := common.GetUsage(bc.tmpPath)
-	usage = usage * float64(_1MB)
 
 	available := (float64)(maxCacheSize) - usage
 	_, free, err := common.GetAvailFree("/")

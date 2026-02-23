@@ -203,6 +203,63 @@ func testMkDirErrorAttrExist(suite *libfuseTestSuite) {
 
 // TODO: ReadDir test
 
+func testReaddirMissingHandle(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	fill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
+		return true
+	}
+
+	err := cfuseFS.Readdir("/missing", fill, 0, 999)
+	suite.assert.Equal(-fuse.EBADF, err)
+}
+
+func testReaddirMissingCache(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	fill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
+		return true
+	}
+
+	handle := handlemap.NewHandle("dir/")
+	fh := handlemap.Add(handle)
+	defer handlemap.Delete(handle.ID)
+
+	err := cfuseFS.Readdir("/dir", fill, 0, uint64(fh))
+	suite.assert.Equal(-fuse.EIO, err)
+}
+
+func testReaddirEmptyPageToken(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	handle := handlemap.NewHandle("dir/")
+	cacheInfo := &dirChildCache{
+		sIndex:   0,
+		eIndex:   0,
+		token:    "",
+		length:   0,
+		children: make([]*internal.ObjAttr, 0),
+	}
+	cacheDots(cacheInfo)
+	cacheInfo.token = "next"
+	cacheInfo.lastPage = false
+	handle.SetValue("cache", cacheInfo)
+	fh := handlemap.Add(handle)
+	defer handlemap.Delete(handle.ID)
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir/", Token: "next"}).
+		Return([]*internal.ObjAttr{}, "next", nil)
+
+	fillCalled := false
+	fill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
+		fillCalled = true
+		return true
+	}
+
+	err := cfuseFS.Readdir("/dir", fill, 2, uint64(fh))
+	suite.assert.Equal(0, err)
+	suite.assert.False(fillCalled)
+}
+
 func testRmDir(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
@@ -271,6 +328,60 @@ func testCreateError(suite *libfuseTestSuite) {
 		Return(&handlemap.Handle{}, errors.New("failed to create file"))
 
 	err, _ := cfuseFS.Create(path, 0, uint32(mode))
+	suite.assert.Equal(-fuse.EIO, err)
+}
+
+func testRenameFileFastPathSuccess(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	src := "src"
+	dst := "dst"
+	srcAttr := &internal.ObjAttr{Flags: internal.NewFileBitMap()}
+
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(srcAttr, nil)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Times(0)
+	suite.mock.EXPECT().RenameFile(gomock.AssignableToTypeOf(internal.RenameFileOptions{})).
+		DoAndReturn(func(opts internal.RenameFileOptions) error {
+			suite.assert.Equal(src, opts.Src)
+			suite.assert.Equal(dst, opts.Dst)
+			suite.assert.Equal(srcAttr, opts.SrcAttr)
+			suite.assert.Nil(opts.DstAttr)
+			return nil
+		})
+
+	err := cfuseFS.Rename("/"+src, "/"+dst)
+	suite.assert.Equal(0, err)
+}
+
+func testRenameFileFastPathDstDirOnError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	src := "src"
+	dst := "dst"
+	srcAttr := &internal.ObjAttr{Flags: internal.NewFileBitMap()}
+	dstAttr := &internal.ObjAttr{Flags: internal.NewDirBitMap()}
+
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(srcAttr, nil)
+	suite.mock.EXPECT().RenameFile(gomock.Any()).Return(errors.New("rename failed"))
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Return(dstAttr, nil)
+
+	err := cfuseFS.Rename("/"+src, "/"+dst)
+	suite.assert.Equal(-fuse.EISDIR, err)
+}
+
+func testRenameFileFastPathError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	src := "src"
+	dst := "dst"
+	srcAttr := &internal.ObjAttr{Flags: internal.NewFileBitMap()}
+	dstAttr := &internal.ObjAttr{Flags: internal.NewFileBitMap()}
+
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(srcAttr, nil)
+	suite.mock.EXPECT().RenameFile(gomock.Any()).Return(errors.New("rename failed"))
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Return(dstAttr, nil)
+
+	err := cfuseFS.Rename("/"+src, "/"+dst)
 	suite.assert.Equal(-fuse.EIO, err)
 }
 

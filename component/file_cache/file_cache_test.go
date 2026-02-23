@@ -2240,6 +2240,40 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 	suite.assert.EqualValues(1024, attr.Size)
 }
 
+func (suite *fileCacheTestSuite) TestGetAttrDirtyOpenHandle() {
+	defer suite.cleanupTest()
+
+	file := "file26_dirty"
+
+	// Create file in cloud storage so GetAttr has a baseline there.
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Open via file cache and write without flushing, leaving a dirty handle.
+	openHandle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: file, Flags: os.O_RDWR, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	handlemap.Add(openHandle)
+
+	data := []byte("dirty data")
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: openHandle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(attr)
+	suite.assert.Equal(file, attr.Path)
+	suite.assert.EqualValues(len(data), attr.Size)
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	suite.assert.NoError(err)
+}
+
 func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	defer suite.cleanupTest()
 
@@ -2286,9 +2320,17 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.True(os.IsNotExist(err))
 
 	// open the file in parallel and try getting the size of file while open is on going
+	errCh := make(chan error, 1)
 	go func() {
-		_, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0666})
-		suite.assert.NoError(err)
+		openHandle, openErr := suite.fileCache.OpenFile(
+			internal.OpenFileOptions{Name: file, Mode: 0666},
+		)
+		if openErr == nil && openHandle != nil {
+			openErr = suite.fileCache.ReleaseFile(
+				internal.ReleaseFileOptions{Handle: openHandle},
+			)
+		}
+		errCh <- openErr
 	}()
 
 	// Read the Directory
@@ -2297,6 +2339,9 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.NotNil(attr)
 	suite.assert.Equal(file, attr.Path)
 	suite.assert.EqualValues(size, attr.Size)
+
+	openErr := <-errCh
+	suite.assert.NoError(openErr)
 }
 
 // func (suite *fileCacheTestSuite) TestGetAttrError() {
@@ -2636,6 +2681,90 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 	// Path should not be in fake storage
 	// With new changes we always download and then truncate so file will exists in local path
 	// _, err = os.Stat(suite.fake_storage_path + "/" + path)
+}
+
+func (suite *fileCacheTestSuite) TestTruncateFileHandleNoOpDoesNotSetDirty() {
+	defer suite.cleanupTest()
+
+	suite.fileCache.createEmptyFile = true
+	path := "file32a"
+
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.assert.NoError(err)
+	suite.assert.False(
+		handle.Dirty(),
+		"new handle should start clean when create-empty-file is enabled",
+	)
+
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: 0, Handle: handle},
+	)
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty(), "no-op truncate should not mark handle dirty")
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) TestTruncateFileHandleReopenFallback() {
+	defer suite.cleanupTest()
+
+	path := "file32b"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.assert.NoError(err)
+
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
+		Handle: handle,
+		Data:   []byte("abc"),
+		Offset: 0,
+	})
+	suite.assert.NoError(err)
+
+	// Simulate a missing fd on an otherwise valid handle.
+	handle.SetFileObject(nil)
+	handle.UnixFD = 0
+
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: 1, Handle: handle},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(handle.GetFileObject(), "truncate should recover a missing file object")
+
+	info, statErr := os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.NoError(statErr)
+	suite.assert.EqualValues(1, info.Size())
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) TestDirtyCountTracksWriteAndFlush() {
+	defer suite.cleanupTest()
+
+	suite.fileCache.createEmptyFile = true
+	path := "dirty_count_file"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.assert.NoError(err)
+
+	flock := suite.fileCache.fileLocks.Get(path)
+	suite.assert.EqualValues(0, flock.DirtyCount(), "handle should start clean")
+
+	_, err = suite.fileCache.WriteFile(&internal.WriteFileOptions{
+		Handle: handle,
+		Data:   []byte("abc"),
+		Offset: 0,
+	})
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+	suite.assert.EqualValues(1, flock.DirtyCount(), "dirty count should be updated after write")
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty())
+	suite.assert.EqualValues(0, flock.DirtyCount(), "dirty count should be cleared after flush")
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheTestSuite) TestZZMountPathConflict() {
