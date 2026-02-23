@@ -275,14 +275,14 @@ func (s3 *S3Storage) StreamDir(
 
 		log.Debug("S3Storage::StreamDir : %s So far retrieved %d objects in %d iterations",
 			options.Name, totalEntriesFetched, iteration)
-		if marker == nil || *marker == "" {
+		if marker == nil || *marker == "" || len(newList) == 0 {
 			break
 		} else {
 			log.Debug("S3Storage::StreamDir : %s List iteration %d nextMarker=\"%s\"",
 				options.Name, iteration, *nextMarker)
 		}
 		// decrement and loop
-		entriesRemaining -= totalEntriesFetched
+		entriesRemaining -= int32(len(newList))
 		// in one case, the response will be missing one entry (see comment above `count++` in Client::List)
 		if entriesRemaining == 1 && options.Token == "" {
 			// don't make a request just for that one leftover entry

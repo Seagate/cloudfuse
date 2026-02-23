@@ -65,9 +65,8 @@ var duPath []string = []string{
 }
 var selectedDuPath string = ""
 
-// GetUsage: The current disk usage in MB
+// GetUsage: The current disk usage in bytes
 func GetUsage(path string) (float64, error) {
-	var currSize float64
 	var out bytes.Buffer
 
 	if selectedDuPath == "" {
@@ -89,7 +88,7 @@ func GetUsage(path string) (float64, error) {
 	// https://man7.org/linux/man-pages/man1/du.1.html
 	// Note: We cannot just pass -BM as a parameter here since it will result in less accurate estimates of the size of the path
 	// (i.e. du will round up to 1M if the path is smaller than 1M).
-	cmd := exec.Command(selectedDuPath, "-sh", path)
+	cmd := exec.Command(selectedDuPath, "-sb", path)
 	cmd.Stdout = &out
 
 	err := cmd.Run()
@@ -102,25 +101,12 @@ func GetUsage(path string) (float64, error) {
 		return 0, nil
 	}
 
-	// some OS's use "," instead of "." that will not work for float parsing - replace it
-	size = strings.Replace(size, ",", ".", 1)
-	parsed, err := strconv.ParseFloat(size[:len(size)-1], 64)
+	parsed, err := strconv.ParseFloat(size, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse du output")
 	}
 
-	switch size[len(size)-1] {
-	case 'K':
-		currSize = parsed / float64(1024)
-	case 'M':
-		currSize = parsed
-	case 'G':
-		currSize = parsed * 1024
-	case 'T':
-		currSize = parsed * 1024 * 1024
-	}
-
-	return currSize, nil
+	return parsed, nil
 }
 
 var currentUID int = -1
