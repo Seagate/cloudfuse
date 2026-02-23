@@ -89,6 +89,7 @@ const maxResultsPerListCall = 1000
 func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
+	start := time.Now()
 
 	downloadInput := &transfermanager.DownloadObjectInput{
 		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
@@ -104,7 +105,28 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
-		return parseS3Err(err, attemptedAction)
+		parsedErr := parseS3Err(err, attemptedAction)
+		log.Err(
+			"Client::getObjectMultipartDownload : failed key=%s elapsed=%s err=%v",
+			key,
+			time.Since(start),
+			parsedErr,
+		)
+		return parsedErr
+	}
+	elapsed := time.Since(start)
+	if elapsed > 500*time.Millisecond {
+		log.Info(
+			"Client::getObjectMultipartDownload : slow download key=%s elapsed=%s",
+			key,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"Client::getObjectMultipartDownload : download complete key=%s elapsed=%s",
+			key,
+			elapsed,
+		)
 	}
 	return nil
 }
@@ -166,6 +188,7 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 func (cl *Client) putObject(options putObjectOptions) error {
 	key := cl.getKey(options.name, options.isSymLink, options.isDir)
 	log.Trace("Client::putObject : putting object %s", key)
+	start := time.Now()
 	ctx := context.Background()
 
 	// Handle nil body by providing an empty reader
@@ -190,7 +213,34 @@ func (cl *Client) putObject(options putObjectOptions) error {
 	_, err := cl.transferManager.UploadObject(ctx, uploadInput)
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
-	return parseS3Err(err, attemptedAction)
+	parsedErr := parseS3Err(err, attemptedAction)
+	elapsed := time.Since(start)
+	if parsedErr != nil {
+		log.Err(
+			"Client::putObject : upload failed key=%s size=%d elapsed=%s err=%v",
+			key,
+			options.size,
+			elapsed,
+			parsedErr,
+		)
+		return parsedErr
+	}
+	if elapsed > 500*time.Millisecond {
+		log.Info(
+			"Client::putObject : slow upload key=%s size=%d elapsed=%s",
+			key,
+			options.size,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"Client::putObject : upload complete key=%s size=%d elapsed=%s",
+			key,
+			options.size,
+			elapsed,
+		)
+	}
+	return nil
 }
 
 // Wrapper for awsS3Client.DeleteObject.
@@ -256,6 +306,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal.ObjAttr, error) {
 	key := cl.getKey(name, isSymlink, isDir)
 	log.Trace("Client::headObject : object %s", key)
+	start := time.Now()
 
 	result, err := cl.AwsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
 		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
@@ -263,7 +314,7 @@ func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal
 	})
 	if err != nil {
 		// Make sure the attempted starts with "HeadObject",  or else parseS3Err will log to Err
-		attemptedAction := fmt.Sprintf("HeadObject(%s)", name)
+		attemptedAction := fmt.Sprintf("HeadObject(%s) elapsed=%s", name, time.Since(start))
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
@@ -273,6 +324,26 @@ func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal
 		object = createObjAttrDir(name)
 	} else {
 		object = createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
+	}
+	elapsed := time.Since(start)
+	if elapsed > 100*time.Millisecond {
+		log.Info(
+			"Client::headObject : slow head key=%s isDir=%t isSymlink=%t size=%d elapsed=%s",
+			key,
+			isDir,
+			isSymlink,
+			object.Size,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"Client::headObject : key=%s isDir=%t isSymlink=%t size=%d elapsed=%s",
+			key,
+			isDir,
+			isSymlink,
+			object.Size,
+			elapsed,
+		)
 	}
 
 	return object, nil
@@ -413,6 +484,7 @@ func (cl *Client) List(
 	marker *string,
 	count int32,
 ) ([]*internal.ObjAttr, *string, error) {
+	start := time.Now()
 	log.Trace("Client::List : prefix %s, marker %s, count %d", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
@@ -470,10 +542,11 @@ func (cl *Client) List(
 	output, err := paginator.NextPage(context.Background())
 	if err != nil {
 		log.Err(
-			"Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v",
+			"Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v elapsed=%s",
 			prefix,
 			bucketName,
 			err,
+			time.Since(start),
 		)
 		return objectAttrList, nil, err
 	}
@@ -554,7 +627,36 @@ func (cl *Client) List(
 		return objectAttrList[i].Path < objectAttrList[j].Path
 	})
 
-	log.Debug("Client::List : %s returning %d entries", prefix, len(objectAttrList))
+	elapsed := time.Since(start)
+	if elapsed > 200*time.Millisecond {
+		log.Info(
+			"Client::List : slow list prefix=%s marker=%s returned=%d nextMarker=%t elapsed=%s",
+			prefix,
+			func(marker *string) string {
+				if marker != nil {
+					return *marker
+				}
+				return ""
+			}(marker),
+			len(objectAttrList),
+			nextMarker != nil && *nextMarker != "",
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"Client::List : prefix=%s marker=%s returned=%d nextMarker=%t elapsed=%s",
+			prefix,
+			func(marker *string) string {
+				if marker != nil {
+					return *marker
+				}
+				return ""
+			}(marker),
+			len(objectAttrList),
+			nextMarker != nil && *nextMarker != "",
+			elapsed,
+		)
+	}
 
 	return objectAttrList, nextMarker, nil
 }

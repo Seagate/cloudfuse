@@ -252,6 +252,7 @@ func (s3 *S3Storage) StreamDir(
 		options.Offset,
 		options.Count,
 	)
+	streamStart := time.Now()
 	objectList := make([]*internal.ObjAttr, 0)
 
 	path := formatListDirName(options.Name)
@@ -303,6 +304,29 @@ func (s3 *S3Storage) StreamDir(
 
 	// increment streamDir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
+
+	elapsed := time.Since(streamStart)
+	if elapsed > 200*time.Millisecond {
+		log.Info(
+			"S3Storage::StreamDir : slow list path=%s token=\"%s\" iterations=%d fetched=%d nextToken=\"%s\" elapsed=%s",
+			options.Name,
+			options.Token,
+			iteration,
+			totalEntriesFetched,
+			*marker,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"S3Storage::StreamDir : %s token=\"%s\" iterations=%d fetched=%d nextToken=\"%s\" elapsed=%s",
+			options.Name,
+			options.Token,
+			iteration,
+			totalEntriesFetched,
+			*marker,
+			elapsed,
+		)
+	}
 
 	return objectList, *marker, nil
 }
@@ -476,12 +500,77 @@ func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 
 func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("S3Storage::CopyToFile : Read file %s", options.Name)
-	return s3.Storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	start := time.Now()
+	err := s3.Storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	elapsed := time.Since(start)
+	if err != nil {
+		log.Err(
+			"S3Storage::CopyToFile : Read file %s failed [%s] offset=%d count=%d elapsed=%s",
+			options.Name,
+			err.Error(),
+			options.Offset,
+			options.Count,
+			elapsed,
+		)
+		return err
+	}
+	if elapsed > 200*time.Millisecond {
+		log.Info(
+			"S3Storage::CopyToFile : slow read file=%s offset=%d count=%d elapsed=%s",
+			options.Name,
+			options.Offset,
+			options.Count,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"S3Storage::CopyToFile : %s read complete offset=%d count=%d elapsed=%s",
+			options.Name,
+			options.Offset,
+			options.Count,
+			elapsed,
+		)
+	}
+	return nil
 }
 
 func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
-	return s3.Storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	uploadSize := int64(-1)
+	if options.File != nil {
+		if stat, statErr := options.File.Stat(); statErr == nil {
+			uploadSize = stat.Size()
+		}
+	}
+	start := time.Now()
+	err := s3.Storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	elapsed := time.Since(start)
+	if err != nil {
+		log.Err(
+			"S3Storage::CopyFromFile : Upload file %s failed [%s] size=%d elapsed=%s",
+			options.Name,
+			err.Error(),
+			uploadSize,
+			elapsed,
+		)
+		return err
+	}
+	if elapsed > 500*time.Millisecond {
+		log.Info(
+			"S3Storage::CopyFromFile : slow upload file=%s size=%d elapsed=%s",
+			options.Name,
+			uploadSize,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"S3Storage::CopyFromFile : upload complete file=%s size=%d elapsed=%s",
+			options.Name,
+			uploadSize,
+			elapsed,
+		)
+	}
+	return nil
 }
 
 // Symlink operations

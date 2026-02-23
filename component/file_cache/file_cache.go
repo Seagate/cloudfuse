@@ -582,6 +582,11 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 func (fc *FileCache) StreamDir(
 	options internal.StreamDirOptions,
 ) ([]*internal.ObjAttr, string, error) {
+	streamStart := time.Now()
+	localDirEntries := 0
+	localOnlyAdded := 0
+	remoteAttrProbeCount := 0
+
 	// For stream directory, there are three different child path situations we have to potentially handle.
 	// 1. Path in storage but not in local cache
 	// 2. Path not in storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
@@ -597,8 +602,17 @@ func (fc *FileCache) StreamDir(
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	dirents, err := os.ReadDir(localPath)
 	if err != nil {
+		log.Trace(
+			"FileCache::StreamDir : %s remoteOnly=%d token=\"%s\" localReadErr=%v elapsed=%s",
+			options.Name,
+			len(attrs),
+			token,
+			err,
+			time.Since(streamStart),
+		)
 		return attrs, token, nil
 	}
+	localDirEntries = len(dirents)
 
 	i := 0 // Index for cloud
 	j := 0 // Index for local cache
@@ -676,6 +690,7 @@ func (fc *FileCache) StreamDir(
 			}
 
 			if shouldProbeRemote {
+				remoteAttrProbeCount++
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
 				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
 					includeLocal = true
@@ -696,9 +711,39 @@ func (fc *FileCache) StreamDir(
 					log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
 					attr := newObjAttr(entryPath, info)
 					attrs = append(attrs, attr)
+					localOnlyAdded++
 				}
 			}
 		}
+	}
+
+	elapsed := time.Since(streamStart)
+	if elapsed > 200*time.Millisecond {
+		log.Info(
+			"FileCache::StreamDir : slow list path=%s token=\"%s\" remoteEntries=%d localDirEntries=%d localOnlyAdded=%d remoteAttrProbes=%d finalEntries=%d nextToken=\"%s\" elapsed=%s",
+			options.Name,
+			options.Token,
+			len(remoteEntries),
+			localDirEntries,
+			localOnlyAdded,
+			remoteAttrProbeCount,
+			len(attrs),
+			token,
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"FileCache::StreamDir : path=%s token=\"%s\" remoteEntries=%d localDirEntries=%d localOnlyAdded=%d remoteAttrProbes=%d finalEntries=%d nextToken=\"%s\" elapsed=%s",
+			options.Name,
+			options.Token,
+			len(remoteEntries),
+			localDirEntries,
+			localOnlyAdded,
+			remoteAttrProbeCount,
+			len(attrs),
+			token,
+			elapsed,
+		)
 	}
 
 	return attrs, token, err
@@ -1183,7 +1228,9 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	var f *os.File
 
 	fc.policy.CacheValid(localPath)
+	downloadCheckStart := time.Now()
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
+	downloadCheckElapsed := time.Since(downloadCheckStart)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err(
 			"FileCache::openFileInternal : Failed to check if download is required for %s [%s]",
@@ -1191,6 +1238,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			err.Error(),
 		)
 	}
+	log.Trace(
+		"FileCache::openFileInternal : %s downloadCheck elapsed=%s required=%t localFileExists=%t hasCloudAttr=%t",
+		handle.Path,
+		downloadCheckElapsed,
+		downloadRequired,
+		fileExists,
+		attr != nil,
+	)
 
 	fileMode := fc.defaultPermission
 	if downloadRequired {
@@ -1239,6 +1294,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 		if fileSize > 0 {
 			// Download/Copy the file from storage to the local file.
 			// We pass a count of 0 to get the entire object
+			downloadStart := time.Now()
 			err = fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
 					Name:   handle.Path,
@@ -1246,12 +1302,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					Count:  0,
 					File:   f,
 				})
+			downloadElapsed := time.Since(downloadStart)
 			if err != nil {
 				// File was created locally and now download has failed so we need to delete it back from local cache
 				log.Err(
-					"FileCache::openFileInternal : error downloading file from storage %s [%s]",
+					"FileCache::openFileInternal : error downloading file from storage %s [%s] elapsed=%s",
 					handle.Path,
 					err.Error(),
+					downloadElapsed,
 				)
 				_ = f.Close()
 				err = os.Remove(localPath)
@@ -1263,6 +1321,21 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					)
 				}
 				return err
+			}
+			if downloadElapsed > 200*time.Millisecond {
+				log.Info(
+					"FileCache::openFileInternal : slow download path=%s size=%d elapsed=%s",
+					handle.Path,
+					fileSize,
+					downloadElapsed,
+				)
+			} else {
+				log.Trace(
+					"FileCache::openFileInternal : download complete path=%s size=%d elapsed=%s",
+					handle.Path,
+					fileSize,
+					downloadElapsed,
+				)
 			}
 		}
 
@@ -1417,6 +1490,7 @@ func (fc *FileCache) isDownloadRequired(
 	objectPath string,
 	flock *common.LockMapItem,
 ) (bool, bool, *internal.ObjAttr, error) {
+	start := time.Now()
 	cached := false
 	downloadRequired := false
 	lmt := time.Time{}
@@ -1453,7 +1527,9 @@ func (fc *FileCache) isDownloadRequired(
 		time.Since(flock.DownloadTime()) > time.Duration(fc.refreshSec)*time.Second
 
 	// get cloud attributes
+	cloudLookupStart := time.Now()
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
+	cloudLookupElapsed := time.Since(cloudLookupStart)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err(
 			"FileCache::isDownloadRequired : Failed to get attr of %s [%s]",
@@ -1500,6 +1576,37 @@ func (fc *FileCache) isDownloadRequired(
 			// As we have decided to continue using old file, we reset the timer to check again after refresh time interval
 			flock.SetDownloadTime()
 		}
+	}
+
+	cloudAttrSize := int64(-1)
+	if cloudAttr != nil {
+		cloudAttrSize = int64(cloudAttr.Size)
+	}
+	totalElapsed := time.Since(start)
+	if totalElapsed > 200*time.Millisecond {
+		log.Info(
+			"FileCache::isDownloadRequired : slow check path=%s localCached=%t refreshExpired=%t downloadRequired=%t hasCloudAttr=%t cloudSize=%d cloudLookup=%s totalElapsed=%s",
+			objectPath,
+			cached,
+			refreshTimerExpired,
+			downloadRequired,
+			cloudAttr != nil,
+			cloudAttrSize,
+			cloudLookupElapsed,
+			totalElapsed,
+		)
+	} else {
+		log.Trace(
+			"FileCache::isDownloadRequired : path=%s localCached=%t refreshExpired=%t downloadRequired=%t hasCloudAttr=%t cloudSize=%d cloudLookup=%s totalElapsed=%s",
+			objectPath,
+			cached,
+			refreshTimerExpired,
+			downloadRequired,
+			cloudAttr != nil,
+			cloudAttrSize,
+			cloudLookupElapsed,
+			totalElapsed,
+		)
 	}
 
 	return downloadRequired, cached, cloudAttr, err
@@ -1642,6 +1749,23 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	//defer exectime.StatTimeCurrentBlock("FileCache::WriteFile")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
+	writeStart := time.Now()
+	logSlowWrite := func(bytesWritten int, writeErr error) {
+		const slowWriteThreshold = 100 * time.Millisecond
+		elapsed := time.Since(writeStart)
+		if elapsed > slowWriteThreshold {
+			log.Info(
+				"FileCache::WriteFile : slow write path=%s requested=%d written=%d offset=%d append=%t err=%v elapsed=%s",
+				options.Handle.Path,
+				len(options.Data),
+				bytesWritten,
+				options.Offset,
+				options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend),
+				writeErr,
+				elapsed,
+			)
+		}
+	}
 
 	if !openCompleted(options.Handle) {
 		flock := fc.fileLocks.Get(options.Handle.Path)
@@ -1650,6 +1774,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 		err := fc.openFileInternal(options.Handle, flock)
 		flock.Unlock()
 		if err != nil {
+			logSlowWrite(0, err)
 			return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 		}
 	}
@@ -1659,6 +1784,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("FileCache::WriteFile : error [couldn't find fd in handle] %s", options.Handle.Path)
+		logSlowWrite(0, syscall.EBADF)
 		return 0, syscall.EBADF
 	}
 
@@ -1673,6 +1799,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 					fc.maxCacheSizeMB,
 					options.Handle.Path,
 				)
+				logSlowWrite(0, syscall.ENOSPC)
 				return 0, syscall.ENOSPC
 			}
 		}
@@ -1704,6 +1831,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
+	logSlowWrite(bytesWritten, err)
 
 	return bytesWritten, err
 }
@@ -1766,6 +1894,47 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
+	flushStart := time.Now()
+	initialDirty := options.Handle.Dirty()
+	syncElapsed := time.Duration(0)
+	uploadElapsed := time.Duration(0)
+	uploadAttempted := false
+	uploadDeferred := false
+	uploadSucceeded := false
+	defer func() {
+		elapsed := time.Since(flushStart)
+		if elapsed > 200*time.Millisecond {
+			log.Info(
+				"FileCache::FlushFile : slow flush path=%s handle=%d initialDirty=%t asyncUpload=%t closeInProgress=%t uploadAttempted=%t uploadDeferred=%t uploadSucceeded=%t syncElapsed=%s uploadElapsed=%s totalElapsed=%s",
+				options.Handle.Path,
+				options.Handle.ID,
+				initialDirty,
+				options.AsyncUpload,
+				options.CloseInProgress,
+				uploadAttempted,
+				uploadDeferred,
+				uploadSucceeded,
+				syncElapsed,
+				uploadElapsed,
+				elapsed,
+			)
+		} else {
+			log.Trace(
+				"FileCache::FlushFile : path=%s handle=%d initialDirty=%t asyncUpload=%t closeInProgress=%t uploadAttempted=%t uploadDeferred=%t uploadSucceeded=%t syncElapsed=%s uploadElapsed=%s totalElapsed=%s",
+				options.Handle.Path,
+				options.Handle.ID,
+				initialDirty,
+				options.AsyncUpload,
+				options.CloseInProgress,
+				uploadAttempted,
+				uploadDeferred,
+				uploadSucceeded,
+				syncElapsed,
+				uploadElapsed,
+				elapsed,
+			)
+		}
+	}()
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
@@ -1794,11 +1963,14 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// Flush all data to disk that has been buffered by the kernel.
 		// for scheduled uploads, we use a read-only file handle
 		if !options.AsyncUpload {
+			syncStart := time.Now()
 			err := fc.syncFile(f, options.Handle.Path)
+			syncElapsed = time.Since(syncStart)
 			if err != nil {
 				log.Err(
-					"FileCache::FlushFile : error [unable to sync file] %s",
+					"FileCache::FlushFile : error [unable to sync file] %s elapsed=%s",
 					options.Handle.Path,
+					syncElapsed,
 				)
 				return syscall.EIO
 			}
@@ -1825,6 +1997,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 		// Figure out if we should upload immediately or append to pending OPS
 		if uploadNow {
+			uploadAttempted = true
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -1851,23 +2024,27 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 					return err
 				}
 			}
+			uploadStart := time.Now()
 			err = fc.NextComponent().CopyFromFile(
 				internal.CopyFromFileOptions{
 					Name: options.Handle.Path,
 					File: uploadHandle,
 				})
+			uploadElapsed = time.Since(uploadStart)
 
 			uploadHandle.Close()
 			if err == nil {
 				// Clear dirty flag since file was successfully uploaded
 				fc.clearHandleDirty(options.Handle)
+				uploadSucceeded = true
 			}
 
 			if err != nil {
 				log.Err(
-					"FileCache::FlushFile : %s upload failed [%s]",
+					"FileCache::FlushFile : %s upload failed [%s] elapsed=%s",
 					options.Handle.Path,
 					err.Error(),
+					uploadElapsed,
 				)
 				return err
 			}
@@ -1888,6 +2065,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				"FileCache::FlushFile : %s upload deferred (Scheduled for upload)",
 				options.Handle.Path,
 			)
+			uploadDeferred = true
 			_, statErr := os.Stat(localPath)
 			if statErr == nil {
 				fc.markFileForUpload(options.Handle.Path)

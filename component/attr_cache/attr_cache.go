@@ -505,15 +505,30 @@ func (ac *AttrCache) StreamDir(
 	options internal.StreamDirOptions,
 ) ([]*internal.ObjAttr, string, error) {
 	log.Trace("AttrCache::StreamDir : %s, token=\"%s\"", options.Name, options.Token)
+	streamStart := time.Now()
+	mergedCachedEntries := 0
+	addedLocalOnlyDirs := 0
+	cloudEntries := 0
+	fromCloud := false
 
 	// try to fetch listing from cache
 	cachedPathList, cachedToken, err := ac.fetchCachedDirList(options.Name, options.Token)
 	if err == nil {
+		log.Trace(
+			"AttrCache::StreamDir : %s served %d entries from list cache token=\"%s\"->\"%s\" in %s",
+			options.Name,
+			len(cachedPathList),
+			options.Token,
+			cachedToken,
+			time.Since(streamStart),
+		)
 		return cachedPathList, cachedToken, err
 	}
 	// listing cache is not complete, so call cloud storage
 	pathList, nextToken, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
+		fromCloud = true
+		cloudEntries = len(pathList)
 		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
 			options.Name, len(pathList), nextToken)
 		// cache returned list
@@ -530,6 +545,7 @@ func (ac *AttrCache) StreamDir(
 			if ac.cacheDirs && nextToken == "" {
 				var numAdded int // prevent shadowing pathList in following line
 				pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
+				addedLocalOnlyDirs = numAdded
 				log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
 					options.Name, numAdded, len(pathList))
 			}
@@ -537,6 +553,7 @@ func (ac *AttrCache) StreamDir(
 	}
 	// add cached items in
 	if len(cachedPathList) > 0 {
+		mergedCachedEntries = len(cachedPathList)
 		log.Info(
 			"AttrCache::StreamDir : %s merging in %d list cache entries...",
 			options.Name,
@@ -560,7 +577,34 @@ func (ac *AttrCache) StreamDir(
 		},
 	)
 	ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
-	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
+	elapsed := time.Since(streamStart)
+	if elapsed > 200*time.Millisecond {
+		log.Info(
+			"AttrCache::StreamDir : slow list path=%s token=\"%s\" nextToken=\"%s\" fromCloud=%t cloudEntries=%d mergedCached=%d addedLocalOnlyDirs=%d finalEntries=%d elapsed=%s",
+			options.Name,
+			options.Token,
+			nextToken,
+			fromCloud,
+			cloudEntries,
+			mergedCachedEntries,
+			addedLocalOnlyDirs,
+			len(pathList),
+			elapsed,
+		)
+	} else {
+		log.Trace(
+			"AttrCache::StreamDir : %s returning %d entries token=\"%s\"->\"%s\" fromCloud=%t cloudEntries=%d mergedCached=%d addedLocalOnlyDirs=%d elapsed=%s",
+			options.Name,
+			len(pathList),
+			options.Token,
+			nextToken,
+			fromCloud,
+			cloudEntries,
+			mergedCachedEntries,
+			addedLocalOnlyDirs,
+			elapsed,
+		)
+	}
 	return pathList, nextToken, err
 }
 

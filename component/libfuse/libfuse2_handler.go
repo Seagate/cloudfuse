@@ -710,13 +710,16 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		log.Trace("Libfuse::Read : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
 	}
+	readStart := time.Now()
+	const slowReadThreshold = 100 * time.Millisecond
 
 	offset := uint64(ofst)
 
 	var err error
 	var bytesRead int
+	cachedRead := handle.Cached()
 
-	if handle.Cached() {
+	if cachedRead {
 		// Remove Pread as not supported on Windows
 		//bytesRead, err = syscall.Pread(handle.FD(), buff, int64(offset))
 		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
@@ -745,6 +748,20 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		return -fuse.EIO
 	}
 
+	elapsed := time.Since(readStart)
+	if elapsed > slowReadThreshold {
+		log.Info(
+			"Libfuse::Read : slow read path=%s handle=%d requested=%d read=%d offset=%d cached=%t elapsed=%s",
+			handle.Path,
+			handle.ID,
+			len(buff),
+			bytesRead,
+			ofst,
+			cachedRead,
+			elapsed,
+		)
+	}
+
 	return bytesRead
 }
 
@@ -762,6 +779,8 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 		log.Trace("Libfuse::Write : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
 	}
+	writeStart := time.Now()
+	const slowWriteThreshold = 100 * time.Millisecond
 
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
 		&internal.WriteFileOptions{
@@ -779,6 +798,19 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 			err.Error(),
 		)
 		return -fuse.EIO
+	}
+
+	elapsed := time.Since(writeStart)
+	if elapsed > slowWriteThreshold {
+		log.Info(
+			"Libfuse::Write : slow write path=%s handle=%d requested=%d written=%d offset=%d elapsed=%s",
+			handle.Path,
+			handle.ID,
+			len(buff),
+			bytesWritten,
+			ofst,
+			elapsed,
+		)
 	}
 
 	return bytesWritten
