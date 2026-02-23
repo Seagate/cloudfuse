@@ -246,6 +246,18 @@ func (suite *libfuseTestSuite) TestMkDirErrorAttrExist() {
 
 // readdir
 
+func (suite *libfuseTestSuite) TestReaddirMissingHandle() {
+	testReaddirMissingHandle(suite)
+}
+
+func (suite *libfuseTestSuite) TestReaddirMissingCache() {
+	testReaddirMissingCache(suite)
+}
+
+func (suite *libfuseTestSuite) TestReaddirEmptyPageToken() {
+	testReaddirEmptyPageToken(suite)
+}
+
 func (suite *libfuseTestSuite) TestRmDir() {
 	testRmDir(suite)
 }
@@ -326,7 +338,17 @@ func (suite *libfuseTestSuite) TestUnlinkError() {
 	testUnlinkError(suite)
 }
 
-// rename
+func (suite *libfuseTestSuite) TestRenameFileFastPathSuccess() {
+	testRenameFileFastPathSuccess(suite)
+}
+
+func (suite *libfuseTestSuite) TestRenameFileFastPathDstDirOnError() {
+	testRenameFileFastPathDstDirOnError(suite)
+}
+
+func (suite *libfuseTestSuite) TestRenameFileFastPathError() {
+	testRenameFileFastPathError(suite)
+}
 
 func (suite *libfuseTestSuite) TestSymlink() {
 	testSymlink(suite)
