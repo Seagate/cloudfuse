@@ -151,15 +151,13 @@ func (st *SizeTracker) Configure(_ bool) error {
 	if config.IsSet(compName + ".journal-name") {
 		journalName = conf.JournalName
 	} else {
-		if config.IsSet("s3storage") {
-			s3conf := s3storage.Options{}
-			if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
-				sanitizedName := common.SanitizeName(s3conf.BucketName + "-" + s3conf.PrefixPath)
-				if sanitizedName != "" {
-					journalName = sanitizedName + ".dat"
-				}
+		s3conf := s3storage.Options{}
+		if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
+			sanitizedName := common.SanitizeName(s3conf.BucketName + "-" + s3conf.PrefixPath)
+			if sanitizedName != "" {
+				journalName = sanitizedName + ".dat"
 			}
-		} else if config.IsSet("azstorage") {
+		} else {
 			azconf := azstorage.AzStorageOptions{}
 			if err := config.UnmarshalKey("azstorage", &azconf); err == nil {
 				sanitizedName := common.SanitizeName(azconf.Container + "-" + azconf.PrefixPath)
