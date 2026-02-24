@@ -31,7 +31,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -211,28 +210,19 @@ Requires=network-online.target
 
 [Service]
 # User service will run as.
-User={{.ServiceUser}}
+User=%s
 
 # Under the hood
 Type=forking
-ExecStart=/usr/bin/cloudfuse mount {{.MountPath}} --config-file={{.ConfigFile}} -o allow_other
-ExecStop=/usr/bin/fusermount -u {{.MountPath}} -z
+ExecStart=/usr/bin/cloudfuse mount %s --config-file=%s -o allow_other
+ExecStop=/usr/bin/fusermount -u %s -z
 
 [Install]
 WantedBy=multi-user.target
 `
-	config := serviceOptions{
-		ConfigFile:  configPath,
-		MountPath:   mountPath,
-		ServiceUser: serviceUser,
-	}
-
-	tmpl, err := template.New("service").Parse(serviceTemplate)
-	if err != nil {
-		return "", fmt.Errorf("could not create a new service file: [%s]", err.Error())
-	}
+	serviceContent := fmt.Sprintf(serviceTemplate, serviceUser, mountPath, configPath, mountPath)
 	serviceName, serviceFilePath := getService(mountPath)
-	err = os.Remove(serviceFilePath)
+	err := os.Remove(serviceFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("failed to replace the service file [%s]", err.Error())
 	}
@@ -243,7 +233,7 @@ WantedBy=multi-user.target
 		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
 	}
 
-	err = tmpl.Execute(newFile, config)
+	_, err = newFile.WriteString(serviceContent)
 	if err != nil {
 		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
 	}
