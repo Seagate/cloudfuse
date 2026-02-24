@@ -50,12 +50,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type serviceOptions struct {
-	ConfigFile  string
-	MountPath   string
-	ServiceUser string
-}
-
 func createDaemon(
 	pipeline *internal.Pipeline,
 	ctx context.Context,
