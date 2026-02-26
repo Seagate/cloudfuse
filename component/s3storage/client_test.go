@@ -1059,7 +1059,7 @@ func (s *clientTestSuite) TestShouldProbeDirMarker() {
 	}
 
 	for _, tc := range cases {
-		got := shouldProbeDirMarker(tc.dirName, tc.explicitDirLookup)
+		got := shouldProbeDirMarker(tc.dirName, tc.explicitDirLookup, true)
 		s.assert.Equal(tc.want, got, tc.name)
 	}
 }

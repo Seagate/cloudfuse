@@ -55,6 +55,7 @@ type Config struct {
 	disableSymlink            bool
 	disableUsage              bool
 	enableDirMarker           bool
+	skipDirProbeOnFileExt     bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
