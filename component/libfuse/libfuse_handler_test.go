@@ -27,9 +27,11 @@ package libfuse
 
 import (
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -80,6 +82,32 @@ func (suite *libfuseTestSuite) TestConfig() {
 	suite.assert.Equal(uint32(60), suite.libfuse.negativeTimeout)
 	suite.assert.Equal(uint64(262144), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.directIO)
+}
+
+func (suite *libfuseTestSuite) TestGenConfigDirectIO() {
+	defer suite.cleanupTest()
+	suite.cleanupTest()
+
+	err := config.ReadConfigFromReader(strings.NewReader("direct-io: true\n"))
+	suite.assert.NoError(err)
+
+	gen := suite.libfuse.GenConfig()
+	suite.assert.Contains(gen, "attribute-expiration-sec: 0")
+	suite.assert.Contains(gen, "entry-expiration-sec: 0")
+	suite.assert.Contains(gen, "negative-entry-expiration-sec: 0")
+}
+
+func (suite *libfuseTestSuite) TestGenConfigDefault() {
+	defer suite.cleanupTest()
+	suite.cleanupTest()
+
+	err := config.ReadConfigFromReader(strings.NewReader("direct-io: false\n"))
+	suite.assert.NoError(err)
+
+	gen := suite.libfuse.GenConfig()
+	suite.assert.Contains(gen, "attribute-expiration-sec: 120")
+	suite.assert.Contains(gen, "entry-expiration-sec: 120")
+	suite.assert.Contains(gen, "negative-entry-expiration-sec: 120")
 }
 
 func (suite *libfuseTestSuite) TestConfigDirectIO() {
@@ -157,6 +185,20 @@ func (suite *libfuseTestSuite) TestConfigDefaultPermission() {
 	suite.assert.True(suite.libfuse.directIO)
 }
 
+func (suite *libfuseTestSuite) TestConfigRootAndThreads() {
+	defer suite.cleanupTest()
+	suite.cleanupTest()
+	config := "allow-root: true\nnonempty: true\nlibfuse:\n  max-fuse-threads: 256\n  umask: 22\n  uid: 1001\n  gid: 1002\n"
+	suite.setupTestHelper(config)
+
+	suite.assert.True(suite.libfuse.allowRoot)
+	suite.assert.True(suite.libfuse.nonEmptyMount)
+	suite.assert.Equal(uint32(256), suite.libfuse.maxFuseThreads)
+	suite.assert.Equal(uint32(22), suite.libfuse.umask)
+	suite.assert.Equal(uint32(1001), suite.libfuse.ownerUID)
+	suite.assert.Equal(uint32(1002), suite.libfuse.ownerGID)
+}
+
 func (suite *libfuseTestSuite) TestConfigDisableKernelCache() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
@@ -230,6 +272,26 @@ func (suite *libfuseTestSuite) TestIgnoreAppendFlag() {
 	suite.assert.True(suite.libfuse.ignoreOpenFlags)
 }
 
+func (suite *libfuseTestSuite) TestTrimFusePath() {
+	testTrimFusePath(suite)
+}
+
+func (suite *libfuseTestSuite) TestNewCgofuseFS() {
+	testNewCgofuseFS(suite)
+}
+
+func (suite *libfuseTestSuite) TestGetAttrRoot() {
+	testGetAttrRoot(suite)
+}
+
+func (suite *libfuseTestSuite) TestGetAttrIgnoredFile() {
+	testGetAttrIgnoredFile(suite)
+}
+
+func (suite *libfuseTestSuite) TestGetAttrErrors() {
+	testGetAttrErrors(suite)
+}
+
 // getattr
 
 func (suite *libfuseTestSuite) TestMkDir() {
@@ -238,6 +300,14 @@ func (suite *libfuseTestSuite) TestMkDir() {
 
 func (suite *libfuseTestSuite) TestMkDirError() {
 	testMkDirError(suite)
+}
+
+func (suite *libfuseTestSuite) TestMkDirErrorPermission() {
+	testMkDirErrorPermission(suite)
+}
+
+func (suite *libfuseTestSuite) TestMkDirErrorExist() {
+	testMkDirErrorExist(suite)
 }
 
 func (suite *libfuseTestSuite) TestMkDirErrorAttrExist() {
@@ -258,6 +328,58 @@ func (suite *libfuseTestSuite) TestReaddirEmptyPageToken() {
 	testReaddirEmptyPageToken(suite)
 }
 
+func (suite *libfuseTestSuite) TestReleasedirMissingHandle() {
+	testReleasedirMissingHandle(suite)
+}
+
+func (suite *libfuseTestSuite) TestReaddirPermissionError() {
+	testReaddirPermissionError(suite)
+}
+
+func (suite *libfuseTestSuite) TestPopulateDirChildCacheReplaceCache() {
+	testPopulateDirChildCacheReplaceCache(suite)
+}
+
+func (suite *libfuseTestSuite) TestPopulateDirChildCacheLastPage() {
+	testPopulateDirChildCacheLastPage(suite)
+}
+
+func (suite *libfuseTestSuite) TestPopulateDirChildCacheNotFound() {
+	testPopulateDirChildCacheNotFound(suite)
+}
+
+func (suite *libfuseTestSuite) TestPopulateDirChildCacheAppend() {
+	testPopulateDirChildCacheAppend(suite)
+}
+
+func (suite *libfuseTestSuite) TestCreateFuseOptionsFlags() {
+	testCreateFuseOptionsFlags(suite)
+}
+
+func (suite *libfuseTestSuite) TestCreateFuseOptionsDirectIO() {
+	testCreateFuseOptionsDirectIO(suite)
+}
+
+func (suite *libfuseTestSuite) TestFillStatModes() {
+	testFillStatModes(suite)
+}
+
+func (suite *libfuseTestSuite) TestFillStatModeDefault() {
+	testFillStatModeDefault(suite)
+}
+
+func (suite *libfuseTestSuite) TestOpendirAndReleasedir() {
+	testOpendirAndReleasedir(suite)
+}
+
+func (suite *libfuseTestSuite) TestServeCachedEntries() {
+	testServeCachedEntries(suite)
+}
+
+func (suite *libfuseTestSuite) TestServeCachedEntriesStopEarly() {
+	testServeCachedEntriesStopEarly(suite)
+}
+
 func (suite *libfuseTestSuite) TestRmDir() {
 	testRmDir(suite)
 }
@@ -270,12 +392,28 @@ func (suite *libfuseTestSuite) TestRmDirError() {
 	testRmDirError(suite)
 }
 
+func (suite *libfuseTestSuite) TestRmDirNotExists() {
+	testRmDirNotExists(suite)
+}
+
+func (suite *libfuseTestSuite) TestRmDirPermission() {
+	testRmDirPermission(suite)
+}
+
 func (suite *libfuseTestSuite) TestCreate() {
 	testCreate(suite)
 }
 
 func (suite *libfuseTestSuite) TestCreateError() {
 	testCreateError(suite)
+}
+
+func (suite *libfuseTestSuite) TestCreateErrorExists() {
+	testCreateErrorExists(suite)
+}
+
+func (suite *libfuseTestSuite) TestCreateErrorPermission() {
+	testCreateErrorPermission(suite)
 }
 
 func (suite *libfuseTestSuite) TestOpen() {
@@ -302,11 +440,63 @@ func (suite *libfuseTestSuite) TestOpenError() {
 	testOpenError(suite)
 }
 
+func (suite *libfuseTestSuite) TestOpenPermissionError() {
+	testOpenPermissionError(suite)
+}
+
 // read
+
+func (suite *libfuseTestSuite) TestReadMissingHandle() {
+	testReadMissingHandle(suite)
+}
+
+func (suite *libfuseTestSuite) TestReadCachedHandle() {
+	testReadCachedHandle(suite)
+}
+
+func (suite *libfuseTestSuite) TestReadCachedHandleEOF() {
+	testReadCachedHandleEOF(suite)
+}
+
+func (suite *libfuseTestSuite) TestReadFromComponent() {
+	testReadFromComponent(suite)
+}
+
+func (suite *libfuseTestSuite) TestReadAccessDenied() {
+	testReadAccessDenied(suite)
+}
+
+func (suite *libfuseTestSuite) TestReadError() {
+	testReadError(suite)
+}
 
 // write
 
+func (suite *libfuseTestSuite) TestWriteMissingHandle() {
+	testWriteMissingHandle(suite)
+}
+
+func (suite *libfuseTestSuite) TestWriteSuccess() {
+	testWriteSuccess(suite)
+}
+
+func (suite *libfuseTestSuite) TestWriteError() {
+	testWriteError(suite)
+}
+
+func (suite *libfuseTestSuite) TestWriteAccessDenied() {
+	testWriteAccessDenied(suite)
+}
+
 // flush
+
+func (suite *libfuseTestSuite) TestFlushNotDirty() {
+	testFlushNotDirty(suite)
+}
+
+func (suite *libfuseTestSuite) TestFlushErrors() {
+	testFlushErrors(suite)
+}
 
 func (suite *libfuseTestSuite) TestTruncate() {
 	testTruncate(suite)
@@ -314,6 +504,10 @@ func (suite *libfuseTestSuite) TestTruncate() {
 
 func (suite *libfuseTestSuite) TestTruncateError() {
 	testTruncateError(suite)
+}
+
+func (suite *libfuseTestSuite) TestTruncatePermission() {
+	testTruncatePermission(suite)
 }
 
 func (suite *libfuseTestSuite) TestFTruncate() {
@@ -326,12 +520,28 @@ func (suite *libfuseTestSuite) TestFTruncateError() {
 
 // release
 
+func (suite *libfuseTestSuite) TestReleaseMissingHandle() {
+	testReleaseMissingHandle(suite)
+}
+
+func (suite *libfuseTestSuite) TestReleaseError() {
+	testReleaseError(suite)
+}
+
+func (suite *libfuseTestSuite) TestReleaseErrorAccess() {
+	testReleaseErrorAccess(suite)
+}
+
 func (suite *libfuseTestSuite) TestUnlink() {
 	testUnlink(suite)
 }
 
 func (suite *libfuseTestSuite) TestUnlinkNotExists() {
 	testUnlinkNotExists(suite)
+}
+
+func (suite *libfuseTestSuite) TestUnlinkPermission() {
+	testUnlinkPermission(suite)
 }
 
 func (suite *libfuseTestSuite) TestUnlinkError() {
@@ -350,12 +560,28 @@ func (suite *libfuseTestSuite) TestRenameFileFastPathError() {
 	testRenameFileFastPathError(suite)
 }
 
+func (suite *libfuseTestSuite) TestRenameDirNotEmpty() {
+	testRenameDirNotEmpty(suite)
+}
+
+func (suite *libfuseTestSuite) TestRenameDirDstNotDir() {
+	testRenameDirDstNotDir(suite)
+}
+
+func (suite *libfuseTestSuite) TestRenameDirPermission() {
+	testRenameDirPermission(suite)
+}
+
 func (suite *libfuseTestSuite) TestSymlink() {
 	testSymlink(suite)
 }
 
 func (suite *libfuseTestSuite) TestSymlinkError() {
 	testSymlinkError(suite)
+}
+
+func (suite *libfuseTestSuite) TestSymlinkPermission() {
+	testSymlinkPermission(suite)
 }
 
 func (suite *libfuseTestSuite) TestReadLink() {
@@ -370,6 +596,10 @@ func (suite *libfuseTestSuite) TestReadLinkError() {
 	testReadLinkError(suite)
 }
 
+func (suite *libfuseTestSuite) TestReadLinkPermission() {
+	testReadLinkPermission(suite)
+}
+
 func (suite *libfuseTestSuite) TestFsync() {
 	testFsync(suite)
 }
@@ -382,12 +612,20 @@ func (suite *libfuseTestSuite) TestFsyncError() {
 	testFsyncError(suite)
 }
 
+func (suite *libfuseTestSuite) TestFsyncPermission() {
+	testFsyncPermission(suite)
+}
+
 func (suite *libfuseTestSuite) TestFsyncDir() {
 	testFsyncDir(suite)
 }
 
 func (suite *libfuseTestSuite) TestFsyncDirError() {
 	testFsyncDirError(suite)
+}
+
+func (suite *libfuseTestSuite) TestFsyncDirPermission() {
+	testFsyncDirPermission(suite)
 }
 
 func (suite *libfuseTestSuite) TestChmod() {
@@ -406,6 +644,10 @@ func (suite *libfuseTestSuite) TestStatFsNotPopulated() {
 	testStatFsNotPopulated(suite)
 }
 
+func (suite *libfuseTestSuite) TestStatFsCloudStorageCapacity() {
+	testStatFsCloudStorageCapacity(suite)
+}
+
 func (suite *libfuseTestSuite) TestStatFsError() {
 	testStatFsError(suite)
 }
@@ -420,6 +662,10 @@ func (suite *libfuseTestSuite) TestChown() {
 
 func (suite *libfuseTestSuite) TestUtimens() {
 	testUtimens(suite)
+}
+
+func (suite *libfuseTestSuite) TestUnsupportedOps() {
+	testUnsupportedOps(suite)
 }
 
 // In order for 'go test' to run this suite, we need to create
