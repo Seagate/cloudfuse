@@ -537,7 +537,15 @@ func (cl *Client) DeleteDirectory(name string) error {
 func (cl *Client) RenameFile(source string, target string, isSymLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.renameObject(
+	isDir, err := cl.directoryExistsForTarget(target)
+	if err != nil {
+		return err
+	}
+	if isDir {
+		return syscall.EISDIR
+	}
+
+	err = cl.renameObject(
 		renameObjectOptions{source: source, target: target, isSymLink: isSymLink},
 	)
 	if err != nil {
@@ -550,6 +558,22 @@ func (cl *Client) RenameFile(source string, target string, isSymLink bool) error
 	}
 
 	return err
+}
+
+func (cl *Client) directoryExistsForTarget(name string) (bool, error) {
+	dirName := internal.ExtendDirName(name)
+	if !shouldProbeDirMarker(dirName, false, cl.Config.skipDirProbeOnFileExt) {
+		return false, nil
+	}
+
+	_, err := cl.getDirectoryAttr(dirName, false)
+	if err == nil {
+		return true, nil
+	}
+	if err == syscall.ENOENT {
+		return false, nil
+	}
+	return false, err
 }
 
 // RenameDirectory : Rename the directory

@@ -890,6 +890,47 @@ func (s *clientTestSuite) TestRenameFileError() {
 	})
 	s.assert.Error(err)
 }
+
+func (s *clientTestSuite) TestRenameFileDstDir() {
+	defer s.cleanupTest()
+	// Setup
+
+	src := generateFileName()
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:               aws.String(src),
+		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
+	})
+	s.assert.NoError(err)
+
+	dstDir := generateDirectoryName()
+	child := generateFileName()
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:               aws.String(path.Join(dstDir, child)),
+		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
+	})
+	s.assert.NoError(err)
+
+	err = s.client.RenameFile(src, dstDir, false)
+	s.assert.EqualValues(syscall.EISDIR, err)
+
+	// Src should still be in the account
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:          aws.String(src),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.NoError(err)
+
+	// Dst file should not be created
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:          aws.String(dstDir),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.Error(err)
+}
 func (s *clientTestSuite) TestRenameDirectory() {
 	defer s.cleanupTest()
 	// setup
