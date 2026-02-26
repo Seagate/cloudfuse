@@ -971,6 +971,37 @@ func (fc *FileCache) getObjectName(localPath string) string {
 	return common.NormalizeObjectName(relPath)
 }
 
+func (fc *FileCache) checkCacheSpace(
+	opName string,
+	targetPath string,
+	existingSize int64,
+	newSize int64,
+	bufferBytes int64,
+) error {
+	currSize, err := common.GetUsage(fc.tmpPath)
+	if err != nil {
+		log.Err(
+			"FileCache::%s : error getting current usage of cache [%s]",
+			opName,
+			err.Error(),
+		)
+		return nil
+	}
+
+	additionalSpace := max(int64(0), newSize-existingSize)
+	if currSize+float64(additionalSpace) > fc.diskHighWaterMark+float64(bufferBytes) {
+		log.Err(
+			"FileCache::%s : cache size limit reached [%f] failed to open %s",
+			opName,
+			fc.maxCacheSizeMB,
+			targetPath,
+		)
+		return syscall.ENOSPC
+	}
+
+	return nil
+}
+
 func unlockAll(flocks []*common.LockMapItem) {
 	for _, flock := range flocks {
 		flock.Unlock()
@@ -1333,27 +1364,20 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	if cloudAttr != nil {
 		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
-			currSize, err := common.GetUsage(fc.tmpPath)
+			// Subtract existing local file size to avoid double-counting.
+			existingSize := int64(0)
+			if info, statErr := os.Stat(localPath); statErr == nil {
+				existingSize = info.Size()
+			}
+			err = fc.checkCacheSpace(
+				"OpenFile",
+				options.Name,
+				existingSize,
+				fileSize,
+				0,
+			)
 			if err != nil {
-				log.Err(
-					"FileCache::OpenFile : error getting current usage of cache [%s]",
-					err.Error(),
-				)
-			} else {
-				// Subtract existing local file size to avoid double-counting
-				existingSize := int64(0)
-				if info, statErr := os.Stat(localPath); statErr == nil {
-					existingSize = info.Size()
-				}
-				additionalSpace := max(int64(0), fileSize-existingSize)
-				if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
-					log.Err(
-						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
-						fc.maxCacheSizeMB,
-						options.Name,
-					)
-					return nil, syscall.ENOSPC
-				}
+				return nil, err
 			}
 		}
 	}
@@ -1635,25 +1659,21 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	}
 
 	if fc.diskHighWaterMark != 0 {
-		currSize, err := common.GetUsage(fc.tmpPath)
+		// Calculate additional space needed beyond the file's current size.
+		existingSize := int64(0)
+		if info, statErr := f.Stat(); statErr == nil {
+			existingSize = info.Size()
+		}
+		newEnd := options.Offset + int64(len(options.Data))
+		err = fc.checkCacheSpace(
+			"WriteFile",
+			options.Handle.Path,
+			existingSize,
+			newEnd,
+			0,
+		)
 		if err != nil {
-			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
-		} else {
-			// Calculate additional space needed beyond the file's current size
-			existingSize := int64(0)
-			if info, statErr := f.Stat(); statErr == nil {
-				existingSize = info.Size()
-			}
-			newEnd := options.Offset + int64(len(options.Data))
-			additionalSpace := max(int64(0), newEnd-existingSize)
-			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
-				log.Err(
-					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
-					fc.maxCacheSizeMB,
-					options.Handle.Path,
-				)
-				return 0, syscall.ENOSPC
-			}
+			return 0, err
 		}
 	}
 
@@ -2115,29 +2135,22 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 
 	if fc.diskHighWaterMark != 0 {
-		currSize, err := common.GetUsage(fc.tmpPath)
+		// Only count the additional space beyond the file's current size.
+		localPath := filepath.Join(fc.tmpPath, options.Name)
+		existingSize := int64(0)
+		if info, statErr := os.Stat(localPath); statErr == nil {
+			existingSize = info.Size()
+		}
+		// Add a buffer to the high water mark to account for any small discrepancies in usage calculations.
+		err := fc.checkCacheSpace(
+			"TruncateFile",
+			options.Name,
+			existingSize,
+			options.NewSize,
+			4096,
+		)
 		if err != nil {
-			log.Err(
-				"FileCache::TruncateFile : error getting current usage of cache [%s]",
-				err.Error(),
-			)
-		} else {
-			// Only count the additional space beyond the file's current size
-			localPath := filepath.Join(fc.tmpPath, options.Name)
-			existingSize := int64(0)
-			if info, statErr := os.Stat(localPath); statErr == nil {
-				existingSize = info.Size()
-			}
-			additionalSpace := max(int64(0), options.NewSize-existingSize)
-			// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
-			if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
-				log.Err(
-					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
-					fc.maxCacheSizeMB,
-					options.Name,
-				)
-				return syscall.ENOSPC
-			}
+			return err
 		}
 	}
 
