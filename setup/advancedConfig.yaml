@@ -141,6 +141,7 @@ attr_cache:
 size_tracker:
   journal-name: <custom name for the size journal file. Default - generated from container/bucket name>
   bucket-capacity-fallback: <total bucket capacity in MB for StatFs calculations. Used for display and eviction mode management. Default - not set>
+  hard-limit: true|false <enforce bucket capacity; writes beyond capacity return ENOSPC. Default - false>
 
 # Loopback configuration
 loopbackfs:
