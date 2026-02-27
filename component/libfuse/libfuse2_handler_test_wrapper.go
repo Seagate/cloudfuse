@@ -382,9 +382,9 @@ func testFillStatModes(suite *libfuseTestSuite) {
 	lf.fillStat(fileAttr, fileStat)
 	lf.fillStat(linkAttr, linkStat)
 
-	suite.assert.NotEqual(dirStat.Mode&fuse.S_IFDIR, 0)
-	suite.assert.NotEqual(fileStat.Mode&fuse.S_IFREG, 0)
-	suite.assert.NotEqual(linkStat.Mode&fuse.S_IFLNK, 0)
+	suite.assert.NotEqual(0, dirStat.Mode&fuse.S_IFDIR)
+	suite.assert.NotEqual(0, fileStat.Mode&fuse.S_IFREG)
+	suite.assert.NotEqual(0, linkStat.Mode&fuse.S_IFLNK)
 }
 
 func testFillStatModeDefault(suite *libfuseTestSuite) {
@@ -399,7 +399,7 @@ func testFillStatModeDefault(suite *libfuseTestSuite) {
 	st := &fuse.Stat_t{}
 	lf.fillStat(attr, st)
 
-	suite.assert.NotEqual(st.Mode&fuse.S_IFDIR, 0)
+	suite.assert.NotEqual(0, st.Mode&fuse.S_IFDIR)
 	suite.assert.Equal(uint32(lf.dirPermission), st.Mode&0x1ff)
 }
 
