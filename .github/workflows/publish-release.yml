@@ -129,14 +129,10 @@ jobs:
           persist-credentials: false
 
       - name: Install Zig
-        env:
-          ZIG: ${{ env.zig }}
-        run: |
-          curl -L https://ziglang.org/download/${ZIG}/zig-x86_64-linux-${ZIG}.tar.xz -o zig.tar.xz
-          mkdir -p $HOME/.local/bin
-          tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/zig-x86_64-linux-${ZIG}" >> $GITHUB_PATH
-          rm zig.tar.xz
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.zig }}
+          use-cache: false
 
       - name: Install Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
