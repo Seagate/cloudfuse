@@ -406,9 +406,9 @@ func testFillStatModes(suite *libfuseTestSuite) {
 	lf.dirPermission = 0777
 	lf.filePermission = 0666
 
-	dirAttr := &internal.ObjAttr{Flags: internal.NewDirBitMap(), Mode: 0}
-	fileAttr := &internal.ObjAttr{Flags: internal.NewFileBitMap(), Mode: 0}
-	linkAttr := &internal.ObjAttr{Flags: internal.NewSymlinkBitMap(), Mode: 0}
+	dirAttr := &internal.ObjAttr{Flags: internal.NewDirBitMap(), Mode: 0701}
+	fileAttr := &internal.ObjAttr{Flags: internal.NewFileBitMap(), Mode: 0640}
+	linkAttr := &internal.ObjAttr{Flags: internal.NewSymlinkBitMap(), Mode: 0777}
 
 	dirStat := &fuse.Stat_t{}
 	fileStat := &fuse.Stat_t{}
@@ -420,6 +420,9 @@ func testFillStatModes(suite *libfuseTestSuite) {
 	suite.assert.NotEqual(0, dirStat.Mode&fuse.S_IFDIR)
 	suite.assert.NotEqual(0, fileStat.Mode&fuse.S_IFREG)
 	suite.assert.NotEqual(0, linkStat.Mode&fuse.S_IFLNK)
+	suite.assert.Equal(uint32(0701), dirStat.Mode&0x1ff)
+	suite.assert.Equal(uint32(0640), fileStat.Mode&0x1ff)
+	suite.assert.Equal(uint32(0777), linkStat.Mode&0x1ff)
 }
 
 func testFillStatModeDefault(suite *libfuseTestSuite) {
@@ -1479,10 +1482,11 @@ func testReadLinkError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	options := internal.ReadLinkOptions{Name: name}
+	linkSize := int64(32)
+	options := internal.ReadLinkOptions{Name: name, Size: linkSize}
 	suite.mock.EXPECT().ReadLink(options).Return("", errors.New("failed to read link"))
 	getAttrOpt := internal.GetAttrOptions{Name: name}
-	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(nil, nil)
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(&internal.ObjAttr{Size: linkSize}, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.EIO, err)
@@ -1493,10 +1497,11 @@ func testReadLinkPermission(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	options := internal.ReadLinkOptions{Name: name}
+	linkSize := int64(64)
+	options := internal.ReadLinkOptions{Name: name, Size: linkSize}
 	suite.mock.EXPECT().ReadLink(options).Return("", os.ErrPermission)
 	getAttrOpt := internal.GetAttrOptions{Name: name}
-	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(nil, nil)
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(&internal.ObjAttr{Size: linkSize}, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.EACCES, err)
