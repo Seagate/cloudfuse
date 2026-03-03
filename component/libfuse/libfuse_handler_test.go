@@ -292,6 +292,10 @@ func (suite *libfuseTestSuite) TestGetAttrErrors() {
 	testGetAttrErrors(suite)
 }
 
+func (suite *libfuseTestSuite) TestFuseErrnoFromError() {
+	testFuseErrnoFromError(suite)
+}
+
 // getattr
 
 func (suite *libfuseTestSuite) TestMkDir() {
@@ -498,6 +502,10 @@ func (suite *libfuseTestSuite) TestFlushNotDirty() {
 	testFlushNotDirty(suite)
 }
 
+func (suite *libfuseTestSuite) TestFlushMissingHandle() {
+	testFlushMissingHandle(suite)
+}
+
 func (suite *libfuseTestSuite) TestFlushErrors() {
 	testFlushErrors(suite)
 }
@@ -578,6 +586,14 @@ func (suite *libfuseTestSuite) TestRenameDirPermission() {
 
 func (suite *libfuseTestSuite) TestRenameDirDstGetAttrPermission() {
 	testRenameDirDstGetAttrPermission(suite)
+}
+
+func (suite *libfuseTestSuite) TestRenameSrcGetAttrPermission() {
+	testRenameSrcGetAttrPermission(suite)
+}
+
+func (suite *libfuseTestSuite) TestRenameSrcGetAttrError() {
+	testRenameSrcGetAttrError(suite)
 }
 
 func (suite *libfuseTestSuite) TestSymlink() {

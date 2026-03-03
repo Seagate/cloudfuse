@@ -338,6 +338,33 @@ func testGetAttrErrors(suite *libfuseTestSuite) {
 	suite.assert.Equal(-fuse.EIO, cfuseFS.Getattr("/"+name, buf, 0))
 }
 
+func testFuseErrnoFromError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	testCases := []struct {
+		err      error
+		expected int
+	}{
+		{err: nil, expected: 0},
+		{err: syscall.ENOTEMPTY, expected: -fuse.ENOTEMPTY},
+		{err: fs.ErrNotExist, expected: -fuse.ENOENT},
+		{err: os.ErrNotExist, expected: -fuse.ENOENT},
+		{err: syscall.EPERM, expected: -fuse.EACCES},
+		{err: syscall.EACCES, expected: -fuse.EACCES},
+		{err: fs.ErrPermission, expected: -fuse.EACCES},
+		{err: os.ErrPermission, expected: -fuse.EACCES},
+		{err: syscall.EEXIST, expected: -fuse.EEXIST},
+		{err: fs.ErrExist, expected: -fuse.EEXIST},
+		{err: os.ErrExist, expected: -fuse.EEXIST},
+		{err: syscall.EIO, expected: -fuse.EIO},
+		{err: errors.New("boom"), expected: -fuse.EIO},
+	}
+
+	for _, tc := range testCases {
+		suite.assert.Equal(tc.expected, fuseErrnoFromError(tc.err))
+	}
+}
+
 func testOpendirAndReleasedir(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	err, fh := cfuseFS.Opendir("/dir")
@@ -629,19 +656,35 @@ func testFlushNotDirty(suite *libfuseTestSuite) {
 
 func testFlushErrors(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
-	handle := handlemap.NewHandle("file")
-	handle.Flags.Set(handlemap.HandleFlagDirty)
-	fh := handlemap.Add(handle)
-	defer handlemap.Delete(handle.ID)
+	handleNotExist := handlemap.NewHandle("file")
+	handleNotExist.Flags.Set(handlemap.HandleFlagDirty)
+	fhNotExist := handlemap.Add(handleNotExist)
+	defer handlemap.Delete(handleNotExist.ID)
+
+	handleAccessDenied := handlemap.NewHandle("file")
+	handleAccessDenied.Flags.Set(handlemap.HandleFlagDirty)
+	fhAccessDenied := handlemap.Add(handleAccessDenied)
+	defer handlemap.Delete(handleAccessDenied.ID)
+
+	handleError := handlemap.NewHandle("file")
+	handleError.Flags.Set(handlemap.HandleFlagDirty)
+	fhError := handlemap.Add(handleError)
+	defer handlemap.Delete(handleError.ID)
 
 	suite.mock.EXPECT().FlushFile(gomock.Any()).Return(syscall.ENOENT)
-	suite.assert.Equal(-fuse.ENOENT, cfuseFS.Flush("/file", uint64(fh)))
+	suite.assert.Equal(-fuse.ENOENT, cfuseFS.Flush("/file", uint64(fhNotExist)))
 
 	suite.mock.EXPECT().FlushFile(gomock.Any()).Return(syscall.EACCES)
-	suite.assert.Equal(-fuse.EACCES, cfuseFS.Flush("/file", uint64(fh)))
+	suite.assert.Equal(-fuse.EACCES, cfuseFS.Flush("/file", uint64(fhAccessDenied)))
 
 	suite.mock.EXPECT().FlushFile(gomock.Any()).Return(errors.New("boom"))
-	suite.assert.Equal(-fuse.EIO, cfuseFS.Flush("/file", uint64(fh)))
+	suite.assert.Equal(-fuse.EIO, cfuseFS.Flush("/file", uint64(fhError)))
+}
+
+func testFlushMissingHandle(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	err := cfuseFS.Flush("/file", 999)
+	suite.assert.Equal(-fuse.EBADF, err)
 }
 
 func testReleaseMissingHandle(suite *libfuseTestSuite) {
@@ -782,22 +825,12 @@ func testCreateFuseOptionsFlags(suite *libfuseTestSuite) {
 
 	umask := uint32(0022)
 	options := createFuseOptions(host, true, true, true, false, 128, umask)
-	if !strings.Contains(options, "allow_other") {
-		suite.T().Fatal("expected allow_other in options")
-	}
-	if !strings.Contains(options, "allow_root") {
-		suite.T().Fatal("expected allow_root in options")
-	}
-	if !strings.Contains(options, "ro") {
-		suite.T().Fatal("expected ro in options")
-	}
+	suite.assert.Contains(options, "allow_other")
+	suite.assert.Contains(options, "allow_root")
+	suite.assert.Contains(options, "ro")
 	expectedUmask := fmt.Sprintf("umask=%04o", umask)
-	if !strings.Contains(options, expectedUmask) {
-		suite.T().Fatal("expected umask in options")
-	}
-	if !strings.Contains(options, "kernel_cache") {
-		suite.T().Fatal("expected kernel_cache in options")
-	}
+	suite.assert.Contains(options, expectedUmask)
+	suite.assert.Contains(options, "kernel_cache")
 }
 
 func testCreateFuseOptionsDirectIO(suite *libfuseTestSuite) {
@@ -806,12 +839,12 @@ func testCreateFuseOptionsDirectIO(suite *libfuseTestSuite) {
 	fuseFS.directIO = true
 
 	options := createFuseOptions(host, false, false, false, false, 128, 0)
-	if !strings.Contains(options, "direct_io") {
-		suite.T().Fatal("expected direct_io in direct-io options")
+	if strings.Contains(options, "max_readahead=") {
+		suite.assert.Contains(options, "direct_io")
+	} else {
+		suite.assert.NotContains(options, "direct_io")
 	}
-	if strings.Contains(options, "kernel_cache") {
-		suite.T().Fatal("did not expect kernel_cache in direct-io options")
-	}
+	suite.assert.NotContains(options, "kernel_cache")
 }
 
 func testPopulateDirChildCacheReplaceCache(suite *libfuseTestSuite) {
@@ -1152,11 +1185,40 @@ func testRenameDirDstGetAttrPermission(suite *libfuseTestSuite) {
 	srcAttr := &internal.ObjAttr{Flags: internal.NewDirBitMap()}
 
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(srcAttr, nil)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Return(nil, os.ErrPermission)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Return(nil, syscall.EPERM)
 	suite.mock.EXPECT().RenameDir(gomock.Any()).Times(0)
 
 	err := cfuseFS.Rename("/"+src, "/"+dst)
 	suite.assert.Equal(-fuse.EACCES, err)
+}
+
+func testRenameSrcGetAttrPermission(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	src := "src"
+	dst := "dst"
+
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(nil, os.ErrPermission)
+	suite.mock.EXPECT().RenameFile(gomock.Any()).Times(0)
+	suite.mock.EXPECT().RenameDir(gomock.Any()).Times(0)
+
+	err := cfuseFS.Rename("/"+src, "/"+dst)
+	suite.assert.Equal(-fuse.EACCES, err)
+}
+
+func testRenameSrcGetAttrError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	src := "src"
+	dst := "dst"
+
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(nil, errors.New("boom"))
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Times(0)
+	suite.mock.EXPECT().RenameDir(gomock.Any()).Times(0)
+	suite.mock.EXPECT().RenameFile(gomock.Any()).Times(0)
+
+	err := cfuseFS.Rename("/"+src, "/"+dst)
+	suite.assert.Equal(-fuse.EIO, err)
 }
 
 func testOpen(suite *libfuseTestSuite) {
@@ -1452,11 +1514,13 @@ func testReadLink(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	options := internal.ReadLinkOptions{Name: name}
-	suite.mock.EXPECT().ReadLink(options).Return("target", nil)
-	attr := &internal.ObjAttr{}
+	linkSize := int64(16)
+	options := internal.ReadLinkOptions{Name: name, Size: linkSize}
 	getAttrOpt := internal.GetAttrOptions{Name: name}
-	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(attr, nil)
+	gomock.InOrder(
+		suite.mock.EXPECT().GetAttr(getAttrOpt).Return(&internal.ObjAttr{Size: linkSize}, nil),
+		suite.mock.EXPECT().ReadLink(options).Return("target", nil),
+	)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(0, err)
@@ -1467,15 +1531,17 @@ func testReadLinkNotExists(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	options := internal.ReadLinkOptions{Name: name}
-	suite.mock.EXPECT().ReadLink(options).Return("", syscall.ENOENT)
-	attr := &internal.ObjAttr{}
+	linkSize := int64(8)
+	options := internal.ReadLinkOptions{Name: name, Size: linkSize}
 	getAttrOpt := internal.GetAttrOptions{Name: name}
-	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(attr, nil)
+	gomock.InOrder(
+		suite.mock.EXPECT().GetAttr(getAttrOpt).Return(&internal.ObjAttr{Size: linkSize}, nil),
+		suite.mock.EXPECT().ReadLink(options).Return("", syscall.ENOENT),
+	)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.ENOENT, err)
-	suite.assert.NotEqual("target", target)
+	suite.assert.Empty(target)
 }
 
 func testReadLinkError(suite *libfuseTestSuite) {
@@ -1490,7 +1556,7 @@ func testReadLinkError(suite *libfuseTestSuite) {
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.EIO, err)
-	suite.assert.NotEqual("target", target)
+	suite.assert.Empty(target)
 }
 
 func testReadLinkPermission(suite *libfuseTestSuite) {
@@ -1518,7 +1584,7 @@ func testFsync(suite *libfuseTestSuite) {
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
 	_, fh := cfuseFS.Open(path, flags)
-	suite.assert.NotEqual(uint64(0), fh)
+	suite.assert.NotZero(fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
 	handle.ID = (handlemap.HandleID)(fh)
@@ -1551,7 +1617,7 @@ func testFsyncError(suite *libfuseTestSuite) {
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
 	_, fh := cfuseFS.Open(path, flags)
-	suite.assert.NotEqual(uint64(0), fh)
+	suite.assert.NotZero(fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
 	handle.ID = (handlemap.HandleID)(fh)
@@ -1574,7 +1640,7 @@ func testFsyncPermission(suite *libfuseTestSuite) {
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
 	_, fh := cfuseFS.Open(path, flags)
-	suite.assert.NotEqual(uint64(0), fh)
+	suite.assert.NotZero(fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
 	handle.ID = (handlemap.HandleID)(fh)
