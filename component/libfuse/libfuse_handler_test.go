@@ -400,6 +400,10 @@ func (suite *libfuseTestSuite) TestRmDirPermission() {
 	testRmDirPermission(suite)
 }
 
+func (suite *libfuseTestSuite) TestRmDirRaceNotEmpty() {
+	testRmDirRaceNotEmpty(suite)
+}
+
 func (suite *libfuseTestSuite) TestCreate() {
 	testCreate(suite)
 }
@@ -572,6 +576,10 @@ func (suite *libfuseTestSuite) TestRenameDirPermission() {
 	testRenameDirPermission(suite)
 }
 
+func (suite *libfuseTestSuite) TestRenameDirDstGetAttrPermission() {
+	testRenameDirDstGetAttrPermission(suite)
+}
+
 func (suite *libfuseTestSuite) TestSymlink() {
 	testSymlink(suite)
 }
@@ -646,6 +654,10 @@ func (suite *libfuseTestSuite) TestStatFsNotPopulated() {
 
 func (suite *libfuseTestSuite) TestStatFsCloudStorageCapacity() {
 	testStatFsCloudStorageCapacity(suite)
+}
+
+func (suite *libfuseTestSuite) TestStatFsCloudStorageCapacityUsedExceedsDisplay() {
+	testStatFsCloudStorageCapacityUsedExceedsDisplay(suite)
 }
 
 func (suite *libfuseTestSuite) TestStatFsError() {

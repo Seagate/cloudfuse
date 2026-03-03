@@ -32,6 +32,7 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -714,6 +715,8 @@ func fuseErrnoFromError(err error) int {
 	switch {
 	case err == nil:
 		return 0
+	case errors.Is(err, syscall.ENOTEMPTY):
+		return -fuse.ENOTEMPTY
 	case errors.Is(err, fs.ErrNotExist):
 		return -fuse.ENOENT
 	case errors.Is(err, fs.ErrPermission):

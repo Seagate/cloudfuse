@@ -179,12 +179,35 @@ func testStatFsCloudStorageCapacity(suite *libfuseTestSuite) {
 	ret := cfuseFS.Statfs(path, buf)
 
 	suite.assert.Equal(0, ret)
-	blocksUnavailable := uint64(attr.Blocks - attr.Bavail)
-	displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / uint64(attr.Bsize)
-	expectedBlocks := max(displayCapacityBlocks, blocksUnavailable)
-	suite.assert.Equal(expectedBlocks, buf.Blocks)
-	suite.assert.Equal(expectedBlocks-blocksUnavailable, buf.Bavail)
-	suite.assert.Equal(expectedBlocks-uint64(attr.Blocks-attr.Bfree), buf.Bfree)
+	suite.assert.Equal(uint64(1024), buf.Blocks)
+	suite.assert.Equal(uint64(1014), buf.Bavail)
+	suite.assert.Equal(uint64(1014), buf.Bfree)
+}
+
+func testStatFsCloudStorageCapacityUsedExceedsDisplay(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	path := "/"
+
+	fuseFS.displayCapacityMb = 1
+	attr := &common.Statfs_t{
+		Frsize:  1,
+		Blocks:  5000,
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   1024,
+		Files:   6,
+		Ffree:   7,
+		Namemax: 255,
+	}
+	suite.mock.EXPECT().StatFs().Return(attr, true, nil)
+
+	buf := &fuse.Statfs_t{}
+	ret := cfuseFS.Statfs(path, buf)
+
+	suite.assert.Equal(0, ret)
+	suite.assert.Equal(uint64(5000), buf.Blocks)
+	suite.assert.Equal(uint64(0), buf.Bavail)
+	suite.assert.Equal(uint64(0), buf.Bfree)
 }
 
 func testStatFsError(suite *libfuseTestSuite) {
@@ -461,9 +484,19 @@ func testReadFromComponent(suite *libfuseTestSuite) {
 	defer handlemap.Delete(handle.ID)
 
 	buf := make([]byte, 4)
-	suite.mock.EXPECT().ReadInBuffer(gomock.Any()).Return(4, nil)
-	read := cfuseFS.Read("/file", buf, 0, uint64(fh))
+	suite.mock.EXPECT().
+		ReadInBuffer(gomock.AssignableToTypeOf(&internal.ReadInBufferOptions{})).
+		DoAndReturn(func(opt *internal.ReadInBufferOptions) (int, error) {
+			suite.assert.Equal(handle.ID, opt.Handle.ID)
+			suite.assert.Equal("file", opt.Handle.Path)
+			suite.assert.Equal(int64(7), opt.Offset)
+			suite.assert.Equal(4, len(opt.Data))
+			copy(opt.Data, []byte("ping"))
+			return 4, nil
+		})
+	read := cfuseFS.Read("/file", buf, 7, uint64(fh))
 	suite.assert.Equal(4, read)
+	suite.assert.Equal("ping", string(buf))
 }
 
 func testReadAccessDenied(suite *libfuseTestSuite) {
@@ -473,8 +506,15 @@ func testReadAccessDenied(suite *libfuseTestSuite) {
 	defer handlemap.Delete(handle.ID)
 
 	buf := make([]byte, 4)
-	suite.mock.EXPECT().ReadInBuffer(gomock.Any()).Return(0, os.ErrPermission)
-	read := cfuseFS.Read("/file", buf, 0, uint64(fh))
+	suite.mock.EXPECT().
+		ReadInBuffer(gomock.AssignableToTypeOf(&internal.ReadInBufferOptions{})).
+		DoAndReturn(func(opt *internal.ReadInBufferOptions) (int, error) {
+			suite.assert.Equal(handle.ID, opt.Handle.ID)
+			suite.assert.Equal(int64(3), opt.Offset)
+			suite.assert.Equal(4, len(opt.Data))
+			return 0, os.ErrPermission
+		})
+	read := cfuseFS.Read("/file", buf, 3, uint64(fh))
 	suite.assert.Equal(-fuse.EACCES, read)
 }
 
@@ -485,8 +525,15 @@ func testReadError(suite *libfuseTestSuite) {
 	defer handlemap.Delete(handle.ID)
 
 	buf := make([]byte, 4)
-	suite.mock.EXPECT().ReadInBuffer(gomock.Any()).Return(0, errors.New("boom"))
-	read := cfuseFS.Read("/file", buf, 0, uint64(fh))
+	suite.mock.EXPECT().
+		ReadInBuffer(gomock.AssignableToTypeOf(&internal.ReadInBufferOptions{})).
+		DoAndReturn(func(opt *internal.ReadInBufferOptions) (int, error) {
+			suite.assert.Equal(handle.ID, opt.Handle.ID)
+			suite.assert.Equal(int64(5), opt.Offset)
+			suite.assert.Equal(4, len(opt.Data))
+			return 0, errors.New("boom")
+		})
+	read := cfuseFS.Read("/file", buf, 5, uint64(fh))
 	suite.assert.Equal(-fuse.EIO, read)
 }
 
@@ -504,8 +551,16 @@ func testWriteSuccess(suite *libfuseTestSuite) {
 	defer handlemap.Delete(handle.ID)
 
 	buf := []byte("data")
-	suite.mock.EXPECT().WriteFile(gomock.Any()).Return(len(buf), nil)
-	written := cfuseFS.Write("/file", buf, 0, uint64(fh))
+	suite.mock.EXPECT().
+		WriteFile(gomock.AssignableToTypeOf(&internal.WriteFileOptions{})).
+		DoAndReturn(func(opt *internal.WriteFileOptions) (int, error) {
+			suite.assert.Equal(handle.ID, opt.Handle.ID)
+			suite.assert.Equal("file", opt.Handle.Path)
+			suite.assert.Equal(int64(9), opt.Offset)
+			suite.assert.Equal("data", string(opt.Data))
+			return len(opt.Data), nil
+		})
+	written := cfuseFS.Write("/file", buf, 9, uint64(fh))
 	suite.assert.Equal(len(buf), written)
 }
 
@@ -516,8 +571,15 @@ func testWriteError(suite *libfuseTestSuite) {
 	defer handlemap.Delete(handle.ID)
 
 	buf := []byte("data")
-	suite.mock.EXPECT().WriteFile(gomock.Any()).Return(0, errors.New("boom"))
-	written := cfuseFS.Write("/file", buf, 0, uint64(fh))
+	suite.mock.EXPECT().
+		WriteFile(gomock.AssignableToTypeOf(&internal.WriteFileOptions{})).
+		DoAndReturn(func(opt *internal.WriteFileOptions) (int, error) {
+			suite.assert.Equal(handle.ID, opt.Handle.ID)
+			suite.assert.Equal(int64(11), opt.Offset)
+			suite.assert.Equal("data", string(opt.Data))
+			return 0, errors.New("boom")
+		})
+	written := cfuseFS.Write("/file", buf, 11, uint64(fh))
 	suite.assert.Equal(-fuse.EIO, written)
 }
 
@@ -528,8 +590,15 @@ func testWriteAccessDenied(suite *libfuseTestSuite) {
 	defer handlemap.Delete(handle.ID)
 
 	buf := []byte("data")
-	suite.mock.EXPECT().WriteFile(gomock.Any()).Return(0, os.ErrPermission)
-	written := cfuseFS.Write("/file", buf, 0, uint64(fh))
+	suite.mock.EXPECT().
+		WriteFile(gomock.AssignableToTypeOf(&internal.WriteFileOptions{})).
+		DoAndReturn(func(opt *internal.WriteFileOptions) (int, error) {
+			suite.assert.Equal(handle.ID, opt.Handle.ID)
+			suite.assert.Equal(int64(13), opt.Offset)
+			suite.assert.Equal("data", string(opt.Data))
+			return 0, os.ErrPermission
+		})
+	written := cfuseFS.Write("/file", buf, 13, uint64(fh))
 	suite.assert.Equal(-fuse.EACCES, written)
 }
 
@@ -884,6 +953,19 @@ func testRmDirPermission(suite *libfuseTestSuite) {
 	suite.assert.Equal(-fuse.EACCES, err)
 }
 
+func testRmDirRaceNotEmpty(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	isDirEmptyOptions := internal.IsDirEmptyOptions{Name: name}
+	suite.mock.EXPECT().IsDirEmpty(isDirEmptyOptions).Return(true)
+	deleteDirOptions := internal.DeleteDirOptions{Name: name}
+	suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(syscall.ENOTEMPTY)
+
+	err := cfuseFS.Rmdir(path)
+	suite.assert.Equal(-fuse.ENOTEMPTY, err)
+}
+
 func testCreate(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
@@ -1039,6 +1121,21 @@ func testRenameDirPermission(suite *libfuseTestSuite) {
 	suite.mock.EXPECT().
 		RenameDir(internal.RenameDirOptions{Src: src, Dst: dst}).
 		Return(os.ErrPermission)
+
+	err := cfuseFS.Rename("/"+src, "/"+dst)
+	suite.assert.Equal(-fuse.EACCES, err)
+}
+
+func testRenameDirDstGetAttrPermission(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	src := "src"
+	dst := "dst"
+	srcAttr := &internal.ObjAttr{Flags: internal.NewDirBitMap()}
+
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src}).Return(srcAttr, nil)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dst}).Return(nil, os.ErrPermission)
+	suite.mock.EXPECT().RenameDir(gomock.Any()).Times(0)
 
 	err := cfuseFS.Rename("/"+src, "/"+dst)
 	suite.assert.Equal(-fuse.EACCES, err)
