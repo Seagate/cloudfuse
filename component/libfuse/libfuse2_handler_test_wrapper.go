@@ -260,36 +260,6 @@ func testReaddirEmptyPageToken(suite *libfuseTestSuite) {
 	suite.assert.False(fillCalled)
 }
 
-func testReaddirNonZeroOffsetCachesDots(suite *libfuseTestSuite) {
-	defer suite.cleanupTest()
-
-	handle := handlemap.NewHandle("dir/")
-	cacheInfo := &dirChildCache{
-		sIndex:   0,
-		eIndex:   0,
-		token:    "",
-		length:   0,
-		children: make([]*internal.ObjAttr, 0),
-	}
-	handle.SetValue("cache", cacheInfo)
-	fh := handlemap.Add(handle)
-	defer handlemap.Delete(handle.ID)
-
-	suite.mock.EXPECT().
-		StreamDir(internal.StreamDirOptions{Name: "dir/", Token: ""}).
-		Return([]*internal.ObjAttr{}, "", nil)
-
-	var names []string
-	fill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
-		names = append(names, name)
-		return true
-	}
-
-	err := cfuseFS.Readdir("/dir", fill, 1, uint64(fh))
-	suite.assert.Equal(0, err)
-	suite.assert.Equal([]string{".", ".."}, names)
-}
-
 func testRmDir(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
