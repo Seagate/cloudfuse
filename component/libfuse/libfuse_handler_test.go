@@ -188,13 +188,13 @@ func (suite *libfuseTestSuite) TestConfigDefaultPermission() {
 func (suite *libfuseTestSuite) TestConfigRootAndThreads() {
 	defer suite.cleanupTest()
 	suite.cleanupTest()
-	config := "allow-root: true\nnonempty: true\nlibfuse:\n  max-fuse-threads: 256\n  umask: 22\n  uid: 1001\n  gid: 1002\n"
+	config := "allow-root: true\nnonempty: true\nlibfuse:\n  max-fuse-threads: 256\n  umask: 022\n  uid: 1001\n  gid: 1002\n"
 	suite.setupTestHelper(config)
 
 	suite.assert.True(suite.libfuse.allowRoot)
 	suite.assert.True(suite.libfuse.nonEmptyMount)
 	suite.assert.Equal(uint32(256), suite.libfuse.maxFuseThreads)
-	suite.assert.Equal(uint32(22), suite.libfuse.umask)
+	suite.assert.Equal(uint32(0o22), suite.libfuse.umask)
 	suite.assert.Equal(uint32(1001), suite.libfuse.ownerUID)
 	suite.assert.Equal(uint32(1002), suite.libfuse.ownerGID)
 }

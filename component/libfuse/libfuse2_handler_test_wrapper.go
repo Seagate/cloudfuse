@@ -243,6 +243,12 @@ func testMkDirErrorPermission(suite *libfuseTestSuite) {
 	path := "/" + name
 	mode := fs.FileMode(0775)
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
+
+	if runtime.GOOS == "windows" {
+		option := internal.GetAttrOptions{Name: name}
+		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
+	}
+
 	suite.mock.EXPECT().CreateDir(options).Return(os.ErrPermission)
 
 	err := cfuseFS.Mkdir(path, 0775)
@@ -255,6 +261,12 @@ func testMkDirErrorExist(suite *libfuseTestSuite) {
 	path := "/" + name
 	mode := fs.FileMode(0775)
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
+
+	if runtime.GOOS == "windows" {
+		option := internal.GetAttrOptions{Name: name}
+		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
+	}
+
 	suite.mock.EXPECT().CreateDir(options).Return(os.ErrExist)
 
 	err := cfuseFS.Mkdir(path, 0775)
@@ -490,7 +502,7 @@ func testReadFromComponent(suite *libfuseTestSuite) {
 			suite.assert.Equal(handle.ID, opt.Handle.ID)
 			suite.assert.Equal("file", opt.Handle.Path)
 			suite.assert.Equal(int64(7), opt.Offset)
-			suite.assert.Equal(4, len(opt.Data))
+			suite.assert.Len(opt.Data, 4)
 			copy(opt.Data, []byte("ping"))
 			return 4, nil
 		})
@@ -511,7 +523,7 @@ func testReadAccessDenied(suite *libfuseTestSuite) {
 		DoAndReturn(func(opt *internal.ReadInBufferOptions) (int, error) {
 			suite.assert.Equal(handle.ID, opt.Handle.ID)
 			suite.assert.Equal(int64(3), opt.Offset)
-			suite.assert.Equal(4, len(opt.Data))
+			suite.assert.Len(opt.Data, 4)
 			return 0, os.ErrPermission
 		})
 	read := cfuseFS.Read("/file", buf, 3, uint64(fh))
@@ -530,7 +542,7 @@ func testReadError(suite *libfuseTestSuite) {
 		DoAndReturn(func(opt *internal.ReadInBufferOptions) (int, error) {
 			suite.assert.Equal(handle.ID, opt.Handle.ID)
 			suite.assert.Equal(int64(5), opt.Offset)
-			suite.assert.Equal(4, len(opt.Data))
+			suite.assert.Len(opt.Data, 4)
 			return 0, errors.New("boom")
 		})
 	read := cfuseFS.Read("/file", buf, 5, uint64(fh))
@@ -776,7 +788,7 @@ func testCreateFuseOptionsFlags(suite *libfuseTestSuite) {
 	if !strings.Contains(options, "ro") {
 		suite.T().Fatal("expected ro in options")
 	}
-	expectedUmask := fmt.Sprintf("umask=%04d", umask)
+	expectedUmask := fmt.Sprintf("umask=%04o", umask)
 	if !strings.Contains(options, expectedUmask) {
 		suite.T().Fatal("expected umask in options")
 	}
@@ -791,6 +803,9 @@ func testCreateFuseOptionsDirectIO(suite *libfuseTestSuite) {
 	fuseFS.directIO = true
 
 	options := createFuseOptions(host, false, false, false, false, 128, 0)
+	if !strings.Contains(options, "direct_io") {
+		suite.T().Fatal("expected direct_io in direct-io options")
+	}
 	if strings.Contains(options, "kernel_cache") {
 		suite.T().Fatal("did not expect kernel_cache in direct-io options")
 	}
