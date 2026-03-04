@@ -81,49 +81,17 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
 
-      - name: Cache Zig
-        if: runner.os == 'Linux'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: ~/.local/bin
-          key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
-
       - name: Install Zig
-        env:
-          RUNNER_ARCH: ${{ runner.arch }}
-          ENV_ZIG: ${{ env.zig }}
-        run: |
-          if [[ "${RUNNER_ARCH}" == "X64" ]]; then
-            ZIG_ARCH="x86_64"
-          elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
-            ZIG_ARCH="aarch64"
-          else
-            echo "Unsupported architecture: ${RUNNER_ARCH}"
-            exit 1
-          fi
-
-          ZIG_DIR="zig-${ZIG_ARCH}-linux-${ENV_ZIG}"
-          ZIG_TARBALL="${ZIG_DIR}.tar.xz"
-          ZIG_DIR_PATH="$HOME/.local/bin/${ZIG_DIR}"
-
-          # If cached Zig already exists, add it to PATH and skip download
-          if [ -d "${ZIG_DIR_PATH}" ]; then
-            echo "Found cached Zig at ${ZIG_DIR_PATH}"
-            echo "${ZIG_DIR_PATH}" >> $GITHUB_PATH
-            exit 0
-          fi
-
-          # Otherwise download and extract Zig, then add to PATH
-          curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
-          mkdir -p $HOME/.local/bin
-          tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "${ZIG_DIR_PATH}" >> $GITHUB_PATH
-          rm zig.tar.xz
+        if: runner.os == 'Linux'
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.zig }}
+          cache-key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
 
       - name: Set CGO
         env:
@@ -243,7 +211,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -275,7 +243,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
