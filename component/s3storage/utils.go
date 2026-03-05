@@ -141,6 +141,15 @@ func parseS3Err(err error, attemptedAction string) error {
 			}
 			return syscall.ENOENT
 		}
+		if errorCode == "KeyTooLongError" {
+			log.Err(
+				"%s : Failed to %s with error %s because key length exceeded backend limit",
+				functionName,
+				attemptedAction,
+				errorCode,
+			)
+			return syscall.ENAMETOOLONG
+		}
 	}
 
 	// unrecognized error - parsing failed

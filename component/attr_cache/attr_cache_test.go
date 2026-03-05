@@ -414,6 +414,33 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 	}
 }
 
+func (suite *attrCacheTestSuite) TestCreateDirUpdatesParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	options := internal.CreateDirOptions{Name: filepath.Join(parentPath, "child")}
+	suite.mock.EXPECT().CreateDir(options).Return(nil)
+
+	err := suite.attrCache.CreateDir(options)
+	suite.NoError(err)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.True(updatedParent.attr.Ctime.After(staleTime))
+	suite.True(updatedParent.attr.Mtime.After(staleTime))
+}
+
 // Tests Create Directory Without Caching Empty Directories
 func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 	defer suite.cleanupTest()
@@ -1082,6 +1109,33 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 	suite.assert.True(found)
 	suite.assert.True(checkItem.exists())
 	suite.assert.EqualValues(0, checkItem.attr.Size)
+}
+
+func (suite *attrCacheTestSuite) TestCreateFileUpdatesParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	options := internal.CreateFileOptions{Name: filepath.Join(parentPath, "child")}
+	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, nil)
+
+	_, err := suite.attrCache.CreateFile(options)
+	suite.NoError(err)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.True(updatedParent.attr.Ctime.After(staleTime))
+	suite.True(updatedParent.attr.Mtime.After(staleTime))
 }
 
 // Tests Open File

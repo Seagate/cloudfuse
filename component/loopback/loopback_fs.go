@@ -406,8 +406,9 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 		Size:  info.Size(),
 		Mode:  info.Mode(),
 		Mtime: info.ModTime(),
+		Atime: info.ModTime(),
+		Ctime: info.ModTime(),
 	}
-	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	if info.Mode()&os.ModeSymlink != 0 {
 		_, err := os.Readlink(path)

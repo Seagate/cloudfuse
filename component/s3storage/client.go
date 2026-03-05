@@ -399,6 +399,13 @@ func (cl *Client) CreateDirectory(name string) error {
 	if cl.Config.enableDirMarker {
 		err := cl.putObject(putObjectOptions{name: name, isDir: true})
 		if err != nil {
+			if errors.Is(err, syscall.ENAMETOOLONG) {
+				log.Warn(
+					"Client::CreateDirectory : skipping marker for long path %s",
+					name,
+				)
+				return nil
+			}
 			log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
 			return err
 		}
