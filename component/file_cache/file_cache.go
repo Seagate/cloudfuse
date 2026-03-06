@@ -971,6 +971,37 @@ func (fc *FileCache) getObjectName(localPath string) string {
 	return common.NormalizeObjectName(relPath)
 }
 
+func (fc *FileCache) checkCacheSpace(
+	opName string,
+	targetPath string,
+	existingSize int64,
+	newSize int64,
+	bufferBytes int64,
+) error {
+	currSize, err := common.GetUsage(fc.tmpPath)
+	if err != nil {
+		log.Err(
+			"FileCache::%s : error getting current usage of cache [%s]",
+			opName,
+			err.Error(),
+		)
+		return nil
+	}
+
+	additionalSpace := max(int64(0), newSize-existingSize)
+	if currSize+float64(additionalSpace) > fc.diskHighWaterMark+float64(bufferBytes) {
+		log.Err(
+			"FileCache::%s : cache size limit reached [%f] failed to open %s",
+			opName,
+			fc.maxCacheSizeMB,
+			targetPath,
+		)
+		return syscall.ENOSPC
+	}
+
+	return nil
+}
+
 func unlockAll(flocks []*common.LockMapItem) {
 	for _, flock := range flocks {
 		flock.Unlock()
@@ -1333,27 +1364,20 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	if cloudAttr != nil {
 		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
-			currSize, err := common.GetUsage(fc.tmpPath)
+			// Subtract existing local file size to avoid double-counting.
+			existingSize := int64(0)
+			if info, statErr := os.Stat(localPath); statErr == nil {
+				existingSize = info.Size()
+			}
+			err = fc.checkCacheSpace(
+				"OpenFile",
+				options.Name,
+				existingSize,
+				fileSize,
+				0,
+			)
 			if err != nil {
-				log.Err(
-					"FileCache::OpenFile : error getting current usage of cache [%s]",
-					err.Error(),
-				)
-			} else {
-				// Subtract existing local file size to avoid double-counting
-				existingSize := int64(0)
-				if info, statErr := os.Stat(localPath); statErr == nil {
-					existingSize = info.Size()
-				}
-				additionalSpace := max(int64(0), fileSize-existingSize)
-				if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
-					log.Err(
-						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
-						fc.maxCacheSizeMB,
-						options.Name,
-					)
-					return nil, syscall.ENOSPC
-				}
+				return nil, err
 			}
 		}
 	}
@@ -1635,25 +1659,21 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	}
 
 	if fc.diskHighWaterMark != 0 {
-		currSize, err := common.GetUsage(fc.tmpPath)
+		// Calculate additional space needed beyond the file's current size.
+		existingSize := int64(0)
+		if info, statErr := f.Stat(); statErr == nil {
+			existingSize = info.Size()
+		}
+		newEnd := options.Offset + int64(len(options.Data))
+		err = fc.checkCacheSpace(
+			"WriteFile",
+			options.Handle.Path,
+			existingSize,
+			newEnd,
+			0,
+		)
 		if err != nil {
-			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
-		} else {
-			// Calculate additional space needed beyond the file's current size
-			existingSize := int64(0)
-			if info, statErr := f.Stat(); statErr == nil {
-				existingSize = info.Size()
-			}
-			newEnd := options.Offset + int64(len(options.Data))
-			additionalSpace := max(int64(0), newEnd-existingSize)
-			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
-				log.Err(
-					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
-					fc.maxCacheSizeMB,
-					options.Handle.Path,
-				)
-				return 0, syscall.ENOSPC
-			}
+			return 0, err
 		}
 	}
 
@@ -1902,10 +1922,11 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// Don't log these by default, as it noticeably affects performance
 	// log.Trace("FileCache::GetAttr : %s", options.Name)
 
-	// For get attr, there are three different path situations we have to potentially handle.
-	// 1. Path in cloud storage but not in local cache
-	// 2. Path not in cloud storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
-	// 3. Path in cloud storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
+	// For get attr, there are four different file state situations we have to potentially handle.
+	// 1. File exists in cloud storage but not in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
+	// 2. File exists in local cache but not in cloud storage (e.g., newly created and not uploaded yet; also supports immutable containers): serve local attributes.
+	// 3. File exists in both cloud storage and local cache: start from cloud attributes, but override size/mtime from local cache.
+	// 4. File is open in local cache and dirty (local cache is the source of truth)
 
 	// If the file is being downloaded or deleted, the size and mod time will be incorrect
 	// wait for download or deletion to complete before getting local file info
@@ -1913,7 +1934,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
 	flock.RLock()
 
-	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
+	// Case 4: File in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, localErr := os.Stat(localPath)
 	if flock.Count() > 0 && flock.DirtyCount() > 0 {
@@ -2114,29 +2135,22 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 
 	if fc.diskHighWaterMark != 0 {
-		currSize, err := common.GetUsage(fc.tmpPath)
+		// Only count the additional space beyond the file's current size.
+		localPath := filepath.Join(fc.tmpPath, options.Name)
+		existingSize := int64(0)
+		if info, statErr := os.Stat(localPath); statErr == nil {
+			existingSize = info.Size()
+		}
+		// Add a buffer to the high water mark to account for any small discrepancies in usage calculations.
+		err := fc.checkCacheSpace(
+			"TruncateFile",
+			options.Name,
+			existingSize,
+			options.NewSize,
+			4096,
+		)
 		if err != nil {
-			log.Err(
-				"FileCache::TruncateFile : error getting current usage of cache [%s]",
-				err.Error(),
-			)
-		} else {
-			// Only count the additional space beyond the file's current size
-			localPath := filepath.Join(fc.tmpPath, options.Name)
-			existingSize := int64(0)
-			if info, statErr := os.Stat(localPath); statErr == nil {
-				existingSize = info.Size()
-			}
-			additionalSpace := max(int64(0), options.NewSize-existingSize)
-			// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
-			if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
-				log.Err(
-					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
-					fc.maxCacheSizeMB,
-					options.Name,
-				)
-				return syscall.ENOSPC
-			}
+			return err
 		}
 	}
 
@@ -2155,38 +2169,14 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			// Recover missing fd on valid handles by reopening the cached path.
-			// This avoids issues when truncate arrives before the handle has a live file object.
-			localPath := filepath.Join(fc.tmpPath, options.Name)
-			reopened, reopenErr := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
-			if reopenErr == nil {
-				options.Handle.UnixFD = uint64(reopened.Fd())
-				options.Handle.SetFileObject(reopened)
-				f = reopened
-			}
-		}
-
-		if f == nil {
-			log.Warn(
-				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
-				options.Name,
+			log.Err(
+				"FileCache::TruncateFile : error [couldn't find fd in handle] %s",
+				options.Handle.Path,
 			)
-			options.Handle = nil
-		}
-	}
-
-	if options.Handle != nil {
-		f := options.Handle.GetFileObject()
-		if f == nil {
 			return syscall.EBADF
 		}
 
-		info, err := f.Stat()
-		if err == nil && info.Size() == options.NewSize {
-			return nil
-		}
-
-		err = f.Truncate(options.NewSize)
+		err := f.Truncate(options.NewSize)
 		if err != nil {
 			log.Err(
 				"FileCache::TruncateFile : error truncating file %s [%s]",

@@ -213,6 +213,7 @@ s3storage:
   use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
+  skip-dir-probe-on-file-ext: true|false <skip directory probing when the final path segment looks like a file extension of 1-4 alphanumeric characters. Default - true>
 
 # Mount all configuration
 mountall:
