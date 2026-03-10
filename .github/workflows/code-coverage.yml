@@ -15,6 +15,7 @@ concurrency:
 jobs:
   BuildAndTest-Coverage:
     name: Build and Test with Code Coverage
+    environment: testing
     strategy:
       matrix:
         go: ["1.26"]
@@ -1024,6 +1025,7 @@ jobs:
 
   BuildAndTest-Coverage-Windows:
     name: Build and Test with Code Coverage on Windows
+    environment: testing
     strategy:
       matrix:
         go: ["1.26"]
@@ -1949,6 +1951,7 @@ jobs:
       - BuildAndTest-Coverage
       - BuildAndTest-Coverage-Windows
     name: Cleanup Test Accounts
+    environment: testing
     strategy:
       matrix:
         go: ["1.26"]

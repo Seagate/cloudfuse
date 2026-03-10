@@ -21,6 +21,7 @@ concurrency:
 jobs:
   linux-unit-test:
     name: Build and Test on Linux
+    environment: testing
     strategy:
       matrix:
         job_name:
@@ -194,6 +195,7 @@ jobs:
 
   test:
     name: Build and Test on Windows
+    environment: testing
     strategy:
       matrix:
         os: ["windows-latest", "windows-11-arm"]
