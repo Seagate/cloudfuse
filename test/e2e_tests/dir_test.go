@@ -463,6 +463,35 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.dirTestCleanup([]string{testDir})
 }
 
+// # List directory with dot entries
+func (suite *dirTestSuite) TestDirListShowsDots() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping TestDirListShowsDots on Windows")
+		return
+	}
+	cmd := exec.Command("ls", "-al", suite.testPath)
+	cliOut, err := cmd.Output()
+	suite.NoError(err)
+	lines := strings.Split(string(cliOut), "\n")
+	foundDot := false
+	foundDotDot := false
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		name := fields[len(fields)-1]
+		switch name {
+		case ".":
+			foundDot = true
+		case "..":
+			foundDotDot = true
+		}
+	}
+	suite.True(foundDot, "expected '.' to be listed in ls -al output")
+	suite.True(foundDotDot, "expected '..' to be listed in ls -al output")
+}
+
 // // # List directory recursively
 // func (suite *dirTestSuite) TestDirListRecursive() {
 // 	testDir := filepath.Join(suite.testPath, "bigTestDir")
