@@ -238,7 +238,7 @@ func testReaddirEmptyPageToken(suite *libfuseTestSuite) {
 		length:   0,
 		children: make([]*internal.ObjAttr, 0),
 	}
-	cacheDots(cacheInfo)
+	cacheDots(cacheInfo, "dir/")
 	cacheInfo.token = "next"
 	cacheInfo.lastPage = false
 	handle.SetValue("cache", cacheInfo)
