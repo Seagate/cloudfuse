@@ -478,6 +478,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			cachedAt: currentTime,
 		})
 		if newDirAttrCacheItem != nil {
+			newDirAttrCacheItem.setMode(options.Mode)
 			newDirAttrCacheItem.touchModifyAndChangeTimes(currentTime)
 		}
 		// update flags for tracking directory existence
