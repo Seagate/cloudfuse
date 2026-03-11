@@ -28,9 +28,11 @@ package libfuse
 import (
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 	"syscall"
@@ -258,6 +260,9 @@ func (lf *Libfuse) destroyFuse() error {
 func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	stbuf.Uid = lf.ownerUID
 	stbuf.Gid = lf.ownerGID
+	stbuf.Nlink = 1
+	stbuf.Size = attr.Size
+	stbuf.Ino = inodeForAttr(attr)
 
 	typeBits := fileTypeBits(attr)
 	permBits := modePermBits(attr.Mode)
@@ -354,7 +359,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// log.Trace("Libfuse::Getattr : %s", name)
 
 	// Return the default configuration for the root
-	if name == "" {
+	if name == "" || name == "." || name == ".." {
 		stat.Mode = fuse.S_IFDIR | 0777
 		stat.Uid = cf.uid
 		stat.Gid = cf.gid
@@ -363,6 +368,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 		stat.Mtim = fuse.NewTimespec(time.Now())
 		stat.Atim = stat.Mtim
 		stat.Ctim = stat.Mtim
+		stat.Ino = inodeForPath(name)
 		return 0
 	}
 
@@ -545,7 +551,7 @@ func (cf *CgofuseFS) Readdir(
 	newRequest := offset == 0
 	if newRequest {
 		// cache the first two entries ('.' & '..')
-		cacheDots(cacheInfo)
+		cacheDots(cacheInfo, handle.Path)
 	}
 	startOffset := offset
 	// fetch and serve directory contents back to the OS in a loop until their buffer is full
@@ -599,11 +605,14 @@ type fillFunc = func(name string, stat *fuse.Stat_t, ofst int64) bool
 
 // add the first two entries in any directory listing ('.' and '..') to the cache
 // this replaces any existing cache
-func cacheDots(cacheInfo *dirChildCache) {
-	dotAttrs := []*internal.ObjAttr{
-		{Flags: fuseFS.lsFlags, Name: "."},
-		{Flags: fuseFS.lsFlags, Name: ".."},
-	}
+func cacheDots(cacheInfo *dirChildCache, dirPath string) {
+	currentDir := internal.CreateObjAttrDir(dirPath)
+	currentDir.Name = "."
+	parentPath := strings.TrimSuffix(dirPath, "/")
+	parentPath = path.Dir(parentPath)
+	parentDir := internal.CreateObjAttrDir(parentPath)
+	parentDir.Name = ".."
+	dotAttrs := []*internal.ObjAttr{currentDir, parentDir}
 	cacheInfo.sIndex = 0
 	cacheInfo.eIndex = 2
 	cacheInfo.length = 2
@@ -611,6 +620,22 @@ func cacheDots(cacheInfo *dirChildCache) {
 	cacheInfo.children = cacheInfo.children[:0]
 	cacheInfo.children = dotAttrs
 	cacheInfo.lastPage = false
+}
+
+func inodeForAttr(attr *internal.ObjAttr) uint64 {
+	if attr == nil {
+		return 0
+	}
+	if attr.Path != "" {
+		return inodeForPath(attr.Path)
+	}
+	return inodeForPath(attr.Name)
+}
+
+func inodeForPath(p string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(p))
+	return h.Sum64()
 }
 
 // Fill the directory list cache with data from the next component
