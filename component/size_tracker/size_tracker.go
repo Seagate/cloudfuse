@@ -58,6 +58,19 @@ const (
 	Emergency                     // 2
 )
 
+func (e EvictionMode) String() string {
+	switch e {
+	case Normal:
+		return "Normal"
+	case Overuse:
+		return "Overuse"
+	case Emergency:
+		return "Emergency"
+	default:
+		return fmt.Sprintf("Unknown(%d)", int(e))
+	}
+}
+
 type SizeTrackerOptions struct {
 	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
@@ -335,6 +348,11 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 					sizeOffset = bucketUsage - serverUsage
 				}
 				st.statSizeOffset = uint64(max(0, sizeOffset))
+				log.Info(
+					"SizeTracker::StatFs : Bucket usage updated - evictionMode=%s, sizeOffset=%d bytes",
+					st.evictionMode,
+					st.statSizeOffset,
+				)
 			}
 		}
 		// add the offset
