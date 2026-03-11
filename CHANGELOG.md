@@ -1,5 +1,16 @@
 # Cloudfuse Changelog #
 
+## **2.1.2** ##
+
+March 11th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#845](https://github.com/Seagate/cloudfuse/pull/845) Reduce binary size
+- [#855](https://github.com/Seagate/cloudfuse/pull/855) Add . and .. to directory listings
+- [#856](https://github.com/Seagate/cloudfuse/pull/856) Fix log destruction concurrency bug
+
 ## **2.1.1** ##
 
 February 23rd 2026
