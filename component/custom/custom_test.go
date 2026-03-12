@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,6 @@ package custom
 
 import (
 	"os"
-	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,48 +59,35 @@ func (suite *customTestSuite) SetupTest() {
 //
 // This flag disables all optimizations and inline replacements and then .so will load in debug mode as well.
 // However same .so will not work with cli mount and there you need to build .so without these flags.
-func (suite *customTestSuite) _TestInitializePluginsValidPath() {
-	// Direct paths to the Go plugin source files
-	source1 := "../../test/sample_custom_component1/main.go"
-	source2 := "../../test/sample_custom_component2/main.go"
+//
+// TODO: Fix this test, commenting it out for now to pass the lint checks.
+//
+// func (suite *customTestSuite) _TestInitializePluginsValidPath() {
+// 	// Direct paths to the Go plugin source files
+// 	source1 := "../../test/sample_custom_component1/main.go"
+// 	source2 := "../../test/sample_custom_component2/main.go"
 
-	// Paths to the compiled .so files in the current directory
-	plugin1 := "./sample_custom_component1.so"
-	plugin2 := "./sample_custom_component2.so"
+// 	// Paths to the compiled .so files in the current directory
+// 	plugin1 := "./sample_custom_component1.so"
+// 	plugin2 := "./sample_custom_component2.so"
 
-	// Compile the Go plugin source files into .so files
-	cmd := exec.Command(
-		"go",
-		"build",
-		"-buildmode=plugin",
-		"-gcflags=all=-N -l",
-		"-o",
-		plugin1,
-		source1,
-	)
-	err := cmd.Run()
-	suite.assert.NoError(err)
-	cmd = exec.Command(
-		"go",
-		"build",
-		"-buildmode=plugin",
-		"-gcflags=all=-N -l",
-		"-o",
-		plugin2,
-		source2,
-	)
-	err = cmd.Run()
-	suite.assert.NoError(err)
+// 	// Compile the Go plugin source files into .so files
+// 	cmd := exec.Command("go", "build", "-buildmode=plugin", "-gcflags=all=-N -l", "-o", plugin1, source1)
+// 	err := cmd.Run()
+// 	suite.assert.NoError(err)
+// 	cmd = exec.Command("go", "build", "-buildmode=plugin", "-gcflags=all=-N -l", "-o", plugin2, source2)
+// 	err = cmd.Run()
+// 	suite.assert.NoError(err)
 
-	os.Setenv("CLOUDFUSE_PLUGIN_PATH", plugin1+":"+plugin2)
+// 	os.Setenv("BLOBFUSE_PLUGIN_PATH", plugin1+":"+plugin2)
 
-	err = initializePlugins()
-	suite.assert.NoError(err)
+// 	err = initializePlugins()
+// 	suite.assert.NoError(err)
 
-	// Clean up the generated .so files
-	os.Remove(plugin1)
-	os.Remove(plugin2)
-}
+// 	// Clean up the generated .so files
+// 	os.Remove(plugin1)
+// 	os.Remove(plugin2)
+// }
 
 func (suite *customTestSuite) TestInitializePluginsInvalidPath() {
 	dummyPath := "/invalid/path/plugin1.so"

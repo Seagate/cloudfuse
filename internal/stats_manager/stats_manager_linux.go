@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -54,7 +54,11 @@ func (sc *StatsCollector) statsDumper() {
 		disableMonitoring()
 		return
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Err("stats_manager::statsDumper : error when closing transfer pipe [%v]", err)
+		}
+	}()
 
 	log.Info("stats_manager::statsDumper : opened transfer pipe file")
 
@@ -108,8 +112,12 @@ func (sc *StatsCollector) statsDumper() {
 			case Decrement:
 				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) - stat.Value.(int64)
 				if stMgrOpt.statsList[idx].Value[stat.Key].(int64) < 0 {
-					log.Err("stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
-						stMgrOpt.statsList[idx].Value[stat.Key], stat.Key, stMgrOpt.statsList[idx].ComponentName)
+					log.Err(
+						"stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
+						stMgrOpt.statsList[idx].Value[stat.Key],
+						stat.Key,
+						stMgrOpt.statsList[idx].ComponentName,
+					)
 				}
 
 			case Replace:
@@ -163,7 +171,11 @@ func statsPolling() {
 		disableMonitoring()
 		return
 	}
-	defer tf.Close()
+	defer func() {
+		if err := tf.Close(); err != nil {
+			log.Err("stats_manager::statsPolling : error closing transfer pipe [%v]", err)
+		}
+	}()
 
 	log.Info("stats_manager::statsPolling : opened transfer pipe file")
 

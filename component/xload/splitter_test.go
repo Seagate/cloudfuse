@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -64,7 +64,8 @@ func (suite *splitterTestSuite) SetupSuite() {
 	suite.assert.NoError(err)
 
 	cfg := fmt.Sprintf("loopbackfs:\n  path: %s\n", remote_path)
-	config.ReadConfigFromReader(strings.NewReader(cfg))
+	err = config.ReadConfigFromReader(strings.NewReader(cfg))
+	suite.assert.NoError(err)
 
 	remote = loopback.NewLoopbackFSComponent()
 	err = remote.Configure(true)
@@ -81,7 +82,7 @@ func (suite *splitterTestSuite) TearDownSuite() {
 func createTestDirsAndFiles(path string, assert *assert.Assertions) {
 	createTestFiles(path, assert)
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		dirName := filepath.Join(path, fmt.Sprintf("dir_%v", i))
 		err := os.MkdirAll(dirName, 0777)
 		assert.NoError(err)
@@ -91,7 +92,7 @@ func createTestDirsAndFiles(path string, assert *assert.Assertions) {
 }
 
 func createTestFiles(path string, assert *assert.Assertions) {
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		filePath := filepath.Join(path, fmt.Sprintf("file_%v", i))
 		f, err := os.Create(filePath)
 		defer func() {

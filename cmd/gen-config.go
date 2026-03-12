@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -46,13 +46,14 @@ type genConfigParams struct {
 var optsGenCfg genConfigParams
 
 var generatedConfig = &cobra.Command{
-	Use:               "gen-config",
-	Short:             "Generate config file from template.",
-	Long:              "Generate config file from template.",
-	SuggestFor:        []string{"generate default config", "generate config"},
-	Hidden:            true,
-	Args:              cobra.ExactArgs(0),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "gen-config",
+	Short:      "Generate config file from template.",
+	Long:       "Generate a cloudfuse configuration file from a template.\nReplaces placeholder values with provided parameters.",
+	SuggestFor: []string{"generate default config", "generate config"},
+	Hidden:     true,
+	Args:       cobra.ExactArgs(0),
+	Example: `  # Generate config from template
+  cloudfuse gen-config --config-file=template.yaml --output-file=config.yaml --temp-path=/tmp/cloudfuse`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
 

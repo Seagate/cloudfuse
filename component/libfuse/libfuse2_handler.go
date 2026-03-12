@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +28,13 @@ package libfuse
 import (
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -200,6 +203,7 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	stbuf.Gid = lf.ownerGID
 	stbuf.Nlink = 1
 	stbuf.Size = attr.Size
+	stbuf.Ino = inodeForAttr(attr)
 
 	// Populate mode
 	// Backing storage implementation has support for mode.
@@ -264,7 +268,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// log.Trace("Libfuse::Getattr : %s", name)
 
 	// Return the default configuration for the root
-	if name == "" {
+	if name == "" || name == "." || name == ".." {
 		stat.Mode = fuse.S_IFDIR | 0777
 		stat.Uid = cf.uid
 		stat.Gid = cf.gid
@@ -273,6 +277,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 		stat.Mtim = fuse.NewTimespec(time.Now())
 		stat.Atim = stat.Mtim
 		stat.Ctim = stat.Mtim
+		stat.Ino = inodeForPath(name)
 		return 0
 	}
 
@@ -285,15 +290,8 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// Get attributes
 	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if err != nil {
-		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
-		switch err {
-		case syscall.ENOENT:
-			return -fuse.ENOENT
-		case syscall.EACCES:
-			return -fuse.EACCES
-		default:
-			return -fuse.EIO
-		}
+		//log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
+		return fuseErrnoFromError(err)
 	}
 
 	// Populate stat
@@ -372,16 +370,10 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		CreateDir(internal.CreateDirOptions{Name: name, Mode: fs.FileMode(mode)})
 	if err != nil {
 		log.Err("Libfuse::Mkdir : Failed to create %s [%s]", name, err.Error())
-		if os.IsPermission(err) {
-			return -fuse.EACCES
-		} else if os.IsExist(err) {
-			return -fuse.EEXIST
-		} else {
-			return -fuse.EIO
-		}
+		return fuseErrnoFromError(err)
 	}
 
-	libfuseStatsCollector.PushEvents(createDir, name, map[string]interface{}{md: fs.FileMode(mode)})
+	libfuseStatsCollector.PushEvents(createDir, name, map[string]any{md: fs.FileMode(mode)})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 
 	return 0
@@ -462,11 +454,16 @@ func (cf *CgofuseFS) Readdir(
 	newRequest := offset == 0
 	if newRequest {
 		// cache the first two entries ('.' & '..')
-		cacheDots(cacheInfo)
+		cacheDots(cacheInfo, handle.Path)
 	}
 	startOffset := offset
 	// fetch and serve directory contents back to the OS in a loop until their buffer is full
 	for {
+		if cacheInfo.lastPage && startOffset >= cacheInfo.eIndex {
+			// EOF for this directory stream.
+			return 0
+		}
+
 		// is the next offset we need already cached in our cacheInfo structure?
 		offsetCached := startOffset >= cacheInfo.sIndex && startOffset < cacheInfo.eIndex
 		fetchDataFromPipeline := !offsetCached
@@ -485,6 +482,9 @@ func (cf *CgofuseFS) Readdir(
 		}
 		// we can't get the requested data (validToken is probably false)
 		if startOffset >= cacheInfo.eIndex {
+			if cacheInfo.lastPage {
+				return 0
+			}
 			log.Warn("Libfuse::Readdir : %s offset=%d but last cached offset is %d (token=%s)",
 				path, startOffset, cacheInfo.eIndex, cacheInfo.token)
 			// If offset is still beyond the end index limit then we are done iterating
@@ -508,11 +508,14 @@ type fillFunc = func(name string, stat *fuse.Stat_t, ofst int64) bool
 
 // add the first two entries in any directory listing ('.' and '..') to the cache
 // this replaces any existing cache
-func cacheDots(cacheInfo *dirChildCache) {
-	dotAttrs := []*internal.ObjAttr{
-		{Flags: fuseFS.lsFlags, Name: "."},
-		{Flags: fuseFS.lsFlags, Name: ".."},
-	}
+func cacheDots(cacheInfo *dirChildCache, dirPath string) {
+	currentDir := internal.CreateObjAttrDir(dirPath)
+	currentDir.Name = "."
+	parentPath := strings.TrimSuffix(dirPath, "/")
+	parentPath = path.Dir(parentPath)
+	parentDir := internal.CreateObjAttrDir(parentPath)
+	parentDir.Name = ".."
+	dotAttrs := []*internal.ObjAttr{currentDir, parentDir}
 	cacheInfo.sIndex = 0
 	cacheInfo.eIndex = 2
 	cacheInfo.length = 2
@@ -520,6 +523,22 @@ func cacheDots(cacheInfo *dirChildCache) {
 	cacheInfo.children = cacheInfo.children[:0]
 	cacheInfo.children = dotAttrs
 	cacheInfo.lastPage = false
+}
+
+func inodeForAttr(attr *internal.ObjAttr) uint64 {
+	if attr == nil {
+		return 0
+	}
+	if attr.Path != "" {
+		return inodeForPath(attr.Path)
+	}
+	return inodeForPath(attr.Name)
+}
+
+func inodeForPath(p string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(p))
+	return h.Sum64()
 }
 
 // Fill the directory list cache with data from the next component
@@ -538,12 +557,7 @@ func populateDirChildCache(
 		Token: cacheInfo.token,
 	})
 	if err != nil {
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT
-		} else if os.IsPermission(err) {
-			return -fuse.EACCES
-		}
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 	// compile results and update cache
 	// let the cache grow to MaxDirListCount
@@ -600,11 +614,7 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 	err := fuseFS.NextComponent().DeleteDir(internal.DeleteDirOptions{Name: name})
 	if err != nil {
 		log.Err("Libfuse::Rmdir : Failed to delete %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT
-		}
-
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
 	libfuseStatsCollector.PushEvents(deleteDir, name, nil)
@@ -623,13 +633,7 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 		CreateFile(internal.CreateFileOptions{Name: name, Mode: fs.FileMode(mode)})
 	if err != nil {
 		log.Err("Libfuse::Create : Failed to create %s [%s]", name, err.Error())
-		if os.IsExist(err) {
-			return -fuse.EEXIST, 0
-		} else if os.IsPermission(err) {
-			return -fuse.EACCES, 0
-		}
-
-		return -fuse.EIO, 0
+		return fuseErrnoFromError(err), 0
 	}
 
 	fh := handlemap.Add(handle)
@@ -644,7 +648,7 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	libfuseStatsCollector.PushEvents(
 		createFile,
 		name,
-		map[string]interface{}{md: fs.FileMode(mode)},
+		map[string]any{md: fs.FileMode(mode)},
 	)
 
 	// increment open file handles count
@@ -668,13 +672,7 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 
 	if err != nil {
 		log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT, 0
-		} else if os.IsPermission(err) {
-			return -fuse.EACCES, 0
-		}
-
-		return -fuse.EIO, 0
+		return fuseErrnoFromError(err), 0
 	}
 
 	fh := handlemap.Add(handle)
@@ -714,7 +712,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
 	} else {
 		bytesRead, err = fuseFS.NextComponent().ReadInBuffer(
-			internal.ReadInBufferOptions{
+			&internal.ReadInBufferOptions{
 				Handle: handle,
 				Offset: int64(offset),
 				Data:   buff,
@@ -731,10 +729,27 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 			handle.ID,
 			err.Error(),
 		)
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
 	return bytesRead
+}
+
+func fuseErrnoFromError(err error) int {
+	switch {
+	case err == nil:
+		return 0
+	case errors.Is(err, syscall.ENOTEMPTY):
+		return -fuse.ENOTEMPTY
+	case errors.Is(err, fs.ErrNotExist):
+		return -fuse.ENOENT
+	case errors.Is(err, fs.ErrPermission):
+		return -fuse.EACCES
+	case errors.Is(err, fs.ErrExist):
+		return -fuse.EEXIST
+	default:
+		return -fuse.EIO
+	}
 }
 
 // Write writes data to a file from the buffer with the given offset.
@@ -749,7 +764,7 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 	}
 
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
-		internal.WriteFileOptions{
+		&internal.WriteFileOptions{
 			Handle:   handle,
 			Offset:   ofst,
 			Data:     buff,
@@ -763,13 +778,18 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 			handle.ID,
 			err.Error(),
 		)
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
 	return bytesWritten
 }
 
-// Flush flushes any cached file data.
+// Flush is called on each close() of a file descriptor, as opposed to release which is called on the close of the
+// last file descriptor for a file.
+//
+// NOTE: The flush() method may be called more than once for each open().  This happens if more than one file descriptor
+// refers to an open file handle, e.g. due to dup(), dup2() or fork() calls.  It is not possible to determine if a flush
+// is final, so each flush should be treated equally.
 func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
@@ -793,14 +813,7 @@ func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 			handle.ID,
 			err.Error(),
 		)
-		switch err {
-		case syscall.ENOENT:
-			return -fuse.ENOENT
-		case syscall.EACCES:
-			return -fuse.EACCES
-		default:
-			return -fuse.EIO
-		}
+		return fuseErrnoFromError(err)
 	}
 
 	return 0
@@ -812,17 +825,21 @@ func (cf *CgofuseFS) Truncate(path string, size int64, fh uint64) int {
 	name = common.NormalizeObjectName(name)
 
 	log.Trace("Libfuse::Truncate : %s size %d", name, size)
+	handle, _ := handlemap.Load(handlemap.HandleID(fh))
 
-	err := fuseFS.NextComponent().TruncateFile(internal.TruncateFileOptions{Name: name, Size: size})
+	err := fuseFS.NextComponent().TruncateFile(
+		internal.TruncateFileOptions{
+			Name:    name,
+			OldSize: -1,
+			NewSize: int64(size),
+			Handle:  handle,
+		})
 	if err != nil {
 		log.Err("Libfuse::Truncate : error truncating file %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT
-		}
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
-	libfuseStatsCollector.PushEvents(truncateFile, name, map[string]interface{}{"size": size})
+	libfuseStatsCollector.PushEvents(truncateFile, name, map[string]any{"size": size})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 
 	return 0
@@ -838,7 +855,7 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	}
 	log.Trace("Libfuse::Release : %s, handle: %d", handle.Path, handle.ID)
 
-	err := fuseFS.NextComponent().CloseFile(internal.CloseFileOptions{Handle: handle})
+	err := fuseFS.NextComponent().ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	if err != nil {
 		log.Err(
 			"Libfuse::Release : error closing file %s, handle: %d [%s]",
@@ -846,14 +863,7 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 			handle.ID,
 			err.Error(),
 		)
-		switch err {
-		case syscall.ENOENT:
-			return -fuse.ENOENT
-		case syscall.EACCES:
-			return -fuse.EACCES
-		default:
-			return -fuse.EIO
-		}
+		return fuseErrnoFromError(err)
 	}
 
 	handlemap.Delete(handle.ID)
@@ -873,12 +883,7 @@ func (cf *CgofuseFS) Unlink(path string) int {
 	err := fuseFS.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: name})
 	if err != nil {
 		log.Err("Libfuse::Unlink : error deleting file %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT
-		} else if os.IsPermission(err) {
-			return -fuse.EACCES
-		}
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 
 	}
 
@@ -908,33 +913,28 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 	}
 
 	srcAttr, srcErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: srcPath})
-	if os.IsNotExist(srcErr) {
+	if srcErr != nil {
 		log.Err("Libfuse::Rename : Failed to get attributes of %s [%s]", srcPath, srcErr.Error())
-		return -fuse.ENOENT
-	}
-	dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
-
-	// EISDIR
-	if dstErr == nil && dstAttr.IsDir() && !srcAttr.IsDir() {
-		log.Err(
-			"Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory",
-			dstPath,
-			srcPath,
-		)
-		return -fuse.EISDIR
-	}
-
-	// ENOTDIR
-	if dstErr == nil && !dstAttr.IsDir() && srcAttr.IsDir() {
-		log.Err(
-			"Libfuse::Rename : dst [%s] is an existing file but src [%s] is a directory",
-			dstPath,
-			srcPath,
-		)
-		return -fuse.ENOTDIR
+		return fuseErrnoFromError(srcErr)
 	}
 
 	if srcAttr.IsDir() {
+		dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
+		if errors.Is(dstErr, fs.ErrPermission) {
+			log.Err("Libfuse::Rename : access denied for %s [%s]", dstPath, dstErr.Error())
+			return -fuse.EACCES
+		}
+
+		// ENOTDIR
+		if dstErr == nil && !dstAttr.IsDir() {
+			log.Err(
+				"Libfuse::Rename : dst [%s] is an existing file but src [%s] is a directory",
+				dstPath,
+				srcPath,
+			)
+			return -fuse.ENOTDIR
+		}
+
 		// ENOTEMPTY
 		if dstErr == nil {
 			empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: dstPath})
@@ -952,29 +952,54 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 				dstPath,
 				err.Error(),
 			)
-			return -fuse.EIO
+			return fuseErrnoFromError(err)
 		}
 
 		libfuseStatsCollector.PushEvents(
 			renameDir,
 			srcPath,
-			map[string]interface{}{source: srcPath, dest: dstPath},
+			map[string]any{source: srcPath, dest: dstPath},
 		)
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 
 	} else {
+		// Fast path for file renames: skip destination GetAttr unless rename fails.
+		// This avoids extra metadata round-trips when destination is usually a new file.
 		err := fuseFS.NextComponent().RenameFile(internal.RenameFileOptions{
 			Src:     srcPath,
 			Dst:     dstPath,
 			SrcAttr: srcAttr,
-			DstAttr: dstAttr,
 		})
 		if err != nil {
-			log.Err("Libfuse::Rename : error renaming file %s -> %s [%s]", srcPath, dstPath, err.Error())
+			dstAttr, dstErr := fuseFS.NextComponent().
+				GetAttr(internal.GetAttrOptions{Name: dstPath})
+			if dstErr == nil && dstAttr.IsDir() {
+				log.Err(
+					"Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory",
+					dstPath,
+					srcPath,
+				)
+				return -fuse.EISDIR
+			}
+
+			log.Err(
+				"Libfuse::Rename : error renaming file %s -> %s [%s]",
+				srcPath,
+				dstPath,
+				err.Error(),
+			)
+
+			if errors.Is(err, fs.ErrPermission) || errors.Is(dstErr, fs.ErrPermission) {
+				return -fuse.EACCES
+			}
 			return -fuse.EIO
 		}
 
-		libfuseStatsCollector.PushEvents(renameFile, srcPath, map[string]interface{}{source: srcPath, dest: dstPath})
+		libfuseStatsCollector.PushEvents(
+			renameFile,
+			srcPath,
+			map[string]any{source: srcPath, dest: dstPath},
+		)
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 
 	}
@@ -998,10 +1023,10 @@ func (cf *CgofuseFS) Symlink(target string, newpath string) int {
 			targetPath,
 			err.Error(),
 		)
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
-	libfuseStatsCollector.PushEvents(createLink, name, map[string]interface{}{trgt: targetPath})
+	libfuseStatsCollector.PushEvents(createLink, name, map[string]any{trgt: targetPath})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 
 	return 0
@@ -1023,10 +1048,7 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 		ReadLink(internal.ReadLinkOptions{Name: name, Size: linkSize})
 	if err != nil {
 		log.Err("Libfuse::Readlink : error reading link file %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT, targetPath
-		}
-		return -fuse.EIO, targetPath
+		return fuseErrnoFromError(err), targetPath
 	}
 
 	// Don't think we need when with using cgofuse
@@ -1034,7 +1056,7 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	// copy(data, targetPath)
 	// data[len(targetPath)] = 0
 
-	libfuseStatsCollector.PushEvents(readLink, name, map[string]interface{}{trgt: targetPath})
+	libfuseStatsCollector.PushEvents(readLink, name, map[string]any{trgt: targetPath})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, readLink, (int64)(1))
 
 	return 0, targetPath
@@ -1061,7 +1083,7 @@ func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	err := fuseFS.NextComponent().SyncFile(options)
 	if err != nil {
 		log.Err("Libfuse::Fsync : error syncing file %s [%s]", handle.Path, err.Error())
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
 	libfuseStatsCollector.PushEvents(syncFile, handle.Path, nil)
@@ -1083,7 +1105,7 @@ func (cf *CgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	err := fuseFS.NextComponent().SyncDir(options)
 	if err != nil {
 		log.Err("Libfuse::Fsyncdir : error syncing dir %s [%s]", name, err.Error())
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
 	libfuseStatsCollector.PushEvents(syncDir, name, nil)
@@ -1105,15 +1127,10 @@ func (cf *CgofuseFS) Chmod(path string, mode uint32) int {
 		})
 	if err != nil {
 		log.Err("Libfuse::Chmod : error in chmod of %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT
-		} else if os.IsPermission(err) {
-			return -fuse.EACCES
-		}
-		return -fuse.EIO
+		return fuseErrnoFromError(err)
 	}
 
-	libfuseStatsCollector.PushEvents(chmod, name, map[string]interface{}{md: fs.FileMode(mode)})
+	libfuseStatsCollector.PushEvents(chmod, name, map[string]any{md: fs.FileMode(mode)})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 
 	return 0

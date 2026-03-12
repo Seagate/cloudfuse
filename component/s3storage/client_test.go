@@ -1,11 +1,10 @@
 //go:build !authtest
-// +build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -156,7 +155,10 @@ func (s *clientTestSuite) SetupTest() {
 	}
 
 	cfgFile.Close()
-	s.setupTestHelper("", true)
+	err = s.setupTestHelper("", true)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) error {
@@ -729,7 +731,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	// create link for all file names with prefix name
 	var sources [5]string
 	var targets [5]string
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		sources[i] = generateFileName()
 		targets[i] = generateFileName()
 
@@ -1010,6 +1012,57 @@ func (s *clientTestSuite) TestGetAttrError() {
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
+func (s *clientTestSuite) TestShouldProbeDirMarker() {
+	defer s.cleanupTest()
+	cases := []struct {
+		name              string
+		dirName           string
+		explicitDirLookup bool
+		want              bool
+	}{
+		{
+			name:              "file-like-extension",
+			dirName:           internal.ExtendDirName("videos/clip.mkv"),
+			explicitDirLookup: false,
+			want:              false,
+		},
+		{
+			name:              "file-like-uppercase-extension",
+			dirName:           internal.ExtendDirName("videos/CLIP.MKV"),
+			explicitDirLookup: false,
+			want:              false,
+		},
+		{
+			name:              "file-like-nxdb-extension",
+			dirName:           internal.ExtendDirName("meta/cache/asset.nxdb"),
+			explicitDirLookup: false,
+			want:              false,
+		},
+		{
+			name:              "no-extension",
+			dirName:           internal.ExtendDirName("logs/2026/02/23"),
+			explicitDirLookup: false,
+			want:              true,
+		},
+		{
+			name:              "explicit-dir-lookup",
+			dirName:           internal.ExtendDirName("videos/clip.mkv"),
+			explicitDirLookup: true,
+			want:              true,
+		},
+		{
+			name:              "root-dir",
+			dirName:           internal.ExtendDirName(""),
+			explicitDirLookup: false,
+			want:              true,
+		},
+	}
+
+	for _, tc := range cases {
+		got := shouldProbeDirMarker(tc.dirName, tc.explicitDirLookup)
+		s.assert.Equal(tc.want, got, tc.name)
+	}
+}
 func (s *clientTestSuite) TestList() {
 	defer s.cleanupTest()
 	// setup
@@ -1149,7 +1202,8 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	storageTestConfigurationParameters.DisableConcurrentDownload = true
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, false)
+	err := s.setupTestHelper(vdConfig, false)
+	s.assert.NoError(err)
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
@@ -1157,7 +1211,7 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	minBodyLen := 10
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
@@ -1344,7 +1398,9 @@ func (s *clientTestSuite) TestWrite() {
 	offset := rand.IntN(bodyLen-1) + 1 // minimum offset of 1
 	newData := []byte(randomString(bodyLen - offset))
 	h := handlemap.NewHandle(name)
-	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
+	err = s.client.Write(
+		&internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData},
+	)
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{

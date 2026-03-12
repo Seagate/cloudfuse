@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -47,9 +47,9 @@ func initializePlugins() error {
 		return nil
 	}
 
-	pluginFiles := strings.Split(pluginFilesPath, ":")
+	pluginFiles := strings.SplitSeq(pluginFilesPath, ":")
 
-	for _, file := range pluginFiles {
+	for file := range pluginFiles {
 		if !strings.HasSuffix(file, ".so") {
 			log.Err("initializePlugins: Invalid plugin file extension: %s", file)
 			continue

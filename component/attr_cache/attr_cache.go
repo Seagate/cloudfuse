@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,7 @@ type AttrCacheOptions struct {
 	EnableSymlinks bool   `config:"enable-symlinks"  yaml:"enable-symlinks,omitempty"`
 	NoCacheDirs    bool   `config:"no-cache-dirs"    yaml:"no-cache-dirs,omitempty"`
 	// hidden option for backward compatibility
-	NoSymlinks bool `config:"no-symlinks"      yaml:"no-symlinks,omitempty"`
+	NoSymlinks bool `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
 
 	//maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
@@ -136,8 +136,8 @@ func (ac *AttrCache) GenConfig() string {
 	log.Info("AttrCache::Configure : config generation started")
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\n%s:", ac.Name()))
-	sb.WriteString(fmt.Sprintf("\n  timeout-sec: %v", defaultAttrCacheTimeout))
+	fmt.Fprintf(&sb, "\n%s:", ac.Name())
+	fmt.Fprintf(&sb, "\n  timeout-sec: %v", defaultAttrCacheTimeout)
 
 	return sb.String()
 }
@@ -926,7 +926,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 }
 
 // WriteFile : Mark the file invalid
-func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (ac *AttrCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 
 	// GetAttr on cache hit will serve from cache, on cache miss will serve from next component.
 	attr, err := ac.GetAttr(
@@ -983,14 +983,14 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		if !found || !truncatedItem.exists() {
 			log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
 			// replace the missing entry
-			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, modifyTime)
+			truncatedAttr := internal.CreateObjAttr(options.Name, options.NewSize, modifyTime)
 			truncatedItem = ac.cache.insert(insertOptions{
 				attr:     truncatedAttr,
 				exists:   true,
 				cachedAt: modifyTime,
 			})
 		}
-		truncatedItem.setSize(options.Size, modifyTime)
+		truncatedItem.setSize(options.NewSize, modifyTime)
 	}
 	return err
 }

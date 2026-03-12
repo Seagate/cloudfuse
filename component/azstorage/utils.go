@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -139,8 +140,8 @@ func getAzDatalakeServiceClientOptions(conf *AzStorageConfig) (*serviceBfs.Clien
 
 // getLogOptions : to configure the SDK logging policy
 func getSDKLogOptions() policy.LogOptions {
-	// If BLOBFUSE_DISABLE_SDK_LOG env var is set to true, then disable the SDK logging
-	if os.Getenv("BLOBFUSE_DISABLE_SDK_LOG") == "true" {
+	// If CLOUDFUSE_DISABLE_SDK_LOG env var is set to true, then disable the SDK logging
+	if os.Getenv("CLOUDFUSE_DISABLE_SDK_LOG") == "true" {
 		return policy.LogOptions{}
 	}
 
@@ -160,7 +161,7 @@ func getSDKLogOptions() policy.LogOptions {
 //   - logging type is silent
 //   - logging level is less than debug
 func setSDKLogListener() {
-	if os.Getenv("BLOBFUSE_DISABLE_SDK_LOG") == "true" || log.GetType() == "silent" ||
+	if os.Getenv("CLOUDFUSE_DISABLE_SDK_LOG") == "true" || log.GetType() == "silent" ||
 		log.GetLogLevel() < common.ELogLevel.LOG_DEBUG() {
 		// reset listener
 		azlog.SetListener(nil)
@@ -179,7 +180,11 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 	} else {
 		u, err := url.Parse(conf.proxyAddress)
 		if err != nil {
-			log.Err("utils::newCloudfuseHttpClient : Failed to parse proxy : %s [%s]", conf.proxyAddress, err.Error())
+			log.Err(
+				"utils::newCloudfuseHttpClient : Failed to parse proxy : %s [%s]",
+				conf.proxyAddress,
+				err.Error(),
+			)
 			return nil, err
 		}
 		ProxyURL = http.ProxyURL(u)
@@ -382,9 +387,7 @@ func populateContentType(newSet string) error { //nolint
 	// We can simply append the new data to end of the map
 	// however there may be conflicting keys and hence we need to merge manually
 	//ContentTypeMap = append(ContentTypeMap, data)
-	for k, v := range data {
-		ContentTypes[k] = v
-	}
+	maps.Copy(ContentTypes, data)
 	return nil
 }
 
@@ -472,16 +475,16 @@ func getFileModeFromACL(objid string, acl string, owner string) (os.FileMode, er
 		userACL := acl[idx : idx+3]
 		mask := extractPermission(acl, "mask::")
 
-		permissions := ""
+		var permissions strings.Builder
 		for i, c := range userACL {
 			if userACL[i] == mask[i] {
-				permissions += string(c)
+				permissions.WriteString(string(c))
 			} else {
-				permissions += "-"
+				permissions.WriteString("-")
 			}
 		}
 
-		return permissions
+		return permissions.String()
 	}
 
 	// Sample string : user::rwx,user:objid1:r--,user:objid2:r--,group::r--,mask::r-x,other::rwx:
@@ -528,7 +531,11 @@ func getFileMode(permissions string) (os.FileMode, error) {
 		if permissions[i] == byte(c) {
 			mode |= 1 << uint(9-1-i)
 		} else if permissions[i] != byte('-') {
-			log.Debug("utils::getFileMode : Unexpected permissions from the service at character %d: %s", i, permissions)
+			log.Debug(
+				"utils::getFileMode : Unexpected permissions from the service at character %d: %s",
+				i,
+				permissions,
+			)
 		}
 	}
 	return mode, nil

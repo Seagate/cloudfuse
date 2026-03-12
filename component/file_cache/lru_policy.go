@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -50,6 +50,10 @@ type lruNode struct {
 
 type lruPolicy struct {
 	sync.Mutex
+
+	// wait group for stopping the go-routines gracefully.
+	wg sync.WaitGroup
+
 	cachePolicyConfig
 
 	nodeMap sync.Map // uses os.Separator (filepath.Join)
@@ -146,6 +150,7 @@ func (p *lruPolicy) StartPolicy() error {
 	// start the timeout monitor
 	p.cacheTimeoutMonitor = time.Tick(time.Duration(p.cacheTimeout) * time.Second)
 
+	p.wg.Add(2)
 	go p.clearCache()
 	go p.asyncCacheValid()
 
@@ -157,6 +162,8 @@ func (p *lruPolicy) ShutdownPolicy() error {
 	log.Trace("lruPolicy::ShutdownPolicy")
 	p.closeSignal <- 1
 	p.closeSignalValidate <- 1
+	// wait for all go-routines to stop.
+	p.wg.Wait()
 	return p.createSnapshot().writeToFile(p.tmpPath)
 }
 
@@ -338,6 +345,7 @@ func (p *lruPolicy) Name() string {
 
 // On validate name of the file was pushed on this channel so now update the LRU list
 func (p *lruPolicy) asyncCacheValid() {
+	defer p.wg.Done()
 	for {
 		select {
 		case name := <-p.validateChan:
@@ -385,6 +393,7 @@ func (p *lruPolicy) cacheValidate(name string) {
 // For all other timer based activities we check the stuff here
 func (p *lruPolicy) clearCache() {
 	log.Trace("lruPolicy::ClearCache")
+	defer p.wg.Done()
 
 	for {
 		select {
@@ -573,7 +582,7 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	// Check if there are any open handles to this file or not
-	if flock.Count() > 0 {
+	if flock.Count() > 0 || flock.SyncPending {
 		log.Warn("lruPolicy::DeleteItem : File in use %s", name)
 		p.CacheValid(name)
 		return

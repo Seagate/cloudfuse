@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -73,7 +73,7 @@ type azAuthConfig struct {
 type azAuth interface {
 	getEndpoint() string
 	setOption(key, value string)
-	getServiceClient(stConfig *AzStorageConfig) (interface{}, error)
+	getServiceClient(stConfig *AzStorageConfig) (any, error)
 }
 
 // getAzAuth returns a new AzAuth
@@ -137,7 +137,10 @@ func getAzBlobAuth(config azAuthConfig) azAuth {
 			},
 		}
 	} else {
-		log.Crit("azAuth::getAzBlobAuth : Auth type %s not supported. Failed to create Auth object", config.AuthMode)
+		log.Crit(
+			"azAuth::getAzBlobAuth : Auth type %s not supported. Failed to create Auth object",
+			config.AuthMode,
+		)
 	}
 	return nil
 }
@@ -181,7 +184,10 @@ func getAzDatalakeAuth(config azAuthConfig) azAuth {
 			},
 		}
 	} else {
-		log.Crit("azAuth::getAzDatalakeAuth : Auth type %s not supported. Failed to create Auth object", config.AuthMode)
+		log.Crit(
+			"azAuth::getAzDatalakeAuth : Auth type %s not supported. Failed to create Auth object",
+			config.AuthMode,
+		)
 	}
 	return nil
 }

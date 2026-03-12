@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -66,7 +66,7 @@ type FileCache struct {
 	offloadIO       bool
 	syncToFlush     bool
 	syncToDelete    bool
-	maxCacheSize    float64
+	maxCacheSizeMB  float64
 
 	defaultPermission os.FileMode
 
@@ -214,7 +214,7 @@ func (fc *FileCache) GenConfig() string {
 	log.Info("FileCache::Configure : config generation started")
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\n%s:", fc.Name()))
+	fmt.Fprintf(&sb, "\n%s:", fc.Name())
 
 	tmpPath := ""
 	_ = config.UnmarshalKey("tmp-path", &tmpPath)
@@ -227,8 +227,8 @@ func (fc *FileCache) GenConfig() string {
 		timeout = 0
 	}
 
-	sb.WriteString(fmt.Sprintf("\n  path: %v", common.ExpandPath(tmpPath)))
-	sb.WriteString(fmt.Sprintf("\n  timeout-sec: %v", timeout))
+	fmt.Fprintf(&sb, "\n  path: %v", common.ExpandPath(tmpPath))
+	fmt.Fprintf(&sb, "\n  timeout-sec: %v", timeout)
 
 	return sb.String()
 }
@@ -316,13 +316,22 @@ func (fc *FileCache) Configure(_ bool) error {
 			fc.Name(),
 			err.Error(),
 		)
-		fc.maxCacheSize = 4192
+		fc.maxCacheSizeMB = 4192
 	} else {
-		fc.maxCacheSize = 0.8 * float64(avail) / (MB)
+		fc.maxCacheSizeMB = 0.8 * float64(avail) / (MB)
 	}
 
 	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
-		fc.maxCacheSize = conf.MaxSizeMB
+		fc.maxCacheSizeMB = conf.MaxSizeMB
+	}
+
+	if fc.maxCacheSizeMB <= 0 {
+		log.Err("FileCache: config error [max-size-mb must be greater than 0]")
+		return fmt.Errorf(
+			"config error in %s error [max-size-mb: %f must be greater than 0]",
+			fc.Name(),
+			fc.maxCacheSizeMB,
+		)
 	}
 
 	if !isLocalDirEmpty(fc.tmpPath) && !fc.allowNonEmpty {
@@ -354,12 +363,12 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	fc.diskHighWaterMark = 0
-	if conf.HardLimit && conf.MaxSizeMB != 0 {
-		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
+	if fc.hardLimit && fc.maxCacheSizeMB != 0 {
+		fc.diskHighWaterMark = fc.maxCacheSizeMB * MB
 	}
 
 	if config.IsSet(compName + ".schedule") {
-		var rawSchedule []map[string]interface{}
+		var rawSchedule []map[string]any
 		err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
 		if err != nil {
 			log.Err(
@@ -381,16 +390,23 @@ func (fc *FileCache) Configure(_ bool) error {
 					window.Duration = durStr
 				}
 				if !isValidCronExpression(window.CronExpr) {
-					log.Err("FileCache::Configure : Invalid cron expression '%s' for schedule window '%s', skipping",
-						window.CronExpr, window.Name)
+					log.Err(
+						"FileCache::Configure : Invalid cron expression '%s' for schedule window '%s', skipping",
+						window.CronExpr,
+						window.Name,
+					)
 					continue
 				}
 
 				// Validate duration
 				_, err := time.ParseDuration(window.Duration)
 				if err != nil {
-					log.Err("FileCache::Configure : Invalid duration '%s' for schedule window '%s': %v, skipping",
-						window.Duration, window.Name, err)
+					log.Err(
+						"FileCache::Configure : Invalid duration '%s' for schedule window '%s': %v, skipping",
+						window.Duration,
+						window.Name,
+						err,
+					)
 					continue
 				}
 
@@ -402,11 +418,11 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-len %v",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
-		int(cacheConfig.maxSizeMB),
+		int(fc.maxCacheSizeMB),
 		int(cacheConfig.highThreshold),
 		int(cacheConfig.lowThreshold),
 		fc.refreshSec,
@@ -421,7 +437,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.syncToDelete,
 		fc.defaultPermission,
 		fc.diskHighWaterMark,
-		fc.maxCacheSize,
+		fc.maxCacheSizeMB,
 		fc.mountPath,
 		len(fc.schedule),
 	)
@@ -444,7 +460,9 @@ func (fc *FileCache) OnConfigChange() {
 	fc.cacheTimeout = max(float64(conf.Timeout), minimumFileCacheTimeout)
 	fc.policyTrace = conf.EnablePolicyTrace
 	fc.offloadIO = conf.OffloadIO
-	fc.maxCacheSize = conf.MaxSizeMB
+	if conf.MaxSizeMB > 0 {
+		fc.maxCacheSizeMB = conf.MaxSizeMB
+	}
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	_ = fc.policy.UpdateConfig(fc.GetPolicyConfig(conf))
@@ -468,7 +486,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
 		cacheTimeout:  uint32(fc.cacheTimeout),
-		maxSizeMB:     conf.MaxSizeMB,
+		maxSizeMB:     fc.maxCacheSizeMB,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 	}
@@ -489,13 +507,13 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
 	// if cache size is set to 0 then we have the root mount usage
-	maxCacheSize := fc.maxCacheSize * MB
+	maxCacheSize := fc.maxCacheSizeMB * MB
 	if maxCacheSize == 0 {
 		log.Err("FileCache::StatFs : Not responding to StatFs because max cache size is zero")
 		return nil, false, nil
 	}
 	usage, _ := common.GetUsage(fc.tmpPath)
-	available := maxCacheSize - usage*MB
+	available := maxCacheSize - usage
 
 	// how much space is available on the underlying file system?
 	availableOnCacheFS, err := fc.getAvailableSize()
@@ -600,7 +618,9 @@ func (fc *FileCache) StreamDir(
 				flock := fc.fileLocks.Get(attr.Path)
 				flock.RLock()
 				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
-				info, err := os.Stat(filepath.Join(localPath, dirent.Name())) // Grab local cache attributes
+				info, err := os.Stat(
+					filepath.Join(localPath, dirent.Name()),
+				) // Grab local cache attributes
 				flock.RUnlock()
 				if err == nil {
 					// attr is a pointer returned by NextComponent
@@ -647,7 +667,6 @@ func (fc *FileCache) StreamDir(
 			}
 		}
 	}
-
 	return attrs, token, err
 }
 
@@ -715,8 +734,16 @@ func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 				return val, err
 			}
 		} else {
-			log.Err("FileCache::deleteEmptyDirs : Directory %s is not empty, contains file %s", localPath, entry.Name())
-			return false, fmt.Errorf("unable to delete directory %s, contains file %s", localPath, entry.Name())
+			log.Err(
+				"FileCache::deleteEmptyDirs : Directory %s is not empty, contains file %s",
+				localPath,
+				entry.Name(),
+			)
+			return false, fmt.Errorf(
+				"unable to delete directory %s, contains file %s",
+				localPath,
+				entry.Name(),
+			)
 		}
 	}
 
@@ -805,7 +832,11 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
 				if mkdirErr != nil {
 					// log any error but do nothing about it
-					log.Warn("FileCache::RenameDir : Failed to created directory %s. Here's why: %v", newPath, mkdirErr)
+					log.Warn(
+						"FileCache::RenameDir : Failed to created directory %s. Here's why: %v",
+						newPath,
+						mkdirErr,
+					)
 				}
 				// remember to delete the src directory later (after its contents are deleted)
 				directoriesToPurge = append(directoriesToPurge, path)
@@ -1009,7 +1040,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// If an empty file is created in cloud storage then there is no need to upload if FlushFile is called immediately after CreateFile.
 	if !fc.createEmptyFile {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 	}
 
 	// update state
@@ -1043,10 +1074,18 @@ func (fc *FileCache) validateStorageError(
 				return syscall.ENOENT
 			} else {
 				if !recoverable {
-					log.Err("FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close", method, path)
+					log.Err(
+						"FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close",
+						method,
+						path,
+					)
 					return syscall.EIO
 				} else {
-					log.Info("FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close", method, path)
+					log.Info(
+						"FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close",
+						method,
+						path,
+					)
 					return nil
 				}
 			}
@@ -1139,7 +1178,11 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			// Create the file if if doesn't already exist.
 			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 			if err != nil {
-				log.Err("FileCache::openFileInternal : error creating directory structure for file %s [%s]", handle.Path, err.Error())
+				log.Err(
+					"FileCache::openFileInternal : error creating directory structure for file %s [%s]",
+					handle.Path,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1177,7 +1220,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					err.Error(),
 				)
 				_ = f.Close()
-				_ = os.Remove(localPath)
+				err = os.Remove(localPath)
+				if err != nil {
+					log.Err(
+						"FileCache::openFileInternal : Failed to remove file %s [%s]",
+						localPath,
+						err.Error(),
+					)
+				}
 				return err
 			}
 		}
@@ -1233,7 +1283,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 
 	if flags&os.O_TRUNC != 0 {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 	}
 
 	inf, err := f.Stat()
@@ -1280,7 +1330,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// check if we are running out of space
-	if downloadRequired && cloudAttr != nil {
+	if cloudAttr != nil {
 		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)
@@ -1290,8 +1340,18 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 					err.Error(),
 				)
 			} else {
-				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-					log.Err("FileCache::OpenFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+				// Subtract existing local file size to avoid double-counting
+				existingSize := int64(0)
+				if info, statErr := os.Stat(localPath); statErr == nil {
+					existingSize = info.Size()
+				}
+				additionalSpace := max(int64(0), fileSize-existingSize)
+				if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
+					log.Err(
+						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
+						fc.maxCacheSizeMB,
+						options.Name,
+					)
 					return nil, syscall.ENOSPC
 				}
 			}
@@ -1341,7 +1401,10 @@ func (fc *FileCache) isDownloadRequired(
 		if fileInPolicyCache {
 			cached = true
 		} else {
-			log.Warn("FileCache::isDownloadRequired : %s exists but is not present in local cache policy", localPath)
+			log.Warn(
+				"FileCache::isDownloadRequired : %s exists but is not present in local cache policy",
+				localPath,
+			)
 		}
 		// gather stat details
 		lmt = finfo.ModTime()
@@ -1350,7 +1413,11 @@ func (fc *FileCache) isDownloadRequired(
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
 	} else {
 		// Catch all, the file needs to be downloaded
-		log.Debug("FileCache::isDownloadRequired : error calling stat %s [%s]", localPath, statErr.Error())
+		log.Debug(
+			"FileCache::isDownloadRequired : error calling stat %s [%s]",
+			localPath,
+			statErr.Error(),
+		)
 	}
 
 	// check if the file is due for a refresh from cloud storage
@@ -1390,9 +1457,17 @@ func (fc *FileCache) isDownloadRequired(
 		} else {
 			// log why we decided not to refresh
 			if !cloudHasLatestData {
-				log.Info("FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]", objectPath, cloudAttr.Mtime, lmt)
+				log.Info(
+					"FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]",
+					objectPath,
+					cloudAttr.Mtime,
+					lmt,
+				)
 			} else if fileIsOpen {
-				log.Info("FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open", objectPath)
+				log.Info(
+					"FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open",
+					objectPath,
+				)
 			}
 			// As we have decided to continue using old file, we reset the timer to check again after refresh time interval
 			flock.SetDownloadTime()
@@ -1402,8 +1477,8 @@ func (fc *FileCache) isDownloadRequired(
 	return downloadRequired, cached, cloudAttr, err
 }
 
-// CloseFile: Flush the file and invalidate it from the cache.
-func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
+// ReleaseFile: Flush the file and invalidate it from the cache.
+func (fc *FileCache) ReleaseFile(options internal.ReleaseFileOptions) error {
 	// Lock the file so that while close is in progress no one can open the file again
 	flock := fc.fileLocks.Get(options.Handle.Path)
 	flock.Lock()
@@ -1413,25 +1488,25 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 
 	if !fc.lazyWrite {
 		// Sync close is called so wait till the upload completes
-		return fc.closeFileInternal(options, flock)
+		return fc.releaseFileInternal(options, flock)
 	}
 
-	go fc.closeFileInternal(options, flock) //nolint
+	go fc.releaseFileInternal(options, flock) //nolint
 	return nil
 }
 
 // flock must already be locked before calling this function
-func (fc *FileCache) closeFileInternal(
-	options internal.CloseFileOptions,
+func (fc *FileCache) releaseFileInternal(
+	options internal.ReleaseFileOptions,
 	flock *common.LockMapItem,
 ) error {
 	log.Trace(
-		"FileCache::closeFileInternal : name=%s, handle=%d",
+		"FileCache::releaseFileInternal : name=%s, handle=%d",
 		options.Handle.Path,
 		options.Handle.ID,
 	)
 
-	// Lock is acquired by CloseFile, at end of this method we need to unlock
+	// Lock is acquired by ReleaseFile, at end of this method we need to unlock
 	// If its async call file shall be locked till the upload completes.
 	defer flock.Unlock()
 	defer fc.fileCloseOpt.Done()
@@ -1445,14 +1520,14 @@ func (fc *FileCache) closeFileInternal(
 			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
 		) //nolint
 		if err != nil {
-			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
+			log.Err("FileCache::releaseFileInternal : failed to flush file %s", options.Handle.Path)
 			return err
 		}
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
 			log.Err(
-				"FileCache::closeFileInternal : error [missing fd in handle object] %s",
+				"FileCache::releaseFileInternal : error [missing fd in handle object] %s",
 				options.Handle.Path,
 			)
 			return syscall.EBADF
@@ -1461,7 +1536,7 @@ func (fc *FileCache) closeFileInternal(
 		err = f.Close()
 		if err != nil {
 			log.Err(
-				"FileCache::closeFileInternal : error closing file %s(%d) [%s]",
+				"FileCache::releaseFileInternal : error closing file %s(%d) [%s]",
 				options.Handle.Path,
 				int(f.Fd()),
 				err.Error(),
@@ -1479,7 +1554,7 @@ func (fc *FileCache) closeFileInternal(
 
 	// If it is an fsync op then purge the file
 	if options.Handle.Fsynced() {
-		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
+		log.Trace("FileCache::releaseFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CachePurge(localPath)
 		return nil
@@ -1489,7 +1564,7 @@ func (fc *FileCache) closeFileInternal(
 }
 
 // ReadInBuffer: Read the local file into a buffer
-func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::ReadInBuffer")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
@@ -1535,7 +1610,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 }
 
 // WriteFile: Write to the local file
-func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::WriteFile")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
@@ -1564,8 +1639,19 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		if err != nil {
 			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
 		} else {
-			if (currSize + float64(len(options.Data))) > fc.diskHighWaterMark {
-				log.Err("FileCache::WriteFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Handle.Path)
+			// Calculate additional space needed beyond the file's current size
+			existingSize := int64(0)
+			if info, statErr := f.Stat(); statErr == nil {
+				existingSize = info.Size()
+			}
+			newEnd := options.Offset + int64(len(options.Data))
+			additionalSpace := max(int64(0), newEnd-existingSize)
+			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
+				log.Err(
+					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
+					fc.maxCacheSizeMB,
+					options.Handle.Path,
+				)
 				return 0, syscall.ENOSPC
 			}
 		}
@@ -1593,7 +1679,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(options.Handle)
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
@@ -1742,7 +1828,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			uploadHandle.Close()
 			if err == nil {
 				// Clear dirty flag since file was successfully uploaded
-				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+				fc.clearHandleDirty(options.Handle)
 			}
 
 			if err != nil {
@@ -1776,7 +1862,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
 			}
-			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+			fc.clearHandleDirty(options.Handle)
 
 		}
 
@@ -1827,27 +1913,40 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
 	flock.RLock()
 
+	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	info, localErr := os.Stat(localPath)
+	if flock.Count() > 0 && flock.DirtyCount() > 0 {
+		if localErr == nil && !info.IsDir() {
+			flock.RUnlock()
+			return newObjAttr(options.Name, info), nil
+		}
+	}
+
+	flock.RUnlock()
+
 	// To cover case 1, get attributes from storage
 	var exists bool
-	attrs, err := fc.NextComponent().GetAttr(options)
-	if err != nil {
-		if err == syscall.ENOENT || os.IsNotExist(err) {
+	attrs, remoteErr := fc.NextComponent().GetAttr(options)
+	if remoteErr != nil {
+		if remoteErr == syscall.ENOENT || os.IsNotExist(remoteErr) {
 			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 			exists = false
 		} else {
-			log.Err("FileCache::GetAttr : Failed to get attr of %s [%s]", options.Name, err.Error())
-			return nil, err
+			log.Err(
+				"FileCache::GetAttr : Failed to get attr of %s [%s]",
+				options.Name,
+				remoteErr.Error(),
+			)
+			return nil, remoteErr
 		}
 	} else {
 		exists = true
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
-	flock.RUnlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-	if err == nil && !info.IsDir() {
+	if localErr == nil && info != nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// attrs is a pointer returned by NextComponent
 			// modifying attrs could corrupt cached directory listings
@@ -1868,6 +1967,30 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	return attrs, nil
+}
+
+func (fc *FileCache) setHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	alreadyDirty := handle.Dirty()
+	if !alreadyDirty {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if !alreadyDirty {
+		fc.fileLocks.Get(handle.Path).IncDirty()
+	}
+}
+
+func (fc *FileCache) clearHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	wasDirty := handle.Dirty()
+	if wasDirty {
+		handle.Flags.Clear(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if wasDirty {
+		fc.fileLocks.Get(handle.Path).DecDirty()
+	}
 }
 
 // RenameFile: Invalidate the file in local cache.
@@ -1988,7 +2111,7 @@ func (fc *FileCache) renameOpenHandles(
 
 // TruncateFile: Update the file with its new size.
 func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.Size)
+	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 
 	if fc.diskHighWaterMark != 0 {
 		currSize, err := common.GetUsage(fc.tmpPath)
@@ -1998,11 +2121,84 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				err.Error(),
 			)
 		} else {
-			if (currSize + float64(options.Size)) > fc.diskHighWaterMark {
-				log.Err("FileCache::TruncateFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+			// Only count the additional space beyond the file's current size
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			existingSize := int64(0)
+			if info, statErr := os.Stat(localPath); statErr == nil {
+				existingSize = info.Size()
+			}
+			additionalSpace := max(int64(0), options.NewSize-existingSize)
+			// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
+			if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
+				log.Err(
+					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
+					fc.maxCacheSizeMB,
+					options.Name,
+				)
 				return syscall.ENOSPC
 			}
 		}
+	}
+
+	if options.Handle != nil {
+		// The call is coming from an open handle, so we can just truncate the local file, and the change will be
+		// flushed to storage on close.
+		if !openCompleted(options.Handle) {
+			flock := fc.fileLocks.Get(options.Name)
+			flock.Lock()
+			err := fc.openFileInternal(options.Handle, flock)
+			flock.Unlock()
+			if err != nil {
+				return fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+			}
+		}
+
+		f := options.Handle.GetFileObject()
+		if f == nil {
+			// Recover missing fd on valid handles by reopening the cached path.
+			// This avoids issues when truncate arrives before the handle has a live file object.
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			reopened, reopenErr := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
+			if reopenErr == nil {
+				options.Handle.UnixFD = uint64(reopened.Fd())
+				options.Handle.SetFileObject(reopened)
+				f = reopened
+			}
+		}
+
+		if f == nil {
+			log.Warn(
+				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
+				options.Name,
+			)
+			options.Handle = nil
+		}
+	}
+
+	if options.Handle != nil {
+		f := options.Handle.GetFileObject()
+		if f == nil {
+			return syscall.EBADF
+		}
+
+		info, err := f.Stat()
+		if err == nil && info.Size() == options.NewSize {
+			return nil
+		}
+
+		err = f.Truncate(options.NewSize)
+		if err != nil {
+			log.Err(
+				"FileCache::TruncateFile : error truncating file %s [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
+			return err
+		}
+
+		fc.setHandleDirty(options.Handle)
+
+		return nil
 	}
 
 	flock := fc.fileLocks.Get(options.Name)
@@ -2022,8 +2218,8 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	if err == nil || os.IsExist(err) {
 		fc.policy.CacheValid(localPath)
 
-		if info.Size() != options.Size {
-			err = os.Truncate(localPath, options.Size)
+		if info.Size() != options.NewSize {
+			err = os.Truncate(localPath, options.NewSize)
 			if err != nil {
 				log.Err(
 					"FileCache::TruncateFile : error truncating cached file %s [%s]",

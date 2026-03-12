@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -152,21 +152,32 @@ func (xl *Xload) Configure(_ bool) error {
 		mntPath := ""
 		err = config.UnmarshalKey("mount-path", &mntPath)
 		if err != nil {
-			log.Err("Xload::Configure : config error [unable to obtain Mount Path [%s]]", err.Error())
+			log.Err(
+				"Xload::Configure : config error [unable to obtain Mount Path [%s]]",
+				err.Error(),
+			)
 			return fmt.Errorf("config error in %s [%s]", xl.Name(), err.Error())
 		}
 
 		if xl.path == mntPath {
 			log.Err("Xload::Configure : config error [xload path is same as mount path]")
-			return fmt.Errorf("config error in %s error [xload path is same as mount path]", xl.Name())
+			return fmt.Errorf(
+				"config error in %s error [xload path is same as mount path]",
+				xl.Name(),
+			)
 		}
 
 		_, err = os.Stat(xl.path)
 		if os.IsNotExist(err) {
-			log.Info("Xload::Configure : config error [xload path does not exist, attempting to create path]")
+			log.Info(
+				"Xload::Configure : config error [xload path does not exist, attempting to create path]",
+			)
 			err := os.Mkdir(xl.path, os.FileMode(0755))
 			if err != nil {
-				log.Err("Xload::Configure : config error creating directory of xload path [%s]", err.Error())
+				log.Err(
+					"Xload::Configure : config error creating directory of xload path [%s]",
+					err.Error(),
+				)
 				return fmt.Errorf("config error in %s [%s]", xl.Name(), err.Error())
 			}
 		}
@@ -449,9 +460,9 @@ func (xl *Xload) downloadFile(fileName string) error {
 // OpenFile: Download the file if not already downloaded and return the file handle
 func (xl *Xload) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace(
-		"Xload::OpenFile : name=%s, flags=%d, mode=%s",
+		"Xload::OpenFile : name=%s, flags=%s, mode=%s",
 		options.Name,
-		options.Flags,
+		common.PrettyOpenFlags(options.Flags),
 		options.Mode,
 	)
 	localPath := filepath.Join(xl.path, options.Name)
@@ -498,7 +509,7 @@ func (xl *Xload) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, 
 	return handle, nil
 }
 
-func (xl *Xload) CloseFile(options internal.CloseFileOptions) error {
+func (xl *Xload) ReleaseFile(options internal.ReleaseFileOptions) error {
 	// Lock the file so that while close is in progress no one can open the file again
 	flock := xl.fileLocks.Get(options.Handle.Path)
 	flock.Lock()

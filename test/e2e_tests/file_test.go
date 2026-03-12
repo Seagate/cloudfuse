@@ -1,11 +1,10 @@
 //go:build !unittest
-// +build !unittest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -84,7 +83,7 @@ func initFileFlags() {
 
 func getFileTestDirName(n int) string {
 	b := make([]byte, n)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:n]
 }
 
@@ -103,7 +102,7 @@ func (suite *fileTestSuite) waitForCondition(
 	timeout time.Duration,
 	interval time.Duration,
 	condition func() (bool, error),
-	msgAndArgs ...interface{},
+	msgAndArgs ...any,
 ) {
 	startTime := time.Now()
 	var lastErr error
@@ -173,6 +172,8 @@ func (suite *fileTestSuite) TestOpenFlag_O_TRUNC() {
 	suite.NoError(err)
 	read, _ = srcFile.Read(tempbuf)
 	suite.Equal(0, read)
+	err = srcFile.Close()
+	suite.NoError(err)
 }
 
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {
@@ -447,7 +448,7 @@ func (suite *fileTestSuite) TestFileNameConflict() {
 	suite.NoError(err)
 }
 
-// # Copy file from once directory to another
+// # Copy file from one directory to another
 func (suite *fileTestSuite) TestFileCopy() {
 	dirName := filepath.Join(suite.testPath, "test123")
 	fileName := filepath.Join(suite.testPath, "test")
@@ -458,15 +459,17 @@ func (suite *fileTestSuite) TestFileCopy() {
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0777)
 	suite.NoError(err)
-	defer srcFile.Close()
 
 	dstFile, err := os.Create(dstFileName)
 	suite.NoError(err)
-	defer dstFile.Close()
 
 	_, err = io.Copy(srcFile, dstFile)
 	suite.NoError(err)
-	dstFile.Close()
+
+	err = srcFile.Close()
+	suite.NoError(err)
+	err = dstFile.Close()
+	suite.NoError(err)
 
 	suite.fileTestCleanup([]string{dirName})
 }
@@ -533,7 +536,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 	fileName := filepath.Join(dirName, "multi")
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
@@ -757,7 +760,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 }
 
 /*
-func (suite *fileTestSuite) TestReadOnlyFile() {
+ func (suite *fileTestSuite) TestReadOnlyFile() {
 	if suite.adlsTest == true {
 		fileName := filepath.Join(suite.testPath, "readOnlyFile.txt")
 		srcFile, err := os.Create(fileName)
@@ -766,13 +769,19 @@ func (suite *fileTestSuite) TestReadOnlyFile() {
 		// make it read only permissions
 		err = os.Chmod(fileName, 0444)
 		suite.Equal(nil, err)
-		_, err = os.OpenFile(fileName, os.O_RDONLY, 0444)
+		f, err := os.OpenFile(fileName, os.O_RDONLY, 0444)
 		suite.Equal(nil, err)
-		_, err = os.OpenFile(fileName, os.O_RDWR, 0444)
+		err = f.Close()
+		suite.Equal(nil, err)
+		f, err = os.OpenFile(fileName, os.O_RDWR, 0444)
 		suite.NotNil(err)
+		if f != nil {
+			closeErr := f.Close()
+			suite.Equal(nil, closeErr)
+		}
 		suite.fileTestCleanup([]string{fileName})
 	}
-} */
+}*/
 
 func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 	// File permissions not working on Windows.
@@ -783,10 +792,15 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 	if suite.adlsTest == true {
 		fileName := filepath.Join(suite.testPath, "createReadOnlyFile.txt")
 		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0444)
-		srcFile.Close()
 		suite.NoError(err)
-		_, err = os.OpenFile(fileName, os.O_RDONLY, 0444)
+		err = srcFile.Close()
 		suite.NoError(err)
+
+		file, err := os.OpenFile(fileName, os.O_RDONLY, 0444)
+		suite.NoError(err)
+		err = file.Close()
+		suite.NoError(err)
+
 		suite.fileTestCleanup([]string{fileName})
 	}
 }
@@ -860,8 +874,8 @@ func TestFileTestSuite(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create test directory [%s]\n", err.Error())
 	}
-	rand.Read(fileTest.minBuff)
-	rand.Read(fileTest.medBuff)
+	_, _ = rand.Read(fileTest.minBuff)
+	_, _ = rand.Read(fileTest.medBuff)
 
 	// Run the actual End to End test
 	suite.Run(t, &fileTest)

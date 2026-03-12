@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,11 +34,16 @@ import (
 //  To use go:generate run command   "NAME="component" go generate"
 
 func main() {
-	_ = cmd.Execute()
+	defer log.Destroy() // nolint:errcheck
+	// This recovers the panics only for the functions that run within this context. all the go-routine
+	// spawned by this function need to handle their panics separately if required. Also the FUSE callbacks
+	// wouldn't run in this context, so the panics originated from the callbacks can't get recovered here.
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
-			log.Err("PANIC: %v", panicErr)
+			log.Crit("PANIC: %v", panicErr)
 			panic(panicErr)
 		}
 	}()
+
+	_ = cmd.Execute()
 }

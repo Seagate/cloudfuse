@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,26 +38,40 @@ import (
 var cloudfusePid string
 
 var healthMonStop = &cobra.Command{
-	Use:               "stop",
-	Short:             "Stops the health monitor binary associated with a given Cloudfuse pid",
-	Long:              "Stops the health monitor binary associated with a given Cloudfuse pid",
-	SuggestFor:        []string{"stp", "st"},
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:   "stop",
+	Short: "Stops health monitor binaries",
+	Long: `Stops health monitor binaries.
+
+Use 'stop --pid=<cloudfuse-pid>' to stop a specific monitor,
+or 'stop all' to stop all running monitors.`,
+	SuggestFor: []string{"stp", "st"},
+	Example: `  # Stop a specific health monitor by cloudfuse pid
+  cloudfuse health-monitor stop --pid=12345
+
+  # Stop all health monitors
+  cloudfuse health-monitor stop all`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cloudfusePid = strings.TrimSpace(cloudfusePid)
 
 		if len(cloudfusePid) == 0 {
-			return fmt.Errorf("pid of cloudfuse process not given")
+			return fmt.Errorf(
+				"pid of cloudfuse process not given. Use --pid flag or 'stop all' subcommand",
+			)
 		}
 
 		pid, err := getPid(cloudfusePid)
 		if err != nil {
-			return fmt.Errorf("failed to get health monitor pid")
+			return fmt.Errorf(
+				"failed to get health monitor pid for cloudfuse pid %s: %w",
+				cloudfusePid,
+				err,
+			)
 		}
 
 		err = stop(pid)
 		if err != nil {
-			return fmt.Errorf("failed to stop health monitor")
+			return fmt.Errorf("failed to stop health monitor: %w", err)
 		}
 
 		return nil
@@ -98,8 +112,8 @@ func getPid(cloudfusePid string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	processes := strings.Split(string(out), "\n")
-	for _, process := range processes {
+	processes := strings.SplitSeq(string(out), "\n")
+	for process := range processes {
 		if strings.Contains(process, "cfusemon") &&
 			strings.Contains(process, fmt.Sprintf("--pid=%s", cloudfusePid)) {
 			re := regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
@@ -131,17 +145,14 @@ func stop(pid string) error {
 	_, err := cliOut.Output()
 	if err != nil {
 		return err
-	} else {
-		fmt.Println("Successfully stopped health monitor binary.")
-		return nil
 	}
+	fmt.Println("Successfully stopped health monitor binary.")
+	return nil
 }
 
 func init() {
 	healthMonCmd.AddCommand(healthMonStop)
-	healthMonStop.AddCommand(healthMonStopAll)
 
 	healthMonStop.Flags().
 		StringVar(&cloudfusePid, "pid", "", "Cloudfuse PID associated with the health monitor that should be stopped")
-	_ = healthMonStop.MarkFlagRequired("pid")
 }

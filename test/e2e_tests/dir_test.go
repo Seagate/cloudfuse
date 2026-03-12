@@ -1,11 +1,10 @@
 //go:build !unittest
-// +build !unittest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -90,7 +89,7 @@ func initDirFlags() {
 
 func getTestDirName(n int) string {
 	b := make([]byte, n)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:n]
 }
 
@@ -103,7 +102,7 @@ func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 	}
 }
 
-func formatMessage(msgAndArgs ...interface{}) string {
+func formatMessage(msgAndArgs ...any) string {
 	if len(msgAndArgs) == 0 {
 		return ""
 	}
@@ -127,7 +126,7 @@ func (suite *dirTestSuite) waitForCondition(
 	timeout time.Duration,
 	interval time.Duration,
 	condition func() (bool, error),
-	msgAndArgs ...interface{},
+	msgAndArgs ...any,
 ) {
 	startTime := time.Now()
 	var lastErr error
@@ -464,6 +463,35 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.dirTestCleanup([]string{testDir})
 }
 
+// # List directory with dot entries
+func (suite *dirTestSuite) TestDirListShowsDots() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping TestDirListShowsDots on Windows")
+		return
+	}
+	cmd := exec.Command("ls", "-al", suite.testPath)
+	cliOut, err := cmd.Output()
+	suite.NoError(err)
+	lines := strings.Split(string(cliOut), "\n")
+	foundDot := false
+	foundDotDot := false
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		name := fields[len(fields)-1]
+		switch name {
+		case ".":
+			foundDot = true
+		case "..":
+			foundDotDot = true
+		}
+	}
+	suite.True(foundDot, "expected '.' to be listed in ls -al output")
+	suite.True(foundDotDot, "expected '..' to be listed in ls -al output")
+}
+
 // // # List directory recursively
 // func (suite *dirTestSuite) TestDirListRecursive() {
 // 	testDir := filepath.Join(suite.testPath, "bigTestDir")
@@ -521,7 +549,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	err = os.Mkdir(filepath.Join(dirName, "tmp"), 0777)
 	suite.NoError(err)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0777)
 		suite.NoError(err)
@@ -602,7 +630,8 @@ func (suite *dirTestSuite) TestGitStash() {
 		suite.NoError(err)
 		suite.Equal(10, n)
 		suite.Equal("TestString", string(data))
-		_ = f.Close()
+		err = f.Close()
+		suite.NoError(err)
 
 		cmd = exec.Command("git", "status")
 		cliOut, err = cmd.Output()
@@ -629,7 +658,8 @@ func (suite *dirTestSuite) TestGitStash() {
 			suite.Contains(string(cliOut), "Changes not staged for commit")
 		}
 
-		os.Chdir(suite.testPath)
+		err = os.Chdir(suite.testPath)
+		suite.NoError(err)
 
 		// As Tar is taking long time first to clone and then to tar just mixing both the test cases
 		cmd = exec.Command("tar", "-zcvf", tarName, dirName)
@@ -678,7 +708,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	suite.NoError(err)
 
 	// Write three more files so one block, 4096 bytes, is filled
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
@@ -760,7 +790,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	suite.NoError(err)
 
 	fileName := filepath.Join(dirName, "small_file_")
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
@@ -774,7 +804,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	//     }, "DiskSize to be %d after initial writes", expectedSize)
 	// }
 
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
@@ -791,7 +821,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		}, "DiskSize to be %d after first truncate", expectedSize)
 	}
 
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
 		err := os.WriteFile(file, suite.medBuff, 0777)
 		suite.NoError(err)
@@ -809,7 +839,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	}
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		oldFile := fileName + strconv.Itoa(i)
 		newFile := renameFile + strconv.Itoa(i)
 		err := os.Rename(oldFile, newFile)
@@ -827,7 +857,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		}, "DiskSize to be %d after first truncate", expectedSize)
 	}
 
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		file := renameFile + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
@@ -884,9 +914,9 @@ func TestDirTestSuite(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create test directory [%s]\n", err.Error())
 	}
-	rand.Read(dirTest.minBuff)
-	rand.Read(dirTest.medBuff)
-	rand.Read(dirTest.hugeBuff)
+	_, _ = rand.Read(dirTest.minBuff)
+	_, _ = rand.Read(dirTest.medBuff)
+	_, _ = rand.Read(dirTest.hugeBuff)
 
 	// Run the actual End to End test
 	suite.Run(t, &dirTest)

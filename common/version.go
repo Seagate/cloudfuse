@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -87,7 +87,7 @@ func (v Version) compare(v2 Version) int {
 
 	// compare the major/minor/patch version
 	// if v has a bigger number, it is newer
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if v.segments[i] > v2.segments[i] {
 			return 1
 		} else if v.segments[i] < v2.segments[i] {

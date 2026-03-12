@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,7 @@ import (
 type ExportedStat struct {
 	Timestamp   string
 	MonitorName string
-	Stat        interface{}
+	Stat        any
 }
 
 type StatsExporter struct {
@@ -118,12 +118,14 @@ func (se *StatsExporter) Destroy() {
 		}
 	}
 
-	se.opFile.Close()
+	if err := se.opFile.Close(); err != nil {
+		log.Err("stats_exporter::Destroy : unable to close file [%v]", err)
+	}
 	close(se.channel)
 	se.wg.Wait()
 }
 
-func (se *StatsExporter) AddMonitorStats(monName string, timestamp string, st interface{}) {
+func (se *StatsExporter) AddMonitorStats(monName string, timestamp string, st any) {
 	// check if the channel is full
 	if len(se.channel) == cap(se.channel) {
 		// remove the first element from the channel
@@ -235,11 +237,13 @@ func (se *StatsExporter) checkOutputFile() error {
 		}
 
 		log.Debug("stats_exporter::checkOutputFile : closing file %v", f.Name())
-		se.opFile.Close()
+		if err = se.opFile.Close(); err != nil {
+			log.Err("stats_exporter::checkOutputFile : failed to close file [%v]", err)
+		}
 
 		err = se.getNewFile()
 		if err != nil {
-			log.Err("stats_exporter::checkOutputFile : [%v]")
+			log.Err("stats_exporter::checkOutputFile : [%v]", err)
 			return err
 		}
 		return nil

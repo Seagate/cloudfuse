@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ func (suite *threadPoolTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *threadPoolTestSuite) cleanupTest() {
+func (suite *threadPoolTestSuite) CleanupTest() {
 }
 
 func (suite *threadPoolTestSuite) TestCreate() {
@@ -122,7 +122,7 @@ func (suite *threadPoolTestSuite) TestPrioritySchedule() {
 	suite.assert.NotNil(tp.priorityCh)
 	suite.assert.NotNil(tp.normalCh)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		tp.Schedule(i < 20, &workItem{failCnt: 5})
 	}
 
@@ -154,7 +154,7 @@ func (suite *threadPoolTestSuite) TestPriorityScheduleWithWriter() {
 	suite.assert.NotNil(tp.priorityCh)
 	suite.assert.NotNil(tp.normalCh)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		tp.Schedule(i < 20, &workItem{failCnt: 5, upload: true, blockId: "test"})
 	}
 

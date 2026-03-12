@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ type azAuthBlobKey struct {
 }
 
 // getServiceClient : returns shared key based service client for blob
-func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (any, error) {
 	if azkey.config.AccountKey == nil {
 		log.Err(
 			"azAuthBlobKey::getServiceClient : Shared key for account is empty, cannot authenticate user",
@@ -100,7 +100,7 @@ type azAuthDatalakeKey struct {
 }
 
 // getServiceClient : returns shared key based service client for datalake
-func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (any, error) {
 	if azkey.config.AccountKey == nil {
 		log.Err(
 			"azAuthDatalakeKey::getServiceClient : Shared key for account is empty, cannot authenticate user",

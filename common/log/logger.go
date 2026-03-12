@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@
 package log
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -45,12 +46,12 @@ type Logger interface {
 
 	GetType() string
 	GetLogLevel() common.LogLevel
-	Debug(format string, args ...interface{})
-	Trace(format string, args ...interface{})
-	Info(format string, args ...interface{})
-	Warn(format string, args ...interface{})
-	Err(format string, args ...interface{})
-	Crit(format string, args ...interface{})
+	Debug(format string, args ...any)
+	Trace(format string, args ...any)
+	Info(format string, args ...any)
+	Warn(format string, args ...any)
+	Err(format string, args ...any)
+	Crit(format string, args ...any)
 	LogRotate() error
 }
 
@@ -136,39 +137,43 @@ func SetLogLevel(lvl common.LogLevel) {
 }
 
 // Destroy : DeInitialize the logging library
+// This should only be called from the main function.
 func Destroy() error {
-	return logObj.Destroy()
+	if logObj != nil {
+		return logObj.Destroy()
+	}
+	return fmt.Errorf("Logger is not initialized")
 }
 
 // ------------------ Public methods for logging events ------------------
 
 // Debug : Debug message logging
-func Debug(msg string, args ...interface{}) {
+func Debug(msg string, args ...any) {
 	logObj.Debug(msg, args...)
 }
 
 // Trace : Trace message logging
-func Trace(msg string, args ...interface{}) {
+func Trace(msg string, args ...any) {
 	logObj.Trace(msg, args...)
 }
 
 // Info : Info message logging
-func Info(msg string, args ...interface{}) {
+func Info(msg string, args ...any) {
 	logObj.Info(msg, args...)
 }
 
 // Warn : Warning message logging
-func Warn(msg string, args ...interface{}) {
+func Warn(msg string, args ...any) {
 	logObj.Warn(msg, args...)
 }
 
 // Err : Error message logging
-func Err(msg string, args ...interface{}) {
+func Err(msg string, args ...any) {
 	logObj.Err(msg, args...)
 }
 
 // Crit : Critical message logging
-func Crit(msg string, args ...interface{}) {
+func Crit(msg string, args ...any) {
 	logObj.Crit(msg, args...)
 }
 

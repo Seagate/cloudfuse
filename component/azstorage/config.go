@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,6 @@ package azstorage
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common/config"
@@ -37,8 +36,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/vibhansa-msft/blobfilter"
-
-	"github.com/JeffreyRichter/enum/enum"
 )
 
 // AuthType Enum
@@ -74,16 +71,39 @@ func (AuthType) WORKLOADIDENTITY() AuthType {
 	return AuthType(6)
 }
 
+var authTypeNames = map[AuthType]string{
+	AuthType(0): "INVALID_AUTH",
+	AuthType(1): "KEY",
+	AuthType(2): "SAS",
+	AuthType(3): "SPN",
+	AuthType(4): "MSI",
+	AuthType(5): "AZCLI",
+	AuthType(6): "WORKLOADIDENTITY",
+}
+
+var authTypeValues = map[string]AuthType{
+	"INVALID_AUTH":     AuthType(0),
+	"KEY":              AuthType(1),
+	"SAS":              AuthType(2),
+	"SPN":              AuthType(3),
+	"MSI":              AuthType(4),
+	"AZCLI":            AuthType(5),
+	"WORKLOADIDENTITY": AuthType(6),
+}
+
 func (a AuthType) String() string {
-	return enum.StringInt(a, reflect.TypeOf(a))
+	if name, ok := authTypeNames[a]; ok {
+		return name
+	}
+	return "INVALID_AUTH"
 }
 
 func (a *AuthType) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(a), s, true, false)
-	if enumVal != nil {
-		*a = enumVal.(AuthType)
+	if val, ok := authTypeValues[strings.ToUpper(s)]; ok {
+		*a = val
+		return nil
 	}
-	return err
+	return fmt.Errorf("invalid AuthType: %s", s)
 }
 
 // AccountType Enum
@@ -91,28 +111,43 @@ type AccountType int
 
 var EAccountType = AccountType(0).INVALID_ACC()
 
-func (AccountType) INVALID_ACC() AccountType {
+func (a AccountType) INVALID_ACC() AccountType {
 	return AccountType(0)
 }
 
-func (AccountType) BLOCK() AccountType {
+func (a AccountType) BLOCK() AccountType {
 	return AccountType(1)
 }
 
-func (AccountType) ADLS() AccountType {
+func (a AccountType) ADLS() AccountType {
 	return AccountType(2)
 }
 
+var accountTypeNames = map[AccountType]string{
+	AccountType(0): "INVALID_ACC",
+	AccountType(1): "BLOCK",
+	AccountType(2): "ADLS",
+}
+
+var accountTypeValues = map[string]AccountType{
+	"INVALID_ACC": AccountType(0),
+	"BLOCK":       AccountType(1),
+	"ADLS":        AccountType(2),
+}
+
 func (a AccountType) String() string {
-	return enum.StringInt(a, reflect.TypeOf(a))
+	if name, ok := accountTypeNames[a]; ok {
+		return name
+	}
+	return "INVALID_ACC"
 }
 
 func (a *AccountType) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(a), s, true, false)
-	if enumVal != nil {
-		*a = enumVal.(AccountType)
+	if val, ok := accountTypeValues[strings.ToUpper(s)]; ok {
+		*a = val
+		return nil
 	}
-	return err
+	return fmt.Errorf("invalid AccountType: %s", s)
 }
 
 // default value for maximum results returned by a list API call
@@ -322,7 +357,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	if opt.BlockSize != 0 {
 		if opt.BlockSize > blockblob.MaxStageBlockBytes {
 			log.Err(
-				"ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %s Bytes",
+				"ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %d Bytes",
 				blockblob.MaxStageBlockBytes,
 			)
 			return errors.New("block size is too large")
@@ -405,8 +440,12 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 			az.stConfig.proxyAddress = opt.HttpsProxyAddress
 		} else {
 			if httpProxyProvided {
-				log.Err("ParseAndValidateConfig : `http-proxy` Invalid : must set `use-http: true` in your config file")
-				return errors.New("`http-proxy` Invalid : must set `use-http: true` in your config file")
+				log.Err(
+					"ParseAndValidateConfig : `http-proxy` Invalid : must set `use-http: true` in your config file",
+				)
+				return errors.New(
+					"`http-proxy` Invalid : must set `use-http: true` in your config file",
+				)
 			}
 		}
 	}
@@ -547,8 +586,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	log.Crit(
-		"ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v",
-		"restricted-characters-windows %v",
+		"ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v, restricted-characters-windows %v",
 		az.stConfig.authConfig.AccountName,
 		az.stConfig.container,
 		az.stConfig.authConfig.AccountType,
@@ -563,7 +601,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.restrictedCharsWin,
 	)
 	log.Crit(
-		"ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %s, fail-unsupported-op %t, mount-all-containers %t",
+		"ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %v, fail-unsupported-op %t, mount-all-containers %t",
 		az.stConfig.authConfig.UseHTTP,
 		az.stConfig.blockSize,
 		az.stConfig.maxConcurrency,

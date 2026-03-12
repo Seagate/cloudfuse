@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -45,13 +45,12 @@ var opts configGenOptions
 var templatesDir = "testdata/config/"
 
 var generateTestConfig = &cobra.Command{
-	Use:               "gen-test-config",
-	Short:             "Generate config file for testing given an output path.",
-	Long:              "Generate config file for testing given an output path.",
-	SuggestFor:        []string{"conv test config", "convert test config"},
-	Hidden:            true,
-	Args:              cobra.ExactArgs(0),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "gen-test-config",
+	Short:      "Generate config file for testing given an output path.",
+	Long:       "Generate config file for testing given an output path.",
+	SuggestFor: []string{"conv test config", "convert test config"},
+	Hidden:     true,
+	Args:       cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
 		var err error

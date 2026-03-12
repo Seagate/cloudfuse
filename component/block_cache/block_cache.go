@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -191,19 +191,19 @@ func (bc *BlockCache) GenConfig() string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\n%s:", bc.Name()))
+	fmt.Fprintf(&sb, "\n%s:", bc.Name())
 
-	sb.WriteString(fmt.Sprintf("\n  block-size-mb: %v", defaultBlockSize))
-	sb.WriteString(fmt.Sprintf("\n  mem-size-mb: %v", memSize))
-	sb.WriteString(fmt.Sprintf("\n  prefetch: %v", prefetch))
-	sb.WriteString(fmt.Sprintf("\n  parallelism: %v", uint32(3*runtime.NumCPU())))
+	fmt.Fprintf(&sb, "\n  block-size-mb: %v", defaultBlockSize)
+	fmt.Fprintf(&sb, "\n  mem-size-mb: %v", memSize)
+	fmt.Fprintf(&sb, "\n  prefetch: %v", prefetch)
+	fmt.Fprintf(&sb, "\n  parallelism: %v", uint32(3*runtime.NumCPU()))
 
 	var tmpPath = ""
 	_ = config.UnmarshalKey("tmp-path", &tmpPath)
 	if tmpPath != "" {
-		sb.WriteString(fmt.Sprintf("\n  path: %v", tmpPath))
-		sb.WriteString(fmt.Sprintf("\n  disk-size-mb: %v", bc.getDefaultDiskSize(tmpPath)))
-		sb.WriteString(fmt.Sprintf("\n  disk-timeout-sec: %v", defaultTimeout))
+		fmt.Fprintf(&sb, "\n  path: %v", tmpPath)
+		fmt.Fprintf(&sb, "\n  disk-size-mb: %v", bc.getDefaultDiskSize(tmpPath))
+		fmt.Fprintf(&sb, "\n  disk-timeout-sec: %v", defaultTimeout)
 	}
 
 	return sb.String()
@@ -268,7 +268,10 @@ func (bc *BlockCache) Configure(_ bool) error {
 		if bc.prefetch == 0 {
 			bc.noPrefetch = true
 		} else if conf.PrefetchCount <= (MIN_PREFETCH * 2) {
-			log.Err("BlockCache::Configure : Prefetch count can not be less then %v", (MIN_PREFETCH*2)+1)
+			log.Err(
+				"BlockCache::Configure : Prefetch count can not be less then %v",
+				(MIN_PREFETCH*2)+1,
+			)
 			return fmt.Errorf("config error in %s [invalid prefetch count]", bc.Name())
 		}
 	}
@@ -350,7 +353,8 @@ func (bc *BlockCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"BlockCache::Configure : block size %v, mem size %v, worker %v, prefetch %v, disk path %v, max size %v, disk timeout %v, prefetch-on-open %t, maxDiskUsageHit %v, noPrefetch %v, consistency %v, cleanup-on-start %t",
+		"BlockCache::Configure : block size %v, mem size %v, worker %v, prefetch %v, disk path %v, max size %v, "+
+			"disk timeout %v, prefetch-on-open %t, maxDiskUsageHit %v, noPrefetch %v, consistency %v, lazy-write: %v, cleanup-on-start %t",
 		bc.blockSize,
 		bc.memSize,
 		bc.workers,
@@ -362,6 +366,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 		bc.maxDiskUsageHit,
 		bc.noPrefetch,
 		bc.consistency,
+		bc.lazyWrite,
 		conf.CleanupOnStart,
 	)
 
@@ -432,7 +437,7 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 	log.Trace(
 		"BlockCache::OpenFile : name=%s, flags=%X, mode=%s",
 		options.Name,
-		options.Flags,
+		common.PrettyOpenFlags(options.Flags),
 		options.Mode,
 	)
 
@@ -582,22 +587,26 @@ func (bc *BlockCache) FlushFile(options internal.FlushFileOptions) error {
 	return nil
 }
 
-// CloseFile: File is closed by application so release all the blocks and submit back to blockPool
-func (bc *BlockCache) CloseFile(options internal.CloseFileOptions) error {
+// ReleaseFile: File is closed by application so release all the blocks and submit back to blockPool
+func (bc *BlockCache) ReleaseFile(options internal.ReleaseFileOptions) error {
 	bc.fileCloseOpt.Add(1)
 	if !bc.lazyWrite {
 		// Sync close is called so wait till the upload completes
-		return bc.closeFileInternal(options)
+		return bc.releaseFileInternal(options)
 	}
 
 	// Async close is called so schedule the upload and return here
-	go bc.closeFileInternal(options) //nolint
+	go bc.releaseFileInternal(options) //nolint
 	return nil
 }
 
-// closeFileInternal: Actual handling of the close file goes here
-func (bc *BlockCache) closeFileInternal(options internal.CloseFileOptions) error {
-	log.Trace("BlockCache::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+// releaseFileInternal: Actual handling of the close file goes here
+func (bc *BlockCache) releaseFileInternal(options internal.ReleaseFileOptions) error {
+	log.Trace(
+		"BlockCache::ReleaseFileInternal : name=%s, handle=%d",
+		options.Handle.Path,
+		options.Handle.ID,
+	)
 
 	defer bc.fileCloseOpt.Done()
 
@@ -611,7 +620,10 @@ func (bc *BlockCache) closeFileInternal(options internal.CloseFileOptions) error
 			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
 		) //nolint
 		if err != nil {
-			log.Err("BlockCache::CloseFile : failed to flush file %s", options.Handle.Path)
+			log.Err(
+				"BlockCache::ReleaseFileInternal : failed to flush file %s",
+				options.Handle.Path,
+			)
 			return err
 		}
 	}
@@ -654,7 +666,7 @@ func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
 }
 
 // ReadInBuffer: Read the file into a buffer
-func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	if options.Offset >= options.Handle.Size {
 		// EOF reached so early exit
 		return 0, io.EOF
@@ -767,10 +779,17 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 				return nil, err
 			}
 		} else if !shouldCommit && !shouldDownload {
-			prop, err := bc.GetAttr(internal.GetAttrOptions{Name: handle.Path, RetrieveMetadata: false})
+			prop, err := bc.GetAttr(
+				internal.GetAttrOptions{Name: handle.Path, RetrieveMetadata: false},
+			)
 			//if failed to get attr
 			if err != nil {
-				log.Err("BlockCache::getBlock : Failed to get properties for %v=>%s [%s]", handle.ID, handle.Path, err.Error())
+				log.Err(
+					"BlockCache::getBlock : Failed to get properties for %v=>%s [%s]",
+					handle.ID,
+					handle.Path,
+					err.Error(),
+				)
 				return nil, err
 			}
 
@@ -778,13 +797,25 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 				//create a null block and return
 				block, err := bc.blockPool.MustGet()
 				if err != nil {
-					log.Err("BlockCache::getBlock : Unable to allocate block %v=>%s (index %v) %v", handle.ID, handle.Path, index, err)
+					log.Err(
+						"BlockCache::getBlock : Unable to allocate block %v=>%s (index %v) %v",
+						handle.ID,
+						handle.Path,
+						index,
+						err,
+					)
 					return nil, err
 				}
 
 				block.offset = readoffset
 				// block.flags.Set(BlockFlagSynced)
-				log.Debug("BlockCache::getBlock : Returning a null block %v for %v=>%s (read offset %v)", index, handle.ID, handle.Path, readoffset)
+				log.Debug(
+					"BlockCache::getBlock : Returning a null block %v for %v=>%s (read offset %v)",
+					index,
+					handle.ID,
+					handle.Path,
+					readoffset,
+				)
 				return block, nil
 			}
 		}
@@ -817,12 +848,26 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			// This is a case of random read so increment the random read count
 			handle.OptCnt++
 
-			log.Debug("BlockCache::getBlock : Unable to get block %v=>%s (offset %v, index %v) Random %v", handle.ID, handle.Path, readoffset, index, handle.OptCnt)
+			log.Debug(
+				"BlockCache::getBlock : Unable to get block %v=>%s (offset %v, index %v) Random %v",
+				handle.ID,
+				handle.Path,
+				readoffset,
+				index,
+				handle.OptCnt,
+			)
 
 			// This block is not present even after prefetch so lets download it now
 			err := bc.startPrefetch(handle, index, false)
 			if err != nil && err != io.EOF {
-				log.Err("BlockCache::getBlock : Unable to start prefetch  %v=>%s (offset %v, index %v) [%s]", handle.ID, handle.Path, readoffset, index, err.Error())
+				log.Err(
+					"BlockCache::getBlock : Unable to start prefetch  %v=>%s (offset %v, index %v) [%s]",
+					handle.ID,
+					handle.Path,
+					readoffset,
+					index,
+					err.Error(),
+				)
 				return nil, err
 			}
 		}
@@ -1202,14 +1247,24 @@ func (bc *BlockCache) download(item *workItem) {
 				var successfulRead = true
 				numberOfBytes, err := f.Read(item.block.data)
 				if err != nil {
-					log.Err("BlockCache::download : Failed to read data from disk cache %s [%s]", fileName, err.Error())
+					log.Err(
+						"BlockCache::download : Failed to read data from disk cache %s [%s]",
+						fileName,
+						err.Error(),
+					)
 					successfulRead = false
 					f.Close()
 					_ = root.Remove(fileName)
 				}
 
-				if numberOfBytes != int(bc.blockSize) && item.block.offset+uint64(numberOfBytes) != uint64(item.handle.Size) {
-					log.Err("BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v", bc.getBlockSize(uint64(item.handle.Size), item.block), numberOfBytes, item.handle.Size)
+				if numberOfBytes != int(bc.blockSize) &&
+					item.block.offset+uint64(numberOfBytes) != uint64(item.handle.Size) {
+					log.Err(
+						"BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v",
+						bc.getBlockSize(uint64(item.handle.Size), item.block),
+						numberOfBytes,
+						item.handle.Size,
+					)
 					successfulRead = false
 					f.Close()
 					_ = root.Remove(fileName)
@@ -1219,7 +1274,13 @@ func (bc *BlockCache) download(item *workItem) {
 
 				if successfulRead {
 					// If user has enabled consistency check then compute the md5sum and match it in xattr
-					successfulRead = checkBlockConsistency(bc, item, numberOfBytes, localPath, fileName)
+					successfulRead = checkBlockConsistency(
+						bc,
+						item,
+						numberOfBytes,
+						localPath,
+						fileName,
+					)
 
 					// We have read the data from disk so there is no need to go over network
 					// Just mark the block that download is complete
@@ -1234,7 +1295,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 	var etag string
 	// If file does not exists then download the block from the container
-	n, err := bc.NextComponent().ReadInBuffer(internal.ReadInBufferOptions{
+	n, err := bc.NextComponent().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: item.handle,
 		Offset: int64(item.block.offset),
 		Data:   item.block.data,
@@ -1269,7 +1330,12 @@ func (bc *BlockCache) download(item *workItem) {
 		return
 	} else if n == 0 {
 		// No data read so just reschedule this request
-		log.Err("BlockCache::download : Failed to read %v=>%s from offset %v [0 bytes read]", item.handle.ID, item.handle.Path, item.block.id)
+		log.Err(
+			"BlockCache::download : Failed to read %v=>%s from offset %v [0 bytes read]",
+			item.handle.ID,
+			item.handle.Path,
+			item.block.id,
+		)
 		item.failCnt++
 		bc.threadPool.Schedule(false, item)
 		return
@@ -1361,7 +1427,7 @@ func (bc *BlockCache) download(item *workItem) {
 }
 
 // WriteFile: Write to the local file
-func (bc *BlockCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (bc *BlockCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	// log.Debug("BlockCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	options.Handle.Lock()
@@ -1501,7 +1567,12 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 					return nil, fmt.Errorf("failed to download block")
 				}
 			} else {
-				log.Debug("BlockCache::getOrCreateBlock : push block %v to the cooking list for %v=>%v", block.id, handle.ID, handle.Path)
+				log.Debug(
+					"BlockCache::getOrCreateBlock : push block %v to the cooking list for %v=>%v",
+					block.id,
+					handle.ID,
+					handle.Path,
+				)
 				block.node = handle.Buffers.Cooking.PushBack(block)
 			}
 		} else {
@@ -1530,10 +1601,20 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 
 		// If the block was staged earlier then we are overwriting it here so move it back to cooking queue
 		if block.flags.IsSet(BlockFlagSynced) {
-			log.Debug("BlockCache::getOrCreateBlock : Overwriting back to staged block %v for %v=>%s", block.id, handle.ID, handle.Path)
+			log.Debug(
+				"BlockCache::getOrCreateBlock : Overwriting back to staged block %v for %v=>%s",
+				block.id,
+				handle.ID,
+				handle.Path,
+			)
 
 		} else if block.flags.IsSet(BlockFlagDownloading) {
-			log.Debug("BlockCache::getOrCreateBlock : Waiting for download to finish for committed block %v for %v=>%s", block.id, handle.ID, handle.Path)
+			log.Debug(
+				"BlockCache::getOrCreateBlock : Waiting for download to finish for committed block %v for %v=>%s",
+				block.id,
+				handle.ID,
+				handle.Path,
+			)
 			_, ok := <-block.state
 			if ok {
 				block.Unblock()
@@ -1541,7 +1622,12 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 
 			// if the block failed to download, it can't be used for overwriting
 			if block.IsFailed() {
-				log.Err("BlockCache::getOrCreateBlock : Failed to download block %v for %v=>%s", block.id, handle.ID, handle.Path)
+				log.Err(
+					"BlockCache::getOrCreateBlock : Failed to download block %v for %v=>%s",
+					block.id,
+					handle.ID,
+					handle.Path,
+				)
 
 				// Remove this node from handle so that next read retries to download the block again
 				bc.releaseDownloadFailedBlock(handle, block)
@@ -1550,7 +1636,12 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 		} else if block.flags.IsSet(BlockFlagUploading) {
 			// If the block is being staged, then wait till it is uploaded,
 			// and then write to the same block and move it back to cooking queue
-			log.Debug("BlockCache::getOrCreateBlock : Waiting for the block %v to upload for %v=>%s", block.id, handle.ID, handle.Path)
+			log.Debug(
+				"BlockCache::getOrCreateBlock : Waiting for the block %v to upload for %v=>%s",
+				block.id,
+				handle.ID,
+				handle.Path,
+			)
 			_, ok := <-block.state
 			if ok {
 				block.Unblock()
@@ -2004,7 +2095,7 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, []stri
 	for k := range listMap {
 		offsets = append(offsets, k)
 	}
-	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
+	slices.Sort(offsets)
 
 	zeroBlockStaged := false
 	zeroBlockID := ""
@@ -2076,7 +2167,14 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, []stri
 
 			} else {
 				blockIDList = append(blockIDList, listMap[offsets[i]].id)
-				log.Debug("BlockCache::getBlockIDList : Preparing blocklist for %v=>%s (%v :  %v, size %v)", handle.ID, handle.Path, offsets[i], listMap[offsets[i]].id, listMap[offsets[i]].size)
+				log.Debug(
+					"BlockCache::getBlockIDList : Preparing blocklist for %v=>%s (%v :  %v, size %v)",
+					handle.ID,
+					handle.Path,
+					offsets[i],
+					listMap[offsets[i]].id,
+					listMap[offsets[i]].size,
+				)
 				index++
 				i++
 			}
@@ -2098,8 +2196,20 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, []stri
 					committed: false,
 					size:      bc.blockPool.blockSize,
 				}
-				log.Debug("BlockCache::getBlockIDList : Adding zero block for %v=>%s, index %v", handle.ID, handle.Path, index)
-				log.Debug("BlockCache::getBlockIDList : Preparing blocklist for %v=>%s (%v :  %v, zero block size %v)", handle.ID, handle.Path, index, zeroBlockID, bc.blockPool.blockSize)
+				log.Debug(
+					"BlockCache::getBlockIDList : Adding zero block for %v=>%s, index %v",
+					handle.ID,
+					handle.Path,
+					index,
+				)
+				log.Debug(
+					"BlockCache::getBlockIDList : Preparing blocklist for %v=>%s (%v :  %v, zero block size %v)",
+					handle.ID,
+					handle.Path,
+					index,
+					zeroBlockID,
+					bc.blockPool.blockSize,
+				)
 				index++
 			}
 		}
@@ -2186,7 +2296,7 @@ func (bc *BlockCache) diskEvict(node *list.Element) {
 // checkDiskUsage : Callback to check usage of disk and decide whether eviction is needed
 func (bc *BlockCache) checkDiskUsage() bool {
 	data, _ := common.GetUsage(bc.tmpPath)
-	usage := uint32((data * 100) / float64(bc.diskSize/_1MB))
+	usage := uint32((data * 100) / float64(bc.diskSize))
 
 	if bc.maxDiskUsageHit {
 		if usage >= MIN_POOL_USAGE {
@@ -2331,6 +2441,21 @@ func (bc *BlockCache) SyncFile(options internal.SyncFileOptions) error {
 	return nil
 }
 
+func (bc *BlockCache) TruncateFile(options internal.TruncateFileOptions) error {
+	log.Trace("BlockCache::TruncateFile : path=%s, size=%d", options.Name, options.NewSize)
+
+	// Set the block size that need to used by the next component
+	options.BlockSize = int64(bc.blockSize)
+
+	err := bc.NextComponent().TruncateFile(options)
+	if err != nil {
+		log.Err("BlockCache::TruncateFile : Failed to truncate file %s: %v", options.Name, err)
+		return err
+	}
+
+	return nil
+}
+
 func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	var maxCacheSize uint64
 	if bc.diskSize > 0 {
@@ -2344,7 +2469,6 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	}
 
 	usage, _ := common.GetUsage(bc.tmpPath)
-	usage = usage * float64(_1MB)
 
 	available := (float64)(maxCacheSize) - usage
 	_, free, err := common.GetAvailFree("/")
@@ -2353,7 +2477,7 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 		return nil, false, err
 	}
 
-	const blockSize = 4096
+	blockSize := int64(bc.blockSize)
 
 	statfs := &common.Statfs_t{
 		Blocks:  uint64(maxCacheSize) / uint64(blockSize),

@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -117,7 +117,11 @@ func AddRegistryValue(keyName string, valueName string, value string) error {
 }
 
 func RemoveRegistryValue(keyName string, valueName string) error {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyName, registry.SET_VALUE|registry.QUERY_VALUE)
+	key, err := registry.OpenKey(
+		registry.LOCAL_MACHINE,
+		keyName,
+		registry.SET_VALUE|registry.QUERY_VALUE,
+	)
 	if err != nil {
 		return err
 	}

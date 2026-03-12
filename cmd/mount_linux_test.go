@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -141,6 +142,14 @@ func (suite *mountTestSuite) SetupTest() {
 	}
 }
 
+func (suite *mountTestSuite) SetupSuite() {
+	out, err := executeCommandC(rootCmd, "mount")
+	strings.Contains(out, "accepts 1 arg(s), received 0")
+	if err == nil {
+		panic("Unable to parse the empty flags to mount command")
+	}
+}
+
 func (suite *mountTestSuite) cleanupTest() {
 	resetCLIFlags(*mountCmd)
 	resetCLIFlags(*mountAllCmd)
@@ -183,6 +192,8 @@ func (suite *mountTestSuite) TestMountDirNotEmpty() {
 	suite.assert.NoError(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
 
+	err = os.MkdirAll(tempDir, 0777)
+	suite.assert.NoError(err)
 	err = os.MkdirAll(tempDir, 0777)
 	suite.assert.NoError(err)
 	defer os.RemoveAll(mntDir)
@@ -446,7 +457,7 @@ func (suite *mountTestSuite) TestInvalidLibfuseOption() {
 		"-o a=b=c",
 	)
 	suite.assert.Error(err)
-	suite.assert.Contains(op, "invalid FUSE options")
+	suite.assert.Contains(op, "Invalid FUSE options")
 }
 
 // mount failure test where a libfuse option is undefined
@@ -476,7 +487,7 @@ func (suite *mountTestSuite) TestUndefinedLibfuseOption() {
 		"-o random_option",
 	)
 	suite.assert.Error(err)
-	suite.assert.Contains(op, "invalid FUSE options")
+	suite.assert.Contains(op, "Invalid FUSE options")
 }
 
 // mount failure test where umask value is invalid
@@ -565,6 +576,44 @@ func (suite *mountTestSuite) TestInvalidGIDValue() {
 	)
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to parse gid")
+}
+
+func (suite *mountTestSuite) TestInvalidFlagWithValue() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(mntDir)
+
+	// incorrect flag
+	out, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--invalid-flag=test",
+	)
+	suite.assert.Error(err)
+	suite.assert.Contains(out, "unknown flag: --invalid-flag")
+}
+
+func (suite *mountTestSuite) TestInvalidFlagWithOutValue() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(mntDir)
+
+	// incorrect flag
+	out, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--invalid-flag",
+	)
+	suite.assert.Error(err)
+	suite.assert.Contains(out, "unknown flag: --invalid-flag")
 }
 
 // fuse option parsing validation
@@ -674,7 +723,8 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 	// Create a test directory
 	testDir := filepath.Join(os.TempDir(), "cleanup_test")
 	os.RemoveAll(testDir)
-	os.MkdirAll(testDir, 0755)
+	err := os.MkdirAll(testDir, 0755)
+	suite.assert.NoError(err)
 
 	defer func() {
 		os.RemoveAll(testDir)
@@ -683,9 +733,12 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 	testPath := filepath.Join(testDir, "dir1")
 	testPath2 := filepath.Join(testDir, "dir2")
 	testPath3 := filepath.Join(testDir, "dir3")
-	os.MkdirAll(testPath, 0755)
-	os.MkdirAll(testPath2, 0755)
-	os.MkdirAll(testPath3, 0755)
+	err = os.MkdirAll(testPath, 0755)
+	suite.assert.NoError(err)
+	err = os.MkdirAll(testPath2, 0755)
+	suite.assert.NoError(err)
+	err = os.MkdirAll(testPath3, 0755)
+	suite.assert.NoError(err)
 
 	createFilesInCacheDirs := func() {
 		// Create some test files
@@ -751,6 +804,166 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+1)%3]))
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+2)%3]))
 	}
+}
+
+// TestValidateMountOptionsInvalidLogLevel tests validation with invalid log level
+func (suite *mountTestSuite) TestValidateMountOptionsInvalidLogLevel() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(mntDir)
+
+	op, err := executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		"--log-level=invalid_level",
+	)
+	suite.assert.Error(err)
+	suite.assert.Contains(op, "invalid log level")
+}
+
+// TestMountWithDefaultWorkingDir tests mount with custom default working directory
+func (suite *mountTestSuite) TestMountWithDefaultWorkingDir() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(mntDir)
+
+	workDir, err := os.MkdirTemp("", "workdir")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(workDir)
+
+	// This will still fail because the pipeline can't initialize,
+	// but it tests the working directory setup code path
+	_, err = executeCommandC(
+		rootCmd,
+		"mount",
+		mntDir,
+		fmt.Sprintf("--config-file=%s", confFileMntTest),
+		fmt.Sprintf("--default-working-dir=%s", workDir),
+	)
+	// Error is expected because of invalid storage config
+	suite.assert.Error(err)
+}
+
+// TestMountHelp tests mount help output
+func (suite *mountTestSuite) TestMountHelp() {
+	defer suite.cleanupTest()
+
+	op, err := executeCommandC(rootCmd, "mount", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "mount")
+	suite.assert.Contains(op, "config-file")
+}
+
+// TestMountAllHelp tests mount all help output
+func (suite *mountTestSuite) TestMountAllHelp() {
+	defer suite.cleanupTest()
+
+	op, err := executeCommandC(rootCmd, "mount", "all", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "mount")
+	suite.assert.Contains(op, "all")
+}
+
+// TestLoggingGoroutineIDDefaultBehavior ensures that when logging.goroutine-id is
+// not set in config, the mount code block sets it based on log level:
+// - LOG_DEBUG and above -> true
+// - below LOG_DEBUG (e.g., LOG_INFO) -> false
+func (suite *mountTestSuite) TestLoggingGoroutineIDDefaultBehavior() {
+	// Prepare two minimal configs differing only by logging.level
+	cfgDebug := `
+logging:
+  type: syslog
+  level: log_debug
+default-working-dir: /tmp/cloudfuse
+file_cache:
+  path: /tmp/fileCachePath
+libfuse:
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 60
+azstorage:
+  account-name: myAccountName
+  account-key: myAccountKey
+  mode: key
+  endpoint: myEndpoint
+  container: myContainer
+  max-retries: 1
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+`
+
+	cfgInfo := `
+logging:
+  type: syslog
+  level: log_info
+default-working-dir: /tmp/cloudfuse
+file_cache:
+  path: /tmp/fileCachePath
+libfuse:
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 60
+azstorage:
+  account-name: myAccountName
+  account-key: myAccountKey
+  mode: key
+  endpoint: myEndpoint
+  container: myContainer
+  max-retries: 1
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+`
+
+	// Helper to run mount and inspect options.Logging.LogGoroutineID
+	run := func(cfg string) (bool, string) {
+		// reset shared state
+		resetCLIFlags(*mountCmd)
+		resetCLIFlags(*mountAllCmd)
+		viper.Reset()
+		options = mountOptions{}
+
+		// write config
+		confFile, err := os.CreateTemp("", "conf*.yaml")
+		suite.NoError(err)
+
+		_, err = confFile.WriteString(cfg)
+		suite.NoError(err)
+		confFile.Close()
+		defer os.Remove(confFile.Name())
+
+		// mount dir must exist and be empty
+		mntDir, err := os.MkdirTemp("", "mntdir")
+		suite.NoError(err)
+		defer os.RemoveAll(mntDir)
+
+		// Run the command; it may fail later, but the logging option should be set by then
+		out, err := executeCommandC(
+			rootCmd,
+			"mount",
+			mntDir,
+			fmt.Sprintf("--config-file=%s", confFile.Name()),
+		)
+		suite.Error(err)
+		return options.Logging.LogGoroutineID, out
+	}
+
+	// Case: LOG_DEBUG -> expect true
+	gidDebug, _ := run(cfgDebug)
+	suite.True(gidDebug)
+
+	// Case: LOG_INFO -> expect false
+	gidInfo, _ := run(cfgInfo)
+	suite.False(gidInfo)
 }
 
 func TestMountCommand(t *testing.T) {

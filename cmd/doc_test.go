@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -112,6 +112,28 @@ func (suite *docTestSuite) TestOutputDirIsFileError() {
 	op, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opFileName))
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "output location is invalid as it is pointing to a file")
+}
+
+// TestDocHelp tests doc command help output
+func (suite *docTestSuite) TestDocHelp() {
+	defer suite.cleanupTest()
+
+	op, err := executeCommandC(rootCmd, "doc", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "Generates Markdown documentation")
+	suite.assert.Contains(op, "output-location")
+}
+
+// TestDocNoArgs tests doc command without args (should still work with defaults)
+func (suite *docTestSuite) TestDocNoArgs() {
+	defer suite.cleanupTest()
+
+	// Create temp dir for default output
+	opDir := "/tmp/docs_" + randomString(6)
+	defer os.RemoveAll(opDir)
+
+	_, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
+	suite.assert.NoError(err)
 }
 
 func TestDocCommand(t *testing.T) {

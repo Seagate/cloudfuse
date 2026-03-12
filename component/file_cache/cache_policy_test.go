@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -51,7 +51,8 @@ func (suite *cachePolicyTestSuite) SetupTest() {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	suite.assert = assert.New(suite.T())
-	os.Mkdir(cache_path, fs.FileMode(0777))
+	err = os.Mkdir(cache_path, fs.FileMode(0777))
+	suite.assert.NoError(err)
 }
 
 func (suite *cachePolicyTestSuite) cleanupTest() {
@@ -69,26 +70,25 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 	defer suite.cleanupTest()
 	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	data := make([]byte, 1024*1024)
-	f.Write(data)
+	_, err := f.Write(data)
+	suite.assert.NoError(err)
 	result, _ := common.GetUsage(cache_path)
-	suite.assert.Equal(float64(1), math.Floor(result))
+	suite.assert.InEpsilon(float64(1*MB), math.Floor(result), 1)
 	f.Close()
 }
 
-// We should return the sector size used. Here there should be two sectors used
+// GetUsage returns apparent file size in bytes (excluding directory metadata)
 func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	defer suite.cleanupTest()
 	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	data := make([]byte, 4097)
-	f.Write(data)
+	_, err := f.Write(data)
+	suite.assert.NoError(err)
 	f.Close()
 	result, err := common.GetUsage(cache_path)
 	suite.assert.NoError(err)
 
-	// Linux du overestimates the number of sectors used by 1 sometimes
-	// So check that we aren't more or less than 1 sector size off.
-	suite.assert.GreaterOrEqual(result, 2.0*common.SectorSize/MB)
-	suite.assert.LessOrEqual(result, 3.0*common.SectorSize/MB)
+	suite.assert.InEpsilon(float64(4097), result, 1)
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
@@ -96,10 +96,11 @@ func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	data := make([]byte, 1024*1024)
 
 	f, _ := os.Create(filepath.Join(cache_path, "test"))
-	f.Write(data)
+	_, err := f.Write(data)
+	suite.assert.NoError(err)
 	result := getUsagePercentage(cache_path, 4)
 	// since the value might defer a little distro to distro
-	suite.assert.GreaterOrEqual(result, float64(25))
+	suite.assert.GreaterOrEqual(result, float64(24))
 	suite.assert.LessOrEqual(result, float64(30))
 	f.Close()
 

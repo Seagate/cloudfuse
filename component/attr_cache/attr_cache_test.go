@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -44,9 +44,9 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 )
 
 type attrCacheTestSuite struct {
@@ -254,7 +254,7 @@ func generateNestedPathAttr(path string, size int64, mode os.FileMode) []*intern
 func generateListPathAttr(path string, numEntries int) []*internal.ObjAttr {
 	path = internal.TruncateDirName(path)
 	pathAttrs := make([]*internal.ObjAttr, 0)
-	for i := 0; i < numEntries; i++ {
+	for i := range numEntries {
 		filename := fmt.Sprintf("%s/file%d", path, i)
 		newPathAttr := getPathAttr(filename, defaultSize, fs.FileMode(defaultMode), true)
 		pathAttrs = append(pathAttrs, newPathAttr)
@@ -377,7 +377,7 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 	var paths = []string{"a", "a/"}
 
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.SetupTest()
@@ -423,7 +423,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 	config := fmt.Sprintf("attr_cache:\n  no-cache-dirs: %t", noCacheDirs)
 
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(
@@ -594,7 +594,7 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			for _, p := range aAttr {
 				checkItem, found := suite.attrCache.cache.get(p.Path)
 				suite.assert.True(found)
-				if !p.IsDir() {
+				if !checkItem.attr.IsDir() {
 					suite.assert.Equal(size, checkItem.attr.Size) // new size should be set
 					suite.assert.Equal(mode, checkItem.attr.Mode) // new mode should be set
 				}
@@ -1390,9 +1390,9 @@ func (suite *attrCacheTestSuite) TestWriteFileError() {
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).
 		Return(&internal.ObjAttr{Path: path}, nil)
-	suite.mock.EXPECT().WriteFile(options).Return(0, errors.New("Failed to write a file"))
+	suite.mock.EXPECT().WriteFile(&options).Return(0, errors.New("Failed to write a file"))
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.Error(err)
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
@@ -1412,9 +1412,9 @@ func (suite *attrCacheTestSuite) TestWriteFileDoesNotExist() {
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).
 		Return(&internal.ObjAttr{Path: path}, nil)
-	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
+	suite.mock.EXPECT().WriteFile(&options).Return(0, nil)
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.NoError(err)
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
@@ -1432,9 +1432,9 @@ func (suite *attrCacheTestSuite) TestWriteFileExists() {
 	options := internal.WriteFileOptions{Handle: &handle, Metadata: nil}
 	// Entry Already Exists
 	suite.addPathToCache(path, true)
-	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
+	suite.mock.EXPECT().WriteFile(&options).Return(0, nil)
 
-	_, err := suite.attrCache.WriteFile(options)
+	_, err := suite.attrCache.WriteFile(&options)
 	suite.assert.NoError(err)
 	suite.assertExists(path)
 }
@@ -1445,7 +1445,7 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	path := "a"
 	size := 1024
 
-	options := internal.TruncateFileOptions{Name: path, Size: int64(size)}
+	options := internal.TruncateFileOptions{Name: path, NewSize: int64(size)}
 
 	// Error
 	suite.mock.EXPECT().TruncateFile(options).Return(errors.New("Failed to truncate a file"))

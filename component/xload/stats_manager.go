@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -231,12 +231,12 @@ func (sm *StatsManager) calculateBandwidth() {
 	bandwidthMbps := float64(bytesTransferred*8) / (timeLapsed * float64(MB))
 	diskSpeedMbps := float64(sm.diskIOBytes*8) / (timeLapsed * float64(MB))
 
-	var maxBlocks, pr, reg uint32
+	var maximum, pr, reg uint32
 	var waiting int32
 	var poolusage uint32
 
 	if sm.pool != nil {
-		maxBlocks, pr, reg, waiting = sm.pool.GetUsageDetails()
+		maximum, pr, reg, waiting = sm.pool.GetUsageDetails()
 		sm.pool.Usage()
 	}
 
@@ -244,7 +244,7 @@ func (sm *StatsManager) calculateBandwidth() {
 		"%v Pending, %v Total, Bytes transferred %v, Throughput (Mbps): %.2f, Disk Speed (Mbps): %.2f, Blockpool usage: %v%%, (%v / %v / %v : %v), Time: %.2f",
 		currTime.Format(time.RFC1123), percentCompleted, sm.success, sm.failed,
 		filesPending, sm.totalFiles, bytesTransferred, bandwidthMbps, diskSpeedMbps, poolusage,
-		maxBlocks, pr, reg, waiting, timeLapsed)
+		maximum, pr, reg, waiting, timeLapsed)
 
 	if sm.fileHandle != nil {
 		err := sm.marshalStatsData(&statsJSONData{

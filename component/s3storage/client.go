@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,7 +44,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -54,7 +54,8 @@ import (
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -70,8 +71,7 @@ type Client struct {
 	Connection
 	AwsS3Client       *s3.Client // S3 client library supplied by AWS
 	blockLocks        common.KeyedMutex
-	downloader        *manager.Downloader
-	uploader          *manager.Uploader
+	transferManager   *transfermanager.Client
 	stagedBlocks      map[string]map[string][]byte // map[fileName]map[blockId]data
 	stagedBlocksMutex sync.RWMutex                 // Mutex to protect the cache
 }
@@ -276,15 +276,12 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// Create downloader and uploader to be reused for multipart downloads
-	cl.downloader = manager.NewDownloader(cl.AwsS3Client, func(u *manager.Downloader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
-	})
-
-	cl.uploader = manager.NewUploader(cl.AwsS3Client, func(u *manager.Uploader) {
-		u.PartSize = cl.Config.partSize
-		u.Concurrency = cl.Config.concurrency
+	// Create transfermanager client for uploads and downloads
+	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = cl.Config.partSize
+		o.Concurrency = cl.Config.concurrency
+		o.MultipartUploadThreshold = cl.Config.uploadCutoff
+		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
 	})
 
 	return nil
@@ -415,9 +412,9 @@ func (cl *Client) CreateLink(source string, target string, isSymlink bool) error
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-	symlinkMap := map[string]*string{symlinkKey: to.Ptr("false")}
+	symlinkMap := map[string]*string{symlinkKey: new("false")}
 	if isSymlink {
-		symlinkMap[symlinkKey] = to.Ptr("true")
+		symlinkMap[symlinkKey] = new("true")
 	}
 	return cl.WriteFromBuffer(source, symlinkMap, data)
 }
@@ -432,7 +429,11 @@ func (cl *Client) DeleteFile(name string) error {
 		log.Err("Client::DeleteFile : %s does not exist", name)
 		return syscall.ENOENT
 	} else if err != nil {
-		log.Err("Client::DeleteFile : Failed to getFileAttr for object %s. Here's why: %v", name, err)
+		log.Err(
+			"Client::DeleteFile : Failed to getFileAttr for object %s. Here's why: %v",
+			name,
+			err,
+		)
 		return err
 	}
 
@@ -496,7 +497,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 					)
 				}
 			} else {
-				objectsToDelete = append(objectsToDelete, object) //consider just object instead of object.path to pass down attributes that come from list.
+				objectsToDelete = append(
+					objectsToDelete,
+					object,
+				) //consider just object instead of object.path to pass down attributes that come from list.
 			}
 		}
 		// Delete the collected files
@@ -579,7 +583,11 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			if srcObject.IsDir() {
 				err = cl.RenameDirectory(srcPath, dstPath)
 			} else {
-				err = cl.RenameFile(srcPath, dstPath, srcObject.IsSymlink()) //use sourceObjects to pass along symLink bool
+				err = cl.RenameFile(
+					srcPath,
+					dstPath,
+					srcObject.IsSymlink(),
+				) //use sourceObjects to pass along symLink bool
 			}
 			if err != nil {
 				log.Err(
@@ -617,23 +625,26 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
+	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
+	dirName := internal.ExtendDirName(name)
 
 	// first let's suppose the caller is looking for a file
 	// so if this was called with a trailing slash, don't look for an object
-	if len(name) > 0 && name[len(name)-1] != '/' {
+	if !explicitDirLookup {
 		attr, err := cl.getFileAttr(name)
 		if err == nil {
 			return attr, err
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
+		} else if !shouldProbeDirMarker(dirName, explicitDirLookup) {
+			// For obvious file-like names, skip expensive directory probing on miss-heavy paths.
+			return nil, syscall.ENOENT
 		}
 	}
 
-	// ensure a trailing slash
-	dirName := internal.ExtendDirName(name)
 	// now search for that as a directory
-	return cl.getDirectoryAttr(dirName)
+	return cl.getDirectoryAttr(dirName, explicitDirLookup)
 }
 
 // Get attributes for the given file path.
@@ -650,33 +661,81 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	return object, err
 }
 
-func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
+func (cl *Client) getDirectoryAttr(
+	dirName string,
+	explicitDirLookup bool,
+) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// Try seartching for the object directly if supported
-	if cl.Config.enableDirMarker {
-		attr, err := cl.headObject(dirName, false, true)
-		if err == nil {
-			return attr, err
-		}
-	}
+	objects, _, listErr := cl.List(dirName, nil, 1)
 
-	// Otherwise, the cloud does not support directory markers, so use list
-	// or the directory does exist but there is no marker for it, so look for an object
-	// in the directory
-	objects, _, err := cl.List(dirName, nil, 1)
-	if err != nil {
-		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
-		return nil, err
-	} else if len(objects) > 0 {
+	// Otherwise, the cloud does not support directory markers, or there is no
+	// marker, so look for an object in the directory.
+	if listErr != nil {
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
+		return nil, listErr
+	}
+	if len(objects) > 0 {
 		// create and return an objAttr for the directory
 		attr := internal.CreateObjAttrDir(dirName)
 		return attr, nil
 	}
 
+	// Only check for explicit empty directory markers when needed.
+	// For file-like names, this saves one extra HeadObject
+	// call on miss-heavy paths that are not directories.
+	if cl.Config.enableDirMarker && shouldProbeDirMarker(dirName, explicitDirLookup) {
+		headAttr, headErr := cl.headObject(dirName, false, true)
+		if headErr == nil {
+			return headAttr, nil
+		}
+		if headErr != syscall.ENOENT {
+			log.Err(
+				"Client::getDirectoryAttr : HeadObject(%s) failed. Here's why: %v",
+				dirName,
+				headErr,
+			)
+			return nil, headErr
+		}
+	}
+
 	// directory not found in bucket
 	log.Err("Client::getDirectoryAttr : not found: %s", dirName)
 	return nil, syscall.ENOENT
+}
+
+var knownFileLikeExtensions = map[string]struct{}{
+	".tmp":  {},
+	".ini":  {},
+	".inf":  {},
+	".db":   {},
+	".guid": {},
+	".nxdb": {},
+	".mkv":  {},
+	".mp4":  {},
+	".avi":  {},
+	".mov":  {},
+	".txt":  {},
+	".doc":  {},
+	".docx": {},
+	".xls":  {},
+	".xlsx": {},
+	".ppt":  {},
+	".pptx": {},
+}
+
+func shouldProbeDirMarker(dirName string, explicitDirLookup bool) bool {
+	if explicitDirLookup {
+		return true
+	}
+	trimmed := internal.TruncateDirName(dirName)
+	base := strings.ToLower(path.Base(trimmed))
+	ext := strings.ToLower(path.Ext(base))
+	if ext == "" {
+		return true
+	}
+	_, isFileLike := knownFileLikeExtensions[ext]
+	return !isFileLike
 }
 
 // Download object data to a file handle.
@@ -715,8 +774,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	}
 	// read object data
 	defer objectDataReader.Close()
-	objectData, err := io.ReadAll(objectDataReader)
-
+	_, err = io.Copy(fi, objectDataReader)
 	if err != nil {
 		if strings.Contains(err.Error(), "checksum did not match") {
 			// If count is 0 and offset is 0 then this is a real checksum error
@@ -735,14 +793,8 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 			return err
 		}
 	}
-	// write data to file
-	_, err = fi.Write(objectData)
-	if err != nil {
-		log.Err("Couldn't write to file %v. Here's why: %v", name, err)
-		return err
-	}
 
-	return err
+	return nil
 }
 
 // Download object with the given name and return the data as a byte array.
@@ -891,7 +943,7 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 	// if file is smaller than the uploadCutoff it is small, otherwise it is a multipart
 	// upload
 	if result.Size < cutoff {
-		blockList.Flags.Set(common.SmallFile)
+		blockList.Flags.Set(common.BlobFlagHasNoBlocks)
 		return &blockList, nil
 	}
 
@@ -951,7 +1003,12 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 		objectData = objectData[:size]
 	} else if int64(len(objectData)) < size {
 		// pad the data with zeros
-		log.Warn("Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.", name, len(objectData), size)
+		log.Warn(
+			"Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.",
+			name,
+			len(objectData),
+			size,
+		)
 		oldObjectData := objectData
 		newObjectData := make([]byte, size)
 		copy(newObjectData, oldObjectData)
@@ -970,7 +1027,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 }
 
 // Write : write data at given offset to an object
-func (cl *Client) Write(options internal.WriteFileOptions) error {
+func (cl *Client) Write(options *internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	data := options.Data
@@ -986,7 +1043,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		return err
 	}
 
-	if fileOffsets.SmallFile() {
+	if fileOffsets.HasNoBlocks() {
 		// case 1: file consists of no parts (small file)
 
 		// get the existing object data
@@ -1021,14 +1078,17 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple parts
 		err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 		if err != nil {
-			log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
+			log.Err("Client::Write : Failed to upload to object %s. Here's why: %v", name, err)
 			return err
 		}
 	} else {
 		// case 2: given offset is within the size of the object - and the object consists of multiple parts
 		// case 3: new parts need to be added
 
-		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(offset, length)
+		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(
+			offset,
+			length,
+		)
 		// keeps track of how much new data will be appended to the end of the file (applicable only to case 3)
 		newBufferSize := int64(0)
 		// case 3?
@@ -1039,9 +1099,18 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		oldDataBuffer := make([]byte, oldDataSize+newBufferSize)
 		if !appendOnly {
 			// fetch the parts that will be impacted by the new changes so we can overwrite them
-			err = cl.ReadInBuffer(name, fileOffsets.BlockList[index].StartIndex, oldDataSize, oldDataBuffer)
+			err = cl.ReadInBuffer(
+				name,
+				fileOffsets.BlockList[index].StartIndex,
+				oldDataSize,
+				oldDataBuffer,
+			)
 			if err != nil {
-				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
+				log.Err(
+					"BlockBlob::Write : Failed to read data in buffer %s [%s]",
+					name,
+					err.Error(),
+				)
 			}
 		}
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
@@ -1144,7 +1213,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	if combineBlocks {
 		bol.BlockList, err = cl.combineSmallBlocks(name, bol.BlockList)
 		if err != nil {
-			log.Err("Client::StageAndCommit : Failed to combine small blocks: %v ", name, err)
+			log.Err("Client::StageAndCommit : Failed to combine small blocks for %s: %v", name, err)
 			return err
 		}
 	}
@@ -1168,7 +1237,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
-			"Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ",
+			"Client::StageAndCommit : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1181,7 +1250,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 	if uploadID == "" {
 		log.Err(
-			"Client::StageAndCommit : No upload id found in start upload request. Here's why: %v ",
+			"Client::StageAndCommit : No upload id found in start upload request for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1222,6 +1291,10 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 			var partResp *s3.UploadPartOutput
 			partResp, err = cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
+			if err != nil {
+				return err
+			}
+
 			eTag = partResp.ETag
 			blk.Flags.Clear(common.DirtyBlock)
 
@@ -1237,13 +1310,21 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
 			partResp, err = cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
-				Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
-				Key:             aws.String(key),
-				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key)),
-				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
-				PartNumber:      &partNumber,
-				UploadId:        &uploadID,
+				Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+				Key:    aws.String(key),
+				CopySource: aws.String(
+					fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key),
+				),
+				CopySourceRange: aws.String(
+					"bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1),
+				),
+				PartNumber: &partNumber,
+				UploadId:   &uploadID,
 			})
+			if err != nil {
+				return err
+			}
+
 			eTag = partResp.CopyPartResult.ETag
 
 			// Collect the checksums
@@ -1258,7 +1339,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 		if err != nil {
 			log.Info(
-				"Client::StageAndCommit : Attempting to abort upload due to error: ",
+				"Client::StageAndCommit : Attempting to abort upload due to error: %s",
 				err.Error(),
 			)
 			abortErr := cl.abortMultipartUpload(key, uploadID)
@@ -1295,7 +1376,10 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		},
 	})
 	if err != nil {
-		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+		log.Info(
+			"Client::StageAndCommit : Attempting to abort upload due to error: %s",
+			err.Error(),
+		)
 		abortErr := cl.abortMultipartUpload(key, uploadID)
 		return errors.Join(err, abortErr)
 	}
@@ -1330,16 +1414,28 @@ func (cl *Client) combineSmallBlocks(
 			var addData []byte
 			// If there is no data in the block and it is not truncated, we need to get it from the cloud. Otherwise we can just copy it.
 			if len(blk.Data) == 0 && !blk.Truncated() {
-				result, err := cl.getObject(getObjectOptions{name: name, offset: blk.StartIndex, count: blk.EndIndex - blk.StartIndex})
+				result, err := cl.getObject(
+					getObjectOptions{
+						name:   name,
+						offset: blk.StartIndex,
+						count:  blk.EndIndex - blk.StartIndex,
+					},
+				)
 				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
+					log.Err(
+						"Client::combineSmallBlocks : Unable to get object with error: %s",
+						err.Error(),
+					)
 					return nil, err
 				}
 
 				defer result.Close()
 				addData, err = io.ReadAll(result)
 				if err != nil {
-					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: ", err.Error())
+					log.Err(
+						"Client::combineSmallBlocks : Unable to read bytes from object with error: %s",
+						err.Error(),
+					)
 					return nil, err
 				}
 			} else {
@@ -1480,7 +1576,7 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
-			"Client::CommitBlocks : Failed to create multipart upload. Here's why: %v ",
+			"Client::CommitBlocks : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1493,7 +1589,7 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 	}
 	if uploadID == "" {
 		log.Err(
-			"Client::CommitBlocks : No upload id found in start upload request. Here's why: %v ",
+			"Client::CommitBlocks : No upload id found in start upload request for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1544,7 +1640,7 @@ func (cl *Client) CommitBlocks(name string, blockList []string) error {
 
 		partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
 		if err != nil {
-			log.Err("Client::CommitBlocks : failed to upload part: ", uploadErr)
+			log.Err("Client::CommitBlocks : failed to upload part: %v", uploadErr)
 			break
 		}
 

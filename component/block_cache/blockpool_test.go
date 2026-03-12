@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ func (suite *blockpoolTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 }
 
-func (suite *blockpoolTestSuite) cleanupTest() {
+func (suite *blockpoolTestSuite) CleanupTest() {
 }
 
 func validateNullData(b *Block) bool {
@@ -188,7 +188,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaustion() {
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	var blocks []*Block
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		b, err := bp.MustGet()
 		suite.assert.NoError(err)
 		suite.assert.NotNil(b)
@@ -220,7 +220,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaustion() {
 // get n blocks
 func getBlocks(suite *blockpoolTestSuite, bp *BlockPool, n int) []*Block {
 	var blocks []*Block
-	for i := 0; i < n; i++ {
+	for range n {
 		b := bp.TryGet()
 		suite.assert.NotNil(b)
 

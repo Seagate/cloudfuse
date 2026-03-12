@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,6 +38,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ type LogOptions struct {
 	LogFilePath    string `config:"file-path"        yaml:"file-path,omitempty"`
 	MaxLogFileSize uint64 `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
 	LogFileCount   uint64 `config:"file-count"       yaml:"file-count,omitempty"`
+	LogGoroutineID bool   `config:"goroutine-id"     yaml:"goroutine-id,omitempty"`
 	TimeTracker    bool   `config:"track-time"       yaml:"track-time,omitempty"`
 }
 
@@ -120,7 +122,10 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 				// Previous mount is in stale state so lets cleanup the state
 				log.Info("Mount::validate : Cleaning up stale mount")
 				if err = unmountCloudfuse(opt.MountPath, true, true); err != nil {
-					return fmt.Errorf("directory is already mounted, unmount manually before remount [%v]", err.Error())
+					return fmt.Errorf(
+						"directory is already mounted, unmount manually before remount [%v]",
+						err.Error(),
+					)
 				}
 			}
 		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
@@ -264,12 +269,28 @@ func parseConfig() error {
 // We use the cobra library to provide a CLI for Cloudfuse.
 // Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
-	Use:               "mount <mount path>",
-	Short:             "Mount the container as a filesystem",
-	Long:              "Mount the container as a filesystem",
-	SuggestFor:        []string{"mnt", "mout"},
-	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "mount <mount path>",
+	Short:      "Mount the container as a filesystem",
+	Long:       "Mount the container as a filesystem",
+	Aliases:    []string{"mnt"},
+	SuggestFor: []string{"mout"},
+	GroupID:    groupCore,
+	Args:       cobra.ExactArgs(1),
+	Example: `  # Mount with a config file
+  cloudfuse mount ~/mycontainer --config-file=config.yaml
+
+  # Mount in foreground mode for debugging
+  cloudfuse mount ~/mycontainer --config-file=config.yaml --foreground
+
+  # Dry run to test configuration
+  cloudfuse mount ~/mycontainer --config-file=config.yaml --dry-run`,
+	// Directory completion for mount path argument
+	ValidArgsFunction: func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveFilterDirs
+	},
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.inputMountPath = args[0]
 		options.MountPath = common.ExpandPath(args[0])
@@ -338,7 +359,9 @@ var mountCmd = &cobra.Command{
 			} else if containers, err = getContainerListAzure(); len(containers) != 0 && err == nil {
 				pipeline = append(pipeline, "azstorage")
 			} else {
-				return errors.New("failed to initialize new pipeline :: unable to determine cloud provider. no pipeline components found in the config: " + err.Error())
+				return errors.New(
+					"failed to initialize new pipeline :: unable to determine cloud provider. no pipeline components found in the config: " + err.Error(),
+				)
 			}
 			options.Components = pipeline
 		}
@@ -368,52 +391,49 @@ var mountCmd = &cobra.Command{
 		}
 
 		if config.IsSet("libfuse-options") {
-			for _, v := range options.LibfuseOptions {
-				parameter := strings.Split(v, "=")
-				if len(parameter) > 2 || len(parameter) <= 0 {
-					return errors.New(common.FuseAllowedFlags)
-				}
+			for _, raw := range options.LibfuseOptions {
+				v := strings.TrimSpace(raw)
+				key, val, hasEq := strings.Cut(v, "=")
 
-				v = strings.TrimSpace(v)
 				if ignoreFuseOptions(v) {
 					continue
-				} else if v == "allow_other" || v == "allow_other=true" {
+				} else if v == "allow_other" || (hasEq && key == "allow_other" && val == "true") {
 					config.Set("allow-other", "true")
-				} else if strings.HasPrefix(v, "attr_timeout=") {
-					config.Set("lfuse.attribute-expiration-sec", parameter[1])
-				} else if strings.HasPrefix(v, "entry_timeout=") {
-					config.Set("lfuse.entry-expiration-sec", parameter[1])
-				} else if strings.HasPrefix(v, "negative_timeout=") {
-					config.Set("lfuse.negative-entry-expiration-sec", parameter[1])
-				} else if v == "ro" || v == "ro=true" {
+				} else if hasEq && key == "attr_timeout" {
+					config.Set("lfuse.attribute-expiration-sec", val)
+				} else if hasEq && key == "entry_timeout" {
+					config.Set("lfuse.entry-expiration-sec", val)
+				} else if hasEq && key == "negative_timeout" {
+					config.Set("lfuse.negative-entry-expiration-sec", val)
+				} else if v == "ro" || (hasEq && key == "ro" && val == "true") {
 					config.Set("read-only", "true")
-				} else if v == "allow_root" || v == "allow_root=true" {
+				} else if v == "allow_root" || (hasEq && key == "allow_root" && val == "true") {
 					config.Set("allow-root", "true")
-				} else if v == "nonempty" || v == "nonempty=true" {
+				} else if v == "nonempty" || (hasEq && key == "nonempty" && val == "true") {
 					// For fuse3, -o nonempty mount option has been removed and
 					// mounting over non-empty directories is now always allowed.
 					// For fuse2, this option is supported.
 					options.NonEmpty = true
 					config.Set("nonempty", "true")
-				} else if strings.HasPrefix(v, "umask=") {
-					umask, err := strconv.ParseUint(parameter[1], 10, 32)
+				} else if hasEq && key == "umask" {
+					umask, err := parseUmaskOption(val)
 					if err != nil {
-						return fmt.Errorf("failed to parse umask [%s]", err.Error())
+						return err
 					}
 					config.Set("lfuse.umask", fmt.Sprint(umask))
-				} else if strings.HasPrefix(v, "uid=") {
-					val, err := strconv.ParseUint(parameter[1], 10, 32)
+				} else if hasEq && key == "uid" {
+					valUint, err := strconv.ParseUint(val, 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse uid [%s]", err.Error())
 					}
-					config.Set("lfuse.uid", fmt.Sprint(val))
-				} else if strings.HasPrefix(v, "gid=") {
-					val, err := strconv.ParseUint(parameter[1], 10, 32)
+					config.Set("lfuse.uid", fmt.Sprint(valUint))
+				} else if hasEq && key == "gid" {
+					valUint, err := strconv.ParseUint(val, 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse gid [%s]", err.Error())
 					}
-					config.Set("lfuse.gid", fmt.Sprint(val))
-				} else if v == "direct_io" || v == "direct_io=true" {
+					config.Set("lfuse.gid", fmt.Sprint(valUint))
+				} else if v == "direct_io" || (hasEq && key == "direct_io" && val == "true") {
 					config.Set("lfuse.direct-io", "true")
 					config.Set("direct-io", "true")
 					directIO = true
@@ -455,14 +475,24 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("invalid log level [%s]", err.Error())
 		}
 
-		err = log.SetDefaultLogger(options.Logging.Type, common.LogConfig{
-			FilePath:    options.Logging.LogFilePath,
-			MaxFileSize: options.Logging.MaxLogFileSize,
-			FileCount:   options.Logging.LogFileCount,
-			Level:       logLevel,
-			TimeTracker: options.Logging.TimeTracker,
-		})
+		// If goroutine-id is not set in config file, then set it based on log level.
+		// For LOG_DEBUG level, enable goroutine-id by default.
+		if !config.IsSet("logging.goroutine-id") {
+			if logLevel >= common.ELogLevel.LOG_DEBUG() {
+				options.Logging.LogGoroutineID = true
+			} else {
+				options.Logging.LogGoroutineID = false
+			}
+		}
 
+		err = log.SetDefaultLogger(options.Logging.Type, common.LogConfig{
+			FilePath:       options.Logging.LogFilePath,
+			MaxFileSize:    options.Logging.MaxLogFileSize,
+			FileCount:      options.Logging.LogFileCount,
+			Level:          logLevel,
+			TimeTracker:    options.Logging.TimeTracker,
+			LogGoroutineID: options.Logging.LogGoroutineID,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
 		}
@@ -470,18 +500,15 @@ var mountCmd = &cobra.Command{
 		if !disableVersionCheck {
 			err := VersionCheck()
 			if err != nil {
-				log.Err(err.Error())
+				log.Err("%s", err.Error())
 			}
 		}
 
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
 
-		// check if cloudfuse stats monitor is added in the disable list
-		for _, mon := range options.MonitorOpt.DisableList {
-			if mon == common.CfuseStats {
-				common.CfsDisabled = true
-				break
-			}
+		// check if blobfuse stats monitor is added in the disable list
+		if slices.Contains(options.MonitorOpt.DisableList, common.CfuseStats) {
+			common.CfsDisabled = true
 		}
 
 		config.Set("mount-path", options.MountPath)
@@ -495,6 +522,7 @@ var mountCmd = &cobra.Command{
 		)
 		log.Info("Mount Command: %s", os.Args)
 		log.Crit("Logging level set to : %s", logLevel.String())
+		log.Crit("Log options: %+v", options.Logging)
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
 		if directIO {
@@ -533,18 +561,14 @@ var mountCmd = &cobra.Command{
 					"mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]",
 					err,
 				)
-				return Destroy(
-					fmt.Sprintf(
-						"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
-						err.Error(),
-					),
+				return fmt.Errorf(
+					"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
+					err.Error(),
 				)
 			}
 
 			log.Err("mount :  failed to initialize new pipeline [%v]", err)
-			return Destroy(
-				fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()),
-			)
+			return fmt.Errorf("mount : failed to initialize new pipeline [%s]", err.Error())
 		}
 
 		// Dry run ends here
@@ -642,9 +666,6 @@ var mountCmd = &cobra.Command{
 		}
 		return nil
 	},
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return nil, cobra.ShellCompDirectiveDefault
-	},
 }
 
 func ignoreFuseOptions(opt string) bool {
@@ -655,6 +676,17 @@ func ignoreFuseOptions(opt string) bool {
 		}
 	}
 	return false
+}
+
+func parseUmaskOption(raw string) (uint32, error) {
+	umask, err := strconv.ParseUint(raw, 8, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse umask [%s]", err.Error())
+	}
+	if umask > 0o777 {
+		return 0, fmt.Errorf("failed to parse umask [value out of range: %s]", raw)
+	}
+	return uint32(umask), nil
 }
 
 func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
@@ -673,16 +705,15 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	err := pipeline.Start(ctx)
 	if err != nil {
 		log.Err("mount: error unable to start pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to start pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to start pipeline [%s]", err.Error())
 	}
 
 	err = pipeline.Stop()
 	if err != nil {
 		log.Err("mount: error unable to stop pipeline [%s]", err.Error())
-		return Destroy(fmt.Sprintf("unable to stop pipeline [%s]", err.Error()))
+		return fmt.Errorf("unable to stop pipeline [%s]", err.Error())
 	}
 
-	_ = log.Destroy()
 	return nil
 }
 
@@ -805,17 +836,20 @@ func init() {
 
 	options = mountOptions{}
 
-	mountCmd.AddCommand(mountListCmd)
-	mountCmd.AddCommand(mountAllCmd)
-
-	mountCmd.PersistentFlags().StringVar(&options.ConfigFile, "config-file", "",
+	mountCmd.PersistentFlags().StringVarP(&options.ConfigFile, "config-file", "c", "",
 		"Configures the path for the file where the account credentials are provided. Default is config.yaml in current directory.")
-	_ = mountCmd.MarkPersistentFlagFilename("config-file", "yaml")
+	_ = mountCmd.MarkPersistentFlagFilename("config-file", "yaml", "yml", "aes")
+	_ = mountCmd.RegisterFlagCompletionFunc(
+		"config-file",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml", "aes"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
 
 	mountCmd.PersistentFlags().BoolVar(&options.SecureConfig, "secure-config", false,
 		"Encrypt auto generated config file for each container")
 
-	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
+	mountCmd.PersistentFlags().StringVarP(&options.PassPhrase, "passphrase", "p", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	mountCmd.PersistentFlags().
@@ -824,7 +858,11 @@ func init() {
 	_ = mountCmd.RegisterFlagCompletionFunc(
 		"log-type",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{
+				cobra.CompletionWithDesc("silent", "No logging output"),
+				cobra.CompletionWithDesc("base", "Log to file (default)"),
+				cobra.CompletionWithDesc("syslog", "Log to system log"),
+			}, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
 
@@ -840,13 +878,13 @@ func init() {
 		"log-level",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{
-				"LOG_OFF",
-				"LOG_CRIT",
-				"LOG_ERR",
-				"LOG_WARNING",
-				"LOG_INFO",
-				"LOG_TRACE",
-				"LOG_DEBUG",
+				cobra.CompletionWithDesc("LOG_OFF", "Disable all logging"),
+				cobra.CompletionWithDesc("LOG_CRIT", "Critical errors only"),
+				cobra.CompletionWithDesc("LOG_ERR", "Errors and above"),
+				cobra.CompletionWithDesc("LOG_WARNING", "Warnings and above (default)"),
+				cobra.CompletionWithDesc("LOG_INFO", "Info and above"),
+				cobra.CompletionWithDesc("LOG_TRACE", "Trace and above"),
+				cobra.CompletionWithDesc("LOG_DEBUG", "All messages including debug"),
 			}, cobra.ShellCompDirectiveNoFileComp
 		},
 	)
@@ -856,8 +894,12 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
+	mountCmd.PersistentFlags().Bool("log-goroutine-id",
+		false, "Enable logging of goroutine IDs. Default is true for LOG_DEBUG level, false otherwise.")
+	config.BindPFlag("logging.goroutine-id", mountCmd.PersistentFlags().Lookup("log-goroutine-id"))
+
 	mountCmd.PersistentFlags().
-		Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
+		BoolP("foreground", "f", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
 	mountCmd.PersistentFlags().
@@ -868,9 +910,10 @@ func init() {
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
-	mountCmd.PersistentFlags().
+	mountCmd.Flags().
 		Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
-	config.BindPFlag("lazy-write", mountCmd.PersistentFlags().Lookup("lazy-write"))
+	config.BindPFlag("lazy-write", mountCmd.Flags().Lookup("lazy-write"))
+	mountCmd.Flags().Lookup("lazy-write").Hidden = true
 
 	mountCmd.PersistentFlags().
 		String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
@@ -906,12 +949,17 @@ func init() {
 		mountCmd.Flags().
 			StringVar(&options.PassphrasePipe, "passphrase-pipe", "", "Specifies a named pipe to read the passphrase from.")
 		config.BindPFlag("passphrase-pipe", mountCmd.Flags().Lookup("passphrase-pipe"))
+
+		mountCmd.MarkFlagsMutuallyExclusive("passphrase", "passphrase-pipe")
 	}
 
 	if runtime.GOOS == "linux" {
 		mountCmd.Flags().
 			StringVar(&options.ServiceUser, "remount-system-user", "", "User that the service remount will run as.")
 		config.BindPFlag("remount-system-user", mountCmd.Flags().Lookup("remount-system-user"))
+
+		// When enabling remount as system on Linux, the service user is required
+		mountCmd.MarkFlagsRequiredTogether("enable-remount-system", "remount-system-user")
 	}
 
 	mountCmd.PersistentFlags().
@@ -932,13 +980,4 @@ func init() {
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)
 	config.AddConfigChangeEventListener(config.ConfigChangeEventHandlerFunc(OnConfigChange))
-}
-
-func Destroy(message string) error {
-	_ = log.Destroy()
-	if message != "" {
-		return fmt.Errorf("%s", message)
-	}
-
-	return nil
 }

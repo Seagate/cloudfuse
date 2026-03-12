@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/sys/windows"
 )
 
 type Mount struct {
@@ -46,12 +48,20 @@ const mountFile = "mounts.json"
 
 func getAppDataFolder(useSystem bool) (string, error) {
 	if useSystem {
-		systemRoot := os.Getenv("SystemRoot")
-		if systemRoot == "" {
+		systemRoot, err := windows.GetWindowsDirectory()
+		if err != nil {
 			return "", errors.New("Could not find system root")
 		}
 		systemRoot = filepath.Clean(systemRoot)
-		fullPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", "AppData", "Roaming", "Cloudfuse")
+		fullPath := filepath.Join(
+			systemRoot,
+			"System32",
+			"config",
+			"systemprofile",
+			"AppData",
+			"Roaming",
+			"Cloudfuse",
+		)
 		return fullPath, nil
 	}
 

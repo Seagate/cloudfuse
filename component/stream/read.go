@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -57,7 +57,7 @@ func (r *ReadCache) Configure(conf StreamOptions) error {
 func (r *ReadCache) Stop() error {
 	log.Trace("Stopping component : %s", r.Name())
 	handleMap := handlemap.GetHandles()
-	handleMap.Range(func(key, value interface{}) bool {
+	handleMap.Range(func(key, value any) bool {
 		handle := value.(*handlemap.Handle)
 		if handle.CacheObj != nil {
 			handle.CacheObj.Lock()
@@ -96,7 +96,7 @@ func (r *ReadCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handl
 		handlemap.CreateCacheObject(int64(r.BufferSize), handle)
 		if r.CachedObjects >= r.CachedObjLimit {
 			log.Trace(
-				"Stream::OpenFile : file handle limit exceeded - switch handle to stream only mode %s [%s]",
+				"Stream::OpenFile : file handle limit exceeded - switch handle to stream only mode %s [%v]",
 				options.Name,
 				handle.ID,
 			)
@@ -137,7 +137,7 @@ func (r *ReadCache) getBlock(handle *handlemap.Handle, offset int64) (*common.Bl
 		handle.CacheObj.Put(blockKeyObj, block)
 		handle.CacheObj.Unlock()
 		// if the block does not exist fetch it from the next component
-		options := internal.ReadInBufferOptions{
+		options := &internal.ReadInBufferOptions{
 			Handle: handle,
 			Offset: block.StartIndex,
 			Data:   block.Data,
@@ -187,7 +187,7 @@ func (r *ReadCache) copyCachedBlock(
 	return dataRead, nil
 }
 
-func (r *ReadCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (r *ReadCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// if we're only streaming then avoid using the cache
 	if r.StreamOnly || options.Handle.CacheObj.StreamOnly {
 		data, err := r.NextComponent().ReadInBuffer(options)
@@ -203,11 +203,15 @@ func (r *ReadCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, err
 	return r.copyCachedBlock(options.Handle, options.Offset, options.Data)
 }
 
-func (r *ReadCache) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("Stream::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
-	err := r.NextComponent().CloseFile(options)
+func (r *ReadCache) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+	err := r.NextComponent().ReleaseFile(options)
 	if err != nil {
-		log.Err("Stream::CloseFile : error closing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error releasing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	if !r.StreamOnly && !options.Handle.CacheObj.StreamOnly {
 		options.Handle.CacheObj.Lock()
@@ -224,7 +228,7 @@ func (r *ReadCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr,
 	return r.NextComponent().GetAttr(options)
 }
 
-func (r *ReadCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (r *ReadCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	return 0, syscall.ENOTSUP
 }
 

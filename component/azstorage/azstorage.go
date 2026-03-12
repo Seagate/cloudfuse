@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,8 +38,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // AzStorage Wrapper type around azure go-sdk (track-1)
@@ -104,7 +102,7 @@ reconfigure:
 	}
 
 	// If user has not specified the account type then detect it's HNS or FNS
-	if conf.AccountType == "" && az.storage.IsAccountADLS() {
+	if conf.AccountType == "" && !config.IsSet(compName+".use-adls") && az.storage.IsAccountADLS() {
 		log.Crit(
 			"AzStorage::Configure : Auto detected account type as adls, reconfiguring storage connection.",
 		)
@@ -133,13 +131,13 @@ func (az *AzStorage) OnConfigChange() {
 
 	err = ParseAndReadDynamicConfig(az, conf, true)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to reparse config", err.Error())
+		log.Err("AzStorage::OnConfigChange : failed to reparse config [%s]", err.Error())
 		return
 	}
 
 	err = az.storage.UpdateConfig(az.stConfig)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig", err.Error())
+		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig [%s]", err.Error())
 		return
 	}
 
@@ -222,7 +220,7 @@ func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 		azStatsCollector.PushEvents(
 			createDir,
 			options.Name,
-			map[string]interface{}{mode: options.Mode.String()},
+			map[string]any{mode: options.Mode.String()},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 	}
@@ -283,7 +281,10 @@ func (az *AzStorage) StreamDir(
 			az.listBlocked = false
 			log.Info("AzStorage::StreamDir : Unblocked List API")
 		} else {
-			log.Info("AzStorage::StreamDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
+			log.Info(
+				"AzStorage::StreamDir : Blocked List API for %d more seconds",
+				int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()),
+			)
 			return make([]*internal.ObjAttr, 0), "", nil
 		}
 	}
@@ -307,7 +308,7 @@ func (az *AzStorage) StreamDir(
 	)
 
 	if new_marker == nil {
-		new_marker = to.Ptr("")
+		new_marker = new("")
 	} else if *new_marker != "" {
 		log.Debug("AzStorage::StreamDir : next-marker %s for Path %s", *new_marker, path)
 		if len(new_list) == 0 {
@@ -317,7 +318,10 @@ func (az *AzStorage) StreamDir(
 			   and will terminate the readdir call. As there are more items left on the server side we
 			   need to retry getting a list here.
 			*/
-			log.Warn("AzStorage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *new_marker)
+			log.Warn(
+				"AzStorage::StreamDir : next-marker %s but current list is empty. Need to retry listing",
+				*new_marker,
+			)
 			options.Token = *new_marker
 			return az.StreamDir(options)
 		}
@@ -327,7 +331,7 @@ func (az *AzStorage) StreamDir(
 	if len(path) == 0 {
 		path = "/"
 	}
-	azStatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(new_list)})
+	azStatsCollector.PushEvents(streamDir, path, map[string]any{count: len(new_list)})
 
 	// increment streamdir call count
 	azStatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
@@ -346,7 +350,7 @@ func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
 		azStatsCollector.PushEvents(
 			renameDir,
 			options.Src,
-			map[string]interface{}{src: options.Src, dest: options.Dst},
+			map[string]any{src: options.Src, dest: options.Dst},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 	}
@@ -374,7 +378,7 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	azStatsCollector.PushEvents(
 		createFile,
 		options.Name,
-		map[string]interface{}{mode: options.Mode.String()},
+		map[string]any{mode: options.Mode.String()},
 	)
 
 	// increment open file handles count
@@ -407,8 +411,8 @@ func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, nil
 }
 
-func (az *AzStorage) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("AzStorage::CloseFile : %s", options.Handle.Path)
+func (az *AzStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("AzStorage::ReleaseFile : %s", options.Handle.Path)
 
 	// decrement open file handles count
 	azStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
@@ -438,14 +442,14 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 		azStatsCollector.PushEvents(
 			renameFile,
 			options.Src,
-			map[string]interface{}{src: options.Src, dest: options.Dst},
+			map[string]any{src: options.Src, dest: options.Dst},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 	}
 	return err
 }
 
-func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
+func (az *AzStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	var size int64
@@ -485,7 +489,7 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 	return
 }
 
-func (az *AzStorage) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (az *AzStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	err := az.storage.Write(options)
 	return len(options.Data), err
 }
@@ -498,14 +502,14 @@ func (az *AzStorage) GetFileBlockOffsets(
 }
 
 func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := az.storage.TruncateFile(options.Name, options.Size)
+	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.NewSize)
+	err := az.storage.TruncateFile(options)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
 			truncateFile,
 			options.Name,
-			map[string]interface{}{size: options.Size},
+			map[string]any{size: options.NewSize},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
@@ -539,7 +543,7 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 		azStatsCollector.PushEvents(
 			createLink,
 			options.Name,
-			map[string]interface{}{target: options.Target},
+			map[string]any{target: options.Target},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 	}
@@ -577,7 +581,7 @@ func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 		azStatsCollector.PushEvents(
 			chmod,
 			options.Name,
-			map[string]interface{}{mode: options.Mode.String()},
+			map[string]any{mode: options.Mode.String()},
 		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 	}
