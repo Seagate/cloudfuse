@@ -95,7 +95,7 @@ func validateObjectPathLength(name string) error {
 
 	if name == "" {
 		return nil
-	}
+		}
 
 	for _, component := range strings.Split(name, "/") {
 		if len(component) > maxNameSize {
@@ -1151,9 +1151,6 @@ func (cf *CgofuseFS) Symlink(target string, newpath string) int {
 		return errno
 	}
 	targetPath := common.NormalizeObjectName(target)
-	if err := validateObjectPathLength(targetPath); err != nil {
-		return fuseErrnoFromError(err)
-	}
 	log.Trace("Libfuse::Symlink : Received for %s -> %s", name, targetPath)
 
 	err := fuseFS.NextComponent().

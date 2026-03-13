@@ -1954,11 +1954,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// to update properties, we need to make a deep copy first
 			newAttr := *attrs
 			newAttr.Size = localAttr.Size
-			newAttr.Mode = localAttr.Mode
 			newAttr.Mtime = localAttr.Mtime
-			newAttr.Atime = localAttr.Atime
-			newAttr.Ctime = localAttr.Ctime
-			newAttr.Flags.Clear(internal.PropFlagModeDefault)
 			attrs = &newAttr
 		} else { // Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
