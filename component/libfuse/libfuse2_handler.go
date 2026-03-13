@@ -93,12 +93,14 @@ func validateObjectPathLength(name string) error {
 		return syscall.ENAMETOOLONG
 	}
 
-	if name == "" {
-		return nil
+	componentLen := 0
+	for i := 0; i < len(name); i++ {
+		if name[i] == '/' {
+			componentLen = 0
+			continue
 		}
-
-	for _, component := range strings.Split(name, "/") {
-		if len(component) > maxNameSize {
+		componentLen++
+		if componentLen > maxNameSize {
 			return syscall.ENAMETOOLONG
 		}
 	}
