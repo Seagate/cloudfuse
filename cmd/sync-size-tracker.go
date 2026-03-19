@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -48,6 +48,9 @@ var syncCmd = &cobra.Command{
 	Hidden: true,
 	Short:  "Update the size tracker journal with the size of the configured S3 subdirectory",
 	Long:   "Reads s3storage.subdirectory from the provided config file, calculates the total size of all objects under it, and updates the size tracker journal.",
+	Args:   cobra.NoArgs,
+	Example: `  # Sync size tracker with config file
+  cloudfuse sync-size-tracker --config-file=config.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if options.ConfigFile == "" {
 			_, err := os.Stat(common.DefaultConfigFilePath)
@@ -118,25 +121,45 @@ var syncCmd = &cobra.Command{
 			}
 		}
 
-		// Update journal
-		ms, err := size_tracker.CreateSizeJournal(journalName)
-		if err != nil {
-			return fmt.Errorf("failed to open size journal: %w", err)
-		}
-		defer func() { _ = ms.CloseFile() }()
-
-		current := ms.GetSize()
-		if total > current {
-			ms.Add(total - current)
-		} else if total < current {
-			ms.Subtract(current - total)
+		// Update journal and verify accuracy
+		var oldSize, newSize uint64
+		firstRead := true
+		maxAttempts := 3
+		for attempt := 0; newSize != total && attempt < maxAttempts; attempt++ {
+			ms, err := size_tracker.CreateSizeJournal(journalName)
+			if err != nil {
+				return fmt.Errorf("failed to open size journal: %w", err)
+			}
+			ms.Start()
+			newSize = ms.GetSize()
+			if firstRead {
+				oldSize = newSize
+				firstRead = false
+			}
+			if total != newSize {
+				ms.Add(int64(total - newSize))
+				ms.IncrementEpoch()
+			}
+			_ = ms.Stop() // Stop syncs
 		}
 
 		// Print minimal status
 		var bucket string
 		_ = config.UnmarshalKey("s3storage.bucket-name", &bucket)
-		fmt.Printf("sync complete: bucket=%s prefix=%q size=%d (was %d) journal=%s\n",
-			bucket, dir, total, current, journalName)
+		res := "failure"
+		if newSize == total {
+			res = "success"
+		}
+		fmt.Printf(
+			"Sync %s: %s/%s contains %dB. %s updated (%d -> %d).\n",
+			res,
+			bucket,
+			dir,
+			total,
+			journalName,
+			oldSize,
+			newSize,
+		)
 		return nil
 	},
 }

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -82,7 +82,10 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 			},
 			&azidentity.ClientAssertionCredentialOptions{})
 		if err != nil {
-			log.Err("AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]", err.Error())
+			log.Err(
+				"AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]",
+				err.Error(),
+			)
 			return nil, err
 		}
 	} else {
@@ -97,15 +100,23 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 			defer buff.Destroy()
 		} else {
 			err := errors.New("AzAuthSPN::getTokenCredential : Client secret not provided for SPN")
-			log.Err(err.Error())
+			log.Err("%s", err.Error())
 			return nil, err
 		}
 
-		cred, err = azidentity.NewClientSecretCredential(azspn.config.TenantID, azspn.config.ClientID, buff.String(), &azidentity.ClientSecretCredentialOptions{
-			ClientOptions: clOpts,
-		})
+		cred, err = azidentity.NewClientSecretCredential(
+			azspn.config.TenantID,
+			azspn.config.ClientID,
+			buff.String(),
+			&azidentity.ClientSecretCredentialOptions{
+				ClientOptions: clOpts,
+			},
+		)
 		if err != nil {
-			log.Err("AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]", err.Error())
+			log.Err(
+				"AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]",
+				err.Error(),
+			)
 			return nil, err
 		}
 	}
@@ -118,7 +129,7 @@ type azAuthBlobSPN struct {
 }
 
 // getServiceClient : returns SPN based service client for blob
-func (azspn *azAuthBlobSPN) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+func (azspn *azAuthBlobSPN) getServiceClient(stConfig *AzStorageConfig) (any, error) {
 	cred, err := azspn.getTokenCredential()
 	if err != nil {
 		log.Err(
@@ -153,7 +164,7 @@ type azAuthDatalakeSPN struct {
 }
 
 // getServiceClient : returns SPN based service client for datalake
-func (azspn *azAuthDatalakeSPN) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+func (azspn *azAuthDatalakeSPN) getServiceClient(stConfig *AzStorageConfig) (any, error) {
 	cred, err := azspn.getTokenCredential()
 	if err != nil {
 		log.Err(

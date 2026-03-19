@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,8 +38,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-
-	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type ReadWriteFilenameCache struct {
@@ -113,7 +112,7 @@ func (rw *ReadWriteFilenameCache) OpenFile(
 	return handle, err
 }
 
-func (rw *ReadWriteFilenameCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (rw *ReadWriteFilenameCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	// log.Trace("Stream::ReadInBuffer : name=%s, handle=%d, offset=%d", options.Handle.Path, options.Handle.ID, options.Offset)
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createFileCache(options.Handle)
@@ -151,7 +150,7 @@ func (rw *ReadWriteFilenameCache) ReadInBuffer(options internal.ReadInBufferOpti
 	return read, err
 }
 
-func (rw *ReadWriteFilenameCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (rw *ReadWriteFilenameCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	// log.Trace("Stream::WriteFile : name=%s, handle=%d, offset=%d", options.Handle.Path, options.Handle.ID, options.Offset)
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createFileCache(options.Handle)
@@ -189,7 +188,7 @@ func (rw *ReadWriteFilenameCache) WriteFile(options internal.WriteFileOptions) (
 
 // TODO: truncate in cache
 func (rw *ReadWriteFilenameCache) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("Stream::TruncateFile : name=%s, size=%d", options.Name, options.Size)
+	log.Trace("Stream::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 	err := rw.NextComponent().TruncateFile(options)
 	if err != nil {
 		log.Err("Stream::TruncateFile : error truncating file %s [%s]", options.Name, err.Error())
@@ -214,20 +213,28 @@ func (rw *ReadWriteFilenameCache) RenameFile(options internal.RenameFileOptions)
 	return nil
 }
 
-func (rw *ReadWriteFilenameCache) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("Stream::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+func (rw *ReadWriteFilenameCache) ReleaseFile(options internal.ReleaseFileOptions) error {
+	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 	// try to flush again to make sure it's cleaned up
 	err := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 	if err != nil {
-		log.Err("Stream::CloseFile : error flushing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error flushing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 		return err
 	}
 	if !rw.StreamOnly {
 		rw.purge(options.Handle.Path, true)
 	}
-	err = rw.NextComponent().CloseFile(options)
+	err = rw.NextComponent().ReleaseFile(options)
 	if err != nil {
-		log.Err("Stream::CloseFile : error closing file %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReleaseFile : error releasing file %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	return err
 }
@@ -388,12 +395,26 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 			handle.CacheObj.BlockOffsetList = offsets
 			atomic.StoreInt64(&handle.CacheObj.Size, handle.Size)
 			handle.CacheObj.Mtime = handle.Mtime
-			if handle.CacheObj.SmallFile() {
-				if uint64(atomic.LoadInt64(&handle.Size)) > memory.FreeMemory() {
+			if handle.CacheObj.HasNoBlocks() {
+				v, err := mem.VirtualMemory()
+				if err != nil {
+					log.Warn(
+						"ReadWriteFilenameCache::createFileCache : unable to read system memory info for %s [%v]; switching handle to stream-only mode",
+						handle.Path,
+						err,
+					)
 					handle.CacheObj.StreamOnly = true
 					return nil
 				}
-				block, _, err := rw.getBlock(handle, &common.Block{StartIndex: 0, EndIndex: handle.CacheObj.Size})
+
+				if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {
+					handle.CacheObj.StreamOnly = true
+					return nil
+				}
+				block, _, err := rw.getBlock(
+					handle,
+					&common.Block{StartIndex: 0, EndIndex: handle.CacheObj.Size},
+				)
 				if err != nil {
 					return err
 				}
@@ -402,7 +423,7 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 				handle.CacheObj.BlockList = append(handle.CacheObj.BlockList, block)
 				handle.CacheObj.BlockIdLength = common.GetIdLength(block.Id)
 				// now consists of a block - clear the flag
-				handle.CacheObj.Flags.Clear(common.SmallFile)
+				handle.CacheObj.Flags.Clear(common.BlobFlagHasNoBlocks)
 			}
 			rw.fileCache[handle.Path] = handle.CacheObj
 			atomic.AddInt32(&rw.CachedObjects, 1)
@@ -445,7 +466,7 @@ func (rw *ReadWriteFilenameCache) getBlock(
 		if err != nil {
 			return block, false, err
 		}
-		options := internal.ReadInBufferOptions{
+		options := &internal.ReadInBufferOptions{
 			Handle: handle,
 			Offset: block.StartIndex,
 			Data:   block.Data,
@@ -490,7 +511,9 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(
 				)
 				block.Flags.Set(common.DirtyBlock)
 			} else {
-				dataCopied = int64(copy(data[dataRead:], block.Data[offset-blocks[blk_index].StartIndex:]))
+				dataCopied = int64(
+					copy(data[dataRead:], block.Data[offset-blocks[blk_index].StartIndex:]),
+				)
 			}
 			dataLeft -= dataCopied
 			offset += dataCopied
@@ -500,7 +523,8 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(
 		} else if write {
 			emptyByteLength := offset - lastBlock.EndIndex
 			// if the data to append + our last block existing data do not exceed block size - just append to last block
-			if (lastBlock.EndIndex-lastBlock.StartIndex)+(emptyByteLength+dataLeft) <= rw.BlockSize || lastBlock.EndIndex == 0 {
+			if (lastBlock.EndIndex-lastBlock.StartIndex)+(emptyByteLength+dataLeft) <= rw.BlockSize ||
+				lastBlock.EndIndex == 0 {
 				_, _, err := rw.getBlock(handle, lastBlock)
 				if err != nil {
 					return dataRead, err
@@ -523,7 +547,9 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(
 			blk := &common.Block{
 				StartIndex: lastBlock.EndIndex,
 				EndIndex:   lastBlock.EndIndex + dataLeft + emptyByteLength,
-				Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(handle.CacheObj.BlockIdLength)),
+				Id: base64.StdEncoding.EncodeToString(
+					common.NewUUIDWithLength(handle.CacheObj.BlockIdLength),
+				),
 			}
 			blk.Data = make([]byte, blk.EndIndex-blk.StartIndex)
 			dataCopied = int64(copy(blk.Data[offset-blk.StartIndex:], data[dataRead:]))

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,13 +34,13 @@ import (
 )
 
 var generateCmd = &cobra.Command{
-	Use:               "generate <component name>",
-	Hidden:            true,
-	Short:             "Generate a new component for Cloudfuse",
-	Long:              "Generate a new component for Cloudfuse",
-	SuggestFor:        []string{"gen", "gener"},
-	Args:              cobra.ExactArgs(1),
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "generate <component name>",
+	Hidden:     true,
+	Short:      "Generate a new component for Cloudfuse",
+	Long:       "Generate a new cloudfuse component with boilerplate code.\nRuns the componentGenerator.sh script to scaffold the component structure.",
+	SuggestFor: []string{"gen", "gener"},
+	Args:       cobra.ExactArgs(1),
+	Example:    "  cloudfuse generate mycomponent",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		componentName := args[0]
 		script := exec.Command("./cmd/componentGenerator.sh", componentName)

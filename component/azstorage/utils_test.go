@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -760,8 +760,8 @@ func (s *utilsTestSuite) TestRemoveLeadingSlashes() {
 	}
 }
 
-func (suite *utilsTestSuite) TestRemovePrefixPath() {
-	assert := assert.New(suite.T())
+func (s *utilsTestSuite) TestRemovePrefixPath() {
+	assert := assert.New(s.T())
 
 	var inputs = []struct {
 		prefixPath string
@@ -780,7 +780,7 @@ func (suite *utilsTestSuite) TestRemovePrefixPath() {
 	}
 
 	for _, i := range inputs {
-		suite.Run(filepath.Join(i.prefixPath, i.path), func() {
+		s.Run(filepath.Join(i.prefixPath, i.path), func() {
 			output := removePrefixPath(i.prefixPath, i.path)
 			assert.Equal(i.result, output)
 		})

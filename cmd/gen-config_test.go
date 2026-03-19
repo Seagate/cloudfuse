@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -164,7 +164,31 @@ func (suite *genConfig) TestGenConfigGet() {
 func (suite *genConfig) TestNoPath() {
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "gen-config")
+	_, err := executeCommandC(rootCmd, "gen-config", "--o", "./cloudfuse.yaml")
+	suite.assert.Error(err)
+}
+
+// TestGenConfigHelp tests the help output
+func (suite *genConfig) TestGenConfigHelp() {
+	defer suite.cleanupTest()
+
+	output, err := executeCommandC(rootCmd, "gen-config", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(output, "gen-config")
+	suite.assert.Contains(output, "temp-path")
+	suite.assert.Contains(output, "config-file")
+}
+
+// TestValidateGenConfigOptionsInvalidConfigFile tests validation with invalid config file
+func (suite *genConfig) TestValidateGenConfigOptionsInvalidConfigFile() {
+	defer suite.cleanupTest()
+
+	_, err := executeCommandC(
+		rootCmd,
+		"gen-config",
+		"--config-file=/nonexistent/path/config.yaml",
+		"--temp-path=/tmp",
+	)
 	suite.assert.Error(err)
 }
 

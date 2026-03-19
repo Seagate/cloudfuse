@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@
 package s3storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -38,13 +39,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -88,16 +90,17 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
 
-	getObjectInput := &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		Key:    aws.String(key),
+	downloadInput := &transfermanager.DownloadObjectInput{
+		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
+		Key:      aws.String(key),
+		WriterAt: fi,
 	}
 
 	if cl.Config.enableChecksum {
-		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
+		downloadInput.ChecksumMode = tmtypes.ChecksumModeEnabled
 	}
 
-	_, err := cl.downloader.Download(context.Background(), fi, getObjectInput)
+	_, err := cl.transferManager.DownloadObject(context.Background(), downloadInput)
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
@@ -127,7 +130,7 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	getObjectInput := &s3.GetObjectInput{}
+	var getObjectInput *s3.GetObjectInput
 	if rangeString != "" {
 		getObjectInput = &s3.GetObjectInput{
 			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
@@ -164,26 +167,27 @@ func (cl *Client) putObject(options putObjectOptions) error {
 	key := cl.getKey(options.name, options.isSymLink, options.isDir)
 	log.Trace("Client::putObject : putting object %s", key)
 	ctx := context.Background()
-	var err error
 
-	putObjectInput := &s3.PutObjectInput{
+	// Handle nil body by providing an empty reader
+	body := options.objectData
+	if body == nil {
+		body = bytes.NewReader([]byte{})
+	}
+
+	uploadInput := &transfermanager.UploadObjectInput{
 		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
 		Key:         aws.String(key),
-		Body:        options.objectData,
+		Body:        body,
 		ContentType: aws.String(getContentType(key)),
 	}
 
 	if cl.Config.enableChecksum {
-		putObjectInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+		uploadInput.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(
+			cl.Config.checksumAlgorithm,
+		)
 	}
 
-	// If the object is small, just do a normal put object.
-	// If not, then use a multipart upload
-	if options.size < cl.Config.uploadCutoff {
-		_, err = cl.AwsS3Client.PutObject(ctx, putObjectInput)
-	} else {
-		_, err = cl.uploader.Upload(ctx, putObjectInput)
-	}
+	_, err := cl.transferManager.UploadObject(ctx, uploadInput)
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
 	return parseS3Err(err, attemptedAction)
@@ -236,8 +240,8 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err(
 				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
-				result.Errors[i].Key,
-				result.Errors[i].Message,
+				*result.Errors[i].Key,
+				*result.Errors[i].Message,
 			)
 		}
 	}
@@ -349,7 +353,7 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 		},
 	)
 	if abortErr != nil {
-		log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
+		log.Err("Client::StageAndCommit : Error aborting multipart upload: %s", abortErr.Error())
 	}
 
 	// AWS states you need to call listparts to verify that multipart upload was properly aborted
@@ -358,6 +362,15 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 		Key:      aws.String(key),
 		UploadId: &uploadID,
 	})
+	if listErr != nil {
+		log.Err(
+			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: %v",
+			key,
+			uploadID,
+			abortErr,
+		)
+		return errors.Join(abortErr, listErr)
+	}
 	if len(resp.Parts) != 0 {
 		log.Err(
 			"Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ",
@@ -365,15 +378,7 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 			uploadID,
 		)
 	}
-	if listErr != nil {
-		log.Err(
-			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ",
-			key,
-			uploadID,
-			abortErr.Error(),
-		)
-	}
-	return errors.Join(abortErr, listErr)
+	return abortErr
 }
 
 // Wrapper for awsS3Client.ListBuckets
@@ -579,7 +584,7 @@ func createObjAttr(
 
 	if isSymLink {
 		attr.Flags.Set(internal.PropFlagSymlink)
-		attr.Metadata[symlinkKey] = to.Ptr("true")
+		attr.Metadata[symlinkKey] = new("true")
 	}
 
 	return attr

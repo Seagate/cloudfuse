@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -71,12 +71,11 @@ func totalSectors(path string) int64 {
 
 }
 
-// GetUsage: The current disk usage in MB
+// GetUsage: The current disk usage in bytes
 func GetUsage(path string) (float64, error) {
 	totalSectors := totalSectors(path)
 
 	totalBytes := float64(totalSectors * SectorSize)
-	totalBytes = totalBytes / MbToBytes
 
 	return totalBytes, nil
 }
@@ -135,8 +134,8 @@ func ListMountPoints() ([]string, error) {
 		return nil, err
 	}
 	var mntList []string
-	outList := strings.Split(string(out), "\n")
-	for _, item := range outList {
+	outList := strings.SplitSeq(string(out), "\n")
+	for item := range outList {
 		if strings.HasPrefix(item, "cloudfuse") {
 			// Extract the mount path from this line
 			mntPath := strings.Split(item, " ")[1]

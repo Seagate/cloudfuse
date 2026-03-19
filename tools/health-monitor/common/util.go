@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -63,8 +63,8 @@ func CheckProcessStatus(pid string) error {
 		return err
 	}
 
-	processes := strings.Split(string(cliOut), "\n")
-	for _, process := range processes {
+	processes := strings.SplitSeq(string(cliOut), "\n")
+	for process := range processes {
 		l := strings.Fields(process)
 		if len(l) >= 2 && l[1] == pid {
 			return nil

@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,11 @@ var networkTargets = []string{"seagate.com:80", "google.com:80", "8.8.8.8:53", "
 
 type Cloudfuse struct{}
 
-func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+func (m *Cloudfuse) Execute(
+	_ []string,
+	r <-chan svc.ChangeRequest,
+	changes chan<- svc.Status,
+) (ssec bool, errno uint32) {
 	// Notify the Service Control Manager that the service is starting
 	changes <- svc.Status{State: svc.StartPending}
 	log.Trace("Starting %s service", SvcName)
@@ -105,7 +109,12 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 	}
 }
 
-func waitForNetwork(ctx context.Context, targets []string, interval time.Duration, timeout time.Duration) error {
+func waitForNetwork(
+	ctx context.Context,
+	targets []string,
+	interval time.Duration,
+	timeout time.Duration,
+) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -128,7 +137,10 @@ func waitForNetwork(ctx context.Context, targets []string, interval time.Duratio
 func main() {
 	isService, err := svc.IsWindowsService()
 	if err != nil || !isService {
-		log.Err("Unable to determine if running as Windows service or not running as Windows service: %v", err.Error())
+		log.Err(
+			"Unable to determine if running as Windows service or not running as Windows service: %v",
+			err.Error(),
+		)
 		return
 	}
 

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -74,7 +74,9 @@ func transformAccountEndpoint(potentialDfsEndpoint string) string {
 		return strings.ReplaceAll(potentialDfsEndpoint, ".dfs.", ".blob.")
 	} else {
 		// Should we just throw here?
-		log.Warn("Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.")
+		log.Warn(
+			"Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.",
+		)
 	}
 	return potentialDfsEndpoint
 }
@@ -195,7 +197,7 @@ func (dl *Datalake) TestPipeline() error {
 	})
 
 	// we are just validating the auth mode used. So, no need to iterate over the pages
-	_, err := listPathPager.NextPage(context.Background())
+	resp, err := listPathPager.NextPage(context.Background())
 	if err != nil {
 		log.Err(
 			"Datalake::TestPipeline : Failed to validate account with given auth %s",
@@ -207,6 +209,18 @@ func (dl *Datalake) TestPipeline() error {
 			return fmt.Errorf("Datalake::TestPipeline : [%s]", respErr.ErrorCode)
 		}
 		return err
+	} else {
+		// If the account is not HNS, then the permissions will be nil
+		// For empty containers there will be another check done by block_blob TestPipeline
+		// so no need to error out if there are no paths
+		if len(resp.Paths) > 0 {
+			if resp.Paths[0].Permissions == nil {
+				// This is to block FNS account being mounted as HNS account
+				return fmt.Errorf(
+					"Datalake::TestPipeline : Account is not HNS, kindly set correct account type",
+				)
+			}
+		}
 	}
 
 	return dl.BlockBlob.TestPipeline()
@@ -342,7 +356,11 @@ func (dl *Datalake) DeleteDirectory(name string) (err error) {
 			log.Err("Datalake::DeleteDirectory : %s does not exist", name)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::DeleteDirectory : Failed to delete directory %s [%s]", name, err.Error())
+			log.Err(
+				"Datalake::DeleteDirectory : Failed to delete directory %s [%s]",
+				name,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -371,7 +389,12 @@ func (dl *Datalake) RenameFile(source string, target string, srcAttr *internal.O
 			log.Err("Datalake::RenameFile : %s does not exist", source)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::RenameFile : Failed to rename file %s to %s [%s]", source, target, err.Error())
+			log.Err(
+				"Datalake::RenameFile : Failed to rename file %s to %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -397,7 +420,12 @@ func (dl *Datalake) RenameDirectory(source string, target string) error {
 			log.Err("Datalake::RenameDirectory : %s does not exist", source)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]", source, target, err.Error())
+			log.Err(
+				"Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -464,7 +492,11 @@ func (dl *Datalake) GetAttr(name string) (blobAttr *internal.ObjAttr, err error)
 		} else {
 			mode, err := getFileModeFromACL(dl.Config.authConfig.ObjectID, *acl.ACL, *acl.Owner)
 			if err != nil {
-				log.Err("Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]", name, err.Error())
+				log.Err(
+					"Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]",
+					name,
+					err.Error(),
+				)
 			} else {
 				blobAttr.Mode = mode
 			}
@@ -565,7 +597,7 @@ func (dl *Datalake) WriteFromBuffer(name string, metadata map[string]*string, da
 }
 
 // Write : Write to a file at given offset
-func (dl *Datalake) Write(options internal.WriteFileOptions) error {
+func (dl *Datalake) Write(options *internal.WriteFileOptions) error {
 	return dl.BlockBlob.Write(options)
 }
 
@@ -577,8 +609,8 @@ func (dl *Datalake) GetFileBlockOffsets(name string) (*common.BlockOffsetList, e
 	return dl.BlockBlob.GetFileBlockOffsets(name)
 }
 
-func (dl *Datalake) TruncateFile(name string, size int64) error {
-	return dl.BlockBlob.TruncateFile(name, size)
+func (dl *Datalake) TruncateFile(options internal.TruncateFileOptions) error {
+	return dl.BlockBlob.TruncateFile(options)
 }
 
 // ChangeMod : Change mode of a path

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -43,7 +43,7 @@ const InvalidHandleID HandleID = 0
 
 // Flags represented in BitMap for various flags in the handle
 const (
-	HandleFlagUnknown  uint16 = iota
+	HandleFlagUnknown  uint64 = iota
 	HandleFlagDirty           // File has been modified with write operation or is a new file
 	HandleFlagFSynced         // User has called fsync on the file explicitly
 	HandleFlagCached          // File is cached in the local system by cloudfuse
@@ -72,11 +72,11 @@ type Handle struct {
 	ID       HandleID // Cloudfuse assigned unique ID to this handle
 	Size     int64    // Size of the file being handled here
 	Mtime    time.Time
-	UnixFD   uint64                 // Unix FD created by create/open syscall
-	OptCnt   uint64                 // Number of operations done on this file
-	Flags    common.BitMap16        // Various states of the file
-	Path     string                 // Always holds path relative to mount dir, same as object name (uses common.JoinUnixFilepath)
-	values   map[string]interface{} // Map to hold other info if application wants to store
+	UnixFD   uint64          // Unix FD created by create/open syscall
+	OptCnt   uint64          // Number of operations done on this file
+	Flags    common.BitMap64 // Various states of the file
+	Path     string          // Always holds path relative to mount dir, same as object name (uses common.JoinUnixFilepath)
+	values   map[string]any  // Map to hold other info if application wants to store
 }
 
 func NewHandle(path string) *Handle {
@@ -86,7 +86,7 @@ func NewHandle(path string) *Handle {
 		Size:     0,
 		Flags:    0,
 		OptCnt:   0,
-		values:   make(map[string]interface{}),
+		values:   make(map[string]any),
 		CacheObj: nil,
 		FObj:     nil,
 		Buffers:  nil,
@@ -124,18 +124,18 @@ func (handle *Handle) FD() int {
 }
 
 // SetValue : Store user defined parameter inside handle
-func (handle *Handle) SetValue(key string, value interface{}) {
+func (handle *Handle) SetValue(key string, value any) {
 	handle.values[key] = value
 }
 
 // GetValue : Retrieve user defined parameter from handle
-func (handle *Handle) GetValue(key string) (interface{}, bool) {
+func (handle *Handle) GetValue(key string) (any, bool) {
 	val, ok := handle.values[key]
 	return val, ok
 }
 
 // GetValue : Retrieve user defined parameter from handle
-func (handle *Handle) RemoveValue(key string) (interface{}, bool) {
+func (handle *Handle) RemoveValue(key string) (any, bool) {
 	val, ok := handle.values[key]
 	delete(handle.values, key)
 	return val, ok

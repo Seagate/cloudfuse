@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,8 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -41,6 +41,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -48,12 +49,6 @@ import (
 	"github.com/sevlyar/go-daemon"
 	"golang.org/x/sys/unix"
 )
-
-type serviceOptions struct {
-	ConfigFile  string
-	MountPath   string
-	ServiceUser string
-}
 
 func createDaemon(
 	pipeline *internal.Pipeline,
@@ -63,6 +58,11 @@ func createDaemon(
 	umask int,
 	fname string,
 ) error {
+	pid := os.Getpid()
+	traceFile := fmt.Sprintf("%s.%d.trace", strings.ReplaceAll(options.MountPath, "/", "_"), pid)
+	// we link this file to stderr of child process in daemon mode
+	traceFilePath := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), traceFile)
+
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
 		PidFilePerm: pidFilePerm,
@@ -92,7 +92,7 @@ retry:
 		rmErr := os.Remove(pidFileName)
 		if rmErr != nil {
 			log.Err("mount : auto cleanup failed [%v]", rmErr.Error())
-			return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
+			return fmt.Errorf("failed to daemonize application [%s]", err.Error())
 		}
 		goto retry
 	}
@@ -150,11 +150,23 @@ retry:
 
 			buff, err := os.ReadFile(dmnCtx.LogFileName)
 			if err != nil {
-				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
-				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
+				log.Err(
+					"mount: failed to read child [%v] failure logs [%s]",
+					child.Pid,
+					err.Error(),
+				)
+				err = fmt.Errorf("failed to mount, please check logs [%s]", err.Error())
 			} else {
-				return Destroy(string(buff))
+				err = fmt.Errorf("%s", string(buff))
 			}
+
+			// Safe to delete the temp file.
+			rmErr := os.Remove(traceFilePath)
+			if rmErr != nil {
+				log.Err("mount : Failed to delete temp file: %s[%v]", traceFilePath, err)
+			}
+
+			return errors.Join(err, rmErr)
 
 		case <-time.After(options.WaitForMount):
 			log.Info("mount: Child [%v : %s] status check timeout", child.Pid, options.MountPath)
@@ -192,28 +204,19 @@ Requires=network-online.target
 
 [Service]
 # User service will run as.
-User={{.ServiceUser}}
+User=%s
 
 # Under the hood
 Type=forking
-ExecStart=/usr/bin/cloudfuse mount {{.MountPath}} --config-file={{.ConfigFile}} -o allow_other
-ExecStop=/usr/bin/fusermount -u {{.MountPath}} -z
+ExecStart=/usr/bin/cloudfuse mount %s --config-file=%s -o allow_other
+ExecStop=/usr/bin/fusermount -u %s -z
 
 [Install]
 WantedBy=multi-user.target
 `
-	config := serviceOptions{
-		ConfigFile:  configPath,
-		MountPath:   mountPath,
-		ServiceUser: serviceUser,
-	}
-
-	tmpl, err := template.New("service").Parse(serviceTemplate)
-	if err != nil {
-		return "", fmt.Errorf("could not create a new service file: [%s]", err.Error())
-	}
+	serviceContent := fmt.Sprintf(serviceTemplate, serviceUser, mountPath, configPath, mountPath)
 	serviceName, serviceFilePath := getService(mountPath)
-	err = os.Remove(serviceFilePath)
+	err := os.Remove(serviceFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("failed to replace the service file [%s]", err.Error())
 	}
@@ -224,7 +227,7 @@ WantedBy=multi-user.target
 		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
 	}
 
-	err = tmpl.Execute(newFile, config)
+	_, err = newFile.WriteString(serviceContent)
 	if err != nil {
 		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
 	}

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,8 +34,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-
-	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type Stream struct {
@@ -100,7 +99,14 @@ func (st *Stream) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", st.Name(), err.Error())
 	}
 
-	if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > memory.FreeMemory() {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		log.Warn(
+			"Stream::Configure : unable to read system memory info [%v]; falling back to stream-only mode",
+			err,
+		)
+		st.StreamOnly = true
+	} else if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > v.Free {
 		log.Err(
 			"Stream::Configure : config error, not enough free memory for provided configuration",
 		)
@@ -109,7 +115,7 @@ func (st *Stream) Configure(_ bool) error {
 	st.cache = NewStreamConnection(conf, st)
 
 	log.Info(
-		"Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v, StreamCacheMb %v, MaxBlocksPerFile %v",
+		"Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v",
 		conf.BufferSize,
 		conf.BlockSize,
 		conf.CachedObjLimit,
@@ -134,11 +140,11 @@ func (st *Stream) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle,
 	return st.cache.OpenFile(options)
 }
 
-func (st *Stream) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (st *Stream) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	return st.cache.ReadInBuffer(options)
 }
 
-func (st *Stream) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (st *Stream) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	return st.cache.WriteFile(options)
 }
 
@@ -146,8 +152,8 @@ func (st *Stream) FlushFile(options internal.FlushFileOptions) error {
 	return st.cache.FlushFile(options)
 }
 
-func (st *Stream) CloseFile(options internal.CloseFileOptions) error {
-	return st.cache.CloseFile(options)
+func (st *Stream) ReleaseFile(options internal.ReleaseFileOptions) error {
+	return st.cache.ReleaseFile(options)
 }
 
 func (st *Stream) DeleteFile(options internal.DeleteFileOptions) error {

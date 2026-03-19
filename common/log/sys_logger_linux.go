@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -39,17 +39,19 @@ import (
 )
 
 type SysLogger struct {
-	level  common.LogLevel
-	tag    string
-	logger *log.Logger
+	level          common.LogLevel
+	tag            string
+	logGoroutineID bool
+	logger         *log.Logger
 }
 
 var ErrNoSyslogService = errors.New("failed to create syslog object")
 
-func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
+func newSysLogger(lvl common.LogLevel, tag string, logGoroutineID bool) (*SysLogger, error) {
 	l := &SysLogger{
-		level: lvl,
-		tag:   tag,
+		level:          lvl,
+		tag:            tag,
+		logGoroutineID: logGoroutineID,
 	}
 	err := l.init()
 	if err != nil {
@@ -111,43 +113,72 @@ func getSyslogLevel(lvl common.LogLevel) syslog.Priority {
 	}
 }
 
-func (l *SysLogger) write(lvl string, format string, args ...interface{}) {
+func (l *SysLogger) write(lvl string, format string, args ...any) {
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
-	l.logger.Print("[", common.MountPath, "] ", lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
+
+	if l.logGoroutineID {
+		l.logger.Print(
+			"[",
+			common.GetGoroutineID(),
+			"][",
+			common.MountPath,
+			"] ",
+			lvl,
+			" [",
+			filepath.Base(fn),
+			" (",
+			ln,
+			")]: ",
+			msg,
+		)
+	} else {
+		l.logger.Print(
+			"[",
+			common.MountPath,
+			"] ",
+			lvl,
+			" [",
+			filepath.Base(fn),
+			" (",
+			ln,
+			")]: ",
+			msg,
+		)
+	}
 }
 
-func (l *SysLogger) Debug(format string, args ...interface{}) {
+func (l *SysLogger) Debug(format string, args ...any) {
 	if l.level >= common.ELogLevel.LOG_DEBUG() {
 		l.write(common.ELogLevel.LOG_DEBUG().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Trace(format string, args ...interface{}) {
+func (l *SysLogger) Trace(format string, args ...any) {
 	if l.level >= common.ELogLevel.LOG_TRACE() {
 		l.write(common.ELogLevel.LOG_TRACE().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Info(format string, args ...interface{}) {
+func (l *SysLogger) Info(format string, args ...any) {
 	if l.level >= common.ELogLevel.LOG_INFO() {
 		l.write(common.ELogLevel.LOG_INFO().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Warn(format string, args ...interface{}) {
+func (l *SysLogger) Warn(format string, args ...any) {
 	if l.level >= common.ELogLevel.LOG_WARNING() {
 		l.write(common.ELogLevel.LOG_WARNING().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Err(format string, args ...interface{}) {
+func (l *SysLogger) Err(format string, args ...any) {
 	if l.level >= common.ELogLevel.LOG_ERR() {
 		l.write(common.ELogLevel.LOG_ERR().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Crit(format string, args ...interface{}) {
+func (l *SysLogger) Crit(format string, args ...any) {
 	if l.level >= common.ELogLevel.LOG_CRIT() {
 		l.write(common.ELogLevel.LOG_CRIT().String(), format, args...)
 	}

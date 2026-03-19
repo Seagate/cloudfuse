@@ -6,23 +6,27 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   create-installer:
     # Run Inno Setup to create the Windows app installer, then write it to actions/cache
     name: Create Windows Installer
     runs-on: windows-latest
     env:
-      go: "1.25"
+      go: "1.26"
       cgo: "0"
       winfsp: winfsp-2.1.25156.msi
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -52,7 +56,7 @@ jobs:
         # Get the WinFSP installer (from cache or download)
       - name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -64,10 +68,10 @@ jobs:
           WINFSP: ${{ env.winfsp }}
         run: |
           curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
-      
+
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -93,7 +97,7 @@ jobs:
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -105,11 +109,11 @@ jobs:
     needs: create-installer
     runs-on: ubuntu-latest
     env:
-      go: "1.25"
-      zig: 0.15.1
+      go: "1.26"
+      zig: 0.15.2
     permissions:
-      contents: write
-      id-token: write
+      contents: write # Needed to create releases
+      id-token: write # Needed for signing with Cosign
 
     steps:
       # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
@@ -119,30 +123,26 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu libfuse-dev libfuse3-dev
       # Get code and Go ready
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install Zig
-        env:
-          ZIG: ${{ env.zig }}
-        run: |
-          curl -L https://ziglang.org/download/${ZIG}/zig-x86_64-linux-${ZIG}.tar.xz -o zig.tar.xz
-          mkdir -p $HOME/.local/bin
-          tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/zig-x86_64-linux-${ZIG}" >> $GITHUB_PATH
-          rm zig.tar.xz
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.zig }}
+          use-cache: false
 
       - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
           cache: false
 
       - name: Set up Cosign
-        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
 
       - name: Set Version
         id: get_version
@@ -152,7 +152,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -161,7 +161,7 @@ jobs:
 
         # Run GoReleaser (see .goreleaser.yaml)
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7.0.0
         with:
           args: release --clean
         env:
@@ -172,14 +172,14 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Needed to update gh-pages branch
 
     steps:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y createrepo-c
 
       - name: Checkout gh-pages branch
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: gh-pages
           path: gh-pages
@@ -197,7 +197,7 @@ jobs:
 
       - name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}

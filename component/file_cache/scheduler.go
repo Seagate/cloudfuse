@@ -1,7 +1,7 @@
 /*
 	Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-	Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+	Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
@@ -35,7 +35,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-	"github.com/robfig/cron/v3"
+	"github.com/netresearch/go-cron"
 )
 
 type UploadWindow struct {
@@ -69,7 +69,7 @@ func (fc *FileCache) SetupScheduler() error {
 }
 
 func isValidCronExpression(expr string) bool {
-	parser := cron.NewParser(
+	parser := cron.MustNewParser(
 		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
 	)
 	_, err := parser.Parse(expr)
@@ -199,7 +199,7 @@ func (fc *FileCache) servicePendingOps() {
 
 	// Process pending operations
 	numFilesProcessed := 0
-	fc.scheduleOps.Range(func(key, value interface{}) bool {
+	fc.scheduleOps.Range(func(key, value any) bool {
 		numFilesProcessed++
 		select {
 		case <-fc.stopAsyncUpload:
@@ -261,7 +261,11 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		// open the cached file
 		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
 		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
+			log.Err(
+				"FileCache::uploadPendingFile : %s failed to open file. Here's why: %v",
+				name,
+				err,
+			)
 			return err
 		}
 		// write handle attributes
@@ -271,10 +275,12 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		}
 		handle.UnixFD = uint64(f.Fd())
 		handle.SetFileObject(f)
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 
 		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true, AsyncUpload: true})
+		err = fc.flushFileInternal(
+			internal.FlushFileOptions{Handle: handle, CloseInProgress: true, AsyncUpload: true},
+		)
 		f.Close()
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Cause: %v", name, err)

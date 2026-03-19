@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -37,13 +37,13 @@ type StreamConnection interface {
 	DeleteFile(options internal.DeleteFileOptions) error
 	CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) //TODO TEST THIS
 	Configure(cfg StreamOptions) error
-	ReadInBuffer(internal.ReadInBufferOptions) (int, error)
+	ReadInBuffer(*internal.ReadInBufferOptions) (int, error)
 	OpenFile(internal.OpenFileOptions) (*handlemap.Handle, error)
-	WriteFile(options internal.WriteFileOptions) (int, error)
+	WriteFile(options *internal.WriteFileOptions) (int, error)
 	TruncateFile(internal.TruncateFileOptions) error
 	FlushFile(internal.FlushFileOptions) error
 	GetAttr(internal.GetAttrOptions) (*internal.ObjAttr, error)
-	CloseFile(options internal.CloseFileOptions) error
+	ReleaseFile(options internal.ReleaseFileOptions) error
 	SyncFile(options internal.SyncFileOptions) error
 	Stop() error
 }

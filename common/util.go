@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -43,11 +43,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/awnumar/memguard"
+	"github.com/petermattis/goid"
 	"gopkg.in/ini.v1"
 )
 
@@ -70,7 +73,7 @@ func IsDirectoryMounted(path string) bool {
 	// removing trailing / from the path
 	path = strings.TrimRight(path, "/")
 
-	for _, line := range strings.Split(string(mntList), "\n") {
+	for line := range strings.SplitSeq(string(mntList), "\n") {
 		if strings.TrimSpace(line) != "" {
 			mntPoint := strings.Split(line, " ")[1]
 			if path == mntPoint {
@@ -336,6 +339,15 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 		return nil, err
 	}
 
+	// Validate nonce length before passing to GCM to prevent panic
+	if len(nonce) != gcm.NonceSize() {
+		return nil, fmt.Errorf(
+			"invalid nonce length: got %d, expected %d",
+			len(nonce),
+			gcm.NonceSize(),
+		)
+	}
+
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, err
@@ -345,21 +357,33 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 }
 
 func extractSalt(cipherData []byte) ([]byte, error) {
-	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
-	if len(cipherData) < int(uint16Size+saltLength) {
+	// Check minimum length for salt length field
+	if len(cipherData) < int(uint16Size) {
+		return nil, errors.New("cipher data too short to contain salt length")
+	}
+	saltLength := int(binary.LittleEndian.Uint16(cipherData[:uint16Size]))
+	if len(cipherData) < uint16Size+saltLength {
 		return nil, errors.New("invalid data length")
 	}
 	return cipherData[uint16Size : uint16Size+saltLength], nil
 }
 
 func extractNonceAndCiphertext(cipherData []byte) ([]byte, []byte, error) {
-	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
+	// Check minimum length for salt length field
+	if len(cipherData) < int(uint16Size) {
+		return nil, nil, errors.New("cipher data too short to contain salt length")
+	}
+	saltLength := int(binary.LittleEndian.Uint16(cipherData[:uint16Size]))
 	offset := uint16Size + saltLength
 
-	nonceLength := binary.LittleEndian.Uint16(cipherData[offset : offset+uint16Size])
+	// Check if data is long enough to contain nonce length field
+	if len(cipherData) < offset+uint16Size {
+		return nil, nil, errors.New("cipher data too short to contain nonce length")
+	}
+	nonceLength := int(binary.LittleEndian.Uint16(cipherData[offset : offset+uint16Size]))
 	offset += uint16Size
 
-	if len(cipherData) < int(offset+nonceLength) {
+	if len(cipherData) < offset+nonceLength {
 		return nil, nil, errors.New("invalid data length")
 	}
 
@@ -379,19 +403,63 @@ func GetCurrentDistro() string {
 	return distro
 }
 
-type BitMap16 uint16
+// ThreadSafe Bitmap Implementation
+type BitMap64 uint64
 
 // IsSet : Check whether the given bit is set or not
-func (bm BitMap16) IsSet(bit uint16) bool { return (bm & (1 << bit)) != 0 }
+func (bm *BitMap64) IsSet(bit uint64) bool {
+	return (atomic.LoadUint64((*uint64)(bm)) & (1 << bit)) != 0
+}
 
 // Set : Set the given bit in bitmap
-func (bm *BitMap16) Set(bit uint16) { *bm |= (1 << bit) }
+// Return true if the bit was not set and was set by this call, false if the bit was already set.
+func (bm *BitMap64) Set(bit uint64) bool {
+	for {
+		loaded := atomic.LoadUint64((*uint64)(bm))
+		if (loaded & (1 << bit)) != 0 {
+			// Bit already set.
+			return false
+		}
+		newValue := loaded | (1 << bit)
+		if atomic.CompareAndSwapUint64((*uint64)(bm), loaded, newValue) {
+			// Bit was set successfully.
+			return true
+		}
+	}
+}
 
 // Clear : Clear the given bit from bitmap
-func (bm *BitMap16) Clear(bit uint16) { *bm &= ^(1 << bit) }
+// Return true if the bit is set and cleared by this call, false if the bit was already cleared.
+func (bm *BitMap64) Clear(bit uint64) bool {
+	for {
+		loaded := atomic.LoadUint64((*uint64)(bm))
+		if (loaded & (1 << bit)) == 0 {
+			// Bit already cleared.
+			return false
+		}
+		newValue := loaded &^ (1 << bit)
+		if atomic.CompareAndSwapUint64((*uint64)(bm), loaded, newValue) {
+			// Bit was cleared successfully.
+			return true
+		}
+	}
+}
 
 // Reset : Reset the whole bitmap by setting it to 0
-func (bm *BitMap16) Reset() { *bm = 0 }
+// Return true if the bitmap is cleared by this call, false if it was already cleared.
+func (bm *BitMap64) Reset() bool {
+	for {
+		loaded := atomic.LoadUint64((*uint64)(bm))
+		if loaded == 0 {
+			// Bitmap already cleared.
+			return false
+		}
+		if atomic.CompareAndSwapUint64((*uint64)(bm), loaded, 0) {
+			// Bitmap was cleared successfully.
+			return true
+		}
+	}
+}
 
 type KeyedMutex struct {
 	mutexes sync.Map // Zero value is empty and ready for use
@@ -546,13 +614,7 @@ func GetMD5(fi *os.File) ([]byte, error) {
 }
 
 func ComponentInPipeline(pipeline []string, component string) bool {
-	for _, comp := range pipeline {
-		if comp == component {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(pipeline, component)
 }
 
 func ValidatePipeline(pipeline []string) error {
@@ -599,4 +661,53 @@ func UpdatePipeline(pipeline []string, component string) []string {
 	}
 
 	return pipeline
+}
+
+var openFlagNames = []struct {
+	flag int
+	name string
+}{
+	{os.O_RDONLY, "O_RDONLY"},
+	{os.O_WRONLY, "O_WRONLY"},
+	{os.O_RDWR, "O_RDWR"},
+	{os.O_APPEND, "O_APPEND"},
+	{os.O_CREATE, "O_CREATE"},
+	{os.O_EXCL, "O_EXCL"},
+	{os.O_SYNC, "O_SYNC"},
+	{os.O_TRUNC, "O_TRUNC"},
+}
+
+func PrettyOpenFlags(f int) string {
+	// Access mode is mutually exclusive, so handle separately
+	access := f & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR)
+
+	out := []string{}
+	switch access {
+	case os.O_RDONLY:
+		out = append(out, "O_RDONLY")
+	case os.O_WRONLY:
+		out = append(out, "O_WRONLY")
+	case os.O_RDWR:
+		out = append(out, "O_RDWR")
+	}
+
+	// Check remaining flags
+	for _, item := range openFlagNames {
+		if item.flag == os.O_RDONLY || item.flag == os.O_WRONLY || item.flag == os.O_RDWR {
+			continue // skip access flags already handled
+		}
+		if f&item.flag != 0 {
+			out = append(out, item.name)
+		}
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(out, " | "))
+}
+
+// GetGoroutineID returns the goroutine id of the current goroutine.
+// It uses the goid package to retrieve the goroutine id which fetches it
+// from the GO internal runtime data structures, instead of making expensive
+// runtime.Stack calls.
+func GetGoroutineID() uint64 {
+	return (uint64)(goid.Get())
 }

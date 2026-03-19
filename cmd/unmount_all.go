@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 
@@ -36,21 +37,30 @@ import (
 )
 
 var umntAllCmd = &cobra.Command{
-	Use:               "all",
-	Short:             "Unmount all instances of Cloudfuse",
-	Long:              "Unmount all instances of Cloudfuse",
-	SuggestFor:        []string{"al", "all"},
-	FlagErrorHandling: cobra.ExitOnError,
+	Use:        "all",
+	Short:      "Unmount all instances of Cloudfuse",
+	Long:       "Unmount all cloudfuse mount points at once.\nReturns a summary of how many mounts were successfully unmounted.",
+	SuggestFor: []string{"al"},
+	Args:       cobra.NoArgs,
+	Example: `  # Unmount all cloudfuse mounts
+  cloudfuse unmount all
+
+  # Lazy unmount all (Linux only)
+  cloudfuse unmount all --lazy`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {
-			return fmt.Errorf("failed to list mount points [%s]", err.Error())
+			return fmt.Errorf("failed to list mount points: %w", err)
 		}
 
-		lazy, _ := cmd.Flags().GetBool("lazy")
+		lazy, err := cmd.Flags().GetBool("lazy")
+		if err != nil && runtime.GOOS != "windows" {
+			return fmt.Errorf("failed to get lazy flag: %w", err)
+		}
 		mountfound := 0
 		unmounted := 0
-		errMsg := "failed to unmount - \n"
+		var errMsg strings.Builder
+		errMsg.WriteString("failed to unmount - \n")
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
@@ -65,18 +75,18 @@ var umntAllCmd = &cobra.Command{
 			if err == nil {
 				unmounted += 1
 			} else {
-				errMsg += " " + mntPath + " - [" + err.Error() + "]\n"
+				errMsg.WriteString(" " + mntPath + " - [" + err.Error() + "]\n")
 			}
 		}
 
 		if mountfound == 0 {
-			fmt.Println("Nothing to unmount")
+			cmd.Println("Nothing to unmount")
 		} else {
-			fmt.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
+			cmd.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
 		}
 
 		if unmounted < mountfound {
-			return errors.New(errMsg)
+			return errors.New(errMsg.String())
 		}
 
 		return nil
@@ -84,10 +94,6 @@ var umntAllCmd = &cobra.Command{
 }
 
 func init() {
-	if runtime.GOOS == "windows" {
-		umntAllCmd.Flags().
-			Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
-		umntAllCmd.Flags().
-			Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
-	}
+	unmountCmd.AddCommand(umntAllCmd)
+	// Flags are inherited from parent unmount command
 }

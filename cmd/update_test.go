@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -66,7 +66,7 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {
 
 	_, err := executeCommandC(rootCmd, "update", "--version=1.8.0")
 	suite.assert.Error(err)
-	suite.assert.Equal("error: .deb and .rpm requires elevated privileges", err.Error())
+	suite.assert.Equal("update failed: .deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
@@ -77,7 +77,7 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
 
 	_, err := executeCommandC(rootCmd, "update", "--package=deb", "--version=1.8.0")
 	suite.assert.Error(err)
-	suite.assert.Equal("error: .deb and .rpm requires elevated privileges", err.Error())
+	suite.assert.Equal("update failed: .deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateWithOutputDebLinux() {

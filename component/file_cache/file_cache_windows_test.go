@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -60,17 +60,29 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
-	log.Debug(defaultConfig)
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
+	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.cache_path,
+			err,
+		)
 	}
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.fake_storage_path,
+			err,
+		)
 	}
 	suite.setupTestHelper(defaultConfig)
 }
@@ -99,11 +111,19 @@ func (suite *fileCacheWindowsTestSuite) cleanupTest() {
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.cache_path,
+			err,
+		)
 	}
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
-		fmt.Printf("fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+		fmt.Printf(
+			"fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.fake_storage_path,
+			err,
+		)
 	}
 }
 
@@ -112,7 +132,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	// Setup
 	path := "file"
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -131,9 +151,11 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file"
-	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	createHandle, _ := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0777},
+	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -150,7 +172,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	suite.assert.FileExists(suite.cache_path + "/" + path)
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
 }
 
 // In order for 'go test' to run this suite, we need to create

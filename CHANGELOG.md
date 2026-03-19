@@ -1,5 +1,70 @@
 # Cloudfuse Changelog #
 
+## **2.1.2** ##
+
+March 11th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#845](https://github.com/Seagate/cloudfuse/pull/845) Reduce binary size
+- [#855](https://github.com/Seagate/cloudfuse/pull/855) Add . and .. to directory listings
+- [#856](https://github.com/Seagate/cloudfuse/pull/856) Fix log destruction concurrency bug
+
+## **2.1.1** ##
+
+February 23rd 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#827](https://github.com/Seagate/cloudfuse/pull/827) Fix update command on Linux
+- [#780](https://github.com/Seagate/cloudfuse/pull/780) Improve merged server capacity logic
+- [#842](https://github.com/Seagate/cloudfuse/pull/842) Reduce calls to cloud, improve GetAttr, List performance
+
+## **2.1.0** ##
+
+February 3rd 2026
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Features ###
+
+- [#825](https://github.com/Seagate/cloudfuse/pull/825) Generate shell completions on install
+- [#818](https://github.com/Seagate/cloudfuse/pull/818) Improve CLI with better documentation and shortcuts
+- [#819](https://github.com/Seagate/cloudfuse/pull/819) Use new S3 transfer manager for improved S3 uploads
+
+## **2.0.3** ##
+
+January 23rd 2026
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Bug Fixes ###
+
+- [#801](https://github.com/Seagate/cloudfuse/pull/801) Fix libfuse3 dependency for Debian Trixie
+
+## **2.0.2** ##
+
+December 16th 2025
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Bug Fixes ###
+
+- [#767](https://github.com/Seagate/cloudfuse/pull/767) Improve size tracker concurrency and accuracy
+
+## **2.0.1** ##
+
+October 23rd 2025
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Features ###
+
+- [#681](https://github.com/Seagate/cloudfuse/pull/681) Bump blobfuse version to 2.5.0
+
+### Bug Fixes ###
+
+- [#691](https://github.com/Seagate/cloudfuse/pull/691) Add libfuse as explicit dependency
+- [#729](https://github.com/Seagate/cloudfuse/pull/729) Fix size_tracker bug
+
 ## **2.0.0** ##
 
 September 4th 2025
@@ -16,15 +81,15 @@ This version is based on [blobfuse2 2.4.2](https://github.com/Azure/azure-storag
 
 ### Breaking changes
 
-- GUI removed from this repo  
-  The GUI is no longer bundled. Install it separately: <https://github.com/Seagate/cloudfuse-gui>  
+- GUI removed from this repo
+  The GUI is no longer bundled. Install it separately: <https://github.com/Seagate/cloudfuse-gui>
   Use the new TUI with `cloudfuse config` for in-terminal setup.
 
-- CLI cleanup and removals  
-  Some v1 command-line options were removed. All removed options can still be configured in the `config.yaml`.  
+- CLI cleanup and removals
+  Some v1 command-line options were removed. All removed options can still be configured in the `config.yaml`.
   Refer to the docs for the current CLI options.
 
-- Passphrase handling simplified  
+- Passphrase handling simplified
   Base64 encoding of the passphrase is no longer required. Existing base64-encoded values continue to work.
 
 ### Features ###

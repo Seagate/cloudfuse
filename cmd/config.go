@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -48,7 +48,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"go.yaml.in/yaml/v3"
 )
 
 // Top-level struct to hold application context, including tview application instance,
@@ -159,9 +159,14 @@ func newAppContext() *appContext {
 }
 
 var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Launch the interactive configuration tool.",
-	Long:  "Starts an interactive terminal-based UI to generate your Cloudfuse configuration file.",
+	Use:     "config",
+	Short:   "Launch the interactive configuration tool.",
+	Long:    "Starts an interactive terminal-based UI to generate your Cloudfuse configuration file.",
+	Aliases: []string{"configure", "cfg"},
+	GroupID: groupConfig,
+	Args:    cobra.NoArgs,
+	Example: `  # Launch the interactive configuration wizard
+  cloudfuse config`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tui := newAppContext()
 		if err := tui.run(); err != nil {
@@ -179,7 +184,10 @@ func init() {
 // Initializes the tview application, builds the TUI application, and runs it.
 func (tui *appContext) run() error {
 	// Disable cloudfuse logging during TUI session to prevent log messages from interfering with the UI.
-	if err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_OFF()}); err != nil {
+	if err := log.SetDefaultLogger(
+		"silent",
+		common.LogConfig{Level: common.ELogLevel.LOG_OFF()},
+	); err != nil {
 		// If setting silent logger fails, this fallback is sufficient.
 		log.SetLogLevel(1)
 	}
@@ -1048,8 +1056,13 @@ func (tui *appContext) buildPreviewPage(previewPage string) tview.Primitive {
 			colorYellow, tui.config.cacheRetentionDurationSec,
 		)
 	} else {
-		summaryText += fmt.Sprintf("  Cache Retention: [%s::b]%d sec (%d %s)[-]\n\n",
-			colorYellow, tui.config.cacheRetentionDurationSec, tui.config.cacheRetentionDuration, tui.config.cacheRetentionUnit)
+		summaryText += fmt.Sprintf(
+			"  Cache Retention: [%s::b]%d sec (%d %s)[-]\n\n",
+			colorYellow,
+			tui.config.cacheRetentionDurationSec,
+			tui.config.cacheRetentionDuration,
+			tui.config.cacheRetentionUnit,
+		)
 	}
 
 	// Set a dynamic width and height for the summary widget
@@ -1178,7 +1191,7 @@ func (tui *appContext) showExitModal(onConfirm func()) {
 	// Simulate processing with emoji animation
 	go func() {
 		// Show initial message with emoji animation
-		for i := 0; i < len(processingEmojis); i++ {
+		for i := range processingEmojis {
 			currentEmoji := processingEmojis[i]
 			time.Sleep(100 * time.Millisecond)
 			tui.app.QueueUpdateDraw(func() {
@@ -1255,8 +1268,8 @@ func (tui *appContext) dryRun() error {
 // It is used to format text views and other UI elements in the TUI.
 func centerText(text string, width int) string {
 	var centeredLines []string
-	lines := strings.Split(text, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(text, "\n")
+	for line := range lines {
 		visibleLen := tview.TaggedStringWidth(line) // handle color tags
 		if visibleLen >= width {
 			centeredLines = append(centeredLines, line)

@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -134,9 +135,9 @@ func parseS3Err(err error, attemptedAction string) error {
 				errorCode,
 			)
 			if strings.HasPrefix(attemptedAction, "HeadObject") {
-				log.Warn(message)
+				log.Warn("%s", message)
 			} else {
-				log.Err(message)
+				log.Err("%s", message)
 			}
 			return syscall.ENOENT
 		}
@@ -231,9 +232,7 @@ func populateContentType(newSet string) error { //nolint
 	// We can simply append the new data to end of the map
 	// however there may be conflicting keys and hence we need to merge manually
 	//ContentTypeMap = append(ContentTypeMap, data)
-	for k, v := range data {
-		ContentTypes[k] = v
-	}
+	maps.Copy(ContentTypes, data)
 	return nil
 }
 

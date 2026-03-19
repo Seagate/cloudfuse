@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Seagate/cloudfuse/common/log"
@@ -119,10 +120,23 @@ func (p *Pipeline) Create() {
 func (p *Pipeline) Start(ctx context.Context) (err error) {
 	p.Create()
 
+	var errs []error
+
 	for i := len(p.components) - 1; i >= 0; i-- {
 		if err = p.components[i].Start(ctx); err != nil {
-			return err
+			errs = append(errs, err)
+			// stop all the upstream components before returning, f.e., this would prevent the upstream components
+			// to use the logger after it is destroyed.
+			for j := i + 1; j < len(p.components); j++ {
+				if err = p.components[j].Stop(); err != nil {
+					errs = append(errs, err)
+				}
+			}
 		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
@@ -130,10 +144,15 @@ func (p *Pipeline) Start(ctx context.Context) (err error) {
 
 // Stop : Stop the pipeline by calling 'Stop' method of each component
 func (p *Pipeline) Stop() (err error) {
-	for i := 0; i < len(p.components); i++ {
+	var errs []error
+	for i := range p.components {
 		if err = p.components[i].Stop(); err != nil {
-			return err
+			errs = append(errs, err)
 		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil

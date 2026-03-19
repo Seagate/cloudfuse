@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -42,9 +42,9 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 )
 
 type streamTestSuite struct {
@@ -104,7 +104,7 @@ func (suite *streamTestSuite) getRequestOptions(
 	handle *handlemap.Handle,
 	overwriteEndIndex bool,
 	fileSize, offset, endIndex int64,
-) (internal.OpenFileOptions, internal.ReadInBufferOptions, *[]byte) {
+) (internal.OpenFileOptions, *internal.ReadInBufferOptions, *[]byte) {
 	var data []byte
 	openFileOptions := internal.OpenFileOptions{
 		Name:  fileNames[fileIndex],
@@ -116,7 +116,7 @@ func (suite *streamTestSuite) getRequestOptions(
 	} else {
 		data = make([]byte, endIndex-offset)
 	}
-	readInBufferOptions := internal.ReadInBufferOptions{Handle: handle, Offset: offset, Data: data}
+	readInBufferOptions := &internal.ReadInBufferOptions{Handle: handle, Offset: offset, Data: data}
 
 	return openFileOptions, readInBufferOptions, &data
 }
@@ -136,7 +136,7 @@ func getCachedBlock(suite *streamTestSuite, offset int64, handle *handlemap.Hand
 }
 
 // Concurrency helpers with wait group terminations ========================================
-func asyncReadInBuffer(suite *streamTestSuite, readInBufferOptions internal.ReadInBufferOptions) {
+func asyncReadInBuffer(suite *streamTestSuite, readInBufferOptions *internal.ReadInBufferOptions) {
 	_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
 	wg.Done()
 }
@@ -146,8 +146,8 @@ func asyncOpenFile(suite *streamTestSuite, openFileOptions internal.OpenFileOpti
 	wg.Done()
 }
 
-func asyncCloseFile(suite *streamTestSuite, closeFileOptions internal.CloseFileOptions) {
-	_ = suite.stream.CloseFile(closeFileOptions)
+func asyncCloseFile(suite *streamTestSuite, releaseFileOptions internal.ReleaseFileOptions) {
+	_ = suite.stream.ReleaseFile(releaseFileOptions)
 	wg.Done()
 }
 
@@ -218,7 +218,7 @@ func (suite *streamTestSuite) TestReadWriteFile() {
 	suite.cleanupTest()
 	config = "stream:\n  block-size-mb: 0\n  buffer-size-mb: 16\n  max-buffers: 4\n"
 	suite.setupTestHelper(config, true)
-	_, err := suite.stream.WriteFile(internal.WriteFileOptions{})
+	_, err := suite.stream.WriteFile(&internal.WriteFileOptions{})
 	suite.assert.Equal(syscall.ENOTSUP, err)
 }
 
@@ -462,13 +462,13 @@ func (suite *streamTestSuite) TestHandles() {
 		0,
 		0,
 	)
-	closeFileOptions := internal.CloseFileOptions{Handle: handle}
+	releaseFileOptions := internal.ReleaseFileOptions{Handle: handle}
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
 	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(int(suite.stream.BlockSize), nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)
 
-	suite.mock.EXPECT().CloseFile(closeFileOptions).Return(nil)
-	_ = suite.stream.CloseFile(closeFileOptions)
+	suite.mock.EXPECT().ReleaseFile(releaseFileOptions).Return(nil)
+	_ = suite.stream.ReleaseFile(releaseFileOptions)
 
 	// we expect to call read in buffer again since we cleaned the cache after the file was closed
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
@@ -493,7 +493,7 @@ func (suite *streamTestSuite) TestStreamOnlyHandleLimit() {
 		0,
 		0,
 	)
-	closeFileOptions := internal.CloseFileOptions{Handle: handle1}
+	releaseFileOptions := internal.ReleaseFileOptions{Handle: handle1}
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle1, nil)
 	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(int(suite.stream.BlockSize), nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)
@@ -503,8 +503,8 @@ func (suite *streamTestSuite) TestStreamOnlyHandleLimit() {
 	_, _ = suite.stream.OpenFile(openFileOptions)
 	assertHandleStreamOnly(suite, handle2)
 
-	suite.mock.EXPECT().CloseFile(closeFileOptions).Return(nil)
-	_ = suite.stream.CloseFile(closeFileOptions)
+	suite.mock.EXPECT().ReleaseFile(releaseFileOptions).Return(nil)
+	_ = suite.stream.ReleaseFile(releaseFileOptions)
 
 	// we expect to call read in buffer again since we cleaned the cache after the file was closed
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle3, nil)
@@ -659,7 +659,7 @@ func (suite *streamTestSuite) TestCachedData() {
 	config := "stream:\n  block-size-mb: 16\n  buffer-size-mb: 32\n  max-buffers: 4\n"
 	suite.setupTestHelper(config, true)
 	var dataBuffer *[]byte
-	var readInBufferOptions internal.ReadInBufferOptions
+	var readInBufferOptions *internal.ReadInBufferOptions
 	handle_1 := &handlemap.Handle{Size: int64(32 * MB), Path: fileNames[0]}
 
 	data := *getBlockData(suite, 32*MB)
@@ -681,7 +681,9 @@ func (suite *streamTestSuite) TestCachedData() {
 				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.OpenFile(openFileOptions)
 		} else {
-			suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(int(suite.stream.BlockSize), nil)
+			suite.mock.EXPECT().
+				ReadInBuffer(readInBufferOptions).
+				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
 		}
 
@@ -725,7 +727,7 @@ func (suite *streamTestSuite) TestAsyncReadAndEviction() {
 
 	var blockOneDataBuffer *[]byte
 	var blockTwoDataBuffer *[]byte
-	var readInBufferOptions internal.ReadInBufferOptions
+	var readInBufferOptions *internal.ReadInBufferOptions
 	handle_1 := &handlemap.Handle{Size: int64(16 * MB), Path: fileNames[0]}
 
 	// Even though our file size is 16MB below we only check against 8MB of the data (we check against two blocks)
@@ -746,7 +748,9 @@ func (suite *streamTestSuite) TestAsyncReadAndEviction() {
 				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.OpenFile(openFileOptions)
 		} else {
-			suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(int(suite.stream.BlockSize), nil)
+			suite.mock.EXPECT().
+				ReadInBuffer(readInBufferOptions).
+				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
 		}
 
@@ -863,10 +867,10 @@ func (suite *streamTestSuite) TestAsyncClose() {
 	wg.Wait()
 
 	for _, handle := range []*handlemap.Handle{handle_1, handle_2} {
-		closeFileOptions := internal.CloseFileOptions{Handle: handle}
-		suite.mock.EXPECT().CloseFile(closeFileOptions).Return(nil)
+		releaseFileOptions := internal.ReleaseFileOptions{Handle: handle}
+		suite.mock.EXPECT().ReleaseFile(releaseFileOptions).Return(nil)
 		wg.Add(1)
-		go asyncCloseFile(suite, closeFileOptions)
+		go asyncCloseFile(suite, releaseFileOptions)
 	}
 	wg.Wait()
 }

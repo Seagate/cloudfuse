@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -36,7 +36,7 @@ const STRUCT_TAG = "config"
 
 type TreeNode struct {
 	children map[string]*TreeNode
-	value    interface{}
+	value    any
 	name     string
 }
 
@@ -62,7 +62,7 @@ func NewTreeNode(name string) *TreeNode {
 // Insert function is used to insert a new object into the tree
 // The key is specified as a dot separated hierarchical value
 // For eg. root.child1.child2
-func (tree *Tree) Insert(key string, value interface{}) {
+func (tree *Tree) Insert(key string, value any) {
 	subKeys := strings.Split(key, ".")
 	curNode := tree.head
 	for _, idx := range subKeys {
@@ -110,7 +110,7 @@ func (tree *Tree) GetSubTree(key string) *TreeNode {
 }
 
 // parseValue is a utility function that accepts a val and returns the parsed value of that type.
-func parseValue(val string, toType reflect.Kind) interface{} {
+func parseValue(val string, toType reflect.Kind) any {
 	switch toType {
 	case reflect.Bool:
 		parsed, err := strconv.ParseBool(val)
@@ -212,11 +212,7 @@ func parseValue(val string, toType reflect.Kind) interface{} {
 // MergeWithKey is used to merge the contained tree with the object (obj) that is passed in as parameter.
 // getValue parameter is a function that accepts the value stored in a TreeNode and performs any business logic and returns the value that has to be placed in the obj parameter
 // it must also return true|false based on which the value will be set in the obj parameter.
-func (tree *Tree) MergeWithKey(
-	key string,
-	obj interface{},
-	getValue func(val interface{}) (res interface{}, ok bool),
-) {
+func (tree *Tree) MergeWithKey(key string, obj any, getValue func(val any) (res any, ok bool)) {
 	subTree := tree.GetSubTree(key)
 	if subTree == nil {
 		return
@@ -233,7 +229,7 @@ func (tree *Tree) MergeWithKey(
 				if elem.Field(i).Type().Kind() == reflect.Struct {
 					subKey := key + "." + idx
 					tree.MergeWithKey(subKey, elem.Field(i).Addr().Interface(), getValue)
-				} else if elem.Field(i).Type().Kind() == reflect.Ptr {
+				} else if elem.Field(i).Type().Kind() == reflect.Pointer {
 					subKey := key + "." + idx
 					tree.MergeWithKey(subKey, elem.Field(i).Elem().Addr().Interface(), getValue)
 				} else {
@@ -253,10 +249,7 @@ func (tree *Tree) MergeWithKey(
 }
 
 // Merge performs the same function as MergeWithKey but at the root level
-func (tree *Tree) Merge(
-	obj interface{},
-	getValue func(val interface{}) (res interface{}, ok bool),
-) {
+func (tree *Tree) Merge(obj any, getValue func(val any) (res any, ok bool)) {
 	subTree := tree.head
 	if subTree == nil {
 		return
@@ -273,7 +266,7 @@ func (tree *Tree) Merge(
 				if elem.Field(i).Type().Kind() == reflect.Struct {
 					subKey := idx
 					tree.MergeWithKey(subKey, elem.Field(i).Addr().Interface(), getValue)
-				} else if elem.Field(i).Type().Kind() == reflect.Ptr {
+				} else if elem.Field(i).Type().Kind() == reflect.Pointer {
 					subKey := idx
 					tree.MergeWithKey(subKey, elem.Field(i).Elem().Addr().Interface(), getValue)
 				} else {
@@ -333,7 +326,7 @@ func isPrimitiveType(kind reflect.Kind) bool {
 }
 
 // assignToField is utility function to set the val to the passed field based on it's state
-func assignToField(field reflect.Value, val interface{}) {
+func assignToField(field reflect.Value, val any) {
 	if field.CanSet() {
 		if reflect.TypeOf(val).Kind() == reflect.String {
 			parseVal := parseValue(val.(string), field.Kind())

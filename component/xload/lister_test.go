@@ -1,8 +1,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -72,7 +72,8 @@ func (suite *listTestSuite) SetupSuite() {
 	suite.assert.NoError(err)
 
 	cfg := fmt.Sprintf("loopbackfs:\n  path: %s\n", lb_path)
-	config.ReadConfigFromReader(strings.NewReader(cfg))
+	err = config.ReadConfigFromReader(strings.NewReader(cfg))
+	suite.assert.NoError(err)
 
 	lb = loopback.NewLoopbackFSComponent()
 	err = lb.Configure(true)
@@ -99,17 +100,17 @@ func (suite *listTestSuite) createFile(filePath string, size int64) {
 }
 
 func (suite *listTestSuite) createDirsAndFiles(path string) {
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		filePath := filepath.Join(path, fmt.Sprintf("file_%v", i))
 		suite.createFile(filePath, int64(9*i))
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		dirName := filepath.Join(path, fmt.Sprintf("dir_%v", i))
 		err := os.MkdirAll(dirName, 0777)
 		suite.assert.NoError(err)
 
-		for j := 0; j < 5; j++ {
+		for j := range 5 {
 			filePath := filepath.Join(dirName, fmt.Sprintf("file_%v%v", i, j))
 			suite.createFile(filePath, int64(i*j))
 		}
@@ -274,7 +275,7 @@ func (suite *listTestSuite) TestListerMkdir() {
 	suite.assert.NoError(err)
 	suite.assert.NotNil(rl)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		dirPath := filepath.Join(tl.path, fmt.Sprintf("dir%v", i))
 		err = rl.mkdir(dirPath)
 		suite.assert.NoError(err)
