@@ -1947,18 +1947,19 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if localErr == nil && info != nil && !info.IsDir() {
+		localAttr := newObjAttr(options.Name, info)
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// attrs is a pointer returned by NextComponent
 			// modifying attrs could corrupt cached directory listings
 			// to update properties, we need to make a deep copy first
 			newAttr := *attrs
-			newAttr.Mtime = info.ModTime()
-			newAttr.Size = info.Size()
+			newAttr.Size = localAttr.Size
+			newAttr.Mtime = localAttr.Mtime
 			attrs = &newAttr
 		} else { // Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
 			exists = true
-			attrs = newObjAttr(options.Name, info)
+			attrs = localAttr
 		}
 	}
 

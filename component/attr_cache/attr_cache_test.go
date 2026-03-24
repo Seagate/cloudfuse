@@ -383,7 +383,7 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			options := internal.CreateDirOptions{Name: path}
+			options := internal.CreateDirOptions{Name: path, Mode: 0o750}
 
 			// Error
 			suite.mock.EXPECT().CreateDir(options).Return(errors.New("Failed"))
@@ -399,8 +399,11 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.NoError(err)
 
-			_, found := suite.attrCache.cache.get(truncatedPath)
+			item, found := suite.attrCache.cache.get(truncatedPath)
 			suite.assert.True(found)
+			suite.assert.Equal(os.ModeDir, item.attr.Mode&os.ModeType)
+			suite.assert.Equal(options.Mode, item.attr.Mode&os.ModePerm)
+			suite.assert.False(item.attr.IsModeDefault())
 
 			// Entry Already Exists
 			suite.mock.EXPECT().CreateDir(options).Return(nil)
@@ -412,6 +415,68 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 			suite.assert.True(found)
 		})
 	}
+}
+
+func (suite *attrCacheTestSuite) TestCreateDirUpdatesParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	options := internal.CreateDirOptions{Name: filepath.Join(parentPath, "child")}
+	suite.mock.EXPECT().CreateDir(options).Return(nil)
+
+	err := suite.attrCache.CreateDir(options)
+	suite.NoError(err)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.True(updatedParent.attr.Ctime.After(staleTime))
+	suite.True(updatedParent.attr.Mtime.After(staleTime))
+}
+
+func (suite *attrCacheTestSuite) TestCreateDirExistingDoesNotUpdateParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	childPath := filepath.Join(parentPath, "child")
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	childItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(childPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(childItem)
+
+	options := internal.CreateDirOptions{Name: childPath}
+	suite.mock.EXPECT().CreateDir(options).Return(nil)
+
+	err := suite.attrCache.CreateDir(options)
+	suite.ErrorIs(err, os.ErrExist)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.Equal(staleTime, updatedParent.attr.Ctime)
+	suite.Equal(staleTime, updatedParent.attr.Mtime)
 }
 
 // Tests Create Directory Without Caching Empty Directories
@@ -1082,6 +1147,33 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 	suite.assert.True(found)
 	suite.assert.True(checkItem.exists())
 	suite.assert.EqualValues(0, checkItem.attr.Size)
+}
+
+func (suite *attrCacheTestSuite) TestCreateFileUpdatesParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	options := internal.CreateFileOptions{Name: filepath.Join(parentPath, "child")}
+	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, nil)
+
+	_, err := suite.attrCache.CreateFile(options)
+	suite.NoError(err)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.True(updatedParent.attr.Ctime.After(staleTime))
+	suite.True(updatedParent.attr.Mtime.After(staleTime))
 }
 
 // Tests Open File
