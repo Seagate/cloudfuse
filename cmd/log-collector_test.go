@@ -370,6 +370,10 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 }
 
 func (suite *logCollectTestSuite) TestNoLogTypeConfig() {
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+	defer suite.cleanupTest(currentDir)
+
 	//set up config file
 	TestNoLogTypeConfig := logCollectTestConfig{
 		logType:  "",
@@ -379,7 +383,7 @@ func (suite *logCollectTestSuite) TestNoLogTypeConfig() {
 	configFile := suite.setupConfig(TestNoLogTypeConfig)
 
 	//run the log collector
-	_, err := executeCommandC(
+	_, err = executeCommandC(
 		rootCmd,
 		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
@@ -390,13 +394,16 @@ func (suite *logCollectTestSuite) TestNoLogTypeConfig() {
 }
 
 func (suite *logCollectTestSuite) TestNoLogPathConfig() {
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+	defer suite.cleanupTest(currentDir)
 
 	//set up config file
 	TestNoLogTypeConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: ""}
 	configFile := suite.setupConfig(TestNoLogTypeConfig)
 
 	//run the log collector
-	_, err := executeCommandC(
+	_, err = executeCommandC(
 		rootCmd,
 		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
@@ -428,6 +435,9 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 
 // Log collection test using --output-path flag
 func (suite *logCollectTestSuite) TestArchivePath() {
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+	defer suite.cleanupTest(currentDir)
 
 	// create temp folder for output Path
 	outputPath := common.GetDefaultWorkDir()
@@ -462,6 +472,18 @@ func (suite *logCollectTestSuite) TestArchivePath() {
 	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, tempDir)
 	suite.assert.True(isArcValid)
+}
+
+// TestGatherLogsHelp tests the help output
+func (suite *logCollectTestSuite) TestGatherLogsHelp() {
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+	defer suite.cleanupTest(currentDir)
+
+	op, err := executeCommandC(rootCmd, "gather-logs", "--help")
+	suite.assert.NoError(err)
+	suite.assert.Contains(op, "gather-logs")
+	suite.assert.Contains(op, "output-path")
 }
 
 func TestLogCollectCommand(t *testing.T) {

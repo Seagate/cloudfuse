@@ -7,6 +7,7 @@ before:
   hooks:
     - go mod tidy
     - sh ./scripts/gen_manpages.sh
+    - sh ./scripts/gen_completions.sh
     - go install github.com/goreleaser/chglog/cmd/chglog@latest
     - chglog init
 
@@ -313,6 +314,18 @@ nfpms:
         dst: /usr/share/man/man1/
         file_info:
           mode: 0644
+      - src: ./completions/cloudfuse.bash
+        dst: /usr/share/bash-completion/completions/cloudfuse
+        file_info:
+          mode: 0644
+      - src: ./completions/_cloudfuse
+        dst: /usr/share/zsh/site-functions/_cloudfuse
+        file_info:
+          mode: 0644
+      - src: ./completions/cloudfuse.fish
+        dst: /usr/share/fish/vendor_completions.d/cloudfuse.fish
+        file_info:
+          mode: 0644
 
     overrides:
       deb:
@@ -377,6 +390,18 @@ nfpms:
           mode: 0644
       - src: ./manpages/*
         dst: /usr/share/man/man1/
+        file_info:
+          mode: 0644
+      - src: ./completions/cloudfuse.bash
+        dst: /usr/share/bash-completion/completions/cloudfuse
+        file_info:
+          mode: 0644
+      - src: ./completions/_cloudfuse
+        dst: /usr/share/zsh/site-functions/_cloudfuse
+        file_info:
+          mode: 0644
+      - src: ./completions/cloudfuse.fish
+        dst: /usr/share/fish/vendor_completions.d/cloudfuse.fish
         file_info:
           mode: 0644
 

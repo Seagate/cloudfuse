@@ -1,5 +1,16 @@
 # Cloudfuse Changelog #
 
+## **2.1.0** ##
+
+February 3rd 2026
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Features ###
+
+- [#825](https://github.com/Seagate/cloudfuse/pull/825) Generate shell completions on install
+- [#818](https://github.com/Seagate/cloudfuse/pull/818) Improve CLI with better documentation and shortcuts
+- [#819](https://github.com/Seagate/cloudfuse/pull/819) Use new S3 transfer manager for improved S3 uploads
+
 ## **2.0.3** ##
 
 January 23rd 2026

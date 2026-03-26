@@ -26,41 +26,49 @@
 package cmd
 
 import (
-	"github.com/Seagate/cloudfuse/common"
+	"testing"
 
-	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-var check bool
-
-var versionCmd = &cobra.Command{
-	Use:     "version",
-	Short:   "Print the current version and optionally check for latest version",
-	Long:    "Display cloudfuse version information including git commit, build date, and Go version.",
-	Aliases: []string{"ver"},
-	GroupID: groupUtil,
-	Args:    cobra.NoArgs,
-	Example: `  # Show version info
-  cloudfuse version
-
-  # Check for updates
-  cloudfuse version --check`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Println("cloudfuse version:", common.CloudfuseVersion)
-		cmd.Println("git commit:", common.GitCommit)
-		cmd.Println("commit date:", common.CommitDate)
-		cmd.Println("go version:", common.GoVersion)
-		cmd.Println("OS/Arch:", common.OsArch)
-		if check {
-			return VersionCheck()
-		}
-		return nil
-	},
+type generatorTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
 }
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
+func (suite *generatorTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+}
 
-	versionCmd.Flags().
-		BoolVar(&check, "check", false, "To check whether latest version exists or not")
+func (suite *generatorTestSuite) cleanupTest() {
+	resetCLIFlags(*generateCmd)
+}
+
+func TestGeneratorCommand(t *testing.T) {
+	suite.Run(t, new(generatorTestSuite))
+}
+
+// TestGeneratorRequiresArg tests that generate command requires exactly one argument
+func (suite *generatorTestSuite) TestGeneratorRequiresArg() {
+	defer suite.cleanupTest()
+
+	output, _ := executeCommandC(rootCmd, "generate")
+	suite.assert.Contains(output, "accepts 1 arg(s)")
+}
+
+// TestGeneratorIsHidden tests that the generate command is hidden
+func (suite *generatorTestSuite) TestGeneratorIsHidden() {
+	defer suite.cleanupTest()
+
+	suite.assert.True(generateCmd.Hidden, "generate command should be hidden")
+}
+
+// TestGeneratorHelp tests that help is displayed correctly
+func (suite *generatorTestSuite) TestGeneratorHelp() {
+	defer suite.cleanupTest()
+
+	output, _ := executeCommandC(rootCmd, "generate", "--help")
+	suite.assert.Contains(output, "Generate a new cloudfuse component")
+	suite.assert.Contains(output, "cloudfuse generate mycomponent")
 }

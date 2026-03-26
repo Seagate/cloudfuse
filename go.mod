@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/smithy-go v1.24.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/gdamore/tcell/v2 v2.13.7
+	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/netresearch/go-cron v0.9.1
@@ -23,8 +23,8 @@ require (
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
 	github.com/sevlyar/go-daemon v0.1.7-0.20251110065050-63665fab0d07
-	github.com/shirou/gopsutil/v4 v4.25.12
-	github.com/spf13/cobra v1.9.1
+	github.com/shirou/gopsutil/v4 v4.26.1
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
@@ -86,10 +86,5 @@ require (
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/spf13/cobra => github.com/gapra-msft/cobra v1.4.1-0.20220411185530-5b83e8ba06dd
-
-//replace github.com/Azure/azure-storage-azcopy/v10 v10.19.1-0.20230717101935-ab8ff0a85e48 => <local path>/azure-storage-azcopy
