@@ -1179,7 +1179,7 @@ func (tui *appContext) showExitModal(onConfirm func()) {
 	// Simulate processing with emoji animation
 	go func() {
 		// Show initial message with emoji animation
-		for i := 0; i < len(processingEmojis); i++ {
+		for i := range processingEmojis {
 			currentEmoji := processingEmojis[i]
 			time.Sleep(100 * time.Millisecond)
 			tui.app.QueueUpdateDraw(func() {
@@ -1206,8 +1206,8 @@ func (tui *appContext) showExitModal(onConfirm func()) {
 // It is used to format text views and other UI elements in the TUI.
 func centerText(text string, width int) string {
 	var centeredLines []string
-	lines := strings.Split(text, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(text, "\n")
+	for line := range lines {
 		visibleLen := tview.TaggedStringWidth(line) // handle color tags
 		if visibleLen >= width {
 			centeredLines = append(centeredLines, line)

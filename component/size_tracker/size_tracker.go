@@ -27,6 +27,7 @@ package size_tracker
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -73,13 +74,14 @@ func (st *SizeTracker) SetNextComponent(nc internal.Component) {
 //	this shall not block the call otherwise pipeline will not start
 func (st *SizeTracker) Start(ctx context.Context) error {
 	log.Trace("SizeTracker::Start : Starting component %s", st.Name())
+	st.mountSize.Start()
 	return nil
 }
 
 // Stop : Stop the component functionality and kill all threads started
 func (st *SizeTracker) Stop() error {
 	log.Trace("SizeTracker::Stop : Stopping component %s", st.Name())
-	_ = st.mountSize.CloseFile()
+	_ = st.mountSize.Stop()
 	return nil
 }
 
@@ -97,7 +99,7 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	st.totalBucketCapacity = conf.TotalBucketCapacity
+	st.totalBucketCapacity = conf.TotalBucketCapacity * common.MbToBytes
 
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
@@ -140,45 +142,48 @@ func (st *SizeTracker) RenameDir(options internal.RenameDirOptions) error {
 
 // File operations
 func (st *SizeTracker) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
+	log.Trace("SizeTracker::CreateFile : %s", options.Name)
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
 	handle, err := st.NextComponent().CreateFile(options)
 
 	// File already exists but create succeeded so remove old file size
 	if err == nil && getAttrErr == nil {
-		st.mountSize.Subtract(uint64(attr.Size))
+		st.mountSize.Add(-attr.Size)
 	}
 
 	return handle, err
 }
 
 func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
+	log.Trace("SizeTracker::DeleteFile : %s", options.Name)
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
 	err := st.NextComponent().DeleteFile(options)
 
-	// If the file is a symlink then it has no size so don't change the size
-	if err == nil && getAttrErr == nil && !attr.IsSymlink() {
-		st.mountSize.Subtract(uint64(attr.Size))
+	if err == nil && getAttrErr == nil {
+		st.mountSize.Add(-attr.Size)
 	}
 
 	return err
 }
 
 func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
+	log.Trace("SizeTracker::RenameFile : %s->%s", options.Src, options.Dst)
 	dstAttr, dstErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Dst})
 
 	err := st.NextComponent().RenameFile(options)
 
 	// If dst already exists and rename succeeds, remove overwritten dst size
 	if dstErr == nil && err == nil {
-		st.mountSize.Subtract(uint64(dstAttr.Size))
+		st.mountSize.Add(-dstAttr.Size)
 	}
 
 	return err
 }
 
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
+	// log.Trace("SizeTracker::WriteFile : %s", options.Handle.Path)
 	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().
 		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
@@ -197,37 +202,37 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	diff := newSize - oldSize
 
 	// File already exists and WriteFile succeeded subtract difference in file size
-	if diff < 0 {
-		// diff is negative, so change it back to positive before converting to a uint64
-		st.mountSize.Subtract(uint64(-diff))
-	} else {
-		st.mountSize.Add(uint64(diff))
-	}
+	st.mountSize.Add(diff)
 
 	return bytesWritten, nil
 }
 
 func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error {
+	log.Trace("SizeTracker::TruncateFile : %s to %dB", options.Name, options.Size)
 	var origSize int64
 	attr, getAttrErr := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if getAttrErr == nil {
 		origSize = attr.Size
+	} else if !os.IsNotExist(getAttrErr) {
+		log.Err(
+			"SizeTracker::TruncateFile : %s GetAttr failed. Here's why: %v",
+			options.Name,
+			getAttrErr,
+		)
 	}
 
 	err := st.NextComponent().TruncateFile(options)
-	newSize := options.Size - origSize
-
-	// File already exists and truncate succeeded subtract difference in file size
-	if err == nil && getAttrErr == nil && newSize < 0 {
-		st.mountSize.Subtract(uint64(-newSize))
-	} else if err == nil && getAttrErr == nil && newSize >= 0 {
-		st.mountSize.Add(uint64(newSize))
+	if err != nil {
+		return err
 	}
 
-	return err
+	// subtract difference in file size
+	st.mountSize.Add(options.Size - origSize)
+	return nil
 }
 
 func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error {
+	log.Trace("SizeTracker::CopyFromFile : %s", options.Name)
 	var origSize int64
 	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err == nil {
@@ -242,15 +247,7 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 	if err != nil {
 		return nil
 	}
-	newSize := fileInfo.Size() - origSize
-
-	// File already exists and CopyFromFile succeeded subtract difference in file size
-	if newSize < 0 {
-		st.mountSize.Subtract(uint64(-newSize))
-	} else {
-		st.mountSize.Add(uint64(newSize))
-	}
-
+	st.mountSize.Add(fileInfo.Size() - origSize)
 	return nil
 }
 
@@ -307,6 +304,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 }
 
 func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
+	log.Trace("SizeTracker::CopyFromFile : %s", opt.Name)
 	var origSize int64
 	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: opt.Name})
 	if err == nil {
@@ -328,14 +326,26 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 		log.Err("SizeTracker::CommitData : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", opt.Name, err)
 	}
 
-	diff := newSize - origSize
+	st.mountSize.Add(newSize - origSize)
 
-	// File already exists and CommitData succeeded subtract difference in file size
-	if diff < 0 {
-		st.mountSize.Subtract(uint64(-diff))
-	} else {
-		st.mountSize.Add(uint64(diff))
+	return nil
+}
+
+func (st *SizeTracker) CreateLink(options internal.CreateLinkOptions) error {
+	log.Trace("SizeTracker::CreateLink : %s", options.Name)
+	var origSize int64
+	attr, err := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if err == nil {
+		origSize = attr.Size
 	}
+
+	err = st.NextComponent().CreateLink(options)
+	if err != nil {
+		return err
+	}
+
+	newSize := int64(len(options.Target))
+	st.mountSize.Add(newSize - origSize)
 
 	return nil
 }

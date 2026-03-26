@@ -84,7 +84,7 @@ func (cm *CpuMemProfiler) Monitor() error {
 	return nil
 }
 
-func (cm *CpuMemProfiler) ExportStats(timestamp string, st interface{}) {
+func (cm *CpuMemProfiler) ExportStats(timestamp string, st any) {
 	se, err := hminternal.NewStatsExporter()
 	if err != nil || se == nil {
 		log.Err(

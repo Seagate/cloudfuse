@@ -178,7 +178,7 @@ func (suite *sizeTrackerTestSuite) TestRenameDir() {
 	err := suite.sizeTracker.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0755})
 	suite.assert.NoError(err)
 	path := path.Join(src, generateFileName())
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		handle, err := suite.sizeTracker.CreateFile(
 			internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0644},
 		)
@@ -583,14 +583,19 @@ func (suite *sizeTrackerTestSuite) TestSymlink() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
+	// Create symlink - symlink size is the length of the target path in bytes
 	suite.sizeTracker.CreateLink(internal.CreateLinkOptions{Name: symlink, Target: file})
-	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+	symlinkSize := len(file)
+	suite.assert.EqualValues(len(data)+symlinkSize, suite.sizeTracker.mountSize.GetSize())
 
+	// Delete symlink - should remove only the symlink's size
 	suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: symlink})
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
+	// Delete the actual file - should go back to 0
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerTestSuite) TestStatFS() {

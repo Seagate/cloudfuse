@@ -281,7 +281,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	fc.syncToFlush = conf.SyncToFlush
 	fc.syncToDelete = !conf.SyncNoOp
 	fc.refreshSec = conf.RefreshSec
-	fc.hardLimit = conf.HardLimit
+	fc.hardLimit = true
 
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
@@ -365,10 +365,13 @@ func (fc *FileCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
 	}
+	if config.IsSet(compName + ".hard-limit") {
+		fc.hardLimit = conf.HardLimit
+	}
 
 	fc.diskHighWaterMark = 0
-	if conf.HardLimit && conf.MaxSizeMB != 0 {
-		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
+	if fc.hardLimit && fc.maxCacheSize != 0 {
+		fc.diskHighWaterMark = (((fc.maxCacheSize * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
 	if config.IsSet(compName + ".schedule") {
@@ -450,7 +453,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
 		cacheTimeout:  uint32(fc.cacheTimeout),
-		maxSizeMB:     conf.MaxSizeMB,
+		maxSizeMB:     fc.maxCacheSize,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 		pendingOps:    &fc.pendingOps,
@@ -575,7 +578,10 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			flock.Lock()
 			defer flock.Unlock()
 			fc.addPendingOp(options.Name, flock)
-			log.Info("FileCache::CreateDir : %s created offline and queued for cloud sync", options.Name)
+			log.Info(
+				"FileCache::CreateDir : %s created offline and queued for cloud sync",
+				options.Name,
+			)
 		}
 	case err != nil && !isOffline(err):
 		// we seem to have regained our cloud connection, but GetAttr failed for some reason
@@ -595,7 +601,10 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		if err == nil { // valid
 			log.Warn("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
 		} else { // expired
-			log.Warn("FileCache::CreateDir : %s already exists in cloud storage (and we are offline)", options.Name)
+			log.Warn(
+				"FileCache::CreateDir : %s already exists in cloud storage (and we are offline)",
+				options.Name,
+			)
 		}
 	}
 	return err
@@ -683,7 +692,9 @@ func (fc *FileCache) StreamDir(
 				flock := fc.fileLocks.Get(attr.Path)
 				flock.RLock()
 				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
-				info, err := os.Stat(filepath.Join(localPath, dirent.Name())) // Grab local cache attributes
+				info, err := os.Stat(
+					filepath.Join(localPath, dirent.Name()),
+				) // Grab local cache attributes
 				flock.RUnlock()
 				if err == nil {
 					// attr is a pointer returned by NextComponent
@@ -797,8 +808,16 @@ func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 				return val, err
 			}
 		} else {
-			log.Err("FileCache::deleteEmptyDirs : Directory %s is not empty, contains file %s", localPath, entry.Name())
-			return false, fmt.Errorf("unable to delete directory %s, contains file %s", localPath, entry.Name())
+			log.Err(
+				"FileCache::deleteEmptyDirs : Directory %s is not empty, contains file %s",
+				localPath,
+				entry.Name(),
+			)
+			return false, fmt.Errorf(
+				"unable to delete directory %s, contains file %s",
+				localPath,
+				entry.Name(),
+			)
 		}
 	}
 
@@ -870,7 +889,12 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			options.Dst,
 		)
 	} else if err != nil {
-		log.Err("FileCache::RenameDir : %s -> %s Cloud rename failed. Here's why: %v", options.Src, options.Dst, err)
+		log.Err(
+			"FileCache::RenameDir : %s -> %s Cloud rename failed. Here's why: %v",
+			options.Src,
+			options.Dst,
+			err,
+		)
 		return err
 	}
 
@@ -896,12 +920,20 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
 				if mkdirErr != nil {
 					// log any error but do nothing about it
-					log.Warn("FileCache::RenameDir : Failed to created directory %s. Here's why: %v", newPath, mkdirErr)
+					log.Warn(
+						"FileCache::RenameDir : Failed to created directory %s. Here's why: %v",
+						newPath,
+						mkdirErr,
+					)
 				}
 				// remember to delete the src directory later (after its contents are deleted)
 				directoriesToPurge = append(directoriesToPurge, path)
 				// update pending cloud ops
-				fc.renamePendingOp(fc.getObjectName(path), fc.getObjectName(newPath), fc.fileLocks.Get(fc.getObjectName(newPath)))
+				fc.renamePendingOp(
+					fc.getObjectName(path),
+					fc.getObjectName(newPath),
+					fc.fileLocks.Get(fc.getObjectName(newPath)),
+				)
 			}
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
@@ -1155,10 +1187,18 @@ func (fc *FileCache) validateStorageError(
 				return syscall.ENOENT
 			} else {
 				if !recoverable {
-					log.Err("FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close", method, path)
+					log.Err(
+						"FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close",
+						method,
+						path,
+					)
 					return syscall.EIO
 				} else {
-					log.Info("FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close", method, path)
+					log.Info(
+						"FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close",
+						method,
+						path,
+					)
 					return nil
 				}
 			}
@@ -1247,10 +1287,16 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			// offline access is allowed, but this object might exist in cloud storage
 			if fileExists {
 				// data is cached but (might be) in cloud, so only allow read-only access
-				log.Err("FileCache::OpenFile : %s Read-only access, for consistency offline", handle.Path)
+				log.Err(
+					"FileCache::OpenFile : %s Read-only access, for consistency offline",
+					handle.Path,
+				)
 				flags = os.O_RDONLY
 				if downloadRequired {
-					log.Warn("FileCache::OpenFile : %s ignoring refresh timer (offline)", handle.Path)
+					log.Warn(
+						"FileCache::OpenFile : %s ignoring refresh timer (offline)",
+						handle.Path,
+					)
 					downloadRequired = false
 				}
 			} else {
@@ -1289,7 +1335,11 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			// Create the file if if doesn't already exist.
 			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 			if err != nil {
-				log.Err("FileCache::openFileInternal : error creating directory structure for file %s [%s]", handle.Path, err.Error())
+				log.Err(
+					"FileCache::openFileInternal : error creating directory structure for file %s [%s]",
+					handle.Path,
+					err.Error(),
+				)
 				return err
 			}
 		}
@@ -1327,7 +1377,14 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 					err.Error(),
 				)
 				_ = f.Close()
-				_ = os.Remove(localPath)
+				err = os.Remove(localPath)
+				if err != nil {
+					log.Err(
+						"FileCache::openFileInternal : Failed to remove file %s [%s]",
+						localPath,
+						err.Error(),
+					)
+				}
 				return err
 			}
 		}
@@ -1428,7 +1485,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// check if we are running out of space
-	if downloadRequired && cloudAttr != nil {
+	if cloudAttr != nil {
 		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)
@@ -1439,7 +1496,11 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 				)
 			} else {
 				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-					log.Err("FileCache::OpenFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+					log.Err(
+						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
+						fc.maxCacheSize,
+						options.Name,
+					)
 					return nil, syscall.ENOSPC
 				}
 			}
@@ -1489,7 +1550,10 @@ func (fc *FileCache) isDownloadRequired(
 		if fileInPolicyCache {
 			cached = true
 		} else {
-			log.Warn("FileCache::isDownloadRequired : %s exists but is not present in local cache policy", localPath)
+			log.Warn(
+				"FileCache::isDownloadRequired : %s exists but is not present in local cache policy",
+				localPath,
+			)
 		}
 		// gather stat details
 		lmt = finfo.ModTime()
@@ -1498,7 +1562,11 @@ func (fc *FileCache) isDownloadRequired(
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
 	} else {
 		// Catch all, the file needs to be downloaded
-		log.Debug("FileCache::isDownloadRequired : error calling stat %s [%s]", localPath, statErr.Error())
+		log.Debug(
+			"FileCache::isDownloadRequired : error calling stat %s [%s]",
+			localPath,
+			statErr.Error(),
+		)
 	}
 
 	// check if the file is due for a refresh from cloud storage
@@ -1538,9 +1606,17 @@ func (fc *FileCache) isDownloadRequired(
 		} else {
 			// log why we decided not to refresh
 			if !cloudHasLatestData {
-				log.Info("FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]", objectPath, cloudAttr.Mtime, lmt)
+				log.Info(
+					"FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]",
+					objectPath,
+					cloudAttr.Mtime,
+					lmt,
+				)
 			} else if fileIsOpen {
-				log.Info("FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open", objectPath)
+				log.Info(
+					"FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open",
+					objectPath,
+				)
 			}
 			// As we have decided to continue using old file, we reset the timer to check again after refresh time interval
 			flock.SetDownloadTime()
@@ -1713,7 +1789,11 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
 		} else {
 			if (currSize + float64(len(options.Data))) > fc.diskHighWaterMark {
-				log.Err("FileCache::WriteFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Handle.Path)
+				log.Err(
+					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
+					fc.maxCacheSize,
+					options.Handle.Path,
+				)
 				return 0, syscall.ENOSPC
 			}
 		}
@@ -2159,7 +2239,11 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			)
 		} else {
 			if (currSize + float64(options.Size)) > fc.diskHighWaterMark {
-				log.Err("FileCache::TruncateFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+				log.Err(
+					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
+					fc.maxCacheSize,
+					options.Name,
+				)
 				return syscall.ENOSPC
 			}
 		}

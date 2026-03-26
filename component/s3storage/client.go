@@ -1275,6 +1275,10 @@ func (cl *Client) StageAndCommit(
 
 			var partResp *s3.UploadPartOutput
 			partResp, err = cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
+			if err != nil {
+				return err
+			}
+
 			eTag = partResp.ETag
 			blk.Flags.Clear(common.DirtyBlock)
 
@@ -1297,6 +1301,10 @@ func (cl *Client) StageAndCommit(
 				PartNumber:      &partNumber,
 				UploadId:        &uploadID,
 			})
+			if err != nil {
+				return err
+			}
+
 			eTag = partResp.CopyPartResult.ETag
 
 			// Collect the checksums

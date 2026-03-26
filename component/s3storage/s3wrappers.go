@@ -137,7 +137,7 @@ func (cl *Client) getObject(ctx context.Context, options getObjectOptions) (io.R
 		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	getObjectInput := &s3.GetObjectInput{}
+	var getObjectInput *s3.GetObjectInput
 	if rangeString != "" {
 		getObjectInput = &s3.GetObjectInput{
 			Bucket: aws.String(cl.Config.AuthConfig.BucketName),
@@ -370,13 +370,6 @@ func (cl *Client) abortMultipartUpload(ctx context.Context, key string, uploadID
 		Key:      aws.String(key),
 		UploadId: &uploadID,
 	})
-	if len(resp.Parts) != 0 {
-		log.Err(
-			"Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ",
-			key,
-			uploadID,
-		)
-	}
 	if listErr != nil {
 		log.Err(
 			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ",
@@ -384,8 +377,16 @@ func (cl *Client) abortMultipartUpload(ctx context.Context, key string, uploadID
 			uploadID,
 			abortErr.Error(),
 		)
+		return errors.Join(abortErr, listErr)
 	}
-	return errors.Join(abortErr, listErr)
+	if len(resp.Parts) != 0 {
+		log.Err(
+			"Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ",
+			key,
+			uploadID,
+		)
+	}
+	return abortErr
 }
 
 // Wrapper for awsS3Client.ListBuckets
