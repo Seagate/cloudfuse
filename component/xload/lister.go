@@ -236,7 +236,11 @@ func (rl *remoteLister) Process(item *WorkItem) (int, error) {
 					MD5:      entry.MD5,
 				})
 				if err != nil {
-					log.Err("remoteLister::Process : Failed to schedule file %s for processing [%s]", entry.Path, err.Error())
+					log.Err(
+						"remoteLister::Process : Failed to schedule file %s for processing [%s]",
+						entry.Path,
+						err.Error(),
+					)
 					return 0, err
 				}
 			}

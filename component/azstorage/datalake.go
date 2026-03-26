@@ -74,7 +74,9 @@ func transformAccountEndpoint(potentialDfsEndpoint string) string {
 		return strings.ReplaceAll(potentialDfsEndpoint, ".dfs.", ".blob.")
 	} else {
 		// Should we just throw here?
-		log.Warn("Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.")
+		log.Warn(
+			"Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.",
+		)
 	}
 	return potentialDfsEndpoint
 }
@@ -348,7 +350,11 @@ func (dl *Datalake) DeleteDirectory(ctx context.Context, name string) (err error
 			log.Err("Datalake::DeleteDirectory : %s does not exist", name)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::DeleteDirectory : Failed to delete directory %s [%s]", name, err.Error())
+			log.Err(
+				"Datalake::DeleteDirectory : Failed to delete directory %s [%s]",
+				name,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -382,7 +388,12 @@ func (dl *Datalake) RenameFile(
 			log.Err("Datalake::RenameFile : %s does not exist", source)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::RenameFile : Failed to rename file %s to %s [%s]", source, target, err.Error())
+			log.Err(
+				"Datalake::RenameFile : Failed to rename file %s to %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -408,7 +419,12 @@ func (dl *Datalake) RenameDirectory(ctx context.Context, source string, target s
 			log.Err("Datalake::RenameDirectory : %s does not exist", source)
 			return syscall.ENOENT
 		} else {
-			log.Err("Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]", source, target, err.Error())
+			log.Err(
+				"Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
 			return err
 		}
 	}
@@ -478,7 +494,11 @@ func (dl *Datalake) GetAttr(
 		} else {
 			mode, err := getFileModeFromACL(dl.Config.authConfig.ObjectID, *acl.ACL, *acl.Owner)
 			if err != nil {
-				log.Err("Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]", name, err.Error())
+				log.Err(
+					"Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]",
+					name,
+					err.Error(),
+				)
 			} else {
 				blobAttr.Mode = mode
 			}

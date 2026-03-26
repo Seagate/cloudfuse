@@ -536,7 +536,9 @@ func (rw *ReadWriteCache) readWriteBlocks(
 				)
 				block.Flags.Set(common.DirtyBlock)
 			} else {
-				dataCopied = int64(copy(data[dataRead:], block.Data[offset-blocks[blk_index].StartIndex:]))
+				dataCopied = int64(
+					copy(data[dataRead:], block.Data[offset-blocks[blk_index].StartIndex:]),
+				)
 			}
 			dataLeft -= dataCopied
 			offset += dataCopied
@@ -546,7 +548,8 @@ func (rw *ReadWriteCache) readWriteBlocks(
 		} else if write {
 			emptyByteLength := offset - lastBlock.EndIndex
 			// if the data to append + our last block existing data do not exceed block size - just append to last block
-			if (lastBlock.EndIndex-lastBlock.StartIndex)+(emptyByteLength+dataLeft) <= rw.BlockSize || lastBlock.EndIndex == 0 {
+			if (lastBlock.EndIndex-lastBlock.StartIndex)+(emptyByteLength+dataLeft) <= rw.BlockSize ||
+				lastBlock.EndIndex == 0 {
 				_, _, err := rw.getBlock(handle, lastBlock)
 				if err != nil {
 					return dataRead, err
@@ -567,7 +570,9 @@ func (rw *ReadWriteCache) readWriteBlocks(
 			blk := &common.Block{
 				StartIndex: lastBlock.EndIndex,
 				EndIndex:   lastBlock.EndIndex + dataLeft + emptyByteLength,
-				Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(handle.CacheObj.BlockIdLength)),
+				Id: base64.StdEncoding.EncodeToString(
+					common.NewUUIDWithLength(handle.CacheObj.BlockIdLength),
+				),
 			}
 			blk.Data = make([]byte, blk.EndIndex-blk.StartIndex)
 			dataCopied = int64(copy(blk.Data[offset-blk.StartIndex:], data[dataRead:]))

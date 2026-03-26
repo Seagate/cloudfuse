@@ -121,7 +121,10 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 				// Previous mount is in stale state so lets cleanup the state
 				log.Info("Mount::validate : Cleaning up stale mount")
 				if err = unmountCloudfuse(opt.MountPath, true, true); err != nil {
-					return fmt.Errorf("directory is already mounted, unmount manually before remount [%v]", err.Error())
+					return fmt.Errorf(
+						"directory is already mounted, unmount manually before remount [%v]",
+						err.Error(),
+					)
 				}
 			}
 		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
@@ -339,7 +342,9 @@ var mountCmd = &cobra.Command{
 			} else if containers, err = getContainerListAzure(); len(containers) != 0 && err == nil {
 				pipeline = append(pipeline, "azstorage")
 			} else {
-				return errors.New("failed to initialize new pipeline :: unable to determine cloud provider. no pipeline components found in the config: " + err.Error())
+				return errors.New(
+					"failed to initialize new pipeline :: unable to determine cloud provider. no pipeline components found in the config: " + err.Error(),
+				)
 			}
 			options.Components = pipeline
 		}

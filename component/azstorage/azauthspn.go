@@ -82,7 +82,10 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 			},
 			&azidentity.ClientAssertionCredentialOptions{})
 		if err != nil {
-			log.Err("AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]", err.Error())
+			log.Err(
+				"AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]",
+				err.Error(),
+			)
 			return nil, err
 		}
 	} else {
@@ -101,11 +104,19 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 			return nil, err
 		}
 
-		cred, err = azidentity.NewClientSecretCredential(azspn.config.TenantID, azspn.config.ClientID, buff.String(), &azidentity.ClientSecretCredentialOptions{
-			ClientOptions: clOpts,
-		})
+		cred, err = azidentity.NewClientSecretCredential(
+			azspn.config.TenantID,
+			azspn.config.ClientID,
+			buff.String(),
+			&azidentity.ClientSecretCredentialOptions{
+				ClientOptions: clOpts,
+			},
+		)
 		if err != nil {
-			log.Err("AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]", err.Error())
+			log.Err(
+				"AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]",
+				err.Error(),
+			)
 			return nil, err
 		}
 	}

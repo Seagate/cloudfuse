@@ -681,7 +681,9 @@ func (suite *streamTestSuite) TestCachedData() {
 				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.OpenFile(openFileOptions)
 		} else {
-			suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(int(suite.stream.BlockSize), nil)
+			suite.mock.EXPECT().
+				ReadInBuffer(readInBufferOptions).
+				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
 		}
 
@@ -746,7 +748,9 @@ func (suite *streamTestSuite) TestAsyncReadAndEviction() {
 				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.OpenFile(openFileOptions)
 		} else {
-			suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(int(suite.stream.BlockSize), nil)
+			suite.mock.EXPECT().
+				ReadInBuffer(readInBufferOptions).
+				Return(int(suite.stream.BlockSize), nil)
 			_, _ = suite.stream.ReadInBuffer(readInBufferOptions)
 		}
 

@@ -180,7 +180,11 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 	} else {
 		u, err := url.Parse(conf.proxyAddress)
 		if err != nil {
-			log.Err("utils::newCloudfuseHttpClient : Failed to parse proxy : %s [%s]", conf.proxyAddress, err.Error())
+			log.Err(
+				"utils::newCloudfuseHttpClient : Failed to parse proxy : %s [%s]",
+				conf.proxyAddress,
+				err.Error(),
+			)
 			return nil, err
 		}
 		ProxyURL = http.ProxyURL(u)
@@ -527,7 +531,11 @@ func getFileMode(permissions string) (os.FileMode, error) {
 		if permissions[i] == byte(c) {
 			mode |= 1 << uint(9-1-i)
 		} else if permissions[i] != byte('-') {
-			log.Debug("utils::getFileMode : Unexpected permissions from the service at character %d: %s", i, permissions)
+			log.Debug(
+				"utils::getFileMode : Unexpected permissions from the service at character %d: %s",
+				i,
+				permissions,
+			)
 		}
 	}
 	return mode, nil

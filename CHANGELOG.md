@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **2.0.3** ##
+
+January 23rd 2026
+This version is based on [blobfuse2 2.5.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.0) (upstream).
+
+### Bug Fixes ###
+
+- [#801](https://github.com/Seagate/cloudfuse/pull/801) Fix libfuse3 dependency for Debian Trixie
+
 ## **2.0.2** ##
 
 December 16th 2025

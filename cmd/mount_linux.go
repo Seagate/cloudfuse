@@ -150,7 +150,11 @@ retry:
 
 			buff, err := os.ReadFile(dmnCtx.LogFileName)
 			if err != nil {
-				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
+				log.Err(
+					"mount: failed to read child [%v] failure logs [%s]",
+					child.Pid,
+					err.Error(),
+				)
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
 			} else {
 				return Destroy(string(buff))

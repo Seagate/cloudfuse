@@ -112,8 +112,12 @@ func (sc *StatsCollector) statsDumper() {
 			case Decrement:
 				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) - stat.Value.(int64)
 				if stMgrOpt.statsList[idx].Value[stat.Key].(int64) < 0 {
-					log.Err("stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
-						stMgrOpt.statsList[idx].Value[stat.Key], stat.Key, stMgrOpt.statsList[idx].ComponentName)
+					log.Err(
+						"stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
+						stMgrOpt.statsList[idx].Value[stat.Key],
+						stat.Key,
+						stMgrOpt.statsList[idx].ComponentName,
+					)
 				}
 
 			case Replace:

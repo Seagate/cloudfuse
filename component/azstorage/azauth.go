@@ -137,7 +137,10 @@ func getAzBlobAuth(config azAuthConfig) azAuth {
 			},
 		}
 	} else {
-		log.Crit("azAuth::getAzBlobAuth : Auth type %s not supported. Failed to create Auth object", config.AuthMode)
+		log.Crit(
+			"azAuth::getAzBlobAuth : Auth type %s not supported. Failed to create Auth object",
+			config.AuthMode,
+		)
 	}
 	return nil
 }
@@ -181,7 +184,10 @@ func getAzDatalakeAuth(config azAuthConfig) azAuth {
 			},
 		}
 	} else {
-		log.Crit("azAuth::getAzDatalakeAuth : Auth type %s not supported. Failed to create Auth object", config.AuthMode)
+		log.Crit(
+			"azAuth::getAzDatalakeAuth : Auth type %s not supported. Failed to create Auth object",
+			config.AuthMode,
+		)
 	}
 	return nil
 }

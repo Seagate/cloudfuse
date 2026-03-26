@@ -405,8 +405,12 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 			az.stConfig.proxyAddress = opt.HttpsProxyAddress
 		} else {
 			if httpProxyProvided {
-				log.Err("ParseAndValidateConfig : `http-proxy` Invalid : must set `use-http: true` in your config file")
-				return errors.New("`http-proxy` Invalid : must set `use-http: true` in your config file")
+				log.Err(
+					"ParseAndValidateConfig : `http-proxy` Invalid : must set `use-http: true` in your config file",
+				)
+				return errors.New(
+					"`http-proxy` Invalid : must set `use-http: true` in your config file",
+				)
 			}
 		}
 	}
