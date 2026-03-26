@@ -47,7 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-	"github.com/robfig/cron/v3"
+	"github.com/netresearch/go-cron"
 )
 
 // Common structure for Component

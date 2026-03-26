@@ -36,7 +36,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-	"github.com/robfig/cron/v3"
+	"github.com/netresearch/go-cron"
 )
 
 type UploadWindow struct {
@@ -183,6 +183,14 @@ func (fc *FileCache) startScheduler() {
 	fc.cronScheduler.Start()
 }
 
+func isValidCronExpression(expr string) bool {
+	parser := cron.MustNewParser(
+		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
+	)
+	_, err := parser.Parse(expr)
+	return err == nil
+}
+
 func (fc *FileCache) addPendingOp(name string, flock *common.LockMapItem) {
 	log.Trace("FileCache::addPendingOp : %s", name)
 	fc.pendingOps.Store(name, struct{}{})
@@ -287,7 +295,11 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		// open the cached file
 		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
 		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
+			log.Err(
+				"FileCache::uploadPendingFile : %s failed to open file. Here's why: %v",
+				name,
+				err,
+			)
 			return err
 		}
 		// write handle attributes
