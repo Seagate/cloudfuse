@@ -28,7 +28,6 @@ package azstorage
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common/config"
@@ -37,8 +36,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/vibhansa-msft/blobfilter"
-
-	"github.com/JeffreyRichter/enum/enum"
 )
 
 // AuthType Enum
@@ -74,16 +71,39 @@ func (AuthType) WORKLOADIDENTITY() AuthType {
 	return AuthType(6)
 }
 
+var authTypeNames = map[AuthType]string{
+	AuthType(0): "INVALID_AUTH",
+	AuthType(1): "KEY",
+	AuthType(2): "SAS",
+	AuthType(3): "SPN",
+	AuthType(4): "MSI",
+	AuthType(5): "AZCLI",
+	AuthType(6): "WORKLOADIDENTITY",
+}
+
+var authTypeValues = map[string]AuthType{
+	"INVALID_AUTH":     AuthType(0),
+	"KEY":              AuthType(1),
+	"SAS":              AuthType(2),
+	"SPN":              AuthType(3),
+	"MSI":              AuthType(4),
+	"AZCLI":            AuthType(5),
+	"WORKLOADIDENTITY": AuthType(6),
+}
+
 func (a AuthType) String() string {
-	return enum.StringInt(a, reflect.TypeOf(a))
+	if name, ok := authTypeNames[a]; ok {
+		return name
+	}
+	return "INVALID_AUTH"
 }
 
 func (a *AuthType) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(a), s, true, false)
-	if enumVal != nil {
-		*a = enumVal.(AuthType)
+	if val, ok := authTypeValues[strings.ToUpper(s)]; ok {
+		*a = val
+		return nil
 	}
-	return err
+	return fmt.Errorf("invalid AuthType: %s", s)
 }
 
 // AccountType Enum
@@ -103,16 +123,31 @@ func (AccountType) ADLS() AccountType {
 	return AccountType(2)
 }
 
+var accountTypeNames = map[AccountType]string{
+	AccountType(0): "INVALID_ACC",
+	AccountType(1): "BLOCK",
+	AccountType(2): "ADLS",
+}
+
+var accountTypeValues = map[string]AccountType{
+	"INVALID_ACC": AccountType(0),
+	"BLOCK":       AccountType(1),
+	"ADLS":        AccountType(2),
+}
+
 func (a AccountType) String() string {
-	return enum.StringInt(a, reflect.TypeOf(a))
+	if name, ok := accountTypeNames[a]; ok {
+		return name
+	}
+	return "INVALID_ACC"
 }
 
 func (a *AccountType) Parse(s string) error {
-	enumVal, err := enum.ParseInt(reflect.TypeOf(a), s, true, false)
-	if enumVal != nil {
-		*a = enumVal.(AccountType)
+	if val, ok := accountTypeValues[strings.ToUpper(s)]; ok {
+		*a = val
+		return nil
 	}
-	return err
+	return fmt.Errorf("invalid AccountType: %s", s)
 }
 
 // default value for maximum results returned by a list API call
