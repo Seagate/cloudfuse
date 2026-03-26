@@ -39,10 +39,10 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/winfsp/cgofuse/fuse"
+	"go.uber.org/mock/gomock"
 )
 
 type libfuseTestSuite struct {

@@ -37,7 +37,7 @@ import (
 	common "github.com/Seagate/cloudfuse/common"
 	handlemap "github.com/Seagate/cloudfuse/internal/handlemap"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 var _ Component = &MockComponent{}
