@@ -33,6 +33,11 @@ func setBlockChecksum(localPath string, data []byte, n int) error {
 }
 
 // checkBlockConsistency is a no-op on Windows.
-func checkBlockConsistency(blockCache *BlockCache, item *workItem, numberOfBytes int, localPath, fileName string) bool {
+func checkBlockConsistency(
+	blockCache *BlockCache,
+	item *workItem,
+	numberOfBytes int,
+	localPath, fileName string,
+) bool {
 	return true
 }

@@ -357,7 +357,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	if opt.BlockSize != 0 {
 		if opt.BlockSize > blockblob.MaxStageBlockBytes {
 			log.Err(
-				"ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %s Bytes",
+				"ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %d Bytes",
 				blockblob.MaxStageBlockBytes,
 			)
 			return errors.New("block size is too large")
@@ -586,8 +586,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	log.Crit(
-		"ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v",
-		"restricted-characters-windows %v",
+		"ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v, restricted-characters-windows %v",
 		az.stConfig.authConfig.AccountName,
 		az.stConfig.container,
 		az.stConfig.authConfig.AccountType,
@@ -602,7 +601,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.restrictedCharsWin,
 	)
 	log.Crit(
-		"ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %s, fail-unsupported-op %t, mount-all-containers %t",
+		"ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %v, fail-unsupported-op %t, mount-all-containers %t",
 		az.stConfig.authConfig.UseHTTP,
 		az.stConfig.blockSize,
 		az.stConfig.maxConcurrency,

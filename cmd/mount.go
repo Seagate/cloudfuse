@@ -488,7 +488,7 @@ var mountCmd = &cobra.Command{
 		if !disableVersionCheck {
 			err := VersionCheck()
 			if err != nil {
-				log.Err(err.Error())
+				log.Err("%s", err.Error())
 			}
 		}
 

@@ -62,13 +62,20 @@ func (sc *StatsCollector) statsDumper() {
 		windows.Close(tPipe)
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
+			log.Info(
+				"stats_manager::statsDumper : Named pipe %s not found, retrying...",
+				common.TransferPipe,
+			)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
 			log.Err("stats_manager::statsDumper: Pipe instances are busy, retrying...")
 			time.Sleep(1 * time.Second)
 		} else {
-			log.Err("stats_manager::statsDumper: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
+			log.Err(
+				"stats_manager::statsDumper: Unable to open pipe %s with error [%v]",
+				common.TransferPipe,
+				err,
+			)
 			return
 		}
 	}
@@ -130,8 +137,12 @@ func (sc *StatsCollector) statsDumper() {
 			case Decrement:
 				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) - stat.Value.(int64)
 				if stMgrOpt.statsList[idx].Value[stat.Key].(int64) < 0 {
-					log.Err("stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
-						stMgrOpt.statsList[idx].Value[stat.Key], stat.Key, stMgrOpt.statsList[idx].ComponentName)
+					log.Err(
+						"stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
+						stMgrOpt.statsList[idx].Value[stat.Key],
+						stat.Key,
+						stMgrOpt.statsList[idx].ComponentName,
+					)
 				}
 
 			case Replace:
@@ -174,7 +185,11 @@ func statsPolling() {
 	// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 	err = windows.ConnectNamedPipe(handle, nil)
 	if err != nil {
-		log.Err("stats_manager::statsPolling : unable to connect to named pipe %s: [%v]", common.PollingPipe, err)
+		log.Err(
+			"stats_manager::statsPolling : unable to connect to named pipe %s: [%v]",
+			common.PollingPipe,
+			err,
+		)
 		return
 	}
 	log.Info("StatsReader::statsReader : Connected polling pipe")
@@ -203,13 +218,20 @@ func statsPolling() {
 
 		windows.Close(tPipe)
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Info("stats_manager::statsPolling : Named pipe %s not found, retrying...", common.TransferPipe)
+			log.Info(
+				"stats_manager::statsPolling : Named pipe %s not found, retrying...",
+				common.TransferPipe,
+			)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
 			log.Err("stats_manager::statsPolling: Pipe instances are busy, retrying...")
 			time.Sleep(1 * time.Second)
 		} else {
-			log.Err("stats_manager::statsPolling: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
+			log.Err(
+				"stats_manager::statsPolling: Unable to open pipe %s with error [%v]",
+				common.TransferPipe,
+				err,
+			)
 			return
 		}
 	}
@@ -255,7 +277,10 @@ func statsPolling() {
 			}
 
 			if cmpSt.Timestamp == stMgrOpt.cmpTimeMap[cmpSt.ComponentName] {
-				log.Debug("stats_manager::statsPolling : Skipping as there is no change in stats collected for %v", cmpSt.ComponentName)
+				log.Debug(
+					"stats_manager::statsPolling : Skipping as there is no change in stats collected for %v",
+					cmpSt.ComponentName,
+				)
 				continue
 			}
 
@@ -269,7 +294,7 @@ func statsPolling() {
 
 			// send the stats collected so far to transfer pipe
 			stMgrOpt.transferMtx.Lock()
-			err = windows.WriteFile(tPipe, []byte(fmt.Sprintf("%v\n", string(msg))), nil, nil)
+			err = windows.WriteFile(tPipe, fmt.Appendf(nil, "%v\n", string(msg)), nil, nil)
 			stMgrOpt.transferMtx.Unlock()
 			if err != nil {
 				log.Err("stats_manager::statsDumper : Unable to write to pipe [%v]", err)

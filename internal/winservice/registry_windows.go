@@ -117,7 +117,11 @@ func AddRegistryValue(keyName string, valueName string, value string) error {
 }
 
 func RemoveRegistryValue(keyName string, valueName string) error {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyName, registry.SET_VALUE|registry.QUERY_VALUE)
+	key, err := registry.OpenKey(
+		registry.LOCAL_MACHINE,
+		keyName,
+		registry.SET_VALUE|registry.QUERY_VALUE,
+	)
 	if err != nil {
 		return err
 	}

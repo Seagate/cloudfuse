@@ -34,13 +34,20 @@ import (
 	"github.com/Seagate/cloudfuse/internal/winservice"
 )
 
-func unmountCloudfuseWindows(mountPath string, disableRemountUser bool, disableRemountSystem bool) error {
+func unmountCloudfuseWindows(
+	mountPath string,
+	disableRemountUser bool,
+	disableRemountSystem bool,
+) error {
 	// Remove the mount from json file so it does not remount on restart.
 	if disableRemountUser || disableRemountSystem {
 		err := winservice.RemoveMountJSON(mountPath, disableRemountSystem)
 		// If error is not nill then ignore it
 		if err != nil {
-			log.Err("failed to remove entry from json file [%s]. Are you sure this mount was enabled for remount?", err.Error())
+			log.Err(
+				"failed to remove entry from json file [%s]. Are you sure this mount was enabled for remount?",
+				err.Error(),
+			)
 		}
 	}
 

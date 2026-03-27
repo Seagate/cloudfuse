@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 
@@ -58,7 +59,8 @@ var umntAllCmd = &cobra.Command{
 		}
 		mountfound := 0
 		unmounted := 0
-		errMsg := "failed to unmount - \n"
+		var errMsg strings.Builder
+		errMsg.WriteString("failed to unmount - \n")
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
@@ -73,7 +75,7 @@ var umntAllCmd = &cobra.Command{
 			if err == nil {
 				unmounted += 1
 			} else {
-				errMsg += " " + mntPath + " - [" + err.Error() + "]\n"
+				errMsg.WriteString(" " + mntPath + " - [" + err.Error() + "]\n")
 			}
 		}
 
@@ -84,7 +86,7 @@ var umntAllCmd = &cobra.Command{
 		}
 
 		if unmounted < mountfound {
-			return errors.New(errMsg)
+			return errors.New(errMsg.String())
 		}
 
 		return nil

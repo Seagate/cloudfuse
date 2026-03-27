@@ -135,8 +135,8 @@ func ListMountPoints() ([]string, error) {
 		return nil, err
 	}
 	var mntList []string
-	outList := strings.Split(string(out), "\n")
-	for _, item := range outList {
+	outList := strings.SplitSeq(string(out), "\n")
+	for item := range outList {
 		if strings.HasPrefix(item, "cloudfuse") {
 			// Extract the mount path from this line
 			mntPath := strings.Split(item, " ")[1]

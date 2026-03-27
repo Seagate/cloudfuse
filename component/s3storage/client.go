@@ -43,7 +43,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -422,9 +421,9 @@ func (cl *Client) CreateLink(
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-	symlinkMap := map[string]*string{symlinkKey: to.Ptr("false")}
+	symlinkMap := map[string]*string{symlinkKey: new("false")}
 	if isSymlink {
-		symlinkMap[symlinkKey] = to.Ptr("true")
+		symlinkMap[symlinkKey] = new("true")
 	}
 	return cl.WriteFromBuffer(ctx, source, symlinkMap, data)
 }
@@ -1084,7 +1083,7 @@ func (cl *Client) Write(ctx context.Context, options *internal.WriteFileOptions)
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple parts
 		err := cl.WriteFromBuffer(ctx, name, options.Metadata, *dataBuffer)
 		if err != nil {
-			log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
+			log.Err("Client::Write : Failed to upload to object %s. Here's why: %v", name, err)
 			return err
 		}
 	} else {
@@ -1225,7 +1224,7 @@ func (cl *Client) StageAndCommit(
 	if combineBlocks {
 		bol.BlockList, err = cl.combineSmallBlocks(ctx, name, bol.BlockList)
 		if err != nil {
-			log.Err("Client::StageAndCommit : Failed to combine small blocks: %v ", name, err)
+			log.Err("Client::StageAndCommit : Failed to combine small blocks for %s: %v", name, err)
 			return err
 		}
 	}
@@ -1248,7 +1247,7 @@ func (cl *Client) StageAndCommit(
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
-			"Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ",
+			"Client::StageAndCommit : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1261,7 +1260,7 @@ func (cl *Client) StageAndCommit(
 	}
 	if uploadID == "" {
 		log.Err(
-			"Client::StageAndCommit : No upload id found in start upload request. Here's why: %v ",
+			"Client::StageAndCommit : No upload id found in start upload request for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1350,7 +1349,7 @@ func (cl *Client) StageAndCommit(
 
 		if err != nil {
 			log.Info(
-				"Client::StageAndCommit : Attempting to abort upload due to error: ",
+				"Client::StageAndCommit : Attempting to abort upload due to error: %s",
 				err.Error(),
 			)
 			abortErr := cl.abortMultipartUpload(ctx, key, uploadID)
@@ -1387,7 +1386,10 @@ func (cl *Client) StageAndCommit(
 		},
 	})
 	if err != nil {
-		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+		log.Info(
+			"Client::StageAndCommit : Attempting to abort upload due to error: %s",
+			err.Error(),
+		)
 		abortErr := cl.abortMultipartUpload(ctx, key, uploadID)
 		return errors.Join(err, abortErr)
 	}
@@ -1433,7 +1435,7 @@ func (cl *Client) combineSmallBlocks(
 				)
 				if err != nil {
 					log.Err(
-						"Client::combineSmallBlocks : Unable to get object with error: ",
+						"Client::combineSmallBlocks : Unable to get object with error: %s",
 						err.Error(),
 					)
 					return nil, err
@@ -1443,7 +1445,7 @@ func (cl *Client) combineSmallBlocks(
 				addData, err = io.ReadAll(result)
 				if err != nil {
 					log.Err(
-						"Client::combineSmallBlocks : Unable to read bytes from object with error: ",
+						"Client::combineSmallBlocks : Unable to read bytes from object with error: %s",
 						err.Error(),
 					)
 					return nil, err
@@ -1589,7 +1591,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err(
-			"Client::CommitBlocks : Failed to create multipart upload. Here's why: %v ",
+			"Client::CommitBlocks : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1602,7 +1604,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 	}
 	if uploadID == "" {
 		log.Err(
-			"Client::CommitBlocks : No upload id found in start upload request. Here's why: %v ",
+			"Client::CommitBlocks : No upload id found in start upload request for %s. Here's why: %v",
 			name,
 			err,
 		)
@@ -1653,7 +1655,7 @@ func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []str
 
 		partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
 		if err != nil {
-			log.Err("Client::CommitBlocks : failed to upload part: ", uploadErr)
+			log.Err("Client::CommitBlocks : failed to upload part: %v", uploadErr)
 			break
 		}
 

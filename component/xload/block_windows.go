@@ -57,7 +57,11 @@ func AllocateBlock(size uint64) (*Block, error) {
 	} else {
 		if freeRam < size {
 			// Not enough free RAM to allocate the requested size
-			return nil, fmt.Errorf("insufficient memory available: requested %d bytes, available %d bytes", size, freeRam)
+			return nil, fmt.Errorf(
+				"insufficient memory available: requested %d bytes, available %d bytes",
+				size,
+				freeRam,
+			)
 		}
 	}
 

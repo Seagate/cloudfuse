@@ -17,7 +17,7 @@ jobs:
     name: Build and Test with Code Coverage
     strategy:
       matrix:
-        go: ["1.25"]
+        go: ["1.26"]
         job_name: ["linux-fuse3", "linux-fuse2"]
 
         include:
@@ -1058,7 +1058,7 @@ jobs:
     name: Build and Test with Code Coverage on Windows
     strategy:
       matrix:
-        go: ["1.25"]
+        go: ["1.26"]
         job_name: ["windows"]
 
         include:
@@ -1983,7 +1983,7 @@ jobs:
     name: Cleanup Test Accounts
     strategy:
       matrix:
-        go: ["1.25"]
+        go: ["1.26"]
         job_name: ["linux"]
 
         include:

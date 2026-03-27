@@ -66,8 +66,8 @@ func (suite *mountListTestSuite) TestMountListNoMounts() {
 	output, err := executeCommandC(rootCmd, "mount", "list")
 	suite.assert.NoError(err)
 	// Either no mounts or lists some mounts - both are valid
-	suite.assert.True(
-		len(output) > 0,
+	suite.assert.NotEmpty(
+		output,
 		"Expected output from mount list command",
 	)
 }

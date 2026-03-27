@@ -187,8 +187,8 @@ func (ms *MountSize) sync() error {
 				return err
 			}
 			// Parse simple key=value lines
-			lines := bytes.Split(data, []byte("\n"))
-			for _, ln := range lines {
+			lines := bytes.SplitSeq(data, []byte("\n"))
+			for ln := range lines {
 				ln = bytes.TrimSpace(ln)
 				if len(ln) == 0 ||
 					bytes.HasPrefix(ln, []byte("#")) ||

@@ -201,7 +201,7 @@ func (bb *BlockBlob) TestPipeline() error {
 	listBlobPager := bb.Container.NewListBlobsHierarchyPager(
 		"/",
 		&container.ListBlobsHierarchyOptions{
-			MaxResults: to.Ptr((int32)(2)),
+			MaxResults: new((int32)(2)),
 			Prefix:     &bb.Config.prefixPath,
 			Include:    includeFields,
 		},
@@ -239,7 +239,7 @@ func (bb *BlockBlob) IsAccountADLS() bool {
 	listBlobPager := bb.Container.NewListBlobsHierarchyPager(
 		"/",
 		&container.ListBlobsHierarchyOptions{
-			MaxResults: to.Ptr((int32)(2)),
+			MaxResults: new((int32)(2)),
 			Prefix:     &bb.Config.prefixPath,
 			Include:    includeFields,
 		},
@@ -316,7 +316,7 @@ func (bb *BlockBlob) CreateDirectory(ctx context.Context, name string) error {
 
 	var data []byte
 	metadata := make(map[string]*string)
-	metadata[folderKey] = to.Ptr("true")
+	metadata[folderKey] = new("true")
 
 	return bb.WriteFromBuffer(ctx, name, metadata, data)
 }
@@ -326,7 +326,7 @@ func (bb *BlockBlob) CreateLink(ctx context.Context, source string, target strin
 	log.Trace("BlockBlob::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 	metadata := make(map[string]*string)
-	metadata[symlinkKey] = to.Ptr("true")
+	metadata[symlinkKey] = new("true")
 	return bb.WriteFromBuffer(ctx, source, metadata, data)
 }
 
@@ -472,7 +472,7 @@ func (bb *BlockBlob) RenameDirectory(ctx context.Context, source string, target 
 
 	srcDirPresent := false
 	pager := bb.Container.NewListBlobsFlatPager(&container.ListBlobsFlatOptions{
-		Prefix: to.Ptr(bb.getFormattedPath(source) + "/"),
+		Prefix: new(bb.getFormattedPath(source) + "/"),
 	})
 	for pager.More() {
 		listBlobResp, err := pager.NextPage(ctx)
@@ -490,7 +490,7 @@ func (bb *BlockBlob) RenameDirectory(ctx context.Context, source string, target 
 				log.Err(
 					"BlockBlob::RenameDirectory : Failed to rename file %s [%s]",
 					srcPath,
-					err.Error,
+					err.Error(),
 				)
 			}
 		}
@@ -713,7 +713,7 @@ func (bb *BlockBlob) List(
 	// APIs that may be affected include IsDirEmpty, ReadDir and StreamDir
 
 	if err != nil {
-		log.Err("BlockBlob::List : Failed to list the container with the prefix %s", err.Error)
+		log.Err("BlockBlob::List : Failed to list the container with the prefix [%s]", err.Error())
 		return nil, nil, err
 	}
 
@@ -982,7 +982,7 @@ func (bb *BlockBlob) ReadToFile(
 
 	blobClient := bb.getBlobClient(name)
 
-	downloadPtr := to.Ptr(int64(1))
+	downloadPtr := new(int64(1))
 
 	if common.MonitorCfs() {
 		bb.downloadOptions.Progress = func(bytesTransferred int64) {
@@ -1252,7 +1252,7 @@ func (bb *BlockBlob) WriteFromFile(
 	blobClient := bb.getBlockBlobClient(name)
 	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromFile", name)
 
-	uploadPtr := to.Ptr(int64(1))
+	uploadPtr := new(int64(1))
 
 	blockSize := bb.Config.blockSize
 	// get the size of the file
@@ -1290,7 +1290,7 @@ func (bb *BlockBlob) WriteFromFile(
 		Metadata:    metadata,
 		AccessTier:  bb.Config.defaultTier,
 		HTTPHeaders: &blob.HTTPHeaders{
-			BlobContentType: to.Ptr(getContentType(name)),
+			BlobContentType: new(getContentType(name)),
 			BlobContentMD5:  md5sum,
 		},
 		CPKInfo: bb.blobCPKOpt,
@@ -1354,7 +1354,7 @@ func (bb *BlockBlob) WriteFromBuffer(
 		Metadata:    metadata,
 		AccessTier:  bb.Config.defaultTier,
 		HTTPHeaders: &blob.HTTPHeaders{
-			BlobContentType: to.Ptr(getContentType(name)),
+			BlobContentType: new(getContentType(name)),
 		},
 		CPKInfo: bb.blobCPKOpt,
 	})
@@ -1383,7 +1383,11 @@ func (bb *BlockBlob) GetFileBlockOffsets(
 	)
 
 	if err != nil {
-		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s ", name, err.Error())
+		log.Err(
+			"BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]",
+			name,
+			err.Error(),
+		)
 		return &common.BlockOffsetList{}, err
 	}
 
@@ -1558,7 +1562,6 @@ func (bb *BlockBlob) createNewBlocksTruncate(
 					return err
 				}
 			}
-
 		}
 	}
 
@@ -1906,7 +1909,7 @@ func (bb *BlockBlob) Write(ctx context.Context, options *internal.WriteFileOptio
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
 		err := bb.WriteFromBuffer(ctx, name, options.Metadata, *dataBuffer)
 		if err != nil {
-			log.Err("BlockBlob::Write : Failed to upload to blob %s ", name, err.Error())
+			log.Err("BlockBlob::Write : Failed to upload to blob %s [%s]", name, err.Error())
 			return err
 		}
 		// case 2: given offset is within the size of the blob - and the blob consists of multiple blocks
@@ -1923,7 +1926,7 @@ func (bb *BlockBlob) Write(ctx context.Context, options *internal.WriteFileOptio
 			newBufferSize, err = bb.createNewBlocks(fileOffsets, offset, length)
 			if err != nil {
 				log.Err(
-					"BlockBlob::Write : Failed to create new blocks for file %s",
+					"BlockBlob::Write : Failed to create new blocks for file %s [%s]",
 					name,
 					err.Error(),
 				)
@@ -1999,7 +2002,7 @@ func (bb *BlockBlob) stageAndCommitModifiedBlocks(
 		blockIDList,
 		&blockblob.CommitBlockListOptions{
 			HTTPHeaders: &blob.HTTPHeaders{
-				BlobContentType: to.Ptr(getContentType(name)),
+				BlobContentType: new(getContentType(name)),
 			},
 			Tier:    bb.Config.defaultTier,
 			CPKInfo: bb.blobCPKOpt,
@@ -2088,7 +2091,7 @@ func (bb *BlockBlob) StageAndCommit(
 			blockIDList,
 			&blockblob.CommitBlockListOptions{
 				HTTPHeaders: &blob.HTTPHeaders{
-					BlobContentType: to.Ptr(getContentType(name)),
+					BlobContentType: new(getContentType(name)),
 				},
 				Tier:    bb.Config.defaultTier,
 				CPKInfo: bb.blobCPKOpt,
@@ -2152,7 +2155,11 @@ func (bb *BlockBlob) GetCommittedBlockList(
 	)
 
 	if err != nil {
-		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s ", name, err.Error())
+		log.Err(
+			"BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]",
+			name,
+			err.Error(),
+		)
 		return nil, err
 	}
 
@@ -2225,7 +2232,7 @@ func (bb *BlockBlob) CommitBlocks(
 		blockList,
 		&blockblob.CommitBlockListOptions{
 			HTTPHeaders: &blob.HTTPHeaders{
-				BlobContentType: to.Ptr(getContentType(name)),
+				BlobContentType: new(getContentType(name)),
 			},
 			Tier:    bb.Config.defaultTier,
 			CPKInfo: bb.blobCPKOpt,

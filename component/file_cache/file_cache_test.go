@@ -109,7 +109,7 @@ func (suite *fileCacheTestSuite) SetupTest() {
 		suite.fake_storage_path,
 	)
 	suite.useMock = false
-	log.Debug(defaultConfig)
+	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)

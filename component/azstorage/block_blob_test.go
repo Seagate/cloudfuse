@@ -1,5 +1,4 @@
 //go:build !authtest
-// +build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -505,7 +504,7 @@ func (s *blockBlobTestSuite) TestCreateDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -526,7 +525,7 @@ func (s *blockBlobTestSuite) TestDeleteDir() {
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
@@ -640,7 +639,7 @@ func (s *blockBlobTestSuite) TestIsDirEmpty() {
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -690,7 +689,7 @@ func (s *blockBlobTestSuite) TestStreamDirNoVirtualDirectory() {
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.NoError(err)
@@ -734,7 +733,7 @@ func (s *blockBlobTestSuite) TestStreamDirRoot() {
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
@@ -820,7 +819,7 @@ func (s *blockBlobTestSuite) TestStreamDirWindowsNameConvert() {
 	// Testing dir and dir/
 	var paths = []string{windowsDirName, windowsDirName + "/"}
 	for _, path := range paths {
-		log.Debug(path)
+		log.Debug("%s", path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.NoError(err)
@@ -1331,7 +1330,7 @@ func (s *blockBlobTestSuite) TestRenameFileMetadataConservation() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: src})
 	// Add srcMeta to source
 	srcMeta := make(map[string]*string)
-	srcMeta["foo"] = to.Ptr("bar")
+	srcMeta["foo"] = new("bar")
 	source.SetMetadata(ctx, srcMeta, nil)
 	dst := generateFileName()
 
@@ -1660,7 +1659,11 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	s.az.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err := s.az.TruncateFile(
-		internal.TruncateFileOptions{Name: windowsName, OldSize: -1, NewSize: int64(truncatedLength)},
+		internal.TruncateFileOptions{
+			Name:    windowsName,
+			OldSize: -1,
+			NewSize: int64(truncatedLength),
+		},
 	)
 	s.assert.NoError(err)
 

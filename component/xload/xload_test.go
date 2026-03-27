@@ -88,7 +88,7 @@ func (suite *xloadTestSuite) SetupTest() {
 		suite.local_path,
 		suite.fake_storage_path,
 	)
-	log.Debug(defaultConfig)
+	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
 	os.RemoveAll(suite.local_path)
