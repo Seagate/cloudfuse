@@ -2076,7 +2076,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// If the file is being downloaded or deleted, the size and mod time will be incorrect
 	// wait for download or deletion to complete before getting local file info
 	flock := fc.fileLocks.Get(options.Name)
-	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
 	flock.RLock()
 
 	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
@@ -2089,11 +2088,10 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	}
 
-	flock.RUnlock()
-
 	// To cover case 1, get attributes from storage
 	var exists bool
 	attrs, remoteErr := fc.NextComponent().GetAttr(options)
+	flock.RUnlock()
 	switch {
 	case !isOffline(remoteErr) && os.IsNotExist(remoteErr):
 		log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
@@ -2109,7 +2107,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	flock.RUnlock()
 	if localErr == nil {
 		if !exists { // Case 2 (only in local cache)
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
