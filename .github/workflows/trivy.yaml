@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
 
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284 # 0.34.0
         with:
           scan-type: "fs"
           severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
@@ -51,7 +51,7 @@ jobs:
           exit-code: 1
 
       - name: Trivy License Scan
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284 # 0.34.0
         with:
           scan-type: "fs"
           severity: "HIGH,CRITICAL"

@@ -36,8 +36,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-
-	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type ReadWriteCache struct {
@@ -447,7 +446,18 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 	handle.CacheObj.BlockOffsetList = offsets
 	// if its a small file then download the file in its entirety if there is memory available, otherwise stream only
 	if handle.CacheObj.HasNoBlocks() {
-		if uint64(atomic.LoadInt64(&handle.Size)) > memory.FreeMemory() {
+		v, err := mem.VirtualMemory()
+		if err != nil {
+			log.Warn(
+				"ReadWriteCache::createHandleCache : unable to read system memory info for %s [%v]; switching handle to stream-only mode",
+				handle.Path,
+				err,
+			)
+			handle.CacheObj.StreamOnly = true
+			return nil
+		}
+
+		if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {
 			handle.CacheObj.StreamOnly = true
 			return nil
 		}
