@@ -513,7 +513,7 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 }
 
 // Read file data into the buffer given in options.Data.
-func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (s3 *S3Storage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
@@ -549,7 +549,7 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	return length, err
 }
 
-func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (s3 *S3Storage) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	err := s3.Storage.Write(s3.ctx, options)
 	s3.updateConnectionState(err)
 	return len(options.Data), err
@@ -563,15 +563,15 @@ func (s3 *S3Storage) GetFileBlockOffsets(
 }
 
 func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := s3.Storage.TruncateFile(s3.ctx, options.Name, options.Size)
+	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.NewSize)
+	err := s3.Storage.TruncateFile(s3.ctx, options.Name, options.NewSize)
 	s3.updateConnectionState(err)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
 			truncateFile,
 			options.Name,
-			map[string]any{size: options.Size},
+			map[string]any{size: options.NewSize},
 		)
 		s3StatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}

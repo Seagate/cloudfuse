@@ -948,7 +948,7 @@ func (cl *Client) GetFileBlockOffsets(
 	// if file is smaller than the uploadCutoff it is small, otherwise it is a multipart
 	// upload
 	if result.Size < cutoff {
-		blockList.Flags.Set(common.SmallFile)
+		blockList.Flags.Set(common.BlobFlagHasNoBlocks)
 		return &blockList, nil
 	}
 
@@ -1033,7 +1033,7 @@ func (cl *Client) TruncateFile(ctx context.Context, name string, size int64) err
 }
 
 // Write : write data at given offset to an object
-func (cl *Client) Write(ctx context.Context, options internal.WriteFileOptions) error {
+func (cl *Client) Write(ctx context.Context, options *internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	data := options.Data
@@ -1049,7 +1049,7 @@ func (cl *Client) Write(ctx context.Context, options internal.WriteFileOptions) 
 		return err
 	}
 
-	if fileOffsets.SmallFile() {
+	if fileOffsets.HasNoBlocks() {
 		// case 1: file consists of no parts (small file)
 
 		// get the existing object data

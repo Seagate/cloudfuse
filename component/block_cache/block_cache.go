@@ -657,7 +657,7 @@ func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
 }
 
 // ReadInBuffer: Read the file into a buffer
-func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
+func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	if options.Offset >= options.Handle.Size {
 		// EOF reached so early exit
 		return 0, io.EOF
@@ -1286,7 +1286,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 	var etag string
 	// If file does not exists then download the block from the container
-	n, err := bc.NextComponent().ReadInBuffer(internal.ReadInBufferOptions{
+	n, err := bc.NextComponent().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: item.handle,
 		Offset: int64(item.block.offset),
 		Data:   item.block.data,
@@ -1418,7 +1418,7 @@ func (bc *BlockCache) download(item *workItem) {
 }
 
 // WriteFile: Write to the local file
-func (bc *BlockCache) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (bc *BlockCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	// log.Debug("BlockCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	options.Handle.Lock()
@@ -2426,6 +2426,21 @@ func (bc *BlockCache) SyncFile(options internal.SyncFileOptions) error {
 	) //nolint
 	if err != nil {
 		log.Err("BlockCache::SyncFile : failed to flush file %s", options.Handle.Path)
+		return err
+	}
+
+	return nil
+}
+
+func (bc *BlockCache) TruncateFile(options internal.TruncateFileOptions) error {
+	log.Trace("BlockCache::TruncateFile : path=%s, size=%d", options.Name, options.NewSize)
+
+	// Set the block size that need to used by the next component
+	options.BlockSize = int64(bc.blockSize)
+
+	err := bc.NextComponent().TruncateFile(options)
+	if err != nil {
+		log.Err("BlockCache::TruncateFile : Failed to truncate file %s: %v", options.Name, err)
 		return err
 	}
 

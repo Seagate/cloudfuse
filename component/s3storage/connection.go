@@ -129,7 +129,7 @@ type S3Connection interface {
 		metadata map[string]*string,
 		data []byte,
 	) error
-	Write(ctx context.Context, options internal.WriteFileOptions) error
+	Write(ctx context.Context, options *internal.WriteFileOptions) error
 	GetFileBlockOffsets(ctx context.Context, name string) (*common.BlockOffsetList, error)
 
 	TruncateFile(ctx context.Context, name string, size int64) error

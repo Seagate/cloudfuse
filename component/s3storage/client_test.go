@@ -1347,7 +1347,7 @@ func (s *clientTestSuite) TestWrite() {
 	h := handlemap.NewHandle(name)
 	err = s.client.Write(
 		ctx,
-		internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData},
+		&internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData},
 	)
 	s.assert.NoError(err)
 

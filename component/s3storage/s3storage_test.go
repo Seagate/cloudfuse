@@ -1173,7 +1173,7 @@ func (s *s3StorageTestSuite) TestOpenFileSize() {
 	size := 10
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
 	s.assert.NoError(err)
-	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(size)})
+	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, NewSize: int64(size)})
 	s.assert.NoError(err)
 
 	// TODO: There is a sort of bug in S3 where writing zeros to the object causes it to be unreadable.
@@ -1362,14 +1362,14 @@ func (s *s3StorageTestSuite) TestReadInBuffer() {
 	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.NoError(err)
 
 	output := make([]byte, 5)
 	len, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(5, len)
@@ -1384,14 +1384,14 @@ func (s *s3StorageTestSuite) TestReadInBufferRange() {
 	s.assert.NoError(err)
 	testData := "test data test data "
 	data := []byte(testData)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.NoError(err)
 
 	output := make([]byte, 15)
 	len, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 5, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 5, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(15, len)
@@ -1406,14 +1406,14 @@ func (s *s3StorageTestSuite) TestReadInBufferLargeBuffer() {
 	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.NoError(err)
 
 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
 	len, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.EqualValues(h.Size, len)
@@ -1429,7 +1429,7 @@ func (s *s3StorageTestSuite) TestReadInBufferEmpty() {
 
 	output := make([]byte, 10)
 	len, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(0, len)
@@ -1443,7 +1443,7 @@ func (s *s3StorageTestSuite) TestReadInBufferBadRange() {
 	h.Size = 10
 
 	_, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)},
 	)
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ERANGE, err)
@@ -1457,7 +1457,7 @@ func (s *s3StorageTestSuite) TestReadInBufferError() {
 	h.Size = 10
 
 	_, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)},
 	)
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
@@ -1472,7 +1472,9 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 
 	testData := "test data"
 	data := []byte(testData)
-	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	count, err := s.s3Storage.WriteFile(
+		&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+	)
 	s.assert.NoError(err)
 	s.assert.Equal(len(data), count)
 
@@ -1505,7 +1507,9 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	data := make([]byte, fileSize)
 	rand.Read(data)
 
-	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	count, err := s.s3Storage.WriteFile(
+		&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+	)
 	s.assert.NoError(err)
 	s.assert.Equal(len(data), count)
 
@@ -1554,7 +1558,9 @@ func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 
 	testData := "test data"
 	data := []byte(testData)
-	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	count, err := s.s3Storage.WriteFile(
+		&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+	)
 	s.assert.NoError(err)
 	s.assert.Equal(len(data), count)
 
@@ -1581,11 +1587,11 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1622,11 +1628,11 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: windowsName, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1654,11 +1660,11 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1686,11 +1692,11 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 9
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1718,11 +1724,11 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 9
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1750,11 +1756,11 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 15
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1782,7 +1788,7 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	truncatedLength := 15
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1810,11 +1816,11 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 15
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -1852,7 +1858,7 @@ func (s *s3StorageTestSuite) TestWriteSmallFile() {
 	testData := "test data"
 	data := []byte(testData)
 	dataLen := len(data)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1880,14 +1886,14 @@ func (s *s3StorageTestSuite) TestOverwriteSmallFile() {
 	testData := "test-replace-data"
 	data := []byte(testData)
 	dataLen := len(data)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -1915,14 +1921,14 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendToSmallFile() {
 	testData := "test-data"
 	data := []byte(testData)
 
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -1951,14 +1957,14 @@ func (s *s3StorageTestSuite) TestAppendToSmallFile() {
 	testData := "test-data"
 	data := []byte(testData)
 
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -1987,14 +1993,14 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	testData := "test-data"
 	data := []byte(testData)
 
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2043,7 +2049,7 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 	defer os.Remove(f.Name())
 	newTestData := []byte("cake")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2092,7 +2098,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2140,7 +2146,7 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 5 * MB, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 5 * MB, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2188,7 +2194,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 15*MB - 4, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 15*MB - 4, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2236,7 +2242,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2267,14 +2273,14 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSize() {
 	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
 	data := []byte(testData)
 
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Data: data})
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData},
+		&internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData},
 	)
 	s.assert.NoError(err)
 
@@ -2705,7 +2711,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
@@ -2724,7 +2730,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	before, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
@@ -2733,7 +2739,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 
 	time.Sleep(1 * time.Second) // Wait and then modify the file again
 
-	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
 
 	after, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
@@ -2909,7 +2915,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
 	data := []byte(testData)
 
-	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	// GetFileBlockOffsets
 	offsetList, err := s.s3Storage.GetFileBlockOffsets(
@@ -2917,7 +2923,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	)
 	s.assert.NoError(err)
 	s.assert.Empty(offsetList.BlockList)
-	s.assert.True(offsetList.SmallFile())
+	s.assert.True(offsetList.HasNoBlocks())
 	s.assert.EqualValues(0, offsetList.BlockIdLength)
 }
 
@@ -2991,7 +2997,7 @@ func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 
 	output := make([]byte, 1)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(0, length)
@@ -3032,7 +3038,7 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 
 	output := make([]byte, 15*MB)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(15*MB, length)
@@ -3086,7 +3092,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 
 	output := make([]byte, 15*MB)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(15*MB, length)
@@ -3145,7 +3151,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 
 	output := make([]byte, 16*MB)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(16*MB, length)
@@ -3208,14 +3214,14 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	}
 	blk3.Flags.Set(common.DirtyBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
-	bol.Flags.Clear(common.SmallFile)
+	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 3*blockSizeBytes)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(3*blockSizeBytes, length)
@@ -3291,14 +3297,14 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	}
 	blk3.Flags.Set(common.DirtyBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
-	bol.Flags.Clear(common.SmallFile)
+	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, fileSize+3*blockSizeBytes)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(fileSize+3*blockSizeBytes, length)
@@ -3357,14 +3363,14 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	blk3.Flags.Set(common.TruncatedBlock)
 	blk3.Flags.Set(common.DirtyBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
-	bol.Flags.Clear(common.SmallFile)
+	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 3*int64(blockSizeBytes))
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.EqualValues(3*int64(blockSizeBytes), length)
@@ -3433,14 +3439,14 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	blk3.Flags.Set(common.TruncatedBlock)
 	blk3.Flags.Set(common.DirtyBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
-	bol.Flags.Clear(common.SmallFile)
+	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, fileSize+3*blockSizeBytes)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(fileSize+3*blockSizeBytes, length)
@@ -3500,14 +3506,14 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	blk3.Flags.Set(common.DirtyBlock)
 	blk3.Flags.Set(common.TruncatedBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
-	bol.Flags.Clear(common.SmallFile)
+	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 3*blockSizeBytes)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(3*blockSizeBytes, length)
@@ -3580,7 +3586,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	blk3.Flags.Set(common.DirtyBlock)
 	blk3.Flags.Set(common.TruncatedBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
-	bol.Flags.Clear(common.SmallFile)
+	bol.Flags.Clear(common.BlobFlagHasNoBlocks)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
@@ -3588,7 +3594,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	// file should be empty
 	output := make([]byte, fileSize+3*blockSizeBytes)
 	length, err := s.s3Storage.ReadInBuffer(
-		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+		&internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
 	s.assert.Equal(fileSize+3*blockSizeBytes, length)
@@ -3650,10 +3656,10 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(
 	s.assert.NoError(err)
 
 	data := make([]byte, size)
-	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 
@@ -3688,10 +3694,10 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 	s.assert.NoError(err)
 
 	data := make([]byte, size)
-	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.s3Storage.WriteFile(&internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err = s.s3Storage.TruncateFile(
-		internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)},
+		internal.TruncateFileOptions{Name: name, NewSize: int64(truncatedLength)},
 	)
 	s.assert.NoError(err)
 

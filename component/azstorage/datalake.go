@@ -197,7 +197,7 @@ func (dl *Datalake) TestPipeline() error {
 	})
 
 	// we are just validating the auth mode used. So, no need to iterate over the pages
-	_, err := listPathPager.NextPage(context.Background())
+	resp, err := listPathPager.NextPage(context.Background())
 	if err != nil {
 		log.Err(
 			"Datalake::TestPipeline : Failed to validate account with given auth %s",
@@ -209,6 +209,18 @@ func (dl *Datalake) TestPipeline() error {
 			return fmt.Errorf("Datalake::TestPipeline : [%s]", respErr.ErrorCode)
 		}
 		return err
+	} else {
+		// If the account is not HNS, then the permissions will be nil
+		// For empty containers there will be another check done by block_blob TestPipeline
+		// so no need to error out if there are no paths
+		if len(resp.Paths) > 0 {
+			if resp.Paths[0].Permissions == nil {
+				// This is to block FNS account being mounted as HNS account
+				return fmt.Errorf(
+					"Datalake::TestPipeline : Account is not HNS, kindly set correct account type",
+				)
+			}
+		}
 	}
 
 	return dl.BlockBlob.TestPipeline()
@@ -618,7 +630,7 @@ func (dl *Datalake) WriteFromBuffer(
 }
 
 // Write : Write to a file at given offset
-func (dl *Datalake) Write(ctx context.Context, options internal.WriteFileOptions) error {
+func (dl *Datalake) Write(ctx context.Context, options *internal.WriteFileOptions) error {
 	return dl.BlockBlob.Write(ctx, options)
 }
 
@@ -637,8 +649,8 @@ func (dl *Datalake) GetFileBlockOffsets(
 	return dl.BlockBlob.GetFileBlockOffsets(ctx, name)
 }
 
-func (dl *Datalake) TruncateFile(ctx context.Context, name string, size int64) error {
-	return dl.BlockBlob.TruncateFile(ctx, name, size)
+func (dl *Datalake) TruncateFile(ctx context.Context, options internal.TruncateFileOptions) error {
+	return dl.BlockBlob.TruncateFile(ctx, options)
 }
 
 // ChangeMod : Change mode of a path

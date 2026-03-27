@@ -139,12 +139,12 @@ type AzConnection interface {
 		metadata map[string]*string,
 		data []byte,
 	) error
-	Write(ctx context.Context, options internal.WriteFileOptions) error
+	Write(ctx context.Context, options *internal.WriteFileOptions) error
 	GetFileBlockOffsets(ctx context.Context, name string) (*common.BlockOffsetList, error)
 
 	ChangeMod(context.Context, string, os.FileMode) error
 	ChangeOwner(context.Context, string, int, int) error
-	TruncateFile(context.Context, string, int64) error
+	TruncateFile(ctx context.Context, options internal.TruncateFileOptions) error
 	StageAndCommit(ctx context.Context, name string, bol *common.BlockOffsetList) error
 
 	GetCommittedBlockList(context.Context, string) (*internal.CommittedBlockList, error)
