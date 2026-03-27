@@ -2478,6 +2478,48 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	s.assert.Error(err)
 }
 
+func (s *s3StorageTestSuite) TestRenameFileDstDir() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: src})
+	s.assert.NoError(err)
+
+	dstDir := generateDirectoryName()
+	child := generateFileName()
+	dstDirKey := common.JoinUnixFilepath(
+		s.s3Storage.stConfig.prefixPath,
+		path.Join(dstDir, child),
+	)
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:            aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
+		Key:               aws.String(dstDirKey),
+		ChecksumAlgorithm: s.s3Storage.Storage.(*Client).Config.checksumAlgorithm,
+	})
+	s.assert.NoError(err)
+
+	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: src, Dst: dstDir})
+	s.assert.EqualValues(syscall.EISDIR, err)
+
+	// Src should still be in the account
+	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
+		Key:          aws.String(srcKey),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.NoError(err)
+
+	// Dst file should not be created
+	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dstDir)
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket:       aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
+		Key:          aws.String(dstKey),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.Error(err)
+}
+
 func (s *s3StorageTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
 	// enable symlinks in config

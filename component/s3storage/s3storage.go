@@ -282,7 +282,7 @@ func (s3 *S3Storage) StreamDir(
 				options.Name, iteration, *nextMarker)
 		}
 		// decrement and loop
-		entriesRemaining -= int32(len(newList))
+		entriesRemaining -= totalEntriesFetched
 		// in one case, the response will be missing one entry (see comment above `count++` in Client::List)
 		if entriesRemaining == 1 && options.Token == "" {
 			// don't make a request just for that one leftover entry

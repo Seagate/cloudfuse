@@ -55,6 +55,7 @@ type Options struct {
 	UsePathStyle              bool                    `config:"use-path-style"                yaml:"use-path-style,omitempty"`
 	DisableUsage              bool                    `config:"disable-usage"                 yaml:"disable-usage,omitempty"`
 	EnableDirMarker           bool                    `config:"enable-dir-marker"             yaml:"enable-dir-marker,omitempty"`
+	SkipDirProbeOnFileExt     bool                    `config:"skip-dir-probe-on-file-ext"    yaml:"skip-dir-probe-on-file-ext,omitempty"`
 }
 
 type ConfigSecrets struct {
@@ -85,6 +86,11 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	s3.stConfig.usePathStyle = opt.UsePathStyle
 	s3.stConfig.disableUsage = opt.DisableUsage
 	s3.stConfig.enableDirMarker = opt.EnableDirMarker
+	if config.IsSet("s3storage.skip-dir-probe-on-file-ext") {
+		s3.stConfig.skipDirProbeOnFileExt = opt.SkipDirProbeOnFileExt
+	} else {
+		s3.stConfig.skipDirProbeOnFileExt = true
+	}
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
@@ -188,6 +194,9 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 		}
 	}
 	s3.stConfig.disableSymlink = !enableSymlinks
+	if config.IsSet("s3storage.skip-dir-probe-on-file-ext") {
+		s3.stConfig.skipDirProbeOnFileExt = opt.SkipDirProbeOnFileExt
+	}
 
 	return nil
 }
