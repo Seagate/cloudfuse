@@ -256,8 +256,7 @@ func (suite *lruPolicyTestSuite) TestDeleteItemSkipsSyncPending() {
 	// Simulate eviction flow where the node has already been removed.
 	suite.policy.nodeMap.Delete(localPath)
 
-	flock := suite.policy.fileLocks.Get("sync_pending")
-	flock.SyncPending = true
+	suite.policy.pendingOps.Store("sync_pending", struct{}{})
 
 	suite.policy.deleteItem(localPath)
 

@@ -575,7 +575,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		err = os.Mkdir(localPath, options.Mode.Perm())
 		if err != nil {
 			// report and return the error, since it will rightly return EEXIST when needed, etc
-			log.Err("FileCache::CreateDir : %s os.Mkdir failed. Here's why: %v", err)
+			log.Err("FileCache::CreateDir : %s os.Mkdir failed. Here's why: %v", options.Name, err)
 		} else {
 			// record this directory to sync to cloud later
 			// Note: the s3storage component can return success on CreateDir, even without a cloud connection.
