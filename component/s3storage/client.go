@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -642,23 +643,26 @@ func (cl *Client) RenameDirectory(ctx context.Context, source string, target str
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(ctx context.Context, name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
+	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
+	dirName := internal.ExtendDirName(name)
 
 	// first let's suppose the caller is looking for a file
 	// so if this was called with a trailing slash, don't look for an object
-	if len(name) > 0 && name[len(name)-1] != '/' {
+	if !explicitDirLookup {
 		attr, err := cl.getFileAttr(ctx, name)
 		if err == nil {
 			return attr, err
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
+		} else if !shouldProbeDirMarker(dirName, explicitDirLookup) {
+			// For obvious file-like names, skip expensive directory probing on miss-heavy paths.
+			return nil, syscall.ENOENT
 		}
 	}
 
-	// ensure a trailing slash
-	dirName := internal.ExtendDirName(name)
 	// now search for that as a directory
-	return cl.getDirectoryAttr(ctx, dirName)
+	return cl.getDirectoryAttr(ctx, dirName, explicitDirLookup)
 }
 
 // Get attributes for the given file path.
@@ -675,33 +679,82 @@ func (cl *Client) getFileAttr(ctx context.Context, name string) (*internal.ObjAt
 	return object, err
 }
 
-func (cl *Client) getDirectoryAttr(ctx context.Context, dirName string) (*internal.ObjAttr, error) {
+func (cl *Client) getDirectoryAttr(
+	ctx context.Context,
+	dirName string,
+	explicitDirLookup bool,
+) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// Try seartching for the object directly if supported
-	if cl.Config.enableDirMarker {
-		attr, err := cl.headObject(ctx, dirName, false, true)
-		if err == nil {
-			return attr, err
-		}
-	}
+	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
 
-	// Otherwise, the cloud does not support directory markers, so use list
-	// or the directory does exist but there is no marker for it, so look for an object
-	// in the directory
-	objects, _, err := cl.List(ctx, dirName, nil, 1)
-	if err != nil {
-		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
-		return nil, err
-	} else if len(objects) > 0 {
+	// Otherwise, the cloud does not support directory markers, or there is no
+	// marker, so look for an object in the directory.
+	if listErr != nil {
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
+		return nil, listErr
+	}
+	if len(objects) > 0 {
 		// create and return an objAttr for the directory
 		attr := internal.CreateObjAttrDir(dirName)
 		return attr, nil
 	}
 
+	// Only check for explicit empty directory markers when needed.
+	// For file-like names, this saves one extra HeadObject
+	// call on miss-heavy paths that are not directories.
+	if cl.Config.enableDirMarker && shouldProbeDirMarker(dirName, explicitDirLookup) {
+		headAttr, headErr := cl.headObject(ctx, dirName, false, true)
+		if headErr == nil {
+			return headAttr, nil
+		}
+		if headErr != syscall.ENOENT {
+			log.Err(
+				"Client::getDirectoryAttr : HeadObject(%s) failed. Here's why: %v",
+				dirName,
+				headErr,
+			)
+			return nil, headErr
+		}
+	}
+
 	// directory not found in bucket
 	log.Err("Client::getDirectoryAttr : not found: %s", dirName)
 	return nil, syscall.ENOENT
+}
+
+var knownFileLikeExtensions = map[string]struct{}{
+	".tmp":  {},
+	".ini":  {},
+	".inf":  {},
+	".db":   {},
+	".guid": {},
+	".nxdb": {},
+	".mkv":  {},
+	".mp4":  {},
+	".avi":  {},
+	".mov":  {},
+	".txt":  {},
+	".doc":  {},
+	".docx": {},
+	".xls":  {},
+	".xlsx": {},
+	".ppt":  {},
+	".pptx": {},
+}
+
+func shouldProbeDirMarker(dirName string, explicitDirLookup bool) bool {
+	if explicitDirLookup {
+		return true
+	}
+	trimmed := internal.TruncateDirName(dirName)
+	base := strings.ToLower(path.Base(trimmed))
+	ext := strings.ToLower(path.Ext(base))
+	if ext == "" {
+		return true
+	}
+	_, isFileLike := knownFileLikeExtensions[ext]
+	return !isFileLike
 }
 
 // Download object data to a file handle.
@@ -747,8 +800,7 @@ func (cl *Client) ReadToFile(
 	}
 	// read object data
 	defer objectDataReader.Close()
-	objectData, err := io.ReadAll(objectDataReader)
-
+	_, err = io.Copy(fi, objectDataReader)
 	if err != nil {
 		if strings.Contains(err.Error(), "checksum did not match") {
 			// If count is 0 and offset is 0 then this is a real checksum error
@@ -767,14 +819,8 @@ func (cl *Client) ReadToFile(
 			return err
 		}
 	}
-	// write data to file
-	_, err = fi.Write(objectData)
-	if err != nil {
-		log.Err("Couldn't write to file %v. Here's why: %v", name, err)
-		return err
-	}
 
-	return err
+	return nil
 }
 
 // Download object with the given name and return the data as a byte array.

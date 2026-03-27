@@ -247,6 +247,25 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 	}
 }
 
+func (suite *lruPolicyTestSuite) TestDeleteItemSkipsSyncPending() {
+	defer suite.cleanupTest()
+
+	localPath := filepath.Join(cache_path, "sync_pending")
+	suite.createLocalPath(localPath, false)
+
+	// Simulate eviction flow where the node has already been removed.
+	suite.policy.nodeMap.Delete(localPath)
+
+	flock := suite.policy.fileLocks.Get("sync_pending")
+	flock.SyncPending = true
+
+	suite.policy.deleteItem(localPath)
+
+	suite.assert.FileExists(localPath)
+	_, found := suite.policy.nodeMap.Load(localPath)
+	suite.assert.True(found, "cache entry should be restored when sync is pending")
+}
+
 func (suite *lruPolicyTestSuite) TestIsCached() {
 	defer suite.cleanupTest()
 	suite.policy.CacheValid("temp")

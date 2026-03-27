@@ -377,7 +377,7 @@ func (fc *FileCache) Configure(_ bool) error {
 
 	fc.diskHighWaterMark = 0
 	if fc.hardLimit && fc.maxCacheSizeMB != 0 {
-		fc.diskHighWaterMark = (((fc.maxCacheSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
+		fc.diskHighWaterMark = fc.maxCacheSizeMB * MB
 	}
 
 	if config.IsSet(compName + ".schedule") {
@@ -492,7 +492,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 		return nil, false, nil
 	}
 	usage, _ := common.GetUsage(fc.tmpPath)
-	available := maxCacheSize - usage*MB
+	available := maxCacheSize - usage
 
 	// how much space is available on the underlying file system?
 	availableOnCacheFS, err := fc.getAvailableSize()
@@ -748,7 +748,6 @@ func (fc *FileCache) StreamDir(
 			}
 		}
 	}
-
 	return attrs, token, err
 }
 
@@ -1156,7 +1155,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// If an empty file is created in cloud storage then there is no need to upload if FlushFile is called immediately after CreateFile.
 	if !fc.createEmptyFile {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 	}
 
 	// update state
@@ -1446,7 +1445,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 
 	if flags&os.O_TRUNC != 0 {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(handle)
 	}
 
 	inf, err := f.Stat()
@@ -1503,7 +1502,13 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 					err.Error(),
 				)
 			} else {
-				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
+				// Subtract existing local file size to avoid double-counting
+				existingSize := int64(0)
+				if info, statErr := os.Stat(localPath); statErr == nil {
+					existingSize = info.Size()
+				}
+				additionalSpace := max(int64(0), fileSize-existingSize)
+				if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
 					log.Err(
 						"FileCache::OpenFile : cache size limit reached [%f] failed to open %s",
 						fc.maxCacheSizeMB,
@@ -1796,7 +1801,14 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 		if err != nil {
 			log.Err("FileCache::WriteFile : error getting current usage of cache [%s]", err.Error())
 		} else {
-			if (currSize + float64(len(options.Data))) > fc.diskHighWaterMark {
+			// Calculate additional space needed beyond the file's current size
+			existingSize := int64(0)
+			if info, statErr := f.Stat(); statErr == nil {
+				existingSize = info.Size()
+			}
+			newEnd := options.Offset + int64(len(options.Data))
+			additionalSpace := max(int64(0), newEnd-existingSize)
+			if currSize+float64(additionalSpace) > fc.diskHighWaterMark {
 				log.Err(
 					"FileCache::WriteFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,
@@ -1829,7 +1841,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(options.Handle)
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
@@ -2017,7 +2029,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			if statErr == nil {
 				fc.addPendingOp(options.Handle.Path, fc.fileLocks.Get(options.Handle.Path))
 			}
-			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+			fc.clearHandleDirty(options.Handle)
 		}
 
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
@@ -2067,28 +2079,38 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
 	flock.RLock()
 
+	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	info, localErr := os.Stat(localPath)
+	if flock.Count() > 0 && flock.DirtyCount() > 0 {
+		if localErr == nil && !info.IsDir() {
+			flock.RUnlock()
+			return newObjAttr(options.Name, info), nil
+		}
+	}
+
+	flock.RUnlock()
+
 	// To cover case 1, get attributes from storage
 	var exists bool
-	attrs, err := fc.NextComponent().GetAttr(options)
+	attrs, remoteErr := fc.NextComponent().GetAttr(options)
 	switch {
-	case !isOffline(err) && os.IsNotExist(err):
+	case !isOffline(remoteErr) && os.IsNotExist(remoteErr):
 		log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
-	case err == nil:
+	case remoteErr == nil:
 		exists = true
-	case offlineDataAvailable(err) && fc.offlineAccess:
+	case offlineDataAvailable(remoteErr) && fc.offlineAccess:
 		// we are offline, but we can respond from the attribute cache
-		exists = !errors.Is(err, os.ErrNotExist)
+		exists = !errors.Is(remoteErr, os.ErrNotExist)
 		log.Debug("FileCache::GetAttr : %s exists=%t from cache (offline)", options.Name, exists)
 	default:
-		log.Err("FileCache::GetAttr : %s GetAttr failed. Here's why: %v", options.Name, err)
-		return nil, err
+		log.Err("FileCache::GetAttr : %s GetAttr failed. Here's why: %v", options.Name, remoteErr)
+		return nil, remoteErr
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
 	flock.RUnlock()
-	if err == nil {
+	if localErr == nil {
 		if !exists { // Case 2 (only in local cache)
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
 			exists = true
@@ -2109,6 +2131,30 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	return attrs, nil
+}
+
+func (fc *FileCache) setHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	alreadyDirty := handle.Dirty()
+	if !alreadyDirty {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if !alreadyDirty {
+		fc.fileLocks.Get(handle.Path).IncDirty()
+	}
+}
+
+func (fc *FileCache) clearHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	wasDirty := handle.Dirty()
+	if wasDirty {
+		handle.Flags.Clear(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if wasDirty {
+		fc.fileLocks.Get(handle.Path).DecDirty()
+	}
 }
 
 // RenameFile: Invalidate the file in local cache.
@@ -2246,7 +2292,15 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				err.Error(),
 			)
 		} else {
-			if (currSize + float64(options.NewSize)) > fc.diskHighWaterMark {
+			// Only count the additional space beyond the file's current size
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			existingSize := int64(0)
+			if info, statErr := os.Stat(localPath); statErr == nil {
+				existingSize = info.Size()
+			}
+			additionalSpace := max(int64(0), options.NewSize-existingSize)
+			// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
+			if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
 				log.Err(
 					"FileCache::TruncateFile : cache size limit reached [%f] failed to open %s",
 					fc.maxCacheSizeMB,
@@ -2260,16 +2314,50 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	if options.Handle != nil {
 		// The call is coming from an open handle, so we can just truncate the local file, and the change will be
 		// flushed to storage on close.
+		if !openCompleted(options.Handle) {
+			flock := fc.fileLocks.Get(options.Name)
+			flock.Lock()
+			err := fc.openFileInternal(options.Handle, flock)
+			flock.Unlock()
+			if err != nil {
+				return fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+			}
+		}
+
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			log.Err(
-				"FileCache::TruncateFile : error [couldn't find fd in handle] %s",
-				options.Handle.Path,
+			// Recover missing fd on valid handles by reopening the cached path.
+			// This avoids issues when truncate arrives before the handle has a live file object.
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			reopened, reopenErr := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
+			if reopenErr == nil {
+				options.Handle.UnixFD = uint64(reopened.Fd())
+				options.Handle.SetFileObject(reopened)
+				f = reopened
+			}
+		}
+
+		if f == nil {
+			log.Warn(
+				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
+				options.Name,
 			)
+			options.Handle = nil
+		}
+	}
+
+	if options.Handle != nil {
+		f := options.Handle.GetFileObject()
+		if f == nil {
 			return syscall.EBADF
 		}
 
-		err := f.Truncate(options.NewSize)
+		info, err := f.Stat()
+		if err == nil && info.Size() == options.NewSize {
+			return nil
+		}
+
+		err = f.Truncate(options.NewSize)
 		if err != nil {
 			log.Err(
 				"FileCache::TruncateFile : error truncating file %s [%s]",
@@ -2279,7 +2367,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			return err
 		}
 
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		fc.setHandleDirty(options.Handle)
 
 		return nil
 	}
