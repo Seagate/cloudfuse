@@ -2006,7 +2006,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 
 			switch {
 			case err == nil:
-				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+				fc.clearHandleDirty(options.Handle)
 			case isOffline(err) && fc.offlineAccess:
 				log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
 				// add file to upload queue
