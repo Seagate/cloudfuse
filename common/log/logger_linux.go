@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -44,7 +44,7 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 
 	switch name {
 	case "syslog":
-		sysLogger, err := newSysLogger(config.Level, config.Tag)
+		sysLogger, err := newSysLogger(config.Level, config.Tag, config.LogGoroutineID)
 		if err != nil {
 			if err == ErrNoSyslogService {
 				// Syslog service does not exists on this system
@@ -59,11 +59,12 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 		return silentLogger, nil
 	case "", "default", "base":
 		baseLogger, err := newBaseLogger(LogFileConfig{
-			LogFile:      config.FilePath,
-			LogLevel:     config.Level,
-			LogSize:      config.MaxFileSize * 1024 * 1024,
-			LogFileCount: int(config.FileCount),
-			LogTag:       config.Tag,
+			LogFile:        config.FilePath,
+			LogLevel:       config.Level,
+			LogSize:        config.MaxFileSize * 1024 * 1024,
+			LogFileCount:   int(config.FileCount),
+			LogTag:         config.Tag,
+			LogGoroutineID: config.LogGoroutineID,
 		})
 		if err != nil {
 			return nil, err

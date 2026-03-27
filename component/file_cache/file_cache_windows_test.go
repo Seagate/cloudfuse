@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -132,7 +132,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	// Setup
 	path := "file"
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -155,7 +155,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 		internal.CreateFileOptions{Name: path, Mode: 0777},
 	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -172,7 +172,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	suite.assert.FileExists(suite.cache_path + "/" + path)
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
 }
 
 // In order for 'go test' to run this suite, we need to create

@@ -53,6 +53,7 @@ logging:
   max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
   file-count: <maximum number of files to be rotated to preserve old logs. Default - 10>
   track-time: true|false <track time taken by important operations>
+  goroutine-id: <true|false enable goroutine id in logs for better debugging. Default - true if log level is log_debug, else false>
 
 # Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
 components:

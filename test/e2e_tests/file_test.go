@@ -3,8 +3,8 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
+   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -83,7 +83,7 @@ func initFileFlags() {
 
 func getFileTestDirName(n int) string {
 	b := make([]byte, n)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)[:n]
 }
 
@@ -874,8 +874,8 @@ func TestFileTestSuite(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create test directory [%s]\n", err.Error())
 	}
-	rand.Read(fileTest.minBuff)
-	rand.Read(fileTest.medBuff)
+	_, _ = rand.Read(fileTest.minBuff)
+	_, _ = rand.Read(fileTest.medBuff)
 
 	// Run the actual End to End test
 	suite.Run(t, &fileTest)
