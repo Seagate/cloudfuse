@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -67,6 +68,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		pendingOps:    &sync.Map{},
 	}
 
 	suite.setupTestHelper(config)
@@ -179,6 +181,7 @@ func (suite *lruPolicyTestSuite) TestUpdateConfig() {
 		highThreshold: 70,
 		lowThreshold:  20,
 		fileLocks:     &common.LockMap{},
+		pendingOps:    &sync.Map{},
 	}
 	err := suite.policy.UpdateConfig(config)
 	suite.assert.NoError(err)
@@ -214,6 +217,7 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		pendingOps:    &sync.Map{},
 	}
 	suite.setupTestHelper(config)
 
@@ -316,6 +320,7 @@ func (suite *lruPolicyTestSuite) TestMaxEviction() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		pendingOps:    &sync.Map{},
 	}
 
 	suite.setupTestHelper(config)
