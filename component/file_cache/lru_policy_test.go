@@ -47,7 +47,7 @@ type lruPolicyTestSuite struct {
 	policy *lruPolicy
 }
 
-var cache_path = filepath.Join(home_dir, "file_cache")
+var cache_path = filepath.Join(home_dir, "file_cache"+randomString(8))
 
 func (suite *lruPolicyTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
