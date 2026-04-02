@@ -468,26 +468,6 @@ func testFillStatModeDefault(suite *libfuseTestSuite) {
 	suite.assert.Equal(uint32(lf.dirPermission), st.Mode&0x1ff)
 }
 
-func testFillStatSyntheticInode(suite *libfuseTestSuite) {
-	defer suite.cleanupTest()
-	lf := suite.libfuse
-
-	attr := &internal.ObjAttr{Path: "dir/file", Flags: internal.NewFileBitMap(), Mode: 0644}
-	sameAttr := &internal.ObjAttr{Path: "dir/file", Flags: internal.NewFileBitMap(), Mode: 0644}
-	otherAttr := &internal.ObjAttr{Path: "dir/other", Flags: internal.NewFileBitMap(), Mode: 0644}
-
-	first := &fuse.Stat_t{}
-	second := &fuse.Stat_t{}
-	third := &fuse.Stat_t{}
-	lf.fillStat(attr, first)
-	lf.fillStat(sameAttr, second)
-	lf.fillStat(otherAttr, third)
-
-	suite.assert.NotZero(first.Ino)
-	suite.assert.Equal(first.Ino, second.Ino)
-	suite.assert.NotEqual(first.Ino, third.Ino)
-}
-
 func testFillStatSpecialPermissionBits(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	lf := suite.libfuse

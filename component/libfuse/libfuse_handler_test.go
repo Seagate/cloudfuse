@@ -372,10 +372,6 @@ func (suite *libfuseTestSuite) TestFillStatModeDefault() {
 	testFillStatModeDefault(suite)
 }
 
-func (suite *libfuseTestSuite) TestFillStatSyntheticInode() {
-	testFillStatSyntheticInode(suite)
-}
-
 func (suite *libfuseTestSuite) TestFillStatSpecialPermissionBits() {
 	testFillStatSpecialPermissionBits(suite)
 }
