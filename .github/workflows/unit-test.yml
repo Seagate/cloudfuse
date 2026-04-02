@@ -44,7 +44,7 @@ jobs:
 
     services:
       localstack:
-        image: localstack/localstack:latest
+        image: localstack/localstack:s3-community-archive
         env:
           SERVICES: s3
           AWS_DEFAULT_REGION: us-east-1
