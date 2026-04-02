@@ -17,7 +17,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/go-viper/mapstructure/v2 v2.5.0
-	github.com/montanaflynn/stats v0.8.2
+	github.com/montanaflynn/stats v0.9.0
 	github.com/netresearch/go-cron v0.13.1
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
