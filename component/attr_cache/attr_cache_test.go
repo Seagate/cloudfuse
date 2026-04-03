@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -429,7 +430,7 @@ func (suite *attrCacheTestSuite) TestCreateDirUpdatesParentTimes() {
 	parentItem.attr.Mtime = staleTime
 	parentItem.cachedAt = staleTime
 
-	options := internal.CreateDirOptions{Name: filepath.Join(parentPath, "child")}
+	options := internal.CreateDirOptions{Name: path.Join(parentPath, "child")}
 	suite.mock.EXPECT().CreateDir(options).Return(nil)
 
 	err := suite.attrCache.CreateDir(options)
@@ -445,7 +446,7 @@ func (suite *attrCacheTestSuite) TestCreateDirExistingDoesNotUpdateParentTimes()
 	defer suite.cleanupTest()
 
 	parentPath := "parent"
-	childPath := filepath.Join(parentPath, "child")
+	childPath := path.Join(parentPath, "child")
 	staleTime := time.Unix(1, 0)
 	parentItem := suite.attrCache.cache.insert(insertOptions{
 		attr:     internal.CreateObjAttrDir(parentPath),
@@ -1234,7 +1235,7 @@ func (suite *attrCacheTestSuite) TestCreateFileUpdatesParentTimes() {
 	parentItem.attr.Mtime = staleTime
 	parentItem.cachedAt = staleTime
 
-	options := internal.CreateFileOptions{Name: filepath.Join(parentPath, "child")}
+	options := internal.CreateFileOptions{Name: path.Join(parentPath, "child")}
 	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, nil)
 
 	_, err := suite.attrCache.CreateFile(options)
