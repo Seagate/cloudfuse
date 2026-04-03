@@ -255,6 +255,15 @@ func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
 	value.cachedAt = changedAt
 }
 
+func (value *attrCacheItem) touchModifyAndChangeTimes(changedAt time.Time) {
+	if value == nil || !value.exists() {
+		return
+	}
+	value.attr.Mtime = changedAt
+	value.attr.Ctime = changedAt
+	value.cachedAt = changedAt
+}
+
 func (value *attrCacheItem) setMode(mode os.FileMode) {
 	value.attr.Mode = mode
 	value.attr.Flags.Clear(internal.PropFlagModeDefault)
