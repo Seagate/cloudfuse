@@ -90,7 +90,7 @@ func (fc *FileCache) configureScheduler() error {
 			windowCount := fc.activeWindows.Add(1)
 			if windowCount == 1 {
 				// transition to active - open the window
-				fc.schedulerActiveCh = make(chan struct{})
+				close(fc.startScheduledUploads)
 				log.Info(
 					"FileCache::SchedulerCronFunc : %s - enabled scheduled uploads",
 					window.name,
@@ -127,9 +127,9 @@ func (fc *FileCache) configureScheduler() error {
 					)
 					// Only close resources when the last window ends
 					if windowCount == 0 {
-						close(fc.schedulerActiveCh)
+						fc.startScheduledUploads = make(chan struct{})
 						log.Info(
-							"FileCache::SchedulerCronFunc : %s - disabled scheduled uploads",
+							"FileCache::SchedulerCronFunc : %s window ended - deferring uploads",
 							window.name,
 						)
 					}
@@ -207,13 +207,7 @@ func (fc *FileCache) servicePendingOps() {
 			log.Crit("FileCache::servicePendingOps : Stopping")
 			// TODO: Persist pending ops
 			return
-		case <-fc.schedulerActiveCh:
-			// upload schedule is not active, wait before checking again
-			select {
-			case <-time.After(time.Second):
-			case <-fc.componentStopping:
-			}
-		default:
+		case <-fc.startScheduledUploads:
 			// check if we're connected
 			if !fc.NextComponent().CloudConnected() {
 				// we are offline, wait for a while before checking again
@@ -230,9 +224,7 @@ func (fc *FileCache) servicePendingOps() {
 				select {
 				case <-fc.componentStopping:
 					return false
-				case <-fc.schedulerActiveCh:
-					return false // upload window ended
-				default:
+				case <-fc.startScheduledUploads:
 					path := key.(string)
 					err := fc.uploadPendingFile(path)
 					if isOffline(err) {
@@ -241,6 +233,8 @@ func (fc *FileCache) servicePendingOps() {
 					if err != nil {
 						log.Err("FileCache::servicePendingOps : %s upload failed: %v", path, err)
 					}
+				default:
+					return false // upload window ended
 				}
 				return true // Continue the iteration
 			})
