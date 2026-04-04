@@ -635,7 +635,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
 	}
 	// is the cloud connection down? Is offline access enabled?
-	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
 		// this is a local directory
 		// remove it from the deferred cloud operations
 		// TODO: protect this with a semaphore (probably flock)
@@ -892,7 +892,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// rename the directory in the cloud
 	err = fc.NextComponent().RenameDir(options)
 	// if we are offline, and offline access is enabled, allow local directories to be renamed
-	if isOffline(err) && fc.offlineOperationAllowed(options.Src) && fc.notInCloud(options.Dst) {
+	offlineOkay := fc.offlineAccess && fc.notInCloud(options.Src) && fc.notInCloud(options.Dst)
+	if isOffline(err) && offlineOkay {
 		log.Warn(
 			"FileCache::RenameDir : %s -> %s Cloud is unreachable but neither directory is in cloud storage. Proceeding with offline rename.",
 			options.Src,
@@ -1102,7 +1103,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			newF.GetFileObject().Close()
 		}
 		// are we offline?
-		if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+		if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
 			// remember that we're offline
 			offline = true
 			// clear the error
@@ -1227,7 +1228,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	err := fc.NextComponent().DeleteFile(options)
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", true)
-	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
 		// we are offline and the file is not in cloud, so handle deletion locally
 		// reset err to whether the local file exists
 		_, err = os.Stat(localPath)
@@ -2183,7 +2184,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	err := fc.NextComponent().RenameFile(options)
 	localOnly := errors.Is(err, os.ErrNotExist)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
-	if isOffline(err) && fc.offlineOperationAllowed(options.Src) {
+	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Src) {
 		log.Debug("FileCache::RenameFile : %s Offline rename allowed", options.Src)
 		err = nil
 	}
@@ -2384,7 +2385,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 	err := fc.NextComponent().TruncateFile(options)
 	err = fc.validateStorageError(options.Name, err, "TruncateFile", true)
-	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
 		log.Debug("FileCache::TruncateFile : %s Offline truncate allowed", options.Name)
 		offlineOkay = true
 		err = nil
@@ -2439,7 +2440,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
 		case2okay := err == syscall.EIO
-		offlineOkay = isOffline(err) && fc.offlineOperationAllowed(options.Name)
+		offlineOkay = isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name)
 		if !case2okay && !offlineOkay {
 			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
 			return err
@@ -2485,7 +2486,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)
-	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
 		log.Debug("FileCache::Chown : %s Offline chown allowed", options.Name)
 		offlineOkay = true
 		err = nil

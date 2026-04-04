@@ -325,11 +325,6 @@ func (fc *FileCache) IsScheduled(objName string) bool {
 	return inSchedule
 }
 
-// this returns true when offline access is enabled, and it's safe to access this object offline
-func (fc *FileCache) offlineOperationAllowed(name string) bool {
-	return fc.offlineAccess && fc.notInCloud(name)
-}
-
 // returns true if we *know* that this entity does not exist in cloud storage
 // otherwise returns false (including ambiguous cases)
 func (fc *FileCache) notInCloud(name string) bool {
