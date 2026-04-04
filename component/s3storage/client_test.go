@@ -565,7 +565,7 @@ func (s *clientTestSuite) TestGetRegionEndpoint() {
 func (s *clientTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
-	buckets, err := s.client.ListBuckets()
+	buckets, err := s.client.ListBuckets(context.TODO())
 	s.assert.NoError(err)
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
@@ -583,7 +583,7 @@ func (s *clientTestSuite) TestDefaultBucketName() {
 	)
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
-	buckets, _ := s.client.ListBuckets()
+	buckets, _ := s.client.ListBuckets(ctx)
 	s.assert.Contains(buckets, s.client.Config.AuthConfig.BucketName)
 }
 
@@ -594,8 +594,8 @@ func (s *clientTestSuite) TestSetPrefixPath() {
 	fileName := generateFileName()
 
 	err := s.client.SetPrefixPath(prefix)
-	s.assert.NoError(err)                               //stub
-	err = s.client.CreateFile(fileName, os.FileMode(0)) // create file uses prefix
+	s.assert.NoError(err)                                    //stub
+	err = s.client.CreateFile(ctx, fileName, os.FileMode(0)) // create file uses prefix
 	s.assert.NoError(err)
 
 	// object should be at prefix
@@ -611,7 +611,7 @@ func (s *clientTestSuite) TestCreateFile() {
 	// setup
 	name := generateFileName()
 
-	err := s.client.CreateFile(name, os.FileMode(0))
+	err := s.client.CreateFile(ctx, name, os.FileMode(0))
 	s.assert.NoError(err)
 
 	// file should be in bucket
@@ -627,7 +627,7 @@ func (s *clientTestSuite) TestCreateDirectory() {
 	// setup
 	name := generateDirectoryName()
 
-	err := s.client.CreateDirectory(name)
+	err := s.client.CreateDirectory(ctx, name)
 	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestCreateLink() {
@@ -644,7 +644,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	s.assert.NoError(err)
 	source := generateFileName()
 
-	err = s.client.CreateLink(source, target, true)
+	err = s.client.CreateLink(ctx, source, target, true)
 	s.assert.NoError(err)
 
 	source = s.client.getKey(source, true, false)
@@ -670,7 +670,7 @@ func (s *clientTestSuite) TestReadLink() {
 
 	source := generateFileName()
 
-	err := s.client.CreateLink(source, target, true)
+	err := s.client.CreateLink(ctx, source, target, true)
 	s.assert.NoError(err)
 
 	source = s.client.getKey(source, true, false)
@@ -698,7 +698,7 @@ func (s *clientTestSuite) TestDeleteLink() {
 
 	source := generateFileName()
 
-	err := s.client.CreateLink(source, target, true)
+	err := s.client.CreateLink(ctx, source, target, true)
 	s.assert.NoError(err)
 
 	source = s.client.getKey(source, true, false)
@@ -735,7 +735,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		sources[i] = generateFileName()
 		targets[i] = generateFileName()
 
-		err := s.client.CreateLink(folder+sources[i], targets[i], true)
+		err := s.client.CreateLink(ctx, folder+sources[i], targets[i], true)
 		s.assert.NoError(err)
 
 		sources[i] = s.client.getKey(sources[i], true, false)
@@ -797,7 +797,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	})
 	s.assert.NoError(err)
 
-	err = s.client.DeleteFile(name)
+	err = s.client.DeleteFile(ctx, name)
 	s.assert.NoError(err)
 
 	// This is similar to the s3 bucket command, use getobject for now
@@ -823,7 +823,7 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 	})
 	s.assert.NoError(err)
 
-	err = s.client.DeleteDirectory(dirName)
+	err = s.client.DeleteDirectory(ctx, dirName)
 	s.assert.NoError(err)
 
 	// file in directory should no longer be there
@@ -847,7 +847,7 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.NoError(err)
 	dst := generateFileName()
 
-	err = s.client.RenameFile(src, dst, false)
+	err = s.client.RenameFile(ctx, src, dst, false)
 	s.assert.NoError(err)
 
 	// Src should not be in the account
@@ -872,7 +872,7 @@ func (s *clientTestSuite) TestRenameFileError() {
 	src := generateFileName()
 	dst := generateFileName()
 
-	err := s.client.RenameFile(src, dst, false)
+	err := s.client.RenameFile(ctx, src, dst, false)
 	s.assert.EqualError(err, syscall.ENOENT.Error())
 
 	// Src should not be in the account
@@ -903,7 +903,7 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	s.assert.NoError(err)
 
 	dstDir := generateDirectoryName()
-	err = s.client.RenameDirectory(srcDir, dstDir)
+	err = s.client.RenameDirectory(ctx, srcDir, dstDir)
 	s.assert.NoError(err)
 
 	// file in srcDir should no longer be there
@@ -933,7 +933,7 @@ func (s *clientTestSuite) TestGetAttrDir() {
 	})
 	s.assert.NoError(err)
 
-	attr, err := s.client.GetAttr(dirName)
+	attr, err := s.client.GetAttr(ctx, dirName)
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
@@ -951,7 +951,7 @@ func (s *clientTestSuite) TestGetAttrDirWithOnlyFile() {
 	})
 	s.assert.NoError(err)
 
-	attr, err := s.client.GetAttr(dirName)
+	attr, err := s.client.GetAttr(ctx, dirName)
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
@@ -972,7 +972,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	})
 	s.assert.NoError(err)
 
-	before, err := s.client.GetAttr(name)
+	before, err := s.client.GetAttr(ctx, name)
 
 	// file info
 	s.assert.NoError(err)
@@ -996,7 +996,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	})
 	s.assert.NoError(err)
 
-	after, err := s.client.GetAttr(name)
+	after, err := s.client.GetAttr(ctx, name)
 	s.assert.NoError(err)
 	s.assert.NotNil(after.Mtime)
 
@@ -1008,7 +1008,7 @@ func (s *clientTestSuite) TestGetAttrError() {
 	name := generateFileName()
 
 	// non existent file should throw error
-	_, err := s.client.GetAttr(name)
+	_, err := s.client.GetAttr(ctx, name)
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
@@ -1076,9 +1076,10 @@ func (s *clientTestSuite) TestList() {
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
 	s.assert.NoError(err)
+	ctx := context.Background()
 	// a/c2
 	c2 := base + "/c2"
-	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(c2),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1086,7 +1087,7 @@ func (s *clientTestSuite) TestList() {
 	s.assert.NoError(err)
 	// ab/c1
 	abc1 := base + "b/c1"
-	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(abc1),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1094,7 +1095,7 @@ func (s *clientTestSuite) TestList() {
 	s.assert.NoError(err)
 	// ac
 	ac := base + "c"
-	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(ac),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1103,7 +1104,7 @@ func (s *clientTestSuite) TestList() {
 
 	// with trailing "/" should return only the directory c1 and the file c2
 	baseTrail := base + "/"
-	objects, _, err := s.client.List(baseTrail, nil, 0)
+	objects, _, err := s.client.List(ctx, baseTrail, nil, 0)
 	s.assert.NoError(err)
 	s.assert.NotNil(objects)
 	s.assert.Len(objects, 2)
@@ -1115,7 +1116,7 @@ func (s *clientTestSuite) TestList() {
 	// without trailing "/" only get file ac
 	// if not including the trailing "/", List will return any files with the given prefix
 	// but no directories
-	objects, _, err = s.client.List(base, nil, 0)
+	objects, _, err = s.client.List(ctx, base, nil, 0)
 	s.assert.NoError(err)
 	s.assert.NotNil(objects)
 	s.assert.Len(objects, 1)
@@ -1123,7 +1124,7 @@ func (s *clientTestSuite) TestList() {
 	s.assert.False(objects[0].IsDir())
 
 	// When listing the root, List should not include the root
-	objects, _, err = s.client.List("", nil, 0)
+	objects, _, err = s.client.List(ctx, "", nil, 0)
 	s.assert.NoError(err)
 	s.assert.NotNil(objects)
 	s.assert.NotEmpty(objects)
@@ -1151,7 +1152,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
-	err = s.client.ReadToFile(name, 0, 0, f)
+	err = s.client.ReadToFile(ctx, name, 0, 0, f)
 	s.assert.NoError(err)
 
 	// file content should match generated body
@@ -1185,7 +1186,7 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
-	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
+	err = s.client.ReadToFile(ctx, name, 0, int64(bodyLen), f)
 	s.assert.NoError(err)
 
 	// file content should match generated body
@@ -1223,7 +1224,7 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
-	err = s.client.ReadToFile(name, 0, 0, f)
+	err = s.client.ReadToFile(ctx, name, 0, 0, f)
 	s.assert.NoError(err)
 
 	// file content should match generated body
@@ -1253,7 +1254,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 	})
 	s.assert.NoError(err)
 
-	result, err := s.client.ReadBuffer(name, 0, int64(bodyLen), false)
+	result, err := s.client.ReadBuffer(ctx, name, 0, int64(bodyLen), false)
 
 	// result should match generated body
 	s.assert.NoError(err)
@@ -1277,7 +1278,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 
 	outputLen := rand.IntN(bodyLen-1) + 1 // minimum buffer length of 1
 	output := make([]byte, outputLen)
-	err = s.client.ReadInBuffer(name, 0, int64(outputLen), output)
+	err = s.client.ReadInBuffer(ctx, name, 0, int64(outputLen), output)
 
 	// read in buffer should match first outputLen characters of generated body
 	s.assert.NoError(err)
@@ -1299,7 +1300,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	s.assert.Equal(bodyLen, outputLen)
 	var options internal.WriteFileOptions //stub
 
-	err = s.client.WriteFromFile(name, options.Metadata, f)
+	err = s.client.WriteFromFile(ctx, name, options.Metadata, f)
 	s.assert.NoError(err)
 	f.Close()
 
@@ -1330,7 +1331,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 
 	var options internal.WriteFileOptions //stub
 
-	err := s.client.WriteFromBuffer(name, options.Metadata, body)
+	err := s.client.WriteFromBuffer(ctx, name, options.Metadata, body)
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
@@ -1363,7 +1364,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	s.assert.NoError(err)
 
 	size := rand.IntN(bodyLen-1) + 1 // minimum size of 1
-	err = s.client.TruncateFile(name, int64(size))
+	err = s.client.TruncateFile(ctx, name, int64(size))
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
@@ -1399,6 +1400,7 @@ func (s *clientTestSuite) TestWrite() {
 	newData := []byte(randomString(bodyLen - offset))
 	h := handlemap.NewHandle(name)
 	err = s.client.Write(
+		ctx,
 		&internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData},
 	)
 	s.assert.NoError(err)
@@ -1424,10 +1426,10 @@ func (s *clientTestSuite) TestGetCommittedBlockListSmallFile() {
 	bodyLen := 1024
 	body := []byte(randomString(bodyLen))
 
-	err := s.client.WriteFromBuffer(name, nil, body)
+	err := s.client.WriteFromBuffer(ctx, name, nil, body)
 	s.assert.NoError(err)
 
-	blockList, err := s.client.GetCommittedBlockList(name)
+	blockList, err := s.client.GetCommittedBlockList(ctx, name)
 
 	s.assert.NoError(err)
 	s.assert.NotNil(blockList)
@@ -1441,10 +1443,10 @@ func (s *clientTestSuite) TestGetCommittedBlockListMultipartFile() {
 	bodyLen := int(partSize*2 + partSize/2)
 	body := randomString(bodyLen)
 
-	err := s.client.WriteFromBuffer(name, nil, []byte(body))
+	err := s.client.WriteFromBuffer(ctx, name, nil, []byte(body))
 	s.assert.NoError(err)
 
-	blockList, err := s.client.GetCommittedBlockList(name)
+	blockList, err := s.client.GetCommittedBlockList(ctx, name)
 
 	s.assert.NoError(err)
 	s.assert.NotNil(blockList)
@@ -1474,7 +1476,7 @@ func (s *clientTestSuite) TestGetCommittedBlockListNonExistentFile() {
 	defer s.cleanupTest()
 	name := generateFileName()
 
-	blockList, err := s.client.GetCommittedBlockList(name)
+	blockList, err := s.client.GetCommittedBlockList(ctx, name)
 
 	s.assert.Error(err)
 	s.assert.Equal(syscall.ENOENT, err)

@@ -27,11 +27,14 @@ package azstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -47,6 +50,16 @@ type AzStorage struct {
 	stConfig    AzStorageConfig
 	startTime   time.Time
 	listBlocked bool
+	state       connectionState
+	ctx         context.Context
+	cancelFn    context.CancelFunc
+}
+
+type connectionState struct {
+	sync.Mutex
+	lastConnectionAttempt *time.Time
+	firstOffline          *time.Time
+	retryTicker           *time.Ticker
 }
 
 const compName = "azstorage"
@@ -192,6 +205,16 @@ func (az *AzStorage) Start(ctx context.Context) error {
 	// create stats collector for azstorage
 	azStatsCollector = stats_manager.NewStatsCollector(az.Name())
 	log.Debug("Starting azstorage stats collector")
+	// create a shared context for all cloud operations, with ability to cancel
+	az.ctx, az.cancelFn = context.WithCancel(ctx)
+	// create the retry ticker
+	az.state.retryTicker = time.NewTicker(time.Duration(az.stConfig.backoffTime) * time.Second)
+	az.state.retryTicker.Stop() // stop it for now, we will start it when we are offline
+	go func() {
+		for range az.state.retryTicker.C {
+			az.CloudConnected()
+		}
+	}()
 
 	return nil
 }
@@ -203,9 +226,108 @@ func (az *AzStorage) Stop() error {
 	return nil
 }
 
+// ------------------------- Connectivity check -------------------------------------------
+
+// Online check
+func (az *AzStorage) CloudConnected() bool {
+	log.Trace("AzStorage::CloudConnected")
+	connected := az.state.firstOffline == nil
+	// don't check the connection when it's up, or if we are not ready to retry
+	if connected || !az.timeToRetry() {
+		return connected
+	}
+	// check connection
+	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancelFun()
+	err := az.storage.ConnectionOkay(ctx)
+	log.Debug("AzStorage::CloudConnected : err is %v", err)
+	nowConnected := az.updateConnectionState(err)
+	return nowConnected
+}
+
+func (az *AzStorage) timeToRetry() bool {
+	timeSinceLastAttempt := time.Since(*az.state.lastConnectionAttempt)
+	switch {
+	case timeSinceLastAttempt < time.Duration(az.stConfig.backoffTime)*time.Second:
+		// minimum delay before retrying
+		return false
+	case timeSinceLastAttempt > 90*time.Second:
+		// maximum delay
+		return true
+	default:
+		// when between the minimum and maximum delay, we use an exponential backoff
+		timeOfflineAtLastAttempt := az.state.lastConnectionAttempt.Sub(*az.state.firstOffline)
+		return timeSinceLastAttempt > timeOfflineAtLastAttempt
+	}
+}
+
+func (az *AzStorage) updateConnectionState(err error) bool {
+	az.state.Lock()
+	defer az.state.Unlock()
+	currentTime := time.Now()
+	az.state.lastConnectionAttempt = &currentTime
+	connected := !isOfflineError(err)
+	wasConnected := az.state.firstOffline == nil
+	stateChanged := connected != wasConnected
+	if stateChanged {
+		log.Warn("AzStorage::updateConnectionState : connected is now: %t", connected)
+		if connected {
+			az.state.firstOffline = nil
+			// reset the context to allow new requests
+			az.ctx, az.cancelFn = context.WithCancel(context.Background())
+			// stop the retry ticker
+			az.state.retryTicker.Stop()
+		} else {
+			az.state.firstOffline = &currentTime
+			// cancel all outstanding requests
+			az.cancelFn()
+			log.Warn("AzStorage::updateConnectionState : cancelled all outstanding requests")
+			// reset the ticker to retry the connection
+			az.state.retryTicker.Reset(time.Duration(az.stConfig.backoffTime) * time.Second)
+		}
+	}
+	return connected
+}
+
+func isOfflineError(err error) bool {
+	// handle common error cases
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, syscall.ENOENT):
+		return false
+	case errors.Is(err, context.DeadlineExceeded):
+		return true
+	case errors.Is(err, context.Canceled):
+		return true
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return true
+	case errors.Is(err, &common.CloudUnreachableError{}):
+		return true
+	default:
+		var respErr *azcore.ResponseError
+		errors.As(err, &respErr)
+		if respErr != nil && storeBlobErrToErr(respErr) != ErrUnknown {
+			log.Debug("isOfflineError: errors.As(err, &respErr)")
+			return false
+		}
+		// log the error details
+		unwrappedErr := err
+		for unwrappedErr != nil {
+			log.Debug(
+				"isOfflineError: Uncaught AZ error is of type \"%T\" and value [%v].\n",
+				unwrappedErr,
+				unwrappedErr,
+			)
+			unwrappedErr = errors.Unwrap(unwrappedErr)
+		}
+		return false
+	}
+}
+
 // ------------------------- Container listing -------------------------------------------
 func (az *AzStorage) ListContainers() ([]string, error) {
-	return az.storage.ListContainers()
+	return az.storage.ListContainers(az.ctx)
 }
 
 // ------------------------- Core Operations -------------------------------------------
@@ -214,7 +336,8 @@ func (az *AzStorage) ListContainers() ([]string, error) {
 func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AzStorage::CreateDir : %s", options.Name)
 
-	err := az.storage.CreateDirectory(internal.TruncateDirName(options.Name))
+	err := az.storage.CreateDirectory(az.ctx, internal.TruncateDirName(options.Name))
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -231,7 +354,8 @@ func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 func (az *AzStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("AzStorage::DeleteDir : %s", options.Name)
 
-	err := az.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
+	err := az.storage.DeleteDirectory(az.ctx, internal.TruncateDirName(options.Name))
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(deleteDir, options.Name, nil)
@@ -254,7 +378,8 @@ func formatListDirName(path string) string {
 
 func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("AzStorage::IsDirEmpty : %s", options.Name)
-	list, _, err := az.storage.List(formatListDirName(options.Name), nil, 1)
+	list, _, err := az.storage.List(az.ctx, formatListDirName(options.Name), nil, 1)
+	az.updateConnectionState(err)
 	if err != nil {
 		log.Err("AzStorage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -294,7 +419,8 @@ func (az *AzStorage) StreamDir(
 		options.Count = common.MaxDirListCount
 	}
 
-	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
+	new_list, new_marker, err := az.storage.List(az.ctx, path, &options.Token, options.Count)
+	az.updateConnectionState(err)
 	if err != nil {
 		log.Err("AzStorage::StreamDir : Failed to read dir [%s]", err)
 		return new_list, "", err
@@ -344,7 +470,8 @@ func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
 	options.Src = internal.TruncateDirName(options.Src)
 	options.Dst = internal.TruncateDirName(options.Dst)
 
-	err := az.storage.RenameDirectory(options.Src, options.Dst)
+	err := az.storage.RenameDirectory(az.ctx, options.Src, options.Dst)
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -369,7 +496,8 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := az.storage.CreateFile(options.Name, options.Mode)
+	err := az.storage.CreateFile(az.ctx, options.Name, options.Mode)
+	az.updateConnectionState(err)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +518,8 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("AzStorage::OpenFile : %s", options.Name)
 
-	attr, err := az.storage.GetAttr(options.Name)
+	attr, err := az.storage.GetAttr(az.ctx, options.Name)
+	az.updateConnectionState(err)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +552,8 @@ func (az *AzStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AzStorage::DeleteFile : %s", options.Name)
 
-	err := az.storage.DeleteFile(options.Name)
+	err := az.storage.DeleteFile(az.ctx, options.Name)
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(deleteFile, options.Name, nil)
@@ -436,7 +566,8 @@ func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
 func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AzStorage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := az.storage.RenameFile(options.Src, options.Dst, options.SrcAttr)
+	err := az.storage.RenameFile(az.ctx, options.Src, options.Dst, options.SrcAttr)
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -480,7 +611,7 @@ func (az *AzStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (length
 	}
 
 	length = int(dataLen)
-	err = az.storage.ReadInBuffer(path, options.Offset, dataLen, options.Data, options.Etag)
+	err = az.storage.ReadInBuffer(az.ctx, path, options.Offset, dataLen, options.Data, options.Etag)
 	if err != nil {
 		log.Err("AzStorage::ReadInBuffer : Failed to read %s [%s]", path, err.Error())
 		length = 0
@@ -490,20 +621,23 @@ func (az *AzStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (length
 }
 
 func (az *AzStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
-	err := az.storage.Write(options)
+	err := az.storage.Write(az.ctx, options)
+	az.updateConnectionState(err)
 	return len(options.Data), err
 }
 
 func (az *AzStorage) GetFileBlockOffsets(
 	options internal.GetFileBlockOffsetsOptions,
 ) (*common.BlockOffsetList, error) {
-	return az.storage.GetFileBlockOffsets(options.Name)
-
+	bol, err := az.storage.GetFileBlockOffsets(az.ctx, options.Name)
+	az.updateConnectionState(err)
+	return bol, err
 }
 
 func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.NewSize)
-	err := az.storage.TruncateFile(options)
+	err := az.storage.TruncateFile(az.ctx, options)
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -518,12 +652,16 @@ func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 
 func (az *AzStorage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("AzStorage::CopyToFile : Read file %s", options.Name)
-	return az.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	err := az.storage.ReadToFile(az.ctx, options.Name, options.Offset, options.Count, options.File)
+	az.updateConnectionState(err)
+	return err
 }
 
 func (az *AzStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AzStorage::CopyFromFile : Upload file %s", options.Name)
-	return az.storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	err := az.storage.WriteFromFile(az.ctx, options.Name, options.Metadata, options.File)
+	az.updateConnectionState(err)
+	return err
 }
 
 // Symlink operations
@@ -537,7 +675,8 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 		return syscall.ENOTSUP
 	}
 	log.Trace("AzStorage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := az.storage.CreateLink(options.Name, options.Target)
+	err := az.storage.CreateLink(az.ctx, options.Name, options.Target)
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -557,7 +696,8 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 		return "", syscall.ENOENT
 	}
 	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
-	data, err := az.storage.ReadBuffer(options.Name, 0, options.Size)
+	data, err := az.storage.ReadBuffer(az.ctx, options.Name, 0, options.Size)
+	az.updateConnectionState(err)
 
 	if err != nil {
 		azStatsCollector.PushEvents(readLink, options.Name, nil)
@@ -570,12 +710,15 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 // Attribute operations
 func (az *AzStorage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
 	//log.Trace("AzStorage::GetAttr : Get attributes of file %s", name)
-	return az.storage.GetAttr(options.Name)
+	attr, err = az.storage.GetAttr(az.ctx, options.Name)
+	az.updateConnectionState(err)
+	return attr, err
 }
 
 func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 	log.Trace("AzStorage::Chmod : Change mod of file %s", options.Name)
-	err := az.storage.ChangeMod(options.Name, options.Mode)
+	err := az.storage.ChangeMod(az.ctx, options.Name, options.Mode)
+	az.updateConnectionState(err)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -596,24 +739,38 @@ func (az *AzStorage) Chown(options internal.ChownOptions) error {
 		options.Owner,
 		options.Group,
 	)
-	return az.storage.ChangeOwner(options.Name, options.Owner, options.Group)
+	err := az.storage.ChangeOwner(az.ctx, options.Name, options.Owner, options.Group)
+	az.updateConnectionState(err)
+	return err
 }
 
 func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("AzStorage::FlushFile : Flush file %s", options.Handle.Path)
-	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+	err := az.storage.StageAndCommit(
+		az.ctx,
+		options.Handle.Path,
+		options.Handle.CacheObj.BlockOffsetList,
+	)
+	az.updateConnectionState(err)
+	return err
 }
 
 func (az *AzStorage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	return az.storage.GetCommittedBlockList(name)
+	cbl, err := az.storage.GetCommittedBlockList(az.ctx, name)
+	az.updateConnectionState(err)
+	return cbl, err
 }
 
 func (az *AzStorage) StageData(opt internal.StageDataOptions) error {
-	return az.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+	err := az.storage.StageBlock(az.ctx, opt.Name, opt.Data, opt.Id)
+	az.updateConnectionState(err)
+	return err
 }
 
 func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
-	return az.storage.CommitBlocks(opt.Name, opt.List, opt.NewETag)
+	err := az.storage.CommitBlocks(az.ctx, opt.Name, opt.List, opt.NewETag)
+	az.updateConnectionState(err)
+	return err
 }
 
 // TODO : Below methods are pending to be implemented

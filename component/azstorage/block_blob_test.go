@@ -461,6 +461,37 @@ func (s *blockBlobTestSuite) TestListContainers() {
 	s.assert.Equal(num, count)
 }
 
+func (s *blockBlobTestSuite) TestCloudConnected() {
+	defer s.cleanupTest()
+	s.assert.True(s.az.CloudConnected())
+}
+
+func (s *blockBlobTestSuite) TestUpdateConnectionState() {
+	defer s.cleanupTest()
+	connected := s.az.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(connected)
+	s.assert.False(s.az.CloudConnected())
+	connected = s.az.updateConnectionState(nil)
+	s.assert.True(connected)
+	s.assert.True(s.az.CloudConnected())
+}
+
+func (s *blockBlobTestSuite) TestCloudOfflineCached() {
+	defer s.cleanupTest()
+	s.az.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(s.az.CloudConnected())
+	s.az.updateConnectionState(nil)
+}
+
+func (s *blockBlobTestSuite) TestCloudOfflineContext() {
+	defer s.cleanupTest()
+	s.az.updateConnectionState(&common.CloudUnreachableError{})
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: "file" + randomString(8)})
+	s.assert.Nil(h)
+	s.assert.True(isOfflineError(err))
+	s.az.updateConnectionState(nil)
+}
+
 // TODO : ListContainersHuge: Maybe this is overkill?
 
 func checkMetadata(metadata map[string]*string, key string, val string) bool {
@@ -1108,6 +1139,16 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	name := generateFileName()
 
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	// log error information to debug log
+	unwrappedErr := err
+	for unwrappedErr != nil {
+		fmt.Printf(
+			"Uncaught AZ error is of type \"%T\" and value %v.\n",
+			unwrappedErr,
+			unwrappedErr,
+		)
+		unwrappedErr = errors.Unwrap(unwrappedErr)
+	}
 
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
@@ -3075,7 +3116,7 @@ func (s *blockBlobTestSuite) TestFlushFileUpdateChunkedFile() {
 	s.assert.NoError(err)
 
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
-	err = s.az.storage.ReadInBuffer(
+	err = s.az.storage.ReadInBuffer(ctx,
 		name,
 		int64(blockSize),
 		int64(blockSize),
@@ -3132,7 +3173,7 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	// truncate block
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSize + blockSize/2)
-	err = s.az.storage.ReadInBuffer(
+	err = s.az.storage.ReadInBuffer(ctx,
 		name,
 		int64(blockSize),
 		int64(blockSize)/2,
@@ -3663,10 +3704,10 @@ func (s *blockBlobTestSuite) TestMD5SetOnUpload() {
 			s.assert.Equal(blockblob.MaxUploadBlobBytes+1, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -3675,7 +3716,7 @@ func (s *blockBlobTestSuite) TestMD5SetOnUpload() {
 			s.assert.NoError(err)
 			s.assert.Equal(localMD5, prop.MD5)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = f.Close()
 			_ = os.Remove(name)
 		})
@@ -3726,14 +3767,14 @@ func (s *blockBlobTestSuite) TestMD5NotSetOnUpload() {
 			s.assert.Equal(blockblob.MaxUploadBlobBytes+1, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.Empty(prop.MD5)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = f.Close()
 			_ = os.Remove(name)
 		})
@@ -3784,10 +3825,10 @@ func (s *blockBlobTestSuite) TestMD5AutoSetOnUpload() {
 			s.assert.Equal(100, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -3796,7 +3837,7 @@ func (s *blockBlobTestSuite) TestMD5AutoSetOnUpload() {
 			s.assert.NoError(err)
 			s.assert.Equal(localMD5, prop.MD5)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = f.Close()
 			_ = os.Remove(name)
 		})
@@ -3847,7 +3888,7 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 			s.assert.Equal(100, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 
 			blobClient := s.containerClient.NewBlobClient(name)
@@ -3857,7 +3898,7 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 				nil,
 			)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -3866,7 +3907,7 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 			s.assert.NoError(err)
 			s.assert.NotEqual(localMD5, prop.MD5)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = f.Close()
 			_ = os.Remove(name)
 		})
@@ -3917,12 +3958,12 @@ func (s *blockBlobTestSuite) TestValidateAutoMD5OnRead() {
 			s.assert.Equal(100, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -3930,10 +3971,10 @@ func (s *blockBlobTestSuite) TestValidateAutoMD5OnRead() {
 			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
-			err = s.az.storage.ReadToFile(name, 0, 100, f)
+			err = s.az.storage.ReadToFile(ctx, name, 0, 100, f)
 			s.assert.NoError(err)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = os.Remove(name)
 		})
 	}
@@ -3983,12 +4024,12 @@ func (s *blockBlobTestSuite) TestValidateManualMD5OnRead() {
 			s.assert.Equal(blockblob.MaxUploadBlobBytes+1, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -3996,10 +4037,10 @@ func (s *blockBlobTestSuite) TestValidateManualMD5OnRead() {
 			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
-			err = s.az.storage.ReadToFile(name, 0, blockblob.MaxUploadBlobBytes+1, f)
+			err = s.az.storage.ReadToFile(ctx, name, 0, blockblob.MaxUploadBlobBytes+1, f)
 			s.assert.NoError(err)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = os.Remove(name)
 		})
 	}
@@ -4049,7 +4090,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 			s.assert.Equal(100, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
@@ -4061,7 +4102,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 				nil,
 			)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -4069,11 +4110,11 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
-			err = s.az.storage.ReadToFile(name, 0, 100, f)
+			err = s.az.storage.ReadToFile(ctx, name, 0, 100, f)
 			s.assert.Error(err)
 			s.assert.Contains(err.Error(), "md5 sum mismatch on download")
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = os.Remove(name)
 		})
 	}
@@ -4123,7 +4164,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 			s.assert.Equal(100, n)
 			_, _ = f.Seek(0, 0)
 
-			err = s.az.storage.WriteFromFile(name, nil, f)
+			err = s.az.storage.WriteFromFile(ctx, name, nil, f)
 			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
@@ -4135,7 +4176,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 				nil,
 			)
 
-			prop, err := s.az.storage.GetAttr(name)
+			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
@@ -4143,10 +4184,10 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
-			err = s.az.storage.ReadToFile(name, 0, 100, f)
+			err = s.az.storage.ReadToFile(ctx, name, 0, 100, f)
 			s.assert.NoError(err)
 
-			_ = s.az.storage.DeleteFile(name)
+			_ = s.az.storage.DeleteFile(ctx, name)
 			_ = os.Remove(name)
 		})
 	}
@@ -4183,21 +4224,21 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 // 	s.assert.Nil(err)
 // 	s.assert.NotNil(f)
 
-// 	err = s.az.storage.ReadToFile(name, 0, int64(len(data)), f)
+// 	err = s.az.storage.ReadToFile(ctx, name, 0, int64(len(data)), f)
 // 	s.assert.Nil(err)
 // 	fileData, err := os.ReadFile(name)
 // 	s.assert.Nil(err)
 // 	s.assert.EqualValues(data, fileData)
 
 // 	buf := make([]byte, len(data))
-// 	err = s.az.storage.ReadInBuffer(name, 0, int64(len(data)), buf, nil)
+// 	err = s.az.storage.ReadInBuffer(ctx, name, 0, int64(len(data)), buf, nil)
 // 	s.assert.Nil(err)
 // 	s.assert.EqualValues(data, buf)
 
 // 	rbuf, err := s.az.storage.ReadBuffer(name, 0, int64(len(data)))
 // 	s.assert.Nil(err)
 // 	s.assert.EqualValues(data, rbuf)
-// 	_ = s.az.storage.DeleteFile(name)
+// 	_ = s.az.storage.DeleteFile(ctx, name)
 // 	_ = os.Remove(name)
 // }
 
@@ -4227,7 +4268,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 // 	s.assert.Nil(err)
 // 	_, _ = f.Seek(0, 0)
 
-// 	err = s.az.storage.WriteFromFile(name1, nil, f)
+// 	err = s.az.storage.WriteFromFile(ctx, name1, nil, f)
 //  s.assert.Nil(err)
 
 // 	file := s.containerClient.NewBlobClient(name1)
@@ -4266,8 +4307,8 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 // 	s.assert.Nil(err)
 // 	s.assert.NotNil(resp.RequestID)
 
-// 	_ = s.az.storage.DeleteFile(name1)
-// 	_ = s.az.storage.DeleteFile(name2)
+// 	_ = s.az.storage.DeleteFile(ctx, name1)
+// 	_ = s.az.storage.DeleteFile(ctx, name2)
 // 	_ = os.Remove(name1)
 // }
 
@@ -4525,7 +4566,7 @@ func (s *blockBlobTestSuite) TestList() {
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
-	blobList, marker, err := s.az.storage.List("", nil, 0)
+	blobList, marker, err := s.az.storage.List(ctx, "", nil, 0)
 	s.assert.NoError(err)
 	emptyString := ""
 	s.assert.Equal(&emptyString, marker)
@@ -4533,7 +4574,7 @@ func (s *blockBlobTestSuite) TestList() {
 	s.assert.Len(blobList, 3)
 
 	// Test listing with prefix
-	blobList, marker, err = s.az.storage.List(base+"b/", nil, 0)
+	blobList, marker, err = s.az.storage.List(ctx, base+"b/", nil, 0)
 	s.assert.NoError(err)
 	s.assert.Equal(&emptyString, marker)
 	s.assert.NotNil(blobList)
@@ -4548,7 +4589,7 @@ func (s *blockBlobTestSuite) TestList() {
 	// s.assert.Nil(marker)
 
 	// Test listing with count
-	blobList, marker, err = s.az.storage.List("", nil, 1)
+	blobList, marker, err = s.az.storage.List(ctx, "", nil, 1)
 	s.assert.NoError(err)
 	s.assert.NotNil(blobList)
 	s.assert.NotEmpty(marker)
