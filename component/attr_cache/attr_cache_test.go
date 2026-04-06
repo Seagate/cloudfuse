@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -415,6 +416,68 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 			suite.assert.True(found)
 		})
 	}
+}
+
+func (suite *attrCacheTestSuite) TestCreateDirUpdatesParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	options := internal.CreateDirOptions{Name: path.Join(parentPath, "child")}
+	suite.mock.EXPECT().CreateDir(options).Return(nil)
+
+	err := suite.attrCache.CreateDir(options)
+	suite.NoError(err)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.True(updatedParent.attr.Ctime.After(staleTime))
+	suite.True(updatedParent.attr.Mtime.After(staleTime))
+}
+
+func (suite *attrCacheTestSuite) TestCreateDirExistingDoesNotUpdateParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	childPath := path.Join(parentPath, "child")
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	childItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(childPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(childItem)
+
+	options := internal.CreateDirOptions{Name: childPath}
+	suite.mock.EXPECT().CreateDir(options).Return(nil)
+
+	err := suite.attrCache.CreateDir(options)
+	suite.ErrorIs(err, os.ErrExist)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.Equal(staleTime, updatedParent.attr.Ctime)
+	suite.Equal(staleTime, updatedParent.attr.Mtime)
 }
 
 // Tests Create Directory Without Caching Empty Directories
@@ -1158,6 +1221,33 @@ func (suite *attrCacheTestSuite) TestDeleteFile() {
 	err = suite.attrCache.DeleteFile(options)
 	suite.assert.NoError(err)
 	suite.assertDeleted(path)
+}
+
+func (suite *attrCacheTestSuite) TestCreateFileUpdatesParentTimes() {
+	defer suite.cleanupTest()
+
+	parentPath := "parent"
+	staleTime := time.Unix(1, 0)
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: staleTime,
+	})
+	suite.NotNil(parentItem)
+	parentItem.attr.Ctime = staleTime
+	parentItem.attr.Mtime = staleTime
+	parentItem.cachedAt = staleTime
+
+	options := internal.CreateFileOptions{Name: path.Join(parentPath, "child")}
+	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, nil)
+
+	_, err := suite.attrCache.CreateFile(options)
+	suite.NoError(err)
+
+	updatedParent, found := suite.attrCache.cache.get(parentPath)
+	suite.True(found)
+	suite.True(updatedParent.attr.Ctime.After(staleTime))
+	suite.True(updatedParent.attr.Mtime.After(staleTime))
 }
 
 // Tests Sync File

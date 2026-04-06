@@ -357,6 +357,32 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 	}
 }
 
+// update parent directory metadata for operations that modify directory entries
+func (ac *AttrCache) touchParentDirTimes(
+	childPath string,
+	touchedAt time.Time,
+	createIfMissing bool,
+) {
+	parentPath := getParentDir(childPath)
+	parentItem, found := ac.cache.get(parentPath)
+	if !found || !parentItem.exists() {
+		if !createIfMissing {
+			return
+		}
+		parentAttr := internal.CreateObjAttrDir(parentPath)
+		parentAttr.Ctime = touchedAt
+		parentAttr.Mtime = touchedAt
+		parentItem = ac.cache.insert(insertOptions{
+			attr:     parentAttr,
+			exists:   true,
+			cachedAt: touchedAt,
+		})
+	}
+	if parentItem != nil {
+		parentItem.touchModifyAndChangeTimes(touchedAt)
+	}
+}
+
 // backgroundCleanup: runs in a separate goroutine to periodically clean up expired entries
 func (ac *AttrCache) backgroundCleanup() {
 	defer close(ac.cleanupDone)
@@ -465,6 +491,9 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		if ac.cacheDirs && newDirAttrCacheItem != nil {
 			newDirAttrCacheItem.markInCloud(false)
 		}
+		if err == nil && !directoryAlreadyExists {
+			ac.touchParentDirTimes(options.Name, currentTime, ac.cacheDirs)
+		}
 	}
 	return err
 }
@@ -482,6 +511,9 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		err = ac.deleteDirectory(options.Name, deletionTime)
+		if err == nil {
+			ac.touchParentDirTimes(options.Name, deletionTime, ac.cacheDirs)
+		}
 	}
 
 	return err
@@ -787,6 +819,10 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 			dstDir := internal.TruncateDirName(options.Dst)
 			ac.moveCachedItem(srcItem, srcDir, dstDir, currentTime)
 		}
+		ac.touchParentDirTimes(options.Src, currentTime, ac.cacheDirs)
+		if getParentDir(options.Src) != getParentDir(options.Dst) {
+			ac.touchParentDirTimes(options.Dst, currentTime, ac.cacheDirs)
+		}
 	}
 
 	return err
@@ -817,6 +853,7 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		if newFileEntry != nil {
 			newFileEntry.setMode(options.Mode)
 		}
+		ac.touchParentDirTimes(options.Name, currentTime, ac.cacheDirs)
 	}
 
 	return h, err
@@ -872,6 +909,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Name), deletionTime)
 		}
+		ac.touchParentDirTimes(options.Name, deletionTime, ac.cacheDirs)
 	}
 
 	return err
@@ -934,6 +972,10 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
 			ac.markAncestorsInCloud(getParentDir(options.Dst), renameTime)
+		}
+		ac.touchParentDirTimes(options.Src, renameTime, ac.cacheDirs)
+		if getParentDir(options.Src) != getParentDir(options.Dst) {
+			ac.touchParentDirTimes(options.Dst, renameTime, ac.cacheDirs)
 		}
 	}
 	return err
@@ -1181,6 +1223,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
+		ac.touchParentDirTimes(options.Name, currentTime, ac.cacheDirs)
 	}
 
 	return err
