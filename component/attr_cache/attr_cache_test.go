@@ -384,7 +384,7 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			options := internal.CreateDirOptions{Name: path}
+			options := internal.CreateDirOptions{Name: path, Mode: 0o750}
 
 			// Error
 			suite.mock.EXPECT().CreateDir(options).Return(errors.New("Failed"))
@@ -400,8 +400,11 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.NoError(err)
 
-			_, found := suite.attrCache.cache.get(truncatedPath)
+			item, found := suite.attrCache.cache.get(truncatedPath)
 			suite.assert.True(found)
+			suite.assert.Equal(os.ModeDir, item.attr.Mode&os.ModeType)
+			suite.assert.Equal(options.Mode, item.attr.Mode&os.ModePerm)
+			suite.assert.False(item.attr.IsModeDefault())
 
 			// Entry Already Exists
 			suite.mock.EXPECT().CreateDir(options).Return(nil)

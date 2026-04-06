@@ -15,6 +15,7 @@ concurrency:
 jobs:
   BuildAndTest-Coverage:
     name: Build and Test with Code Coverage
+    environment: testing
     strategy:
       matrix:
         go: ["1.26"]
@@ -41,7 +42,7 @@ jobs:
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
       zig: 0.15.2
-      GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
+      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1024,6 +1025,7 @@ jobs:
 
   BuildAndTest-Coverage-Windows:
     name: Build and Test with Code Coverage on Windows
+    environment: testing
     strategy:
       matrix:
         go: ["1.26"]
@@ -1044,7 +1046,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
-      GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
+      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1949,6 +1951,7 @@ jobs:
       - BuildAndTest-Coverage
       - BuildAndTest-Coverage-Windows
     name: Cleanup Test Accounts
+    environment: testing
     strategy:
       matrix:
         go: ["1.26"]

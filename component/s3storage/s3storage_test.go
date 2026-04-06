@@ -2478,6 +2478,42 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	s.assert.Error(err)
 }
 
+func (s *s3StorageTestSuite) TestRenameFileSymlink() {
+	defer s.cleanupTest()
+	config := generateConfigYaml(
+		storageTestConfigurationParameters,
+	) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
+
+	target := generateFileName()
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+	s.assert.NoError(err)
+
+	src := generateFileName()
+	err = s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: src, Target: target})
+	s.assert.NoError(err)
+
+	srcAttr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: src})
+	s.assert.NoError(err)
+	s.assert.True(srcAttr.IsSymlink())
+
+	dst := generateFileName()
+	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst, SrcAttr: srcAttr})
+	s.assert.NoError(err)
+
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: src})
+	s.assert.Error(err)
+
+	dstAttr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dst})
+	s.assert.NoError(err)
+	s.assert.True(dstAttr.IsSymlink())
+
+	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: dst})
+	s.assert.NoError(err)
+	s.assert.Equal(target, result)
+}
+
 func (s *s3StorageTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
 	// enable symlinks in config

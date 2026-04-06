@@ -299,13 +299,7 @@ func (ac *AttrCache) moveCachedItem(
 	}
 	// generate the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
-	// create the destination attr
-	var dstAttr *internal.ObjAttr
-	if srcItem.attr.IsDir() {
-		dstAttr = internal.CreateObjAttrDir(dstPath)
-	} else {
-		dstAttr = internal.CreateObjAttr(dstPath, srcItem.attr.Size, srcItem.attr.Mtime)
-	}
+	dstAttr := cloneMovedAttr(srcItem.attr, dstPath)
 	// add the destination item to the cache
 	dstItem := ac.cache.insert(insertOptions{
 		attr:     dstAttr,
@@ -313,7 +307,6 @@ func (ac *AttrCache) moveCachedItem(
 		cachedAt: srcItem.cachedAt,
 	})
 	// copy the inCloud flag
-	dstItem.attr.Mode = srcItem.attr.Mode
 	dstItem.markInCloud(srcItem.isInCloud())
 	// recurse over any children
 	for _, srcChildItm := range srcItem.children {
@@ -323,6 +316,21 @@ func (ac *AttrCache) moveCachedItem(
 	srcItem.markDeleted(movedAt)
 	// return the destination item
 	return dstItem
+}
+
+func cloneMovedAttr(srcAttr *internal.ObjAttr, dstPath string) *internal.ObjAttr {
+	dstAttr := *srcAttr
+	dstAttr.Path = dstPath
+	dstAttr.Name = path.Base(dstPath)
+
+	if srcAttr.Metadata != nil {
+		dstAttr.Metadata = make(map[string]*string, len(srcAttr.Metadata))
+		for key, value := range srcAttr.Metadata {
+			dstAttr.Metadata[key] = value
+		}
+	}
+
+	return &dstAttr
 }
 
 // record that cloud storage has records of this directory and all its ancestors existing
@@ -476,8 +484,11 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			exists:   true,
 			cachedAt: currentTime,
 		})
+		if newDirAttrCacheItem != nil {
+			newDirAttrCacheItem.setMode(options.Mode)
+		}
 		// update flags for tracking directory existence
-		if ac.cacheDirs {
+		if ac.cacheDirs && newDirAttrCacheItem != nil {
 			newDirAttrCacheItem.markInCloud(false)
 		}
 		if err == nil && !directoryAlreadyExists {
@@ -839,7 +850,9 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			exists:   true,
 			cachedAt: currentTime,
 		})
-		newFileEntry.setMode(options.Mode)
+		if newFileEntry != nil {
+			newFileEntry.setMode(options.Mode)
+		}
 		ac.touchParentDirTimes(options.Name, currentTime, ac.cacheDirs)
 	}
 
