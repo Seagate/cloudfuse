@@ -128,6 +128,27 @@ License: MIT
 
 Package: cloudfuse
 Architecture: amd64
+Version: 2.2.0
+Priority: optional
+Section: utils
+Maintainer: Seagate Technology <cloudfuse@seagate.com>
+Installed-Size: 26068
+Depends: fuse, libfuse2, libc6 (>= 2.24)
+Filename: dists/stable/main/binary-amd64/cloudfuse_fuse2_2.2.0_linux_amd64.deb
+Size: 9328102
+MD5sum: bad5885153224523c2cb30a753254828
+SHA1: 351668f2d0c577702394d5a4d7e885ee52f2f591
+SHA256: 1438187051660e5a8aed82e966b2d9259a707a6e05c81890545864f7b1b108e6
+SHA512: eba3186ff5e465b0baa1f55d7a1eca4dbd66c0b925f6a30582a2d44c8a3137cfbd8d94d2846eb2d712208f14feb0a90cdd123a7a9255ac34c21a3594de5e5b45
+Homepage: https://github.com/Seagate/cloudfuse
+Description: FUSE file system for interacting with S3 and Azure storage
+ Cloudfuse provides the ability to mount a cloud bucket in your local file
+ system. You can easily read and write to the cloud, and connect programs
+ on your computer to the cloud even if they're not cloud-aware.
+Architecture-Variant: amd64v1
+
+Package: cloudfuse
+Architecture: amd64
 Version: 2.0.0
 Priority: optional
 Section: utils
@@ -274,4 +295,25 @@ Description: FUSE file system for interacting with S3 and Azure storage
  on your computer to the cloud even if they're not cloud-aware.
 Architecture-Variant: amd64v1
 License: MIT
+
+Package: cloudfuse
+Architecture: amd64
+Version: 2.2.0
+Priority: optional
+Section: utils
+Maintainer: Seagate Technology <cloudfuse@seagate.com>
+Installed-Size: 26070
+Depends: fuse3, libfuse3-3 | libfuse3-4, libc6 (>= 2.24)
+Filename: dists/stable/main/binary-amd64/cloudfuse_fuse3_2.2.0_linux_amd64.deb
+Size: 9329754
+MD5sum: 17aa8503f5ca438b05e187934f1d6320
+SHA1: d8a9032692c05c8c966dfd0a48ddbf6bbe1989e0
+SHA256: 11128bd857db27007ac3e447c487b9f7453d0f5c319c840d7df309876414917c
+SHA512: a207a36ebe445c56605450d546c2afa16f7f950a6d284f46fe54e7de7a6d7d8d147a0f75d34b0848b37e6d07e1e1aa7691c0238793378417a4f5466a49352729
+Homepage: https://github.com/Seagate/cloudfuse
+Description: FUSE file system for interacting with S3 and Azure storage
+ Cloudfuse provides the ability to mount a cloud bucket in your local file
+ system. You can easily read and write to the cloud, and connect programs
+ on your computer to the cloud even if they're not cloud-aware.
+Architecture-Variant: amd64v1
 
