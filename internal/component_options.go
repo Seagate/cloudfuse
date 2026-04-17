@@ -27,6 +27,7 @@ package internal
 
 import (
 	"os"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
@@ -208,10 +209,7 @@ func TruncateDirName(name string) string {
 }
 
 func ExtendDirName(name string) string {
-	if len(name) == 0 {
-		return "/"
-	}
-	if name[len(name)-1:] != "/" {
+	if !strings.HasSuffix(name, "/") {
 		name = name + "/"
 	}
 	return name
