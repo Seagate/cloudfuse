@@ -328,16 +328,14 @@ func (fc *FileCache) IsScheduled(objName string) bool {
 // returns true if we *know* that this entity does not exist in cloud storage
 // otherwise returns false (including ambiguous cases)
 func (fc *FileCache) notInCloud(name string) bool {
-	notInCloud, _ := fc.checkCloud(name)
-	return notInCloud
+	cached, exists, _ := fc.checkCloud(name)
+	return cached && !exists
 }
 
-// notInCloud is true if we *know* that this entity does not exist in cloud storage
 // and getAttrErr is the error returned from GetAttr
-func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error) {
+func (fc *FileCache) checkCloud(name string) (cached bool, exists bool, getAttrErr error) {
 	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
-	return notInCloud, getAttrErr
+	return cachedData(getAttrErr), !errors.Is(getAttrErr, os.ErrNotExist), getAttrErr
 }
 
 // checks if the error returned from cloud storage means we're offline

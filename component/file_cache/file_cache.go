@@ -571,7 +571,8 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 
 	// we are offline
 	// check if the directory exists in cloud storage
-	notInCloud, err := fc.checkCloud(options.Name)
+	cached, exists, err := fc.checkCloud(options.Name)
+	notInCloud := cached && !exists
 	switch {
 	case notInCloud:
 		// the directory does not exist in the cloud, so we can create it locally
