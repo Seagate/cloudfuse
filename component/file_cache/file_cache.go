@@ -626,25 +626,24 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
 	// The libfuse component only calls DeleteDir on empty directories, so this directory must be empty
 	err := fc.NextComponent().DeleteDir(options)
-	if err != nil {
-		log.Err("FileCache::DeleteDir : %s failed. Here's why: %v", options.Name, err)
-		// There is a chance that meta file for directory was not created in which case
-		// rest api delete will fail while we still need to cleanup the local cache for the same
-	} else {
-		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
-	}
 	// is the cloud connection down? Is offline access enabled?
-	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
-		// this is a local directory
-		// remove it from the deferred cloud operations
-		// TODO: protect this with a semaphore (probably flock)
-		fc.pendingOps.Delete(options.Name)
-		// delete it locally
-		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
+	if isOffline(err) && fc.offlineAccess {
+		// record pending deletion
+		fc.addPendingOp(options.Name, flock)
 		// clear the error
 		err = nil
+	}
+	// delete locally
+	if err == nil {
+		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
+	} else {
+		log.Err("FileCache::DeleteDir : %s . Here's why: %v", options.Name, err)
 	}
 
 	return err
