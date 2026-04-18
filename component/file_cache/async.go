@@ -302,34 +302,46 @@ func (fc *FileCache) updateObject(name string) error {
 			}
 		}
 	} else {
-		// this is a file
-		// prepare a handle
-		handle := handlemap.NewHandle(name)
-		// open the cached file
-		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
-		if err != nil {
-			log.Err(
-				"FileCache::uploadPendingFile : %s failed to open file. Here's why: %v",
-				name,
-				err,
-			)
-			return err
-		}
-		// write handle attributes
-		inf, err := f.Stat()
-		if err == nil {
-			handle.Size = inf.Size()
-		}
-		handle.UnixFD = uint64(f.Fd())
-		handle.SetFileObject(f)
-		fc.setHandleDirty(handle)
+		if opIsDeletion {
+			options := internal.DeleteFileOptions{Name: name}
+			err = fc.NextComponent().DeleteFile(options)
+			if err != nil {
+				return err
+			}
+		} else {
+			// this is a file
+			// prepare a handle
+			handle := handlemap.NewHandle(name)
+			// open the cached file
+			f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
+			if err != nil {
+				log.Err(
+					"FileCache::uploadPendingFile : %s failed to open file. Here's why: %v",
+					name,
+					err,
+				)
+				return err
+			}
+			// write handle attributes
+			inf, err := f.Stat()
+			if err == nil {
+				handle.Size = inf.Size()
+			}
+			handle.UnixFD = uint64(f.Fd())
+			handle.SetFileObject(f)
+			fc.setHandleDirty(handle)
 
-		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, AsyncUpload: true})
-		f.Close()
-		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
-			return err
+			// upload the file
+			err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, AsyncUpload: true})
+			f.Close()
+			if err != nil {
+				log.Err(
+					"FileCache::uploadPendingFile : %s Upload failed. Here's why: %v",
+					name,
+					err,
+				)
+				return err
+			}
 		}
 	}
 	// update state
