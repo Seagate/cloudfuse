@@ -29,6 +29,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -226,7 +227,7 @@ func (fc *FileCache) servicePendingOps() {
 					return false
 				case <-fc.startScheduledUploads:
 					path := key.(string)
-					err := fc.uploadPendingFile(path)
+					err := fc.updateObject(path)
 					if isOffline(err) {
 						return false // connection lost - abort iteration
 					}
@@ -254,8 +255,8 @@ func (fc *FileCache) servicePendingOps() {
 	}
 }
 
-func (fc *FileCache) uploadPendingFile(name string) error {
-	log.Trace("FileCache::uploadPendingFile : %s", name)
+func (fc *FileCache) updateObject(name string) error {
+	log.Trace("FileCache::updateObject : %s", name)
 
 	// lock the file
 	flock := fc.fileLocks.Get(name)
@@ -270,17 +271,35 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 
 	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
+	opIsDeletion := false
+	isDir := false
 	info, err := os.Stat(localPath)
-	if err != nil {
+	switch {
+	case err == nil:
+		isDir = info.IsDir()
+	case os.IsNotExist(err):
+		opIsDeletion = true
+		isDir = strings.HasSuffix(name, "/")
+	default:
 		log.Err("FileCache::uploadPendingFile : %s failed to stat file. Here's why: %v", name, err)
 		return err
 	}
-	if info.IsDir() {
-		// upload folder
-		options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
-		err = fc.NextComponent().CreateDir(options)
-		if err != nil && !os.IsExist(err) {
-			return err
+	// folder
+	if isDir {
+		if opIsDeletion {
+			// delete folder
+			options := internal.DeleteDirOptions{Name: name}
+			err = fc.NextComponent().DeleteDir(options)
+			if err != nil {
+				return err
+			}
+		} else {
+			// upload folder
+			options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
+			err = fc.NextComponent().CreateDir(options)
+			if err != nil && !os.IsExist(err) {
+				return err
+			}
 		}
 	} else {
 		// this is a file
