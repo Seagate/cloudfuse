@@ -589,7 +589,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			flock := fc.fileLocks.Get(options.Name)
 			flock.Lock()
 			defer flock.Unlock()
-			fc.addPendingOp(options.Name, flock)
+			fc.addPendingOp(options.Name, pendingFlags{isDir: true}, flock)
 			log.Info(
 				"FileCache::CreateDir : %s created offline and queued for cloud sync",
 				options.Name,
@@ -636,7 +636,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	// is the cloud connection down? Is offline access enabled?
 	if isOffline(err) && fc.offlineAccess {
 		// record pending deletion
-		fc.addPendingOp(name, flock)
+		fc.addPendingOp(name, pendingFlags{isDir: true, isDeletion: true}, flock)
 		// clear the error
 		err = nil
 	}
@@ -661,12 +661,9 @@ func (fc *FileCache) StreamDir(
 
 	// To cover case 1, grab all entries from storage
 	attrs, token, err := fc.NextComponent().StreamDir(options)
-	if isOffline(err) && fc.offlineAccess {
-		// we're offline and offline access is allowed, so let's check if we have valid a listing
-		if !errors.Is(err, &common.NoCachedDataError{}) {
-			// drop the error message
-			err = nil
-		}
+	if isOffline(err) && fc.offlineAccess && cachedData(err) {
+		// we have a valid listing for offline access
+		err = nil
 	}
 	if err != nil {
 		return attrs, token, err
@@ -1168,7 +1165,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// if we're offline, record this operation as pending
 	if offline {
-		fc.addPendingOp(options.Name, flock)
+		fc.addPendingOp(options.Name, pendingFlags{}, flock)
 	}
 
 	return handle, nil
@@ -1966,7 +1963,11 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				)
 				_, statErr := os.Stat(localPath)
 				if statErr == nil {
-					fc.addPendingOp(options.Handle.Path, fc.fileLocks.Get(options.Handle.Path))
+					fc.addPendingOp(
+						options.Handle.Path,
+						pendingFlags{},
+						fc.fileLocks.Get(options.Handle.Path),
+					)
 				}
 				fc.clearHandleDirty(options.Handle)
 				return nil
@@ -2411,7 +2412,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.addPendingOp(options.Name, flock)
+				fc.addPendingOp(options.Name, pendingFlags{}, flock)
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 			}
 		}
@@ -2467,7 +2468,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
 				fc.missedChmodList.LoadOrStore(options.Name, true)
 				flock := fc.fileLocks.Get(options.Name)
-				fc.addPendingOp(options.Name, flock)
+				fc.addPendingOp(options.Name, pendingFlags{}, flock)
 			}
 		}
 	}
@@ -2514,7 +2515,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 			} else if offlineOkay {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
 				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
-				fc.addPendingOp(options.Name, flock)
+				fc.addPendingOp(options.Name, pendingFlags{}, flock)
 			}
 		}
 	}

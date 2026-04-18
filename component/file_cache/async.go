@@ -53,6 +53,11 @@ type Config struct {
 
 type WeeklySchedule []UploadWindow
 
+type pendingFlags struct {
+	isDir      bool
+	isDeletion bool
+}
+
 func (fc *FileCache) configureScheduler() error {
 	// load from config
 	var rawSchedule []map[string]interface{}
@@ -192,9 +197,9 @@ func isValidCronExpression(expr string) bool {
 	return err == nil
 }
 
-func (fc *FileCache) addPendingOp(name string, flock *common.LockMapItem) {
+func (fc *FileCache) addPendingOp(name string, value pendingFlags, flock *common.LockMapItem) {
 	log.Trace("FileCache::addPendingOp : %s", name)
-	fc.pendingOps.Store(name, struct{}{})
+	fc.pendingOps.Store(name, value)
 	select {
 	case fc.pendingOpAdded <- struct{}{}:
 	default: // do not block
@@ -227,7 +232,8 @@ func (fc *FileCache) servicePendingOps() {
 					return false
 				case <-fc.startScheduledUploads:
 					path := key.(string)
-					err := fc.updateObject(path)
+					value := value.(pendingFlags)
+					err := fc.updateObject(path, value)
 					if isOffline(err) {
 						return false // connection lost - abort iteration
 					}
@@ -255,7 +261,7 @@ func (fc *FileCache) servicePendingOps() {
 	}
 }
 
-func (fc *FileCache) updateObject(name string) error {
+func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	log.Trace("FileCache::updateObject : %s", name)
 
 	// lock the file
@@ -271,22 +277,21 @@ func (fc *FileCache) updateObject(name string) error {
 
 	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
-	opIsDeletion := false
-	isDir := false
 	info, err := os.Stat(localPath)
-	switch {
-	case err == nil:
-		isDir = info.IsDir()
-	case os.IsNotExist(err):
-		opIsDeletion = true
-		isDir = strings.HasSuffix(name, "/")
-	default:
-		log.Err("FileCache::uploadPendingFile : %s failed to stat file. Here's why: %v", name, err)
+	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
+	if !flags.isDeletion && err != nil {
+		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, err)
 		return err
 	}
-	// folder
-	if isDir {
-		if opIsDeletion {
+	if flags.isDeletion && !os.IsNotExist(err) {
+		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
+	}
+	if flags.isDir != info.IsDir() {
+		log.Err("FileCache::updateObject : %s has wrong dir flag (%b)!", name, flags.isDir)
+	}
+	// delete
+	if os.IsNotExist(err) {
+		if flags.isDir {
 			// delete folder
 			options := internal.DeleteDirOptions{Name: name}
 			err = fc.NextComponent().DeleteDir(options)
@@ -294,58 +299,40 @@ func (fc *FileCache) updateObject(name string) error {
 				return err
 			}
 		} else {
+			// delete file
+			options := internal.DeleteFileOptions{Name: name}
+			err = fc.NextComponent().DeleteFile(options)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		if info.IsDir() {
 			// upload folder
 			options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
 			err = fc.NextComponent().CreateDir(options)
 			if err != nil && !os.IsExist(err) {
 				return err
 			}
-		}
-	} else {
-		if opIsDeletion {
-			options := internal.DeleteFileOptions{Name: name}
-			err = fc.NextComponent().DeleteFile(options)
-			if err != nil {
-				return err
-			}
 		} else {
-			// this is a file
-			// prepare a handle
-			handle := handlemap.NewHandle(name)
-			// open the cached file
+			// upload file
+			// open the file
 			f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
 			if err != nil {
-				log.Err(
-					"FileCache::uploadPendingFile : %s failed to open file. Here's why: %v",
-					name,
-					err,
-				)
+				log.Err("FileCache::updateObject : %s open failed. Here's why: %v", name, err)
 				return err
 			}
-			// write handle attributes
-			inf, err := f.Stat()
-			if err == nil {
-				handle.Size = inf.Size()
-			}
-			handle.UnixFD = uint64(f.Fd())
-			handle.SetFileObject(f)
-			fc.setHandleDirty(handle)
-
-			// upload the file
-			err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, AsyncUpload: true})
-			f.Close()
+			defer f.Close()
+			// upload
+			err = fc.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 			if err != nil {
-				log.Err(
-					"FileCache::uploadPendingFile : %s Upload failed. Here's why: %v",
-					name,
-					err,
-				)
+				log.Err("FileCache::updateObject : %s Upload failed. Here's why: %v", name, err)
 				return err
 			}
 		}
 	}
 	// update state
-	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
+	log.Info("FileCache::updateObject : File uploaded: %s", name)
 	fc.pendingOps.Delete(name)
 
 	return nil
