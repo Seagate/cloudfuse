@@ -626,7 +626,8 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
-	flock := fc.fileLocks.Get(options.Name)
+	name := internal.ExtendDirName(options.Name)
+	flock := fc.fileLocks.Get(name)
 	flock.Lock()
 	defer flock.Unlock()
 
@@ -635,7 +636,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	// is the cloud connection down? Is offline access enabled?
 	if isOffline(err) && fc.offlineAccess {
 		// record pending deletion
-		fc.addPendingOp(options.Name, flock)
+		fc.addPendingOp(name, flock)
 		// clear the error
 		err = nil
 	}
