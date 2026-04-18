@@ -1912,10 +1912,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-	// An Async upload is not a user action, so it should not promote the file in the LRU
-	if !options.AsyncUpload {
-		fc.policy.CacheValid(localPath)
-	}
+	fc.policy.CacheValid(localPath)
 
 	// if our handle is dirty then that means we wrote to the file
 	if options.Handle.Dirty() {
@@ -1939,7 +1936,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 
 		// If lazy write is enabled, stop here
-		if fc.lazyWrite && !options.CloseInProgress && !options.AsyncUpload {
+		if fc.lazyWrite && !options.CloseInProgress {
 			// As lazy-write is enable, upload will be scheduled when file is closed.
 			log.Info(
 				"FileCache::FlushFile : %s will be flushed when handle %d is closed",

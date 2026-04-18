@@ -29,14 +29,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
-	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/netresearch/go-cron"
 )
 

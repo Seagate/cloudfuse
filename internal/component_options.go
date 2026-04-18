@@ -140,7 +140,6 @@ type CopyFromFileOptions struct {
 type FlushFileOptions struct {
 	Handle          *handlemap.Handle
 	CloseInProgress bool
-	AsyncUpload     bool
 }
 
 type SyncFileOptions struct {
