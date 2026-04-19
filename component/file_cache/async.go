@@ -187,15 +187,8 @@ func (fc *FileCache) startScheduler() {
 	fc.cronScheduler.Start()
 }
 
-func isValidCronExpression(expr string) bool {
-	parser := cron.MustNewParser(
-		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
-	)
-	_, err := parser.Parse(expr)
-	return err == nil
-}
-
-func (fc *FileCache) addPendingOp(name string, value pendingFlags, flock *common.LockMapItem) {
+// flock must be locked
+func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 	log.Trace("FileCache::addPendingOp : %s", name)
 	fc.pendingOps.Store(name, value)
 	select {
@@ -204,6 +197,7 @@ func (fc *FileCache) addPendingOp(name string, value pendingFlags, flock *common
 	}
 }
 
+// persistent background thread function
 func (fc *FileCache) servicePendingOps() {
 	for {
 		select {
@@ -259,6 +253,7 @@ func (fc *FileCache) servicePendingOps() {
 	}
 }
 
+// synchronize pending operation with cloud storage
 func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	log.Trace("FileCache::updateObject : %s", name)
 
@@ -285,7 +280,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
 	}
 	if flags.isDir != info.IsDir() {
-		log.Err("FileCache::updateObject : %s has wrong dir flag (%b)!", name, flags.isDir)
+		log.Err("FileCache::updateObject : %s has wrong dir flag (%t)!", name, flags.isDir)
 	}
 	// delete
 	if os.IsNotExist(err) {
@@ -334,11 +329,6 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	fc.pendingOps.Delete(name)
 
 	return nil
-}
-
-func (fc *FileCache) IsScheduled(objName string) bool {
-	_, inSchedule := fc.pendingOps.Load(objName)
-	return inSchedule
 }
 
 // returns true if we *know* that this entity does not exist in cloud storage

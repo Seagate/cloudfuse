@@ -589,7 +589,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			flock := fc.fileLocks.Get(options.Name)
 			flock.Lock()
 			defer flock.Unlock()
-			fc.addPendingOp(options.Name, pendingFlags{isDir: true}, flock)
+			fc.addPendingOp(options.Name, pendingFlags{isDir: true})
 			log.Info(
 				"FileCache::CreateDir : %s created offline and queued for cloud sync",
 				options.Name,
@@ -636,7 +636,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	// is the cloud connection down? Is offline access enabled?
 	if isOffline(err) && fc.offlineAccess {
 		// record pending deletion
-		fc.addPendingOp(name, pendingFlags{isDir: true, isDeletion: true}, flock)
+		fc.addPendingOp(name, pendingFlags{isDir: true, isDeletion: true})
 		// clear the error
 		err = nil
 	}
@@ -725,7 +725,7 @@ func (fc *FileCache) StreamDir(
 		for _, entry := range dirents {
 			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
 			if !entry.IsDir() {
-				// This is an overhead for streamdir for now
+				// This is an overhead for StreamDir for now
 				// As list is paginated we have no way to know whether this particular item exists both in local cache
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
@@ -938,11 +938,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				// remember to delete the src directory later (after its contents are deleted)
 				directoriesToPurge = append(directoriesToPurge, path)
 				// update pending cloud ops
-				fc.renamePendingOp(
-					fc.getObjectName(path),
-					fc.getObjectName(newPath),
-					fc.fileLocks.Get(fc.getObjectName(newPath)),
-				)
+				fc.renamePendingOp(fc.getObjectName(path), fc.getObjectName(newPath))
 			}
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
@@ -1165,7 +1161,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// if we're offline, record this operation as pending
 	if offline {
-		fc.addPendingOp(options.Name, pendingFlags{}, flock)
+		fc.addPendingOp(options.Name, pendingFlags{})
 	}
 
 	return handle, nil
@@ -1558,7 +1554,7 @@ func (fc *FileCache) isDownloadRequired(
 	lmt := time.Time{}
 
 	// check if the file exists locally
-	finfo, statErr := os.Stat(localPath)
+	info, statErr := os.Stat(localPath)
 	if statErr == nil {
 		// The file does not need to be downloaded as long as it is in the cache policy
 		fileInPolicyCache := fc.policy.IsCached(localPath)
@@ -1571,7 +1567,7 @@ func (fc *FileCache) isDownloadRequired(
 			)
 		}
 		// gather stat details
-		lmt = finfo.ModTime()
+		lmt = info.ModTime()
 	} else if os.IsNotExist(statErr) {
 		// The file does not exist in the local cache so it needs to be downloaded
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
@@ -1605,7 +1601,7 @@ func (fc *FileCache) isDownloadRequired(
 	if cached && refreshTimerExpired && cloudAttr != nil {
 		// File is not expired, but the user has configured a refresh timer, which has expired.
 		// Does the cloud have a newer copy?
-		cloudHasLatestData := cloudAttr.Mtime.After(lmt) || finfo.Size() != cloudAttr.Size
+		cloudHasLatestData := cloudAttr.Mtime.After(lmt) || info.Size() != cloudAttr.Size
 		// Is the local file open?
 		fileIsOpen := flock.Count() > 0 && !flock.LazyOpen
 		if cloudHasLatestData && !fileIsOpen {
@@ -1615,7 +1611,7 @@ func (fc *FileCache) isDownloadRequired(
 				cloudAttr.Mtime,
 				lmt,
 				cloudAttr.Size,
-				finfo.Size(),
+				info.Size(),
 			)
 			downloadRequired = true
 		} else {
@@ -1759,8 +1755,7 @@ func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, e
 	options.Handle.OptCnt++
 	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
-		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-		fc.policy.CacheValid(localPath)
+		fc.FileUsed(options.Handle.Path)
 	}
 
 	// Removing Pread as it is not supported on Windows
@@ -1827,8 +1822,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	options.Handle.OptCnt++
 	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
-		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-		fc.policy.CacheValid(localPath)
+		fc.FileUsed(options.Handle.Path)
 	}
 
 	// Removing Pwrite as it is not supported on Windows
@@ -1911,8 +1905,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-	fc.policy.CacheValid(localPath)
+	fc.FileUsed(options.Handle.Path)
 
 	// if our handle is dirty then that means we wrote to the file
 	if options.Handle.Dirty() {
@@ -1958,13 +1951,9 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 					"FileCache::FlushFile : %s upload deferred (Scheduled for upload)",
 					options.Handle.Path,
 				)
-				_, statErr := os.Stat(localPath)
+				_, statErr := os.Stat(filepath.Join(fc.tmpPath, options.Handle.Path))
 				if statErr == nil {
-					fc.addPendingOp(
-						options.Handle.Path,
-						pendingFlags{},
-						fc.fileLocks.Get(options.Handle.Path),
-					)
+					fc.addPendingOp(options.Handle.Path, pendingFlags{})
 				}
 				fc.clearHandleDirty(options.Handle)
 				return nil
@@ -1985,10 +1974,9 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		case isOffline(err) && fc.offlineAccess:
 			log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
 			// add file to upload queue
-			_, err := os.Stat(localPath)
+			_, err := os.Stat(filepath.Join(fc.tmpPath, options.Handle.Path))
 			if err == nil {
-				flock := fc.fileLocks.Get(options.Handle.Path)
-				fc.addPendingOp(options.Handle.Path, pendingFlags{}, flock)
+				fc.addPendingOp(options.Handle.Path, pendingFlags{})
 			}
 		default:
 			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
@@ -1999,6 +1987,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	return nil
 }
 
+// copy local file data to cloud storage
 func (fc *FileCache) uploadFile(name string) error {
 	// Open a new read-only local file handle for the SDK to use to upload
 	// stat
@@ -2129,6 +2118,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	return attrs, nil
 }
 
+// setter
 func (fc *FileCache) setHandleDirty(handle *handlemap.Handle) {
 	handle.Lock()
 	alreadyDirty := handle.Dirty()
@@ -2141,6 +2131,7 @@ func (fc *FileCache) setHandleDirty(handle *handlemap.Handle) {
 	}
 }
 
+// setter
 func (fc *FileCache) clearHandleDirty(handle *handlemap.Handle) {
 	handle.Lock()
 	wasDirty := handle.Dirty()
@@ -2239,19 +2230,20 @@ func (fc *FileCache) renameLocalFile(
 	// rename open handles
 	fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 	// update pending cloud ops
-	fc.renamePendingOp(fc.getObjectName(localSrcPath), fc.getObjectName(localDstPath), dflock)
+	fc.renamePendingOp(fc.getObjectName(localSrcPath), fc.getObjectName(localDstPath))
 
 	return nil
 }
 
-func (fc *FileCache) renamePendingOp(srcName, dstName string, dflock *common.LockMapItem) {
-	_, operationPending := fc.pendingOps.LoadAndDelete(srcName)
+// destination flock must be locked
+func (fc *FileCache) renamePendingOp(srcName, dstName string) {
+	value, operationPending := fc.pendingOps.LoadAndDelete(srcName)
 	if operationPending {
-		fc.pendingOps.Store(dstName, struct{}{})
+		fc.addPendingOp(dstName, value.(pendingFlags))
 	}
 }
 
-// files should already be locked before calling this function
+// flock must be locked for both files
 func (fc *FileCache) renameOpenHandles(
 	srcName, dstName string,
 	sflock, dflock *common.LockMapItem,
@@ -2400,7 +2392,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.addPendingOp(options.Name, pendingFlags{}, flock)
+				fc.addPendingOp(options.Name, pendingFlags{})
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 			}
 		}
@@ -2420,7 +2412,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	return fc.chmodInternal(options)
 }
 
-// file must be locked before calling this function
+// flock must be locked before calling this function
 func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 	var offlineOkay bool
@@ -2455,8 +2447,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 			} else if offlineOkay {
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
 				fc.missedChmodList.LoadOrStore(options.Name, true)
-				flock := fc.fileLocks.Get(options.Name)
-				fc.addPendingOp(options.Name, pendingFlags{}, flock)
+				fc.addPendingOp(options.Name, pendingFlags{})
 			}
 		}
 	}
@@ -2503,7 +2494,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 			} else if offlineOkay {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
 				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
-				fc.addPendingOp(options.Name, pendingFlags{}, flock)
+				fc.addPendingOp(options.Name, pendingFlags{})
 			}
 		}
 	}
@@ -2511,10 +2502,10 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	return nil
 }
 
+// wrapper for CacheValid which takes (object) name
 func (fc *FileCache) FileUsed(name string) error {
 	// Update the owner and group of the file in the local cache
-	localPath := filepath.Join(fc.tmpPath, name)
-	fc.policy.CacheValid(localPath)
+	fc.policy.CacheValid(filepath.Join(fc.tmpPath, name))
 	return nil
 }
 
