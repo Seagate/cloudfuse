@@ -1977,53 +1977,8 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 
 		// Write to storage
-		// Open a new read-only local file handle for the SDK to use to upload
-		uploadHandle, err := common.Open(localPath)
-		var orgMode fs.FileMode
-		modeChanged := false
-		if err != nil {
-			if os.IsPermission(err) {
-				info, _ := os.Stat(localPath)
-				orgMode = info.Mode()
-				newMode := orgMode | 0444
-				err = os.Chmod(localPath, newMode)
-				if err == nil {
-					modeChanged = true
-					uploadHandle, err = common.Open(localPath)
-					log.Info(
-						"FileCache::FlushFile : read mode added to file %s",
-						options.Handle.Path,
-					)
-				}
-			}
-			if err != nil {
-				log.Err(
-					"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
-					options.Handle.Path,
-					err.Error(),
-				)
-				return err
-			}
-		}
-		// upload file data
-		err = fc.NextComponent().CopyFromFile(
-			internal.CopyFromFileOptions{
-				Name: options.Handle.Path,
-				File: uploadHandle,
-			})
-		uploadHandle.Close()
-		// change mode back
-		if modeChanged {
-			err1 := os.Chmod(localPath, orgMode)
-			if err1 != nil {
-				log.Err(
-					"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
-					options.Handle.Path,
-					err1.Error(),
-				)
-			}
-		}
-
+		err = fc.uploadFile(options.Handle.Path)
+		// handle errors and update flags
 		switch {
 		case err == nil:
 			fc.clearHandleDirty(options.Handle)
@@ -2033,42 +1988,78 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			_, err := os.Stat(localPath)
 			if err == nil {
 				flock := fc.fileLocks.Get(options.Handle.Path)
-				fc.addPendingOp(options.Handle.Path, flock)
+				fc.addPendingOp(options.Handle.Path, pendingFlags{}, flock)
 			}
 		default:
 			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
 			return err
 		}
+	}
 
+	return nil
+}
+
+func (fc *FileCache) uploadFile(name string) error {
+	// Open a new read-only local file handle for the SDK to use to upload
+	// stat
+	localPath := filepath.Join(fc.tmpPath, name)
+	info, err := os.Stat(localPath)
+	if err != nil {
+		log.Err("FileCache::FlushFile : %s stat failed [%v]", name, err)
+		return err
+	}
+	origMode := info.Mode()
+	modeChanged := false
+	// open
+	f, openErr := common.Open(localPath)
+	// fix permissions
+	if os.IsPermission(openErr) {
+		newMode := origMode | 0444
+		err = os.Chmod(localPath, newMode)
+		if err == nil {
+			modeChanged = true
+			log.Info("FileCache::FlushFile : read mode added to file %s", name)
+			f, openErr = common.Open(localPath)
+		} else {
+			log.Err("FileCache::FlushFile : %s unable to add read mode [%v]", name, err)
+		}
+	}
+	if openErr != nil {
+		log.Err("FileCache::FlushFile : %s unable to open upload handle [%v]", name, openErr)
+		return openErr
+	}
+	// upload file data
+	uploadErr := fc.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	f.Close()
+	// change mode back
+	if modeChanged {
+		err := os.Chmod(localPath, origMode)
+		if err != nil {
+			log.Err("FileCache::FlushFile : %s Failed to remove read mode [%v]", name, err)
+		}
+	}
+	// update the mode as well
+	if uploadErr == nil {
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
 		// Delete the entry from map so that any further flush do not try to update the mode again
-		_, found := fc.missedChmodList.LoadAndDelete(options.Handle.Path)
+		_, found := fc.missedChmodList.LoadAndDelete(name)
 		if found {
 			// If file is found in map it means last chmod was missed on this
 
 			// When chmod on container was missed, local file was updated with correct mode
 			// Here take the mode from local cache and update the container accordingly
-			localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-			info, err := os.Stat(localPath)
-			if err == nil {
-				err = fc.chmodInternal(
-					internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()},
-				)
-				if err != nil {
-					// chmod was missed earlier for this file and doing it now also
-					// resulted in error so ignore this one and proceed for flush handling
-					log.Err(
-						"FileCache::FlushFile : %s chmod failed [%s]",
-						options.Handle.Path,
-						err.Error(),
-					)
-				}
+			err = fc.chmodInternal(internal.ChmodOptions{Name: name, Mode: origMode})
+			if err != nil {
+				// chmod was missed earlier for this file and doing it now also
+				// resulted in error so ignore this one and proceed for flush handling
+				log.Err("FileCache::FlushFile : %s chmod failed [%v]", name, err)
+				fc.missedChmodList.LoadOrStore(name, true)
 			}
 		}
 	}
 
-	return nil
+	return uploadErr
 }
 
 // GetAttr: Consolidate attributes from storage and local cache

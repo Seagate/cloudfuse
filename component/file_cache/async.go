@@ -322,7 +322,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 			}
 			defer f.Close()
 			// upload
-			err = fc.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+			err = fc.uploadFile(name)
 			if err != nil {
 				log.Err("FileCache::updateObject : %s Upload failed. Here's why: %v", name, err)
 				return err
