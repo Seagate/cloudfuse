@@ -309,14 +309,6 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 			}
 		} else {
 			// upload file
-			// open the file
-			f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
-			if err != nil {
-				log.Err("FileCache::updateObject : %s open failed. Here's why: %v", name, err)
-				return err
-			}
-			defer f.Close()
-			// upload
 			err = fc.uploadFile(name)
 			if err != nil {
 				log.Err("FileCache::updateObject : %s Upload failed. Here's why: %v", name, err)
@@ -325,7 +317,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 		}
 	}
 	// update state
-	log.Info("FileCache::updateObject : File uploaded: %s", name)
+	log.Info("FileCache::updateObject : %s sync successful", name)
 	fc.pendingOps.Delete(name)
 
 	return nil
