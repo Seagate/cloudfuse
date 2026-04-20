@@ -459,15 +459,12 @@ func (cl *Client) DeleteFile(ctx context.Context, name string) error {
 	return nil
 }
 
-// DeleteDirectory : Delete a virtual directory in the container
+// DeleteDirectory : Delete the directory marker in the container
 // If name is given without a trailing slash, a slash will be added.
-// If the directory does not exist, no error will be returned.
+// If the directory marker does not exist, no error will be returned.
+// Deletion is carried out regardless of the enableDirMarker flag
 func (cl *Client) DeleteDirectory(ctx context.Context, name string) error {
 	log.Trace("Client::DeleteDirectory : name %s", name)
-
-	if !cl.Config.enableDirMarker {
-		return nil
-	}
 
 	// Delete the current directory
 	// make sure name has a trailing slash
