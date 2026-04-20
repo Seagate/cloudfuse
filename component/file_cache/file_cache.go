@@ -1125,7 +1125,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			newF.GetFileObject().Close()
 		}
 		// are we offline?
-		if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
+		if isOffline(err) && fc.offlineAccess {
 			// remember that we're offline
 			offline = true
 			// clear the error
@@ -1250,10 +1250,9 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	err := fc.NextComponent().DeleteFile(options)
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", true)
-	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
+	if isOffline(err) && fc.offlineAccess {
 		// we are offline and the file is not in cloud, so handle deletion locally
-		// reset err to whether the local file exists
-		_, err = os.Stat(localPath)
+		err = nil
 	}
 	if err != nil {
 		log.Err("FileCache::DeleteFile : %s deletion failed. Here's why:  %v", options.Name, err)
@@ -1265,8 +1264,8 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	// update file state
 	flock.LazyOpen = false
-	// remove deleted file from async upload map
-	fc.pendingOps.Delete(options.Name)
+	// update pending ops
+	fc.addPendingOp(options.Name, pendingFlags{isDeletion: true})
 
 	return nil
 }
