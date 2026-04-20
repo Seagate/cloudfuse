@@ -1511,6 +1511,13 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	downloadRequired, _, cloudAttr, err := fc.isDownloadRequired(localPath, options.Name, flock)
 
+	// block offline open calls when offline access is disabled
+	disconnected := !fc.NextComponent().CloudConnected() || isOffline(err)
+	if disconnected && !fc.offlineAccess {
+		log.Err("FileCache::OpenFile : %s Offline access is disabled", options.Name)
+		return nil, common.CloudUnreachableError{}
+	}
+
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
 		return nil, err
