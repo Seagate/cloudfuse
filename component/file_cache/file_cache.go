@@ -2262,7 +2262,7 @@ func (fc *FileCache) renameLocalFile(
 	return nil
 }
 
-// destination flock must be locked
+// flock must be locked for both src and dst
 func (fc *FileCache) renamePendingOp(srcName, dstName string) {
 	value, operationPending := fc.pendingOps.LoadAndDelete(srcName)
 	if operationPending {
