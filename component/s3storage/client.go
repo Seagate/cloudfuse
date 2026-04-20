@@ -459,85 +459,26 @@ func (cl *Client) DeleteFile(ctx context.Context, name string) error {
 	return nil
 }
 
-// DeleteDirectory : Recursively delete all objects with the given prefix.
+// DeleteDirectory : Delete a virtual directory in the container
 // If name is given without a trailing slash, a slash will be added.
 // If the directory does not exist, no error will be returned.
 func (cl *Client) DeleteDirectory(ctx context.Context, name string) error {
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
-	// make sure name has a trailing slash
-	name = internal.ExtendDirName(name)
-
-	done := false
-	var marker *string
-	var err error
-	for !done {
-		// list all objects with the prefix
-		objects, marker, err := cl.List(ctx, name, marker, 0)
-		if err != nil {
-			log.Warn(
-				"Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v",
-				name,
-				err,
-			)
-			return err
-		}
-
-		// we have no way of indicating empty folders in the bucket
-		// so if there are no objects with this prefix we can either:
-		// 1. return an error when the user tries to delete an empty directory, or
-		// 2. fail to return an error when trying to delete a non-existent directory
-		// the second one seems much less risky, so we don't check for an empty list here
-
-		// List only returns the objects and prefixes up to the next "/" character after the prefix
-		// This is because List is setting the Delimiter field to "/"
-		// This means that recursive directory deletion actually needs to be recursive.
-		// Delete all found objects *and prefixes ("directories")*.
-		// For improved performance, we'll use one call to delete all objects in this directory.
-		// 	To make one call, we need to make a list of objects to delete first.
-		var objectsToDelete []*internal.ObjAttr
-		for _, object := range objects {
-			if object.IsDir() {
-				err = cl.DeleteDirectory(ctx, object.Path)
-				if err != nil {
-					log.Err(
-						"Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v",
-						object.Path,
-						err,
-					)
-				}
-			} else {
-				objectsToDelete = append(
-					objectsToDelete,
-					object,
-				) //consider just object instead of object.path to pass down attributes that come from list.
-			}
-		}
-		// Delete the collected files
-		err = cl.deleteObjects(ctx, objectsToDelete)
-		if err != nil {
-			log.Err(
-				"Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v",
-				len(objectsToDelete),
-				err,
-			)
-		}
-
-		if marker == nil {
-			done = true
-		}
+	if !cl.Config.enableDirMarker {
+		return nil
 	}
 
 	// Delete the current directory
-	if cl.Config.enableDirMarker {
-		err = cl.deleteObject(ctx, name, false, true)
-		if err != nil {
-			log.Err(
-				"Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v",
-				name,
-				err,
-			)
-		}
+	// make sure name has a trailing slash
+	name = internal.ExtendDirName(name)
+	err := cl.deleteObject(ctx, name, false, true)
+	if err != nil {
+		log.Err(
+			"Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v",
+			name,
+			err,
+		)
 	}
 
 	return err
