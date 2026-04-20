@@ -889,11 +889,11 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 
 	// rename the directory in the cloud
 	err = fc.NextComponent().RenameDir(options)
-	// if we are offline, and offline access is enabled, allow local directories to be renamed
-	offlineOkay := fc.offlineAccess && fc.notInCloud(options.Src) && fc.notInCloud(options.Dst)
-	if isOffline(err) && offlineOkay {
+	// if we are offline and offline access is enabled, allow fully cached local directories to be renamed
+	// we restrict renames to cached data to keep semantics simple (pending ops are only create or delete)
+	if isOffline(err) && fc.offlineAccess && isSubset(cloudObjects, localObjects) {
 		log.Warn(
-			"FileCache::RenameDir : %s -> %s Cloud is unreachable but neither directory is in cloud storage. Proceeding with offline rename.",
+			"FileCache::RenameDir : %s -> %s Cloud is unreachable. Proceeding with offline rename.",
 			options.Src,
 			options.Dst,
 		)
@@ -938,7 +938,10 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				// remember to delete the src directory later (after its contents are deleted)
 				directoriesToPurge = append(directoriesToPurge, path)
 				// update pending cloud ops
-				fc.renamePendingOp(fc.getObjectName(path), fc.getObjectName(newPath))
+				fc.renamePendingOp(
+					internal.ExtendDirName(fc.getObjectName(path)),
+					internal.ExtendDirName(fc.getObjectName(newPath)),
+				)
 			}
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
@@ -1058,6 +1061,31 @@ func combineLists(listA, listB []string) []string {
 	}
 
 	return combinedList
+}
+
+func isSubset(subset, superset []string) bool {
+	// since both lists are sorted, we can walk the two lists using a double-indexed for loop
+	i := 0 // Index for subset
+	j := 0 // Index for superset
+	// Iterate through both lists, adding entries in order
+	for i < len(subset) && j < len(superset) {
+		itemA := subset[i]
+		itemB := superset[j]
+		if itemA < itemB {
+			// superset is ahead of subset - itemA is not a superset member
+			// so subset is not contained in superset
+			return false
+		} else if itemA > itemB {
+			// superset is behind subset - advance superset index
+			j++
+		} else {
+			// match found - move to next subset item
+			i++
+			j++
+		}
+	}
+
+	return true
 }
 
 func (fc *FileCache) getObjectName(localPath string) string {
@@ -2239,7 +2267,9 @@ func (fc *FileCache) renameLocalFile(
 func (fc *FileCache) renamePendingOp(srcName, dstName string) {
 	value, operationPending := fc.pendingOps.LoadAndDelete(srcName)
 	if operationPending {
-		fc.addPendingOp(dstName, value.(pendingFlags))
+		opFlags := value.(pendingFlags)
+		fc.addPendingOp(srcName, pendingFlags{isDir: opFlags.isDir, isDeletion: true})
+		fc.addPendingOp(dstName, opFlags)
 	}
 }
 
