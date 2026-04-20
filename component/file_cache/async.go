@@ -274,6 +274,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
 	if !flags.isDeletion && err != nil {
 		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, err)
+		fc.pendingOps.Delete(name)
 		return err
 	}
 	if flags.isDeletion && !os.IsNotExist(err) {
