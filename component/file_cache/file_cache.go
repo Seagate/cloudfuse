@@ -1660,13 +1660,23 @@ func (fc *FileCache) releaseFileInternal(
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
 	if !noCachedHandle {
-		// flock is already locked, as required by flushFileInternal
-		err := fc.flushFileInternal(
-			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
-		) //nolint
-		if err != nil {
-			log.Err("FileCache::releaseFileInternal : failed to flush file %s", options.Handle.Path)
-			return err
+		// flush
+		// update the cache policy
+		fc.FileUsed(options.Handle.Path)
+		// only flush if dirty
+		if options.Handle.Dirty() {
+			// flush the local file
+			err := fc.flushFileLocal(options.Handle)
+			if err != nil {
+				return err
+			}
+			// upload
+			// flock is already locked
+			flushOptions := internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}
+			err = fc.flushFileCloud(flushOptions)
+			if err != nil {
+				return err
+			}
 		}
 
 		f := options.Handle.GetFileObject()
@@ -1678,7 +1688,7 @@ func (fc *FileCache) releaseFileInternal(
 			return syscall.EBADF
 		}
 
-		err = f.Close()
+		err := f.Close()
 		if err != nil {
 			log.Err(
 				"FileCache::releaseFileInternal : error closing file %s(%d) [%s]",
@@ -1871,102 +1881,107 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 
 // FlushFile: Flush the local file to storage
 func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
-	var flock *common.LockMapItem
 
-	// if flush will upload the file, then acquire the file lock
-	if options.Handle.Dirty() && (!fc.lazyWrite || options.CloseInProgress) {
-		flock = fc.fileLocks.Get(options.Handle.Path)
-		flock.Lock()
-		defer flock.Unlock()
+	// update the cache policy
+	fc.FileUsed(options.Handle.Path)
+
+	// ignore clean handles
+	if !options.Handle.Dirty() {
+		return nil
 	}
 
-	// flock is locked, as required by flushFileInternal
-	return fc.flushFileInternal(options)
+	// flush the local file
+	err := fc.flushFileLocal(options.Handle)
+	if err != nil {
+		return err
+	}
+
+	// If lazy write is enabled, stop here
+	if fc.lazyWrite && !options.CloseInProgress {
+		// As lazy-write is enable, upload will be scheduled when file is closed.
+		log.Info(
+			"FileCache::FlushFile : %s will be flushed when handle %d is closed",
+			options.Handle.Path,
+			options.Handle.ID,
+		)
+		return nil
+	}
+
+	// acquire flock
+	flock := fc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
+	return fc.flushFileCloud(options)
+}
+
+// flush local file
+func (fc *FileCache) flushFileLocal(handle *handlemap.Handle) error {
+	// Flush all data to disk that has been buffered by the kernel.
+	f := handle.GetFileObject()
+	if f == nil {
+		log.Err("FileCache::FlushFile : %s couldn't find fd in handle", handle.Path)
+		return syscall.EBADF
+	}
+	err := fc.syncFile(f, handle.Path)
+	if err != nil {
+		log.Err("FileCache::FlushFile : %s sync failed [%v]", handle.Path, err)
+		return syscall.EIO
+	}
+	return nil
 }
 
 // file must be locked before calling this function
-func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
+func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
-	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-	fc.FileUsed(options.Handle.Path)
+	// ignore clean handles
+	if !options.Handle.Dirty() {
+		return nil
+	}
 
-	// if our handle is dirty then that means we wrote to the file
-	if options.Handle.Dirty() {
+	// If lazy write is enabled, stop here
+	if fc.lazyWrite && !options.CloseInProgress {
+		// As lazy-write is enable, upload will be scheduled when file is closed.
+		log.Info(
+			"FileCache::FlushFile : %s will be flushed when handle %d is closed",
+			options.Handle.Path,
+			options.Handle.ID,
+		)
+		return nil
+	}
 
-		// Flush all data to disk that has been buffered by the kernel.
-		f := options.Handle.GetFileObject()
-		if f == nil {
-			log.Err(
-				"FileCache::FlushFile : error [couldn't find fd in handle] %s",
-				options.Handle.Path,
-			)
-			return syscall.EBADF
+	// decide whether to schedule the upload instead
+	select {
+	case <-fc.startScheduledUploads:
+		// upload now
+	default:
+		// schedule is inactive - push to pendingOps
+		log.Info("FileCache::FlushFile : %s upload deferred (scheduled)", options.Handle.Path)
+		_, statErr := os.Stat(filepath.Join(fc.tmpPath, options.Handle.Path))
+		if statErr == nil {
+			fc.addPendingOp(options.Handle.Path, pendingFlags{})
 		}
-		err := fc.syncFile(f, options.Handle.Path)
-		if err != nil {
-			log.Err(
-				"FileCache::FlushFile : error [unable to sync file] %s",
-				options.Handle.Path,
-			)
-			return syscall.EIO
-		}
+		fc.clearHandleDirty(options.Handle)
+		return nil
+	}
 
-		// If lazy write is enabled, stop here
-		if fc.lazyWrite && !options.CloseInProgress {
-			// As lazy-write is enable, upload will be scheduled when file is closed.
-			log.Info(
-				"FileCache::FlushFile : %s will be flushed when handle %d is closed",
-				options.Handle.Path,
-				options.Handle.ID,
-			)
-			return nil
+	// Write to storage
+	err := fc.uploadFile(options.Handle.Path)
+	// handle errors and update flags
+	switch {
+	case err == nil:
+		fc.clearHandleDirty(options.Handle)
+	case isOffline(err) && fc.offlineAccess:
+		log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
+		// add file to upload queue
+		_, err := os.Stat(filepath.Join(fc.tmpPath, options.Handle.Path))
+		if err == nil {
+			fc.addPendingOp(options.Handle.Path, pendingFlags{})
 		}
-
-		// decide whether to schedule the upload instead
-		select {
-		case <-fc.startScheduledUploads:
-			// upload now
-		default:
-			// schedule is inactive - defer new object writes
-			if fc.notInCloud(options.Handle.Path) {
-				//push to pendingOps as default since we don't want to upload to the cloud
-				log.Info(
-					"FileCache::FlushFile : %s upload deferred (Scheduled for upload)",
-					options.Handle.Path,
-				)
-				_, statErr := os.Stat(filepath.Join(fc.tmpPath, options.Handle.Path))
-				if statErr == nil {
-					fc.addPendingOp(options.Handle.Path, pendingFlags{})
-				}
-				fc.clearHandleDirty(options.Handle)
-				return nil
-			} else {
-				log.Info(
-					"FileCache::FlushFile : %s ignoring schedule to update existing object",
-					options.Handle.Path,
-				)
-			}
-		}
-
-		// Write to storage
-		err = fc.uploadFile(options.Handle.Path)
-		// handle errors and update flags
-		switch {
-		case err == nil:
-			fc.clearHandleDirty(options.Handle)
-		case isOffline(err) && fc.offlineAccess:
-			log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
-			// add file to upload queue
-			_, err := os.Stat(filepath.Join(fc.tmpPath, options.Handle.Path))
-			if err == nil {
-				fc.addPendingOp(options.Handle.Path, pendingFlags{})
-			}
-		default:
-			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
-			return err
-		}
+	default:
+		log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
+		return err
 	}
 
 	return nil
