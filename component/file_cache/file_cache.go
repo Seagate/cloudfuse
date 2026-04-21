@@ -1294,9 +1294,9 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	fileOptions := val.(openFileOptions)
 	flags = fileOptions.flags
 	fMode = fileOptions.fMode
+	overwrite := flags&os.O_TRUNC != 0
 
 	localPath := filepath.Join(fc.tmpPath, handle.Path)
-	var f *os.File
 
 	fc.policy.CacheValid(localPath)
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
@@ -1305,161 +1305,109 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	if isOffline(err) || !fc.NextComponent().CloudConnected() {
 		if !fc.offlineAccess {
 			// offline access is not allowed
-			if downloadRequired || !cachedData(err) {
+			if !overwrite && downloadRequired {
 				// data is unavailable - do not open the file
 				log.Err("FileCache::OpenFile : %s can't download data (offline)", handle.Path)
 				return &common.CloudUnreachableError{}
 			} else {
-				// download is not required, but we can't write while we're offline
-				// TODO: should we just allow writes, in case the connection is re-established soon?
-				log.Err("FileCache::OpenFile : %s Read-only enabled (offline)", handle.Path)
-				flags = os.O_RDONLY
+				// the cloud was connected when open was called,
+				// so try to fulfill the contract by allowing local access
+				// if the connection is not reestablished, flush and close will fail,
+				// 	but at least the data will be on disk
+				log.Err("FileCache::OpenFile : %s Using local file (offline)", handle.Path)
 			}
-		} else if !errors.Is(err, os.ErrNotExist) {
-			// offline access is allowed, but this object might exist in cloud storage
-			if fileExists {
-				// data is cached but (might be) in cloud, so only allow read-only access
-				log.Err(
-					"FileCache::OpenFile : %s Read-only access, for consistency offline",
-					handle.Path,
-				)
-				flags = os.O_RDONLY
-				if downloadRequired {
-					log.Warn(
-						"FileCache::OpenFile : %s ignoring refresh timer (offline)",
-						handle.Path,
-					)
-					downloadRequired = false
-				}
-			} else {
-				// data is unavailable - do not open the file
-				log.Err("FileCache::OpenFile : %s data unavailable (offline)", handle.Path)
-				return &common.CloudUnreachableError{}
-			}
+		} else if !fileExists && !overwrite {
+			// data is unavailable - do not open the file
+			log.Err("FileCache::OpenFile : %s data unavailable (offline)", handle.Path)
+			return &common.CloudUnreachableError{}
 		}
 	}
 
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Err(
-			"FileCache::openFileInternal : Failed to check if download is required for %s [%s]",
-			handle.Path,
-			err.Error(),
-		)
-	}
-
-	fileMode := fc.defaultPermission
-	if downloadRequired {
+	if downloadRequired || overwrite {
 		log.Debug("FileCache::openFileInternal : Need to download %s", handle.Path)
 
-		fileSize := int64(0)
-		if attr != nil {
-			fileSize = int64(attr.Size)
-		}
-
-		if fileExists {
-			log.Debug("FileCache::openFileInternal : Delete cached file %s", handle.Path)
-
-			err := deleteFile(localPath)
-			if err != nil && !os.IsNotExist(err) {
-				log.Err("FileCache::openFileInternal : Failed to delete old file %s", handle.Path)
-			}
-		} else {
-			// Create the file if if doesn't already exist.
-			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
-			if err != nil {
-				log.Err(
-					"FileCache::openFileInternal : error creating directory structure for file %s [%s]",
-					handle.Path,
-					err.Error(),
-				)
-				return err
-			}
-		}
-
-		// Open the file in write mode.
-		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
+		// Create the folder if it doesn't already exist.
+		err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 		if err != nil {
 			log.Err(
-				"FileCache::openFileInternal : error creating new file %s [%s]",
+				"FileCache::openFileInternal : error creating directory structure for file %s [%s]",
 				handle.Path,
 				err.Error(),
 			)
 			return err
 		}
 
-		if flags&os.O_TRUNC != 0 {
-			fileSize = 0
+		// Open a download handle
+		downloadHandle, err := common.OpenFile(localPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, fMode)
+		if err != nil {
+			log.Err("FileCache::openFileInternal : %s open dl handle failed [%v]", handle.Path, err)
+			return err
 		}
 
-		if fileSize > 0 {
+		// download
+		if attr != nil && !overwrite {
 			// Download/Copy the file from storage to the local file.
 			// We pass a count of 0 to get the entire object
-			err = fc.NextComponent().CopyToFile(
+			dlErr := fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
 					Name:   handle.Path,
 					Offset: 0,
 					Count:  0,
-					File:   f,
+					File:   downloadHandle,
 				})
-			if err != nil {
+			if dlErr != nil {
 				// File was created locally and now download has failed so we need to delete it back from local cache
-				log.Err(
-					"FileCache::openFileInternal : error downloading file from storage %s [%s]",
-					handle.Path,
-					err.Error(),
-				)
-				_ = f.Close()
+				log.Err("FileCache::openFileInternal : %s download failed [%v]", handle.Path, dlErr)
+				_ = downloadHandle.Close()
 				err = os.Remove(localPath)
 				if err != nil {
-					log.Err(
-						"FileCache::openFileInternal : Failed to remove file %s [%s]",
-						localPath,
-						err.Error(),
-					)
+					log.Err("FileCache::openFileInternal : %s delete failed [%v]", localPath, err)
 				}
-				return err
+				return dlErr
 			}
 		}
 
 		// Update the last download time of this file
 		flock.SetDownloadTime()
-
-		log.Debug("FileCache::openFileInternal : Download of %s is complete", handle.Path)
-		f.Close()
+		downloadHandle.Close()
+		log.Debug("FileCache::openFileInternal : %s download complete", handle.Path)
 
 		// After downloading the file, update the modified times and mode of the file.
+		fileMode := fc.defaultPermission
 		if attr != nil && !attr.IsModeDefault() {
 			fileMode = attr.Mode
 		}
-	}
 
-	// If user has selected some non default mode in config then every local file shall be created with that mode only
-	err = os.Chmod(localPath, fileMode)
-	if err != nil {
-		log.Err(
-			"FileCache::openFileInternal : Failed to change mode of file %s [%s]",
-			handle.Path,
-			err.Error(),
-		)
-	}
-	// TODO: When chown is supported should we update that?
-
-	if attr != nil {
-		// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
-		err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
+		// If user has selected some non default mode in config then every local file shall be created with that mode only
+		err = os.Chmod(localPath, fileMode)
 		if err != nil {
 			log.Err(
-				"FileCache::openFileInternal : Failed to change times of file %s [%s]",
+				"FileCache::openFileInternal : Failed to change mode of file %s [%s]",
 				handle.Path,
 				err.Error(),
 			)
 		}
-	}
+
+		// TODO: When chown is supported should we update that?
+
+		// set date
+		if attr != nil {
+			// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
+			err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
+			if err != nil {
+				log.Err(
+					"FileCache::openFileInternal : Failed to change times of file %s [%s]",
+					handle.Path,
+					err.Error(),
+				)
+			}
+		}
+	} // end: create & download file
 
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err = common.OpenFile(localPath, flags, fMode)
+	f, err := common.OpenFile(localPath, flags, fMode)
 	if err != nil {
 		log.Err(
 			"FileCache::openFileInternal : error opening cached file %s [%s]",
@@ -1564,7 +1512,8 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	// will opening the file require downloading it?
 	var openErr error
-	if !downloadRequired {
+	openOverwrites := options.Flags&os.O_TRUNC != 0
+	if !downloadRequired || openOverwrites {
 		// use the local file to complete the open operation now
 		// flock is already locked, as required by openFileInternal
 		openErr = fc.openFileInternal(handle, flock)
