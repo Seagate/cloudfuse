@@ -1620,27 +1620,42 @@ func (fc *FileCache) isDownloadRequired(
 
 	// get cloud attributes
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Err(
-			"FileCache::isDownloadRequired : Failed to get attr of %s [%s]",
-			objectPath,
-			err.Error(),
-		)
+	if cloudAttr == nil && !errors.Is(err, os.ErrNotExist) {
+		log.Err("FileCache::isDownloadRequired : %s GetAttr failed [%v]", objectPath, err)
 	}
 
-	if !cached && cloudAttr != nil {
+	// if no data is cached, and there is (or might be) data in cloud storage, download it
+	if !cached && !errors.Is(err, os.ErrNotExist) {
 		downloadRequired = true
 	}
 
+	// check refresh timer
 	if cached && refreshTimerExpired && cloudAttr != nil {
 		// File is not expired, but the user has configured a refresh timer, which has expired.
-		// Does the cloud have a newer copy?
-		cloudHasLatestData := cloudAttr.Mtime.After(lmt) || info.Size() != cloudAttr.Size
-		// Is the local file open?
-		fileIsOpen := flock.Count() > 0 && !flock.LazyOpen
-		if cloudHasLatestData && !fileIsOpen {
+		// before deciding to honor the refresh timer, check for exceptions:
+		switch {
+		// Don't refresh unless the cloud copy is newer
+		case !cloudAttr.Mtime.After(lmt) && info.Size() == cloudAttr.Size:
 			log.Info(
-				"FileCache::isDownloadRequired : File is modified in container, so forcing redownload %s [A-%v : L-%v] [A-%v : L-%v]",
+				"FileCache::isDownloadRequired : %s Cloud data is not latest, skip redownload [A-%v : L-%v]",
+				objectPath,
+				cloudAttr.Mtime,
+				lmt,
+			)
+		// Is the local file open?
+		case flock.Count() > 0 && !flock.LazyOpen:
+			log.Info(
+				"FileCache::isDownloadRequired : %s Need to re-download latest data, but skipping as handle is already open",
+				objectPath,
+			)
+		case !fc.NextComponent().CloudConnected():
+			log.Info(
+				"FileCache::isDownloadRequired : %s Need to re-download, but skipping as cloud is not connected",
+				objectPath,
+			)
+		default:
+			log.Info(
+				"FileCache::isDownloadRequired : %s File is modified in container, so forcing redownload %s [A-%v : L-%v] [A-%v : L-%v]",
 				objectPath,
 				cloudAttr.Mtime,
 				lmt,
@@ -1648,21 +1663,9 @@ func (fc *FileCache) isDownloadRequired(
 				info.Size(),
 			)
 			downloadRequired = true
-		} else {
-			// log why we decided not to refresh
-			if !cloudHasLatestData {
-				log.Info(
-					"FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]",
-					objectPath,
-					cloudAttr.Mtime,
-					lmt,
-				)
-			} else if fileIsOpen {
-				log.Info(
-					"FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open",
-					objectPath,
-				)
-			}
+		}
+
+		if !downloadRequired {
 			// As we have decided to continue using old file, we reset the timer to check again after refresh time interval
 			flock.SetDownloadTime()
 		}
