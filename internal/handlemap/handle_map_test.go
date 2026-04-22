@@ -57,15 +57,11 @@ func (suite *HandleMapSuite) TestHandleFlags() {
 	suite.assert.Equal("abc", h.Path)
 
 	suite.assert.False(h.Dirty())
-	suite.assert.False(h.Fsynced())
 	suite.assert.False(h.Cached())
 	suite.assert.Nil(h.GetFileObject())
 
 	h.Flags.Set(HandleFlagDirty)
 	suite.assert.True(h.Dirty())
-
-	h.Flags.Set(HandleFlagFSynced)
-	suite.assert.True(h.Fsynced())
 
 	h.Flags.Set(HandleFlagCached)
 	suite.assert.True(h.Cached())
