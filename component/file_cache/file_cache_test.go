@@ -1861,14 +1861,13 @@ loopbackfs:
 		"Destination file should exist in local cache after rename")
 
 	// Check if the file has been renamed in pendingOps
-	_, existsInScheduleOld := suite.fileCache.pendingOps.Load(srcFile)
-	suite.assert.False(
-		existsInScheduleOld,
-		"Old file name should not be in pendingOps after rename",
-	)
+	opSrc, foundSrc := suite.fileCache.pendingOps.Load(srcFile)
+	suite.assert.True(foundSrc, "Src deletion should be in pendingOps after rename")
+	suite.assert.True(opSrc.(pendingFlags).isDeletion, "Src pending op should be deletion")
 
-	_, existsInScheduleNew := suite.fileCache.pendingOps.Load(dstFile)
-	suite.assert.True(existsInScheduleNew, "New file name should be in pendingOps after rename")
+	opDst, foundDst := suite.fileCache.pendingOps.Load(dstFile)
+	suite.assert.True(foundDst, "Dst should be in pendingOps after rename")
+	suite.assert.False(opDst.(pendingFlags).isDeletion, "Dst pending op should be creation")
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFileAndPendingOps() {
