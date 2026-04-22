@@ -581,7 +581,7 @@ func (cl *Client) RenameDirectory(ctx context.Context, source string, target str
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(ctx context.Context, name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
-	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
+	explicitDirLookup := strings.HasSuffix(name, "/")
 	dirName := internal.ExtendDirName(name)
 
 	// first let's suppose the caller is looking for a file
@@ -624,23 +624,8 @@ func (cl *Client) getDirectoryAttr(
 ) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
-
-	// Otherwise, the cloud does not support directory markers, or there is no
-	// marker, so look for an object in the directory.
-	if listErr != nil {
-		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
-		return nil, listErr
-	}
-	if len(objects) > 0 {
-		// create and return an objAttr for the directory
-		attr := internal.CreateObjAttrDir(dirName)
-		return attr, nil
-	}
-
-	// Only check for explicit empty directory markers when needed.
-	// For file-like names, this saves one extra HeadObject
-	// call on miss-heavy paths that are not directories.
+	// When directory markers are enabled, check for the marker first via
+	// HeadObject (cheap, single-key lookup) before falling back to a List.
 	if cl.Config.enableDirMarker && shouldProbeDirMarker(dirName, explicitDirLookup) {
 		headAttr, headErr := cl.headObject(ctx, dirName, false, true)
 		if headErr == nil {
@@ -654,6 +639,20 @@ func (cl *Client) getDirectoryAttr(
 			)
 			return nil, headErr
 		}
+	}
+
+	// Either directory markers are disabled, there is no marker, or the name
+	// was skipped by shouldProbeDirMarker. Fall back to listing objects under
+	// the prefix to detect a non-empty directory.
+	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
+	if listErr != nil {
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
+		return nil, listErr
+	}
+	if len(objects) > 0 {
+		// create and return an objAttr for the directory
+		attr := internal.CreateObjAttrDir(dirName)
+		return attr, nil
 	}
 
 	// directory not found in bucket
