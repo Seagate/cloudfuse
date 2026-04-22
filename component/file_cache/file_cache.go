@@ -1873,6 +1873,14 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 // flush local file
 func (fc *FileCache) flushFileLocal(handle *handlemap.Handle) error {
+	//defer exectime.StatTimeCurrentBlock("FileCache::flushFileLocal")()
+	log.Trace("FileCache::flushFileLocal : %s handle=%d", handle.Path, handle.ID)
+
+	// ignore clean handles
+	if !handle.Dirty() {
+		return nil
+	}
+
 	// Flush all data to disk that has been buffered by the kernel.
 	f := handle.GetFileObject()
 	if f == nil {
@@ -1884,6 +1892,7 @@ func (fc *FileCache) flushFileLocal(handle *handlemap.Handle) error {
 		log.Err("FileCache::flushFileLocal : %s sync failed [%v]", handle.Path, err)
 		return syscall.EIO
 	}
+
 	return nil
 }
 
