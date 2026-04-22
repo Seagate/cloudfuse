@@ -1660,10 +1660,9 @@ func (fc *FileCache) releaseFileInternal(
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
 	if !noCachedHandle {
-		// flush
 		// update the cache policy
 		fc.FileUsed(options.Handle.Path)
-		// only flush if dirty
+		// sync
 		if options.Handle.Dirty() {
 			// flush the local file
 			err := fc.flushFileLocal(options.Handle)
@@ -1678,23 +1677,19 @@ func (fc *FileCache) releaseFileInternal(
 				return err
 			}
 		}
-
+		// close
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			log.Err(
-				"FileCache::releaseFileInternal : error [missing fd in handle object] %s",
-				options.Handle.Path,
-			)
+			log.Err("FileCache::releaseFileInternal : %s missing fd in handle", options.Handle.Path)
 			return syscall.EBADF
 		}
-
 		err := f.Close()
 		if err != nil {
 			log.Err(
-				"FileCache::releaseFileInternal : error closing file %s(%d) [%s]",
+				"FileCache::releaseFileInternal : %s (%d) close failed [%v]",
 				options.Handle.Path,
 				int(f.Fd()),
-				err.Error(),
+				err,
 			)
 			return err
 		}
