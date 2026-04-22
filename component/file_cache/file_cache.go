@@ -1664,7 +1664,12 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
-	return fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true})
+	err := fc.NextComponent().SyncFile(options)
+	if err == nil {
+		err = fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true})
+	}
+
+	return err
 }
 
 // in SyncDir we're not going to clear the file cache for now
