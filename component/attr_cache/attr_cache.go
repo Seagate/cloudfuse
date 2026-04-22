@@ -468,35 +468,41 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		// does the directory already exist?
-		oldDirAttrCacheItem, found := ac.cache.get(options.Name)
-		directoryAlreadyExists := found && oldDirAttrCacheItem.exists()
+		dirAttrCacheItem, found := ac.cache.get(options.Name)
+		directoryAlreadyExists := found && dirAttrCacheItem.exists()
 		// if the attribute cache tracks directory existence
 		// then prevent redundant directory creation
-		if ac.cacheDirs && directoryAlreadyExists {
-			return os.ErrExist
+		if directoryAlreadyExists {
+			if ac.cacheDirs {
+				return os.ErrExist
+			}
+		} else {
+			// invalidate existing directory entry (this is redundant but readable)
+			dirAttrCacheItem.invalidate()
+			// add (or replace) the directory entry
+			newDirAttr := internal.CreateObjAttrDir(options.Name)
+			dirAttrCacheItem = ac.cache.insert(insertOptions{
+				attr:     newDirAttr,
+				exists:   true,
+				cachedAt: currentTime,
+			})
+			// insert returns nil when entries are maxed out
+			if dirAttrCacheItem != nil {
+				// update flag for tracking directory existence
+				if ac.cacheDirs {
+					dirAttrCacheItem.markInCloud(false)
+				}
+				// this is a new directory, so we have a complete (empty) listing for it
+				dirAttrCacheItem.listingComplete = true
+			}
+			// if this is a new entry, update the parent directory timestamps
+			if err == nil {
+				ac.touchParentDirTimes(options.Name, currentTime, ac.cacheDirs)
+			}
 		}
-		// invalidate existing directory entry (this is redundant but readable)
-		if found {
-			oldDirAttrCacheItem.invalidate()
-		}
-		// add (or replace) the directory entry
-		newDirAttr := internal.CreateObjAttrDir(options.Name)
-		newDirAttrCacheItem := ac.cache.insert(insertOptions{
-			attr:     newDirAttr,
-			exists:   true,
-			cachedAt: currentTime,
-		})
-		if newDirAttrCacheItem != nil {
-			newDirAttrCacheItem.setMode(options.Mode)
-			// this is a new directory, so we have a complete (empty) listing for it
-			newDirAttrCacheItem.listingComplete = true
-		}
-		// update flag for tracking directory existence
-		if ac.cacheDirs && newDirAttrCacheItem != nil {
-			newDirAttrCacheItem.markInCloud(false)
-		}
-		if err == nil && !directoryAlreadyExists {
-			ac.touchParentDirTimes(options.Name, currentTime, ac.cacheDirs)
+		// if returning success, update the mode
+		if err == nil && dirAttrCacheItem != nil {
+			dirAttrCacheItem.setMode(options.Mode)
 		}
 	}
 	return err
