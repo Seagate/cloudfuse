@@ -1586,7 +1586,7 @@ func (fc *FileCache) isDownloadRequired(
 			)
 		default:
 			log.Info(
-				"FileCache::isDownloadRequired : %s File is modified in container, so forcing redownload %s [A-%v : L-%v] [A-%v : L-%v]",
+				"FileCache::isDownloadRequired : %s File is modified in container, so forcing redownload [A-%v : L-%v] [A-%v : L-%v]",
 				objectPath,
 				cloudAttr.Mtime,
 				lmt,
