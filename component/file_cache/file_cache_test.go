@@ -201,7 +201,6 @@ func (suite *fileCacheTestSuite) TestEmpty() {
 	suite.assert.False(suite.fileCache.createEmptyFile)
 	suite.assert.False(suite.fileCache.allowNonEmpty)
 	suite.assert.InDelta(216000, suite.fileCache.cacheTimeout, 1.0)
-	suite.assert.True(suite.fileCache.syncToFlush)
 }
 
 // Tests configuration of file cache
@@ -217,9 +216,8 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	createEmptyFile := true
 	allowNonEmptyTemp := true
 	cleanupOnStart := true
-	syncToFlush := false
 	config := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t\n  sync-to-flush: %t",
+		"file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t",
 		suite.cache_path,
 		policy,
 		maxSizeMb,
@@ -230,7 +228,6 @@ func (suite *fileCacheTestSuite) TestConfig() {
 		createEmptyFile,
 		allowNonEmptyTemp,
 		cleanupOnStart,
-		syncToFlush,
 	)
 	suite.setupTestHelper(
 		config,
@@ -1162,56 +1159,29 @@ func (suite *fileCacheTestSuite) TestChmodNonexistentCreateEmptyFile() {
 
 func (suite *fileCacheTestSuite) TestSyncFile() {
 	defer suite.cleanupTest()
-
-	suite.fileCache.syncToFlush = false
-	path := "file3"
-
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	err := suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	// On a sync we open, sync, flush and close
-	handle, err = suite.fileCache.OpenFile(
-		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777},
-	)
-	handlemap.Add(handle)
-	suite.assert.NoError(err)
-	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle})
-	suite.assert.NoError(err)
+	// Setup
+	file := "file3"
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
-
-	_, err = suite.fileCache.WriteFile(
+	_, err := suite.fileCache.WriteFile(
 		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
-	handle, loaded := handlemap.Load(handle.ID)
-	suite.assert.True(loaded)
-	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
 
-	// Path should not be in file cache
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	// Path should not be in fake storage
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
-	path = "file.fsync"
-	suite.fileCache.syncToFlush = true
-	handle, err = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.assert.NoError(err)
-	_, err = suite.fileCache.WriteFile(
-		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
-	)
-	suite.assert.NoError(err)
-	suite.assert.True(handle.Dirty())
+	// Sync the File
 	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
-	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.fileCache.syncToFlush = false
+	// Path should be in fake storage
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
+	// Check that fake_storage updated with data
+	d, _ := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+	suite.assert.Equal(data, d)
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFile() {

@@ -253,12 +253,27 @@ func (value *attrCacheItem) markInCloud(inCloud bool) {
 
 func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
 	value.attr.Mtime = changedAt
+	value.attr.Ctime = changedAt
 	value.attr.Size = size
 	value.cachedAt = changedAt
 }
 
+func (value *attrCacheItem) touchModifyAndChangeTimes(changedAt time.Time) {
+	if value == nil || !value.exists() {
+		return
+	}
+	value.attr.Mtime = changedAt
+	value.attr.Ctime = changedAt
+	value.cachedAt = changedAt
+}
+
 func (value *attrCacheItem) setMode(mode os.FileMode) {
-	value.attr.Mode = mode
+	currentType := value.attr.Mode & os.ModeType
+	if currentType == 0 {
+		currentType = mode & os.ModeType
+	}
+	modeBits := mode & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+	value.attr.Mode = currentType | modeBits
 	value.attr.Flags.Clear(internal.PropFlagModeDefault)
 	value.attr.Ctime = time.Now()
 	value.cachedAt = time.Now()

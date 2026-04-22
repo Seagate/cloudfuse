@@ -1501,7 +1501,6 @@ func (tui *appContext) createYAMLConfig() error {
 			TmpPath:       tui.config.cacheLocation,
 			Timeout:       uint32(tui.config.cacheRetentionDurationSec),
 			AllowNonEmpty: !tui.config.clearCacheOnStart,
-			SyncToFlush:   true,
 		}
 		// If cache size is not set to 80%, convert currentCacheSizeGB to MB and set file_cache.max-size-mb to it
 		if tui.config.cacheSize != "80" {

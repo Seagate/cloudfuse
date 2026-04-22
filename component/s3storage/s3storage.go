@@ -498,7 +498,8 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := s3.Storage.RenameFile(s3.ctx, options.Src, options.Dst, false)
+	isSymLink := options.SrcAttr != nil && options.SrcAttr.IsSymlink()
+	err := s3.Storage.RenameFile(s3.ctx, options.Src, options.Dst, isSymLink)
 
 	s3.updateConnectionState(err)
 	if err == nil {

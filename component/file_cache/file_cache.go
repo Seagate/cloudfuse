@@ -69,8 +69,6 @@ type FileCache struct {
 	allowOther      bool
 	offloadIO       bool
 	offlineAccess   bool
-	syncToFlush     bool
-	syncToDelete    bool
 	maxCacheSizeMB  float64
 
 	defaultPermission os.FileMode
@@ -109,9 +107,6 @@ type FileCacheOptions struct {
 	BlockOfflineAccess bool `config:"block-offline-access" yaml:"block-offline-access,omitempty"`
 	EnablePolicyTrace  bool `config:"policy-trace"         yaml:"policy-trace,omitempty"`
 	OffloadIO          bool `config:"offload-io"           yaml:"offload-io,omitempty"`
-
-	SyncToFlush bool `config:"sync-to-flush" yaml:"sync-to-flush"`
-	SyncNoOp    bool `config:"ignore-sync"   yaml:"ignore-sync,omitempty"`
 
 	RefreshSec uint32 `config:"refresh-sec" yaml:"refresh-sec,omitempty"`
 	HardLimit  bool   `config:"hard-limit"  yaml:"hard-limit,omitempty"`
@@ -255,7 +250,6 @@ func (fc *FileCache) Configure(_ bool) error {
 	log.Trace("FileCache::Configure : %s", fc.Name())
 
 	conf := FileCacheOptions{}
-	conf.SyncToFlush = true
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
@@ -281,8 +275,6 @@ func (fc *FileCache) Configure(_ bool) error {
 	fc.policyTrace = conf.EnablePolicyTrace
 	fc.offloadIO = conf.OffloadIO
 	fc.offlineAccess = !conf.BlockOfflineAccess
-	fc.syncToFlush = conf.SyncToFlush
-	fc.syncToDelete = !conf.SyncNoOp
 	fc.refreshSec = conf.RefreshSec
 	fc.hardLimit = conf.HardLimit
 
@@ -374,10 +366,6 @@ func (fc *FileCache) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", fc.Name(), "failed to create cache policy")
 	}
 
-	if config.IsSet(compName + ".sync-to-flush") {
-		log.Warn("Sync will upload current contents of file.")
-	}
-
 	fc.diskHighWaterMark = 0
 	if fc.hardLimit && fc.maxCacheSizeMB != 0 {
 		fc.diskHighWaterMark = fc.maxCacheSizeMB * MB
@@ -395,7 +383,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-len %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-len %v",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
@@ -411,8 +399,6 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.policyTrace,
 		fc.offloadIO,
 		fc.offlineAccess,
-		fc.syncToFlush,
-		fc.syncToDelete,
 		fc.defaultPermission,
 		fc.diskHighWaterMark,
 		fc.maxCacheSizeMB,
@@ -428,7 +414,6 @@ func (fc *FileCache) OnConfigChange() {
 	log.Trace("FileCache::OnConfigChange : %s", fc.Name())
 
 	conf := FileCacheOptions{}
-	conf.SyncToFlush = true
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
@@ -441,8 +426,6 @@ func (fc *FileCache) OnConfigChange() {
 	if conf.MaxSizeMB > 0 {
 		fc.maxCacheSizeMB = conf.MaxSizeMB
 	}
-	fc.syncToFlush = conf.SyncToFlush
-	fc.syncToDelete = !conf.SyncNoOp
 	_ = fc.policy.UpdateConfig(fc.GetPolicyConfig(conf))
 }
 
@@ -1702,14 +1685,6 @@ func (fc *FileCache) releaseFileInternal(
 		flock.LazyOpen = false
 	}
 
-	// If it is an fsync op then purge the file
-	if options.Handle.Fsynced() {
-		log.Trace("FileCache::releaseFileInternal : fsync/sync op, purging %s", options.Handle.Path)
-		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-		fc.policy.CachePurge(localPath)
-		return nil
-	}
-
 	return nil
 }
 
@@ -1837,25 +1812,12 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
-	if fc.syncToFlush {
-		err := fc.FlushFile(
-			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
-		) //nolint
-		if err != nil {
-			log.Err("FileCache::SyncFile : failed to flush file %s", options.Handle.Path)
-			return err
-		}
-	} else if fc.syncToDelete {
-		err := fc.NextComponent().SyncFile(options)
-		if err != nil {
-			log.Err("FileCache::SyncFile : %s failed", options.Handle.Path)
-			return err
-		}
-
-		options.Handle.Flags.Set(handlemap.HandleFlagFSynced)
+	err := fc.NextComponent().SyncFile(options)
+	if err == nil {
+		err = fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true})
 	}
 
-	return nil
+	return err
 }
 
 // in SyncDir we're not going to clear the file cache for now

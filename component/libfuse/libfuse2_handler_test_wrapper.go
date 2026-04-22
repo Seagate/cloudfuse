@@ -349,7 +349,7 @@ func testFuseErrnoFromError(suite *libfuseTestSuite) {
 		{err: syscall.ENOTEMPTY, expected: -fuse.ENOTEMPTY},
 		{err: fs.ErrNotExist, expected: -fuse.ENOENT},
 		{err: os.ErrNotExist, expected: -fuse.ENOENT},
-		{err: syscall.EPERM, expected: -fuse.EACCES},
+		{err: syscall.EPERM, expected: -fuse.EPERM},
 		{err: syscall.EACCES, expected: -fuse.EACCES},
 		{err: fs.ErrPermission, expected: -fuse.EACCES},
 		{err: os.ErrPermission, expected: -fuse.EACCES},
@@ -466,6 +466,44 @@ func testFillStatModeDefault(suite *libfuseTestSuite) {
 
 	suite.assert.NotEqual(0, st.Mode&fuse.S_IFDIR)
 	suite.assert.Equal(uint32(lf.dirPermission), st.Mode&0x1ff)
+}
+
+func testFillStatSpecialPermissionBits(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	lf := suite.libfuse
+
+	attr := &internal.ObjAttr{
+		Path:  "file",
+		Flags: internal.NewFileBitMap(),
+		Mode:  os.FileMode(0751) | os.ModeSetuid | os.ModeSetgid | os.ModeSticky,
+	}
+
+	st := &fuse.Stat_t{}
+	lf.fillStat(attr, st)
+
+	suite.assert.Equal(uint32(07751), st.Mode&0o7777)
+}
+
+func testNormalizeFusePathRelativePathLimit(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	suite.libfuse.mountPath = strings.Repeat("m", 128)
+
+	component := strings.Repeat("a", 200)
+	name := strings.Repeat(component+"/", 19) + component
+
+	normalized, errno := normalizeFusePath("/" + name)
+	suite.assert.Equal(name, normalized)
+	suite.assert.Equal(0, errno)
+}
+
+func testNormalizeFusePathTooLongComponent(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+
+	name := strings.Repeat("a", maxNameSize+1)
+	normalized, errno := normalizeFusePath("/" + name)
+
+	suite.assert.Equal(name, normalized)
+	suite.assert.Equal(-fuse.ENAMETOOLONG, errno)
 }
 
 func testReadMissingHandle(suite *libfuseTestSuite) {

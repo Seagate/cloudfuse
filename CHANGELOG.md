@@ -1,5 +1,16 @@
 # Cloudfuse Changelog #
 
+## **2.2.0** ##
+
+April 7th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Features ###
+
+- [#717](https://github.com/Seagate/cloudfuse/pull/717) Add a dry run validation step to the TUI config flow
+- [#870](https://github.com/Seagate/cloudfuse/pull/870) Improve POSIX compatibility
+- [#879](https://github.com/Seagate/cloudfuse/pull/879) Update parent directory times in attr_cache
+
 ## **2.1.2** ##
 
 March 11th 2026

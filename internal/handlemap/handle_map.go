@@ -45,7 +45,7 @@ const InvalidHandleID HandleID = 0
 const (
 	HandleFlagUnknown  uint64 = iota
 	HandleFlagDirty           // File has been modified with write operation or is a new file
-	HandleFlagFSynced         // User has called fsync on the file explicitly
+	_                         // Skip (formerly HandleFlagFSynced)
 	HandleFlagCached          // File is cached in the local system by cloudfuse
 	HandleOpenedAppend        // File is opened for Append
 )
@@ -96,11 +96,6 @@ func NewHandle(path string) *Handle {
 // Dirty : Handle is dirty or not
 func (handle *Handle) Dirty() bool {
 	return handle.Flags.IsSet(HandleFlagDirty)
-}
-
-// Fsynced : Handle is Fsynced or not
-func (handle *Handle) Fsynced() bool {
-	return handle.Flags.IsSet(HandleFlagFSynced)
 }
 
 // Cached : File is cached on local disk or not
