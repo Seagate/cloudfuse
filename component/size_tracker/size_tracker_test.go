@@ -34,6 +34,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -304,6 +305,219 @@ func (suite *sizeTrackerTestSuite) TestWriteFile() {
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestWriteFileHardLimit() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, MB+1)
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.EqualValues(syscall.ENOSPC, err)
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
+}
+
+func (suite *sizeTrackerTestSuite) TestWriteFileHardLimitWithinCapacity() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, MB/2)
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestWriteFileHardLimitExactCapacity() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, MB-1)
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: int64(len(data)), Data: []byte{0}},
+	)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(MB, suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestWriteFileHardLimitExceedsByOne() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, MB)
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(MB, suite.sizeTracker.mountSize.GetSize())
+
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: int64(len(data)), Data: []byte{0}},
+	)
+	suite.assert.EqualValues(syscall.ENOSPC, err)
+	suite.assert.EqualValues(MB, suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestTruncateFileHardLimitExactCapacity() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, MB/2)
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.TruncateFile(
+		internal.TruncateFileOptions{Name: file, NewSize: int64(MB)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(MB, suite.sizeTracker.mountSize.GetSize())
+}
+
+func (suite *sizeTrackerTestSuite) TestTruncateFileHardLimit() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, MB/2)
+	_, err = suite.sizeTracker.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.TruncateFile(
+		internal.TruncateFileOptions{Name: file, NewSize: int64(2 * MB)},
+	)
+	suite.assert.EqualValues(syscall.ENOSPC, err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+}
+
+func (suite *sizeTrackerTestSuite) TestCopyFromFileHardLimit() {
+	suite.cleanupTest()
+
+	suite.loopback_storage_path = getFakeStoragePath("loopback")
+	cfg := fmt.Sprintf(
+		"loopbackfs:\n  path: %s\n\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 1\n  hard-limit: true",
+		suite.loopback_storage_path,
+		journal_test_name,
+	)
+	suite.setupTestHelper(cfg)
+	defer suite.cleanupTest()
+
+	localFile, err := os.CreateTemp("", "size-tracker-copy-*")
+	suite.assert.NoError(err)
+	defer os.Remove(localFile.Name())
+
+	truncateErr := localFile.Truncate(int64(2 * MB))
+	suite.assert.NoError(truncateErr)
+	_, seekErr := localFile.Seek(0, 0)
+	suite.assert.NoError(seekErr)
+
+	file := generateFileName()
+	err = suite.sizeTracker.CopyFromFile(
+		internal.CopyFromFileOptions{Name: file, File: localFile},
+	)
+	suite.assert.EqualValues(syscall.ENOSPC, err)
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
