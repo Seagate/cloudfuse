@@ -2029,6 +2029,9 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, localErr := os.Stat(localPath)
+	if localErr != nil && !os.IsNotExist(localErr) {
+		log.Warn("FileCache::GetAttr : %s unexpected stat error [%v]", options.Name, localErr)
+	}
 	if flock.Count() > 0 && flock.DirtyCount() > 0 {
 		if localErr == nil && !info.IsDir() {
 			flock.RUnlock()
@@ -2037,6 +2040,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// To cover case 1, get attributes from storage
+	cloudStateUnknown := false
 	inCloud := false
 	attrs, remoteErr := fc.NextComponent().GetAttr(options)
 	flock.RUnlock()
@@ -2052,6 +2056,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	case fc.offlineAccess && isOffline(remoteErr) && localErr == nil:
 		// no information available about the object's state in cloud storage
 		// but the file exists in the local cache, so let offline access proceed
+		cloudStateUnknown = true
 		log.Warn("FileCache::GetAttr : %s cached but cloud state unknown (offline)", options.Name)
 	default:
 		log.Err("FileCache::GetAttr : %s GetAttr failed. Here's why: %v", options.Name, remoteErr)
@@ -2059,10 +2064,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	exists := inCloud
-	switch {
-	case localErr == nil:
-		exists = true
+	if localErr == nil {
 		if !inCloud { // Case 2 (only in local cache)
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
 			attrs = newObjAttr(options.Name, info)
@@ -2075,13 +2077,21 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			newAttr.Size = info.Size()
 			attrs = &newAttr
 		}
-	case !os.IsNotExist(localErr):
-		log.Warn("FileCache::GetAttr : %s unexpected stat error [%v]", options.Name, localErr)
 	}
 
+	exists := inCloud || localErr == nil
 	if !exists {
-		// allow weird local errors, if they ever come up
-		return nil, localErr
+		if !cloudStateUnknown {
+			return nil, syscall.ENOENT
+		} else {
+			// return unexpected local errors when we have nothing better to say
+			log.Warn(
+				"FileCache::GetAttr : %s returning unexpected stat error: %v",
+				options.Name,
+				localErr,
+			)
+			return nil, localErr
+		}
 	}
 
 	return attrs, nil
