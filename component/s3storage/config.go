@@ -172,7 +172,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 			s3.stConfig.healthCheckInterval = 1 * time.Second
 		case specifiedInterval > maxHealthCheckInterval:
 			log.Warn(
-				"S3storage : health-check-interval-sec=%d... using %ds instead",
+				"S3storage : health-check-interval-sec=%d... using %.0fs instead",
 				opt.HealthCheckIntervalSec,
 				maxHealthCheckInterval.Seconds(),
 			)
