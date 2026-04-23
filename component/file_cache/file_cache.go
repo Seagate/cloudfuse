@@ -2037,28 +2037,34 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// To cover case 1, get attributes from storage
-	var exists bool
+	inCloud := false
 	attrs, remoteErr := fc.NextComponent().GetAttr(options)
 	flock.RUnlock()
 	switch {
+	case remoteErr == nil:
+		inCloud = true
 	case !isOffline(remoteErr) && os.IsNotExist(remoteErr):
 		log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
-	case remoteErr == nil:
-		exists = true
-	case offlineDataAvailable(remoteErr) && fc.offlineAccess:
+	case fc.offlineAccess && offlineDataAvailable(remoteErr):
 		// we are offline, but we can respond from the attribute cache
-		exists = !errors.Is(remoteErr, os.ErrNotExist)
-		log.Debug("FileCache::GetAttr : %s exists=%t from cache (offline)", options.Name, exists)
+		inCloud = !errors.Is(remoteErr, os.ErrNotExist)
+		log.Debug("FileCache::GetAttr : %s exists=%t from cache (offline)", options.Name, inCloud)
+	case fc.offlineAccess && isOffline(remoteErr) && localErr == nil:
+		// no information available about the object's state in cloud storage
+		// but the file exists in the local cache, so let offline access proceed
+		log.Warn("FileCache::GetAttr : %s cached but cloud state unknown (offline)", options.Name)
 	default:
 		log.Err("FileCache::GetAttr : %s GetAttr failed. Here's why: %v", options.Name, remoteErr)
 		return nil, remoteErr
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	if localErr == nil {
-		if !exists { // Case 2 (only in local cache)
+	exists := inCloud
+	switch {
+	case localErr == nil:
+		exists = true
+		if !inCloud { // Case 2 (only in local cache)
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
-			exists = true
 			attrs = newObjAttr(options.Name, info)
 		} else if !info.IsDir() { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// attrs is a pointer returned by NextComponent
@@ -2069,10 +2075,13 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			newAttr.Size = info.Size()
 			attrs = &newAttr
 		}
+	case !os.IsNotExist(localErr):
+		log.Warn("FileCache::GetAttr : %s unexpected stat error [%v]", options.Name, localErr)
 	}
 
 	if !exists {
-		return nil, syscall.ENOENT
+		// allow weird local errors, if they ever come up
+		return nil, localErr
 	}
 
 	return attrs, nil
