@@ -2053,6 +2053,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// we are offline, but we can respond from the attribute cache
 		inCloud = !errors.Is(remoteErr, os.ErrNotExist)
 		log.Debug("FileCache::GetAttr : %s exists=%t from cache (offline)", options.Name, inCloud)
+	// TODO: use notInCloud here
 	case fc.offlineAccess && isOffline(remoteErr) && localErr == nil:
 		// no information available about the object's state in cloud storage
 		// but the file exists in the local cache, so let offline access proceed
@@ -2144,12 +2145,23 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	err := fc.NextComponent().RenameFile(options)
 	localOnly := errors.Is(err, os.ErrNotExist)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
-	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Src) {
-		log.Debug("FileCache::RenameFile : %s Offline rename allowed", options.Src)
-		err = nil
+	if fc.offlineAccess && isOffline(err) {
+		// offline renames require a cached src, since pendingOps only records uploads and deletes
+		if _, statErr := os.Stat(filepath.Join(fc.tmpPath, options.Src)); statErr != nil {
+			log.Err("FileCache::RenameFile : %s Offline rename failed (no cache)", options.Src)
+			return err
+		} else {
+			log.Debug("FileCache::RenameFile : %s Offline rename allowed", options.Src)
+			// make sure src is in pendingOps so renamePendingOp works correctly
+			_, srcAlreadyPending := fc.pendingOps.LoadOrStore(options.Src, pendingFlags{})
+			if !srcAlreadyPending {
+				log.Info("FileCache::RenameFile : %s Added src to pendingOps", options.Src)
+			}
+			err = nil
+		}
 	}
 	if err != nil {
-		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
+		log.Err("FileCache::RenameFile : %s rename failed [%v]", options.Src, err)
 		return err
 	}
 
