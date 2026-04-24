@@ -28,6 +28,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -327,8 +328,27 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 // returns true if we *know* that this entity does not exist in cloud storage
 // otherwise returns false (including ambiguous cases)
 func (fc *FileCache) notInCloud(name string) bool {
-	cached, exists, _ := fc.checkCloud(name)
-	return cached && !exists
+	// if an entity is inside a directory we *know* does not exist in cloud storage
+	// then we know the entity is also not in cloud storage
+	// check the given object name first, but then drill up to the nearest parent with cached attributes
+	for cached, exists := false, false; !cached && name != ""; name = getParentDir(name) {
+		cached, exists, _ = fc.checkCloud(name)
+		// return valid results
+		if cached {
+			return !exists
+		}
+	}
+	// fallback
+	return false
+}
+
+// returns the parent directory (without a trailing slash)
+func getParentDir(childPath string) string {
+	parentDir := path.Dir(internal.TruncateDirName(childPath))
+	if parentDir == "." {
+		parentDir = ""
+	}
+	return parentDir
 }
 
 // and getAttrErr is the error returned from GetAttr
