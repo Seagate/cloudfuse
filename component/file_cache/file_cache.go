@@ -654,16 +654,9 @@ func (fc *FileCache) StreamDir(
 
 	// Get files from local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	dirents, err := os.ReadDir(localPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Err(
-				"FileCache::StreamDir : %s os.ReadDir failed. Here's why: %v",
-				options.Name,
-				err,
-			)
-		}
-		return attrs, token, nil
+	dirents, localErr := os.ReadDir(localPath)
+	if localErr != nil && !os.IsNotExist(localErr) {
+		log.Err("FileCache::StreamDir : %s os.ReadDir failed [%v]", options.Name, localErr)
 	}
 
 	i := 0 // Index for cloud
