@@ -2393,32 +2393,35 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 	var offlineOkay bool
 
+	// check local file
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	info, localErr := os.Stat(localPath)
+
 	// Update the file in cloud storage
-	err := fc.NextComponent().Chmod(options)
-	err = fc.validateStorageError(options.Name, err, "Chmod", false)
-	if err != nil {
-		case2okay := err == syscall.EIO
-		offlineOkay = isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name)
-		if !case2okay && !offlineOkay {
-			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
-			return err
-		}
+	cloudErr := fc.NextComponent().Chmod(options)
+	cloudErr = fc.validateStorageError(options.Name, cloudErr, "Chmod", false)
+	switch {
+	// for offline access to work, there needs to be a cached file on which to write the mode
+	case isOffline(cloudErr) && fc.offlineAccess && localErr == nil:
+		log.Debug("FileCache::Chmod : %s operating on cache (offline)", options.Name)
+		offlineOkay = true
+	// validateStorageError codes case 2 as EIO
+	case cloudErr == syscall.EIO:
+		log.Info("FileCache::Chmod : %s operating on cache (object not found)", options.Name)
+	// return all other cloud errors
+	case cloudErr != nil:
+		log.Err("FileCache::Chmod : %s failed [%v]", options.Name, cloudErr)
+		return cloudErr
 	}
 
 	// Update the mode of the file in the local cache
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
-	if err == nil {
+	if localErr == nil {
 		fc.policy.CacheValid(localPath)
 
 		if info.Mode() != options.Mode {
-			err = os.Chmod(localPath, options.Mode)
+			err := os.Chmod(localPath, options.Mode)
 			if err != nil {
-				log.Err(
-					"FileCache::Chmod : error changing mode on the cached path %s [%s]",
-					localPath,
-					err.Error(),
-				)
+				log.Err("FileCache::Chmod : %s local op failed [%v]", options.Name, err)
 				return err
 			} else if offlineOkay {
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
