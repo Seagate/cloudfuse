@@ -2421,7 +2421,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 		if info.Mode() != options.Mode {
 			err := os.Chmod(localPath, options.Mode)
 			if err != nil {
-				log.Err("FileCache::Chmod : %s local op failed [%v]", options.Name, err)
+				log.Err("FileCache::Chmod : %s local chmod failed [%v]", options.Name, err)
 				return err
 			} else if offlineOkay {
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
@@ -2443,32 +2443,35 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
+	// check cache
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	_, localErr := os.Stat(localPath)
+
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)
-	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
+	switch {
+	// for offline access to work, there needs to be a cached file on which to write the owner
+	case isOffline(err) && fc.offlineAccess && localErr == nil:
 		log.Debug("FileCache::Chown : %s Offline chown allowed", options.Name)
 		offlineOkay = true
-		err = nil
-	}
-	if err != nil {
+	// validateStorageError codes case 2 as EIO
+	case err == syscall.EIO:
+		log.Info("FileCache::Chown : %s operating on cache (object not found)", options.Name)
+	// return all other cloud errors
+	case err != nil:
 		log.Err("FileCache::Chown : %s failed to change owner [%s]", options.Name, err.Error())
 		return err
 	}
 
 	// Update the owner and group of the file in the local cache
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-	if _, err = os.Stat(localPath); err == nil {
+	if localErr == nil {
 		fc.policy.CacheValid(localPath)
 
 		if runtime.GOOS != "windows" {
 			err = os.Chown(localPath, options.Owner, options.Group)
 			if err != nil {
-				log.Err(
-					"FileCache::Chown : error changing owner on the cached path %s [%s]",
-					localPath,
-					err.Error(),
-				)
+				log.Err("FileCache::Chown : %s owner change failed [%v]", localPath, err)
 				return err
 			} else if offlineOkay {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
