@@ -254,7 +254,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
-		return fmt.Errorf("config error in %s [%s]", fc.Name(), err.Error())
+		return fmt.Errorf("config error in %s [%w]", fc.Name(), err)
 	}
 
 	fc.createEmptyFile = conf.CreateEmptyFile
@@ -282,7 +282,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	err = config.UnmarshalKey("lazy-write", &fc.lazyWrite)
 	if err != nil {
 		log.Err("FileCache: config error [unable to obtain lazy-write]")
-		return fmt.Errorf("config error in %s [%s]", fc.Name(), err.Error())
+		return fmt.Errorf("config error in %s [%w]", fc.Name(), err)
 	}
 
 	fc.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
@@ -300,7 +300,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	err = config.UnmarshalKey("mount-path", &fc.mountPath)
 	if err != nil {
 		log.Err("FileCache: config error [unable to obtain Mount Path]")
-		return fmt.Errorf("config error in %s [%s]", fc.Name(), err.Error())
+		return fmt.Errorf("config error in %s [%w]", fc.Name(), err)
 	}
 	if filepath.Clean(fc.mountPath) == filepath.Clean(fc.tmpPath) {
 		log.Err("FileCache: config error [tmp-path is same as mount path]")
@@ -314,7 +314,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		err := os.MkdirAll(fc.tmpPath, os.FileMode(0755))
 		if err != nil {
 			log.Err("FileCache: config error creating directory after clean [%s]", err.Error())
-			return fmt.Errorf("config error in %s [%s]", fc.Name(), err.Error())
+			return fmt.Errorf("config error in %s [%w]", fc.Name(), err)
 		}
 	}
 
@@ -2258,7 +2258,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			err := fc.openFileInternal(options.Handle, flock)
 			flock.Unlock()
 			if err != nil {
-				return fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+				return fmt.Errorf("error downloading file for %s [%w]", options.Handle.Path, err)
 			}
 		}
 
