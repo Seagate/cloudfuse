@@ -2315,30 +2315,56 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	err := fc.NextComponent().TruncateFile(options)
-	err = fc.validateStorageError(options.Name, err, "TruncateFile", true)
-	if isOffline(err) && fc.offlineAccess && fc.notInCloud(options.Name) {
-		log.Debug("FileCache::TruncateFile : %s Offline truncate allowed", options.Name)
-		offlineOkay = true
-		err = nil
+	// check local file
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	info, localErr := os.Stat(localPath)
+
+	cloudErr := fc.NextComponent().TruncateFile(options)
+	cloudErr = fc.validateStorageError(options.Name, cloudErr, "TruncateFile", true)
+	if isOffline(cloudErr) && fc.offlineAccess {
+		// is file data needed?
+		needData := options.NewSize == 0
+		haveData := localErr == nil
+		switch {
+		case haveData:
+			log.Debug("FileCache::TruncateFile : %s Offline truncate allowed", options.Name)
+			offlineOkay = true
+		case !needData:
+			log.Debug("FileCache::TruncateFile : %s Creating file (offline)", options.Name)
+			if f, err := common.OpenFile(
+				localPath,
+				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+				fc.defaultPermission,
+			); err == nil {
+				info, localErr = f.Stat()
+				f.Close()
+				offlineOkay = true
+			} else {
+				log.Err(
+					"FileCache::TruncateFile : %s Offline create failed [%v]",
+					options.Name,
+					err,
+				)
+			}
+		default:
+			log.Info("FileCache::TruncateFile : %s Need file data (offline)", options.Name)
+		}
 	}
-	if err != nil {
-		log.Err("FileCache::TruncateFile : %s failed to truncate [%s]", options.Name, err.Error())
-		return err
+	if cloudErr != nil && !offlineOkay {
+		log.Err("FileCache::TruncateFile : %s failed to truncate [%v]", options.Name, cloudErr)
+		return cloudErr
 	}
 
 	// Update the size of the file in the local cache
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
-	if err == nil {
+	if localErr == nil {
 		fc.policy.CacheValid(localPath)
 		if info.Size() != options.NewSize {
-			err = os.Truncate(localPath, options.NewSize)
+			err := os.Truncate(localPath, options.NewSize)
 			if err != nil {
 				log.Err(
-					"FileCache::TruncateFile : error truncating cached file %s [%s]",
+					"FileCache::TruncateFile : %s failed to truncate cached file [%v]",
 					localPath,
-					err.Error(),
+					err,
 				)
 				return err
 			} else if offlineOkay {
