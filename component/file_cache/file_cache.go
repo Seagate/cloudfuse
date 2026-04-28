@@ -1272,6 +1272,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	flags = fileOptions.flags
 	fMode = fileOptions.fMode
 	overwrite := flags&os.O_TRUNC != 0
+	create := flags&os.O_CREATE != 0
 
 	localPath := filepath.Join(fc.tmpPath, handle.Path)
 
@@ -1350,19 +1351,22 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 		log.Debug("FileCache::openFileInternal : %s download complete", handle.Path)
 
 		// After downloading the file, update the modified times and mode of the file.
-		fileMode := fc.defaultPermission
-		if attr != nil && !attr.IsModeDefault() {
-			fileMode = attr.Mode
-		}
+		// Only set permissions when creating a new file (O_CREATE flag is set)
+		if create {
+			fileMode := fc.defaultPermission
+			if attr != nil && !attr.IsModeDefault() {
+				fileMode = attr.Mode
+			}
 
-		// If user has selected some non default mode in config then every local file shall be created with that mode only
-		err = os.Chmod(localPath, fileMode)
-		if err != nil {
-			log.Err(
-				"FileCache::openFileInternal : Failed to change mode of file %s [%s]",
-				handle.Path,
-				err.Error(),
-			)
+			// If user has selected some non default mode in config then every local file shall be created with that mode only
+			err = os.Chmod(localPath, fileMode)
+			if err != nil {
+				log.Err(
+					"FileCache::openFileInternal : Failed to change mode of file %s [%s]",
+					handle.Path,
+					err.Error(),
+				)
+			}
 		}
 
 		// TODO: When chown is supported should we update that?
