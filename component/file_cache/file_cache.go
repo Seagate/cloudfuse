@@ -309,7 +309,7 @@ func (fc *FileCache) Configure(_ bool) error {
 
 	// Extract values from 'conf' and store them as you wish here
 	_, err = os.Stat(fc.tmpPath)
-	if os.IsNotExist(err) {
+	if isNotExist(err) {
 		log.Err("FileCache: config error [tmp-path does not exist. attempting to create tmp-path.]")
 		err := os.MkdirAll(fc.tmpPath, os.FileMode(0755))
 		if err != nil {
@@ -408,6 +408,10 @@ func (fc *FileCache) Configure(_ bool) error {
 	)
 
 	return nil
+}
+
+func isNotExist(err error) bool {
+	return errors.Is(err, os.ErrNotExist)
 }
 
 // OnConfigChange : If component has registered, on config file change this method is called
@@ -656,7 +660,7 @@ func (fc *FileCache) StreamDir(
 	// Get files from local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	dirents, localErr := os.ReadDir(localPath)
-	if localErr != nil && !os.IsNotExist(localErr) {
+	if localErr != nil && !isNotExist(localErr) {
 		log.Err("FileCache::StreamDir : %s os.ReadDir failed [%v]", options.Name, localErr)
 	}
 
@@ -707,7 +711,7 @@ func (fc *FileCache) StreamDir(
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
-				if err != nil && errors.Is(err, os.ErrNotExist) {
+				if err != nil && isNotExist(err) {
 					// get the lock on the file, to allow any pending operation to complete
 					flock := fc.fileLocks.Get(entryPath)
 					flock.RLock()
@@ -767,7 +771,7 @@ func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 
 	entries, err := os.ReadDir(localPath)
 	if err != nil {
-		if err == syscall.ENOENT || os.IsNotExist(err) {
+		if err == syscall.ENOENT || isNotExist(err) {
 			return true, nil
 		}
 
@@ -923,7 +927,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
 			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
-			if os.IsNotExist(err) {
+			if isNotExist(err) {
 				// none of the files that were moved actually exist in local storage
 				log.Info("FileCache::RenameDir : %s does not exist in local cache.", options.Src)
 			} else if err != nil {
@@ -998,7 +1002,7 @@ func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, 
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
 			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
-			if os.IsNotExist(err) {
+			if isNotExist(err) {
 				// none of the files that were moved actually exist in local storage
 				log.Info("FileCache::listObjects : %s does not exist in local cache.", directory)
 			} else if err != nil {
@@ -1007,7 +1011,7 @@ func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, 
 		}
 		return nil
 	})
-	if walkDirErr != nil && !os.IsNotExist(walkDirErr) {
+	if walkDirErr != nil && !isNotExist(walkDirErr) {
 		err = walkDirErr
 	}
 	sort.Strings(objectNames)
@@ -1185,13 +1189,13 @@ func (fc *FileCache) validateStorageError(
 ) error {
 	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
 	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
-	if !isOffline(err) && errors.Is(err, os.ErrNotExist) {
+	if !isOffline(err) && isNotExist(err) {
 		log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
 		if !fc.createEmptyFile {
 			// Check if the file exists in the local cache
 			// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
 			localPath := filepath.Join(fc.tmpPath, path)
-			if _, err := os.Stat(localPath); os.IsNotExist(err) {
+			if _, err := os.Stat(localPath); isNotExist(err) {
 				// If the file is not in the local cache, then the file does not exist.
 				log.Err("FileCache::%s : %s does not exist in local cache", method, path)
 				return syscall.ENOENT
@@ -1543,7 +1547,7 @@ func (fc *FileCache) isDownloadRequired(
 		}
 		// gather stat details
 		lmt = info.ModTime()
-	} else if os.IsNotExist(statErr) {
+	} else if isNotExist(statErr) {
 		// The file does not exist in the local cache so it needs to be downloaded
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
 	} else {
@@ -1561,12 +1565,12 @@ func (fc *FileCache) isDownloadRequired(
 
 	// get cloud attributes
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
-	if cloudAttr == nil && !errors.Is(err, os.ErrNotExist) {
+	if cloudAttr == nil && !isNotExist(err) {
 		log.Err("FileCache::isDownloadRequired : %s GetAttr failed [%v]", objectPath, err)
 	}
 
 	// if no data is cached, and there is (or might be) data in cloud storage, download it
-	if !cached && !errors.Is(err, os.ErrNotExist) {
+	if !cached && !isNotExist(err) {
 		downloadRequired = true
 	}
 
@@ -2021,7 +2025,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, localErr := os.Stat(localPath)
-	if localErr != nil && !os.IsNotExist(localErr) {
+	if localErr != nil && !isNotExist(localErr) {
 		log.Warn("FileCache::GetAttr : %s unexpected stat error [%v]", options.Name, localErr)
 	}
 	if flock.Count() > 0 && flock.DirtyCount() > 0 {
@@ -2038,12 +2042,12 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	switch {
 	case remoteErr == nil: // object found
 		inCloud = true
-	case !isOffline(remoteErr) && os.IsNotExist(remoteErr): // object not found
+	case !isOffline(remoteErr) && isNotExist(remoteErr): // object not found
 		log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 	case fc.offlineAccess && isOffline(remoteErr): // offline access
 		switch {
 		case cachedData(remoteErr): // use offline attributes
-			inCloud = !errors.Is(remoteErr, os.ErrNotExist)
+			inCloud = !isNotExist(remoteErr)
 		case fc.notInCloud(options.Name): // use parent directory attributes
 			inCloud = false
 		case localErr == nil: // no attributes, but allow access to local file
@@ -2127,7 +2131,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
-	localOnly := errors.Is(err, os.ErrNotExist)
+	localOnly := isNotExist(err)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
 	if fc.offlineAccess && isOffline(err) {
 		// offline renames require a cached src, since pendingOps only records uploads and deletes
@@ -2171,7 +2175,7 @@ func (fc *FileCache) renameLocalFile(
 		)
 		fc.policy.CacheValid(localDstPath)
 
-	case os.IsNotExist(err):
+	case isNotExist(err):
 		if localOnly {
 			// neither cloud nor file cache has this file, so return ENOENT
 			log.Err("FileCache::renameLocalFile : %s source file not found", srcName)
