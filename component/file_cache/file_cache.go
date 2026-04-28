@@ -1443,9 +1443,10 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	downloadRequired, _, cloudAttr, err := fc.isDownloadRequired(localPath, options.Name, flock)
+	cloudConnected := fc.NextComponent().CloudConnected()
 
 	// block offline open calls when offline access is disabled
-	if !fc.NextComponent().CloudConnected() && !fc.offlineAccess {
+	if !cloudConnected && !fc.offlineAccess {
 		log.Err("FileCache::OpenFile : %s Offline access is disabled", options.Name)
 		return nil, common.CloudUnreachableError{}
 	}
@@ -1473,7 +1474,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// will opening the file require downloading it?
 	var openErr error
 	openOverwrites := options.Flags&os.O_TRUNC != 0
-	if !downloadRequired || openOverwrites {
+	if !downloadRequired || openOverwrites || !cloudConnected {
 		// use the local file to complete the open operation now
 		// flock is already locked, as required by openFileInternal
 		openErr = fc.openFileInternal(handle, flock)
