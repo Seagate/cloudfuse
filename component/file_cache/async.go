@@ -327,12 +327,14 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 // returns true if we *know* that this entity does not exist in cloud storage
 // otherwise returns false (including ambiguous cases)
 func (fc *FileCache) notInCloud(name string) bool {
-	cached, exists, _ := fc.checkCloud(name)
-	return cached && !exists
+	cloudStateKnown, existsInCloud, _ := fc.checkCloud(name)
+	return cloudStateKnown && !existsInCloud
 }
 
 // and getAttrErr is the error returned from GetAttr
-func (fc *FileCache) checkCloud(name string) (cached bool, exists bool, getAttrErr error) {
+func (fc *FileCache) checkCloud(
+	name string,
+) (cloudStateKnown bool, inCloud bool, getAttrErr error) {
 	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	return cachedData(getAttrErr), !errors.Is(getAttrErr, os.ErrNotExist), getAttrErr
 }
