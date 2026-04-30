@@ -615,24 +615,32 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
 	name := internal.ExtendDirName(options.Name)
+	offlineOkay := false
 	flock := fc.fileLocks.Get(name)
 	flock.Lock()
 	defer flock.Unlock()
 
 	// The libfuse component only calls DeleteDir on empty directories, so this directory must be empty
 	err := fc.NextComponent().DeleteDir(options)
-	// is the cloud connection down? Is offline access enabled?
+	// Allow safe offline access
 	if isOffline(err) && fc.offlineAccess {
-		// record pending deletion
-		fc.addPendingOp(name, pendingFlags{isDir: true, isDeletion: true})
-		// clear the error
-		err = nil
+		if _, statErr := os.Stat(filepath.Join(fc.tmpPath, options.Name)); statErr == nil {
+			log.Debug("FileCache::DeleteDir : %s local access allowed (offline)", options.Name)
+			offlineOkay = true
+		} else if cloudStateKnown, _, _ := fc.checkCloud(options.Name); cloudStateKnown {
+			log.Debug("FileCache::DeleteDir : %s access allowed (offline)", options.Name)
+			offlineOkay = true
+		}
 	}
 	// delete locally
-	if err == nil {
+	if err == nil || offlineOkay {
 		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
 	} else {
 		log.Err("FileCache::DeleteDir : %s . Here's why: %v", options.Name, err)
+	}
+	// record pending op
+	if offlineOkay {
+		fc.addPendingOp(name, pendingFlags{isDir: true, isDeletion: true})
 	}
 
 	return err
@@ -1116,6 +1124,22 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
 			return nil, err
 		}
+	}
+
+	// block offline access when disabled or risky
+	if !fc.NextComponent().CloudConnected() {
+		if !fc.offlineAccess {
+			log.Err("FileCache::CreateFile : %s failed (offline access disabled)", options.Name)
+			return nil, common.CloudUnreachableError{}
+		}
+		// if the file is not in the cache and the cloud state is unknown, block access
+		if _, err := os.Stat(filepath.Join(fc.tmpPath, options.Name)); err != nil {
+			if cloudStateKnown, _, _ := fc.checkCloud(options.Name); !cloudStateKnown {
+				log.Err("FileCache::CreateFile : %s failed (no offline metadata)", options.Name)
+				return nil, common.NewNoCachedDataError(&common.CloudUnreachableError{})
+			}
+		}
+		offline = true
 	}
 
 	// Create the file in local cache
