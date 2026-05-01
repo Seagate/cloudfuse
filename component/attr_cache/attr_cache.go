@@ -1234,7 +1234,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// Serve the request from the attribute cache
 			if !value.exists() {
 				log.Debug("AttrCache::GetAttr : %s ENOENT found in cache (offline)", options.Name)
-				return value.attr, errors.Join(syscall.ENOENT, err)
+				return nil, errors.Join(syscall.ENOENT, err)
 			} else {
 				log.Debug("AttrCache::GetAttr : %s Entry found in cache (offline)", options.Name)
 				return value.attr, err
@@ -1242,10 +1242,19 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 		// drill up to the nearest parent with valid cached attributes
 		// to infer whether this entity could exist in cloud storage
-		log.Debug("AttrCache::GetAttr : %s not found, drilling up... (offline)", options.Name)
-		for parent := getParentDir(options.Name); parent != ""; parent = getParentDir(parent) {
+		log.Debug("AttrCache::GetAttr : %s drilling up... (offline)", options.Name)
+		for parent := getParentDir(options.Name); ; parent = getParentDir(parent) {
 			value, found = ac.cache.get(parent)
 			if !found || !value.valid() {
+				if parent == "" {
+					log.Warn("AttrCache::GetAttr : %s no root listing (offline)", options.Name)
+					return nil, common.NewNoCachedDataError(err)
+				}
+				log.Debug(
+					"AttrCache::GetAttr : %s - %s drilling up... (offline)",
+					options.Name,
+					parent,
+				)
 				continue
 			}
 			switch {
