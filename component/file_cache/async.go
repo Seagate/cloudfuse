@@ -270,53 +270,53 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 
 	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
-	info, err := os.Stat(localPath)
+	info, localErr := os.Stat(localPath)
 	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
-	if !flags.isDeletion && err != nil {
-		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, err)
+	if !flags.isDeletion && localErr != nil {
+		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, localErr)
 		fc.pendingOps.Delete(name)
-		return err
+		return localErr
 	}
-	if flags.isDeletion && !os.IsNotExist(err) {
+	if flags.isDeletion && !os.IsNotExist(localErr) {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
 	}
 	if flags.isDir != info.IsDir() {
 		log.Err("FileCache::updateObject : %s has wrong dir flag (%t)!", name, flags.isDir)
 	}
-	// delete
-	if os.IsNotExist(err) {
+
+	// update cloud
+	op := "deletion"
+	objType := "directory"
+	var cloudErr error
+	if os.IsNotExist(localErr) {
 		if flags.isDir {
 			// delete folder
 			options := internal.DeleteDirOptions{Name: name}
-			err = fc.NextComponent().DeleteDir(options)
-			if err != nil {
-				return err
-			}
+			cloudErr = fc.NextComponent().DeleteDir(options)
 		} else {
 			// delete file
+			objType = "file"
 			options := internal.DeleteFileOptions{Name: name}
-			err = fc.NextComponent().DeleteFile(options)
-			if err != nil {
-				return err
-			}
+			cloudErr = fc.NextComponent().DeleteFile(options)
 		}
 	} else {
+		op = "creation/update"
 		if info.IsDir() {
 			// upload folder
 			options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
-			err = fc.NextComponent().CreateDir(options)
-			if err != nil && !os.IsExist(err) {
-				return err
-			}
+			cloudErr = fc.NextComponent().CreateDir(options)
 		} else {
 			// upload file
-			err = fc.uploadFile(name)
-			if err != nil {
-				log.Err("FileCache::updateObject : %s Upload failed. Here's why: %v", name, err)
-				return err
-			}
+			objType = "file"
+			cloudErr = fc.uploadFile(name)
 		}
 	}
+	// handle errors
+	if cloudErr != nil {
+		log.Err("FileCache::updateObject : %s %s %s failed [%v]", name, objType, op, cloudErr)
+		return cloudErr
+	}
+
 	// update state
 	log.Info("FileCache::updateObject : %s sync successful", name)
 	fc.pendingOps.Delete(name)
