@@ -198,13 +198,7 @@ type CommittedBlock struct {
 type CommittedBlockList []CommittedBlock
 
 func TruncateDirName(name string) string {
-	if len(name) == 0 {
-		return ""
-	}
-	if name[len(name)-1:] == "/" {
-		name = name[:len(name)-1]
-	}
-	return name
+	return strings.TrimSuffix(name, "/")
 }
 
 func ExtendDirName(name string) string {
