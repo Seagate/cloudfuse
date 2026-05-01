@@ -1200,66 +1200,68 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	return handle, nil
 }
 
-// Validate that storage 404 errors truly correspond to Does Not Exist.
-// path: the storage path
-// err: the storage error
-// method: the caller method name
-// recoverable: whether or not case 2 is recoverable on flush/close of the file
-func (fc *FileCache) validateStorageError(
+// resolveCloudNotFoundError handles the case where cloud storage returns "not found"
+// but the file may exist in the local cache (not yet flushed to cloud).
+//
+// This occurs when createEmptyFile is false: files are created locally first,
+// then uploaded on close/flush. During this window, cloud operations will return 404.
+//
+// Returns:
+//   - nil if the file exists locally and canRetryOnClose is true
+//   - ENOENT if the file doesn't exist in cloud or local cache
+//   - EIO if the file exists locally but canRetryOnClose is false
+//   - the original error unchanged for non-404 errors or offline errors
+func (fc *FileCache) resolveCloudNotFoundError(
 	path string,
 	err error,
 	method string,
-	recoverable bool,
+	canRetryOnClose bool,
 ) error {
-	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
-	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
-	if !isOffline(err) && isNotExist(err) {
-		log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
-		if !fc.createEmptyFile {
-			// Check if the file exists in the local cache
-			// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
-			localPath := filepath.Join(fc.tmpPath, path)
-			if _, err := os.Stat(localPath); isNotExist(err) {
-				// If the file is not in the local cache, then the file does not exist.
-				log.Err("FileCache::%s : %s does not exist in local cache", method, path)
-				return syscall.ENOENT
-			} else {
-				if !recoverable {
-					log.Err(
-						"FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close",
-						method,
-						path,
-					)
-					return syscall.EIO
-				} else {
-					log.Info(
-						"FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close",
-						method,
-						path,
-					)
-					return nil
-				}
-			}
-		}
+	// Only handle cloud "not found" errors (skip offline or other errors)
+	if isOffline(err) || !isNotExist(err) {
+		return err
 	}
-	return err
+
+	log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
+
+	// When createEmptyFile is true, cloud 404 means file truly doesn't exist
+	if fc.createEmptyFile {
+		return err
+	}
+
+	// Check if file exists in local cache (pending upload)
+	localPath := filepath.Join(fc.tmpPath, path)
+	if _, statErr := os.Stat(localPath); isNotExist(statErr) {
+		log.Err("FileCache::%s : %s does not exist in local cache", method, path)
+		return syscall.ENOENT
+	}
+
+	// File exists locally but not in cloud - it's pending upload
+	if canRetryOnClose {
+		log.Info("FileCache::%s : %s pending upload, cloud will be updated on close", method, path)
+		return nil
+	}
+
+	log.Err("FileCache::%s : %s pending upload, operation cannot be retried", method, path)
+	return syscall.EIO
 }
 
 func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("FileCache::DeleteFile : name=%s", options.Name)
 	localPath := filepath.Join(fc.tmpPath, options.Name)
+	offlineOkay := false
 
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
 
 	err := fc.NextComponent().DeleteFile(options)
-	err = fc.validateStorageError(options.Name, err, "DeleteFile", true)
+	err = fc.resolveCloudNotFoundError(options.Name, err, "DeleteFile", true)
 	if isOffline(err) && fc.offlineAccess {
-		// we are offline and the file is not in cloud, so handle deletion locally
-		err = nil
+		// we are offline, so handle deletion locally
+		offlineOkay = true
 	}
-	if err != nil {
+	if err != nil && !offlineOkay {
 		log.Err("FileCache::DeleteFile : %s deletion failed. Here's why:  %v", options.Name, err)
 		return err
 	}
@@ -1270,7 +1272,9 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	// update file state
 	flock.LazyOpen = false
 	// update pending ops
-	fc.addPendingOp(options.Name, pendingFlags{isDeletion: true})
+	if offlineOkay {
+		fc.addPendingOp(options.Name, pendingFlags{isDeletion: true})
+	}
 
 	return nil
 }
@@ -2157,7 +2161,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 
 	err := fc.NextComponent().RenameFile(options)
 	localOnly := isNotExist(err)
-	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
+	err = fc.resolveCloudNotFoundError(options.Src, err, "RenameFile", true)
 	if fc.offlineAccess && isOffline(err) {
 		// offline renames require a cached src, since pendingOps only records uploads and deletes
 		if _, statErr := os.Stat(filepath.Join(fc.tmpPath, options.Src)); statErr != nil {
@@ -2353,7 +2357,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	info, localErr := os.Stat(localPath)
 
 	cloudErr := fc.NextComponent().TruncateFile(options)
-	cloudErr = fc.validateStorageError(options.Name, cloudErr, "TruncateFile", true)
+	cloudErr = fc.resolveCloudNotFoundError(options.Name, cloudErr, "TruncateFile", true)
 	if isOffline(cloudErr) && fc.offlineAccess {
 		// is file data needed?
 		needData := options.NewSize == 0
@@ -2432,7 +2436,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 
 	// Update the file in cloud storage
 	cloudErr := fc.NextComponent().Chmod(options)
-	cloudErr = fc.validateStorageError(options.Name, cloudErr, "Chmod", false)
+	cloudErr = fc.resolveCloudNotFoundError(options.Name, cloudErr, "Chmod", false)
 	switch {
 	// for offline access to work, there needs to be a cached file on which to write the mode
 	case isOffline(cloudErr) && fc.offlineAccess && localErr == nil:
@@ -2447,20 +2451,23 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 		return cloudErr
 	}
 
-	// Update the mode of the file in the local cache
-	if localErr == nil {
-		fc.policy.CacheValid(localPath)
+	if localErr != nil {
+		return localErr
+	}
 
-		if info.Mode() != options.Mode {
-			err := os.Chmod(localPath, options.Mode)
-			if err != nil {
-				log.Err("FileCache::Chmod : %s local chmod failed [%v]", options.Name, err)
-				return err
-			} else if offlineOkay {
-				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
-				fc.missedChmodList.LoadOrStore(options.Name, true)
-				fc.addPendingOp(options.Name, pendingFlags{})
-			}
+	// Update the mode of the file in the local cache
+	fc.policy.CacheValid(localPath)
+	if info.Mode() != options.Mode {
+		err := os.Chmod(localPath, options.Mode)
+		if err != nil {
+			log.Err("FileCache::Chmod : %s local chmod failed [%v]", options.Name, err)
+			return err
+		}
+		// record info for later cloud sync
+		fc.missedChmodList.LoadOrStore(options.Name, true)
+		if offlineOkay {
+			log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
+			fc.addPendingOp(options.Name, pendingFlags{})
 		}
 	}
 
@@ -2482,7 +2489,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)
-	err = fc.validateStorageError(options.Name, err, "Chown", false)
+	err = fc.resolveCloudNotFoundError(options.Name, err, "Chown", false)
 	switch {
 	// for offline access to work, there needs to be a cached file on which to write the owner
 	case isOffline(err) && fc.offlineAccess && localErr == nil:
@@ -2497,21 +2504,27 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 		return err
 	}
 
-	// Update the owner and group of the file in the local cache
-	if localErr == nil {
-		fc.policy.CacheValid(localPath)
+	if localErr != nil {
+		return localErr
+	}
 
-		if runtime.GOOS != "windows" {
-			err = os.Chown(localPath, options.Owner, options.Group)
-			if err != nil {
-				log.Err("FileCache::Chown : %s owner change failed [%v]", localPath, err)
-				return err
-			} else if offlineOkay {
-				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
-				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
-				fc.addPendingOp(options.Name, pendingFlags{})
-			}
-		}
+	// Update the owner and group of the file in the local cache
+	fc.policy.CacheValid(localPath)
+
+	// locally, do nothing on Windows
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	// update local file
+	err = os.Chown(localPath, options.Owner, options.Group)
+	if err != nil {
+		log.Err("FileCache::Chown : %s owner change failed [%v]", localPath, err)
+		return err
+	} else if offlineOkay {
+		// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
+		log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
+		fc.addPendingOp(options.Name, pendingFlags{})
 	}
 
 	return nil
