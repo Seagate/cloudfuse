@@ -981,6 +981,55 @@ func (suite *fileCacheTestSuite) TestCreateFile() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestCreateFileOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-create-file"
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: path}).
+		Return(nil, &common.CloudUnreachableError{})
+
+	h, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.True(h.Dirty(), "Handle should be dirty for local-only file creation")
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+
+	op, exists := suite.fileCache.pendingOps.Load(path)
+	suite.assert.True(exists, "File should be queued in pendingOps while offline")
+	suite.assert.Equal(pendingFlags{}, op)
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileOfflineBlocked() {
+	// enable mock component and disable offline access
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  block-offline-access: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-blocked-create-file"
+	h, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.Error(err)
+	suite.assert.Nil(h)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+
+	_, exists := suite.fileCache.pendingOps.Load(path)
+	suite.assert.False(exists, "File should not be queued when offline access is blocked")
+}
+
 func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 	if runtime.GOOS == "windows" {
 		defer suite.cleanupTest()
@@ -1248,6 +1297,66 @@ func (suite *fileCacheTestSuite) TestDeleteFileError() {
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (suite *fileCacheTestSuite) TestDeleteFileOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-delete-file"
+	localPath := filepath.Join(suite.cache_path, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("cached data"), 0777)
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		DeleteFile(internal.DeleteFileOptions{Name: path}).
+		Return(&common.CloudUnreachableError{})
+	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.NoError(err)
+	suite.assert.NoFileExists(localPath)
+
+	op, exists := suite.fileCache.pendingOps.Load(path)
+	suite.assert.True(exists, "File should be queued in pendingOps for deferred deletion")
+	suite.assert.Equal(pendingFlags{isDeletion: true}, op)
+}
+
+func (suite *fileCacheTestSuite) TestDeleteFileOfflineBlocked() {
+	// enable mock component and disable offline access
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  block-offline-access: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-blocked-delete-file"
+	localPath := filepath.Join(suite.cache_path, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("cached data"), 0777)
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		DeleteFile(internal.DeleteFileOptions{Name: path}).
+		Return(&common.CloudUnreachableError{})
+	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	suite.assert.FileExists(localPath)
+
+	_, exists := suite.fileCache.pendingOps.Load(path)
+	suite.assert.False(exists, "File should not be queued when offline access is blocked")
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
