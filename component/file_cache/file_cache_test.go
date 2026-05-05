@@ -502,6 +502,98 @@ func (suite *fileCacheTestSuite) TestCreateDirOffline() {
 	suite.assert.DirExists(filepath.Join(suite.cache_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestStreamDirShowsOfflineCreatedDirectory() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dirName := "offline-created-dir"
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: dirName}).
+		Return(nil, os.ErrNotExist)
+
+	err := suite.fileCache.CreateDir(internal.CreateDirOptions{Name: dirName, Mode: 0777})
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "", Token: ""}).
+		Return([]*internal.ObjAttr{}, "", &common.CloudUnreachableError{})
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: dirName}).
+		Return(nil, os.ErrNotExist)
+
+	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: ""})
+	suite.assert.NoError(err)
+	suite.assert.Equal("", token)
+
+	foundDir := false
+	for _, attr := range attrs {
+		if attr != nil && attr.Name == dirName && attr.IsDir() {
+			foundDir = true
+			break
+		}
+	}
+	suite.assert.True(foundDir, "offline-created directory should appear in StreamDir output")
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileInsideOfflineCreatedDirectory() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dirName := "offline-parent"
+	filePath := dirName + "/nested.txt"
+
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: dirName}).
+		Return(nil, os.ErrNotExist)
+	err := suite.fileCache.CreateDir(internal.CreateDirOptions{Name: dirName, Mode: 0777})
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: filePath}).
+		Return(nil, os.ErrNotExist)
+	h, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: filePath, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.FileExists(filepath.Join(suite.cache_path, filePath))
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: dirName, Token: ""}).
+		Return([]*internal.ObjAttr{}, "", &common.CloudUnreachableError{})
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: filePath}).
+		Return(nil, os.ErrNotExist)
+
+	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: dirName})
+	suite.assert.NoError(err)
+	suite.assert.Equal("", token)
+
+	foundFile := false
+	for _, attr := range attrs {
+		if attr != nil && attr.Path == filePath {
+			foundFile = true
+			break
+		}
+	}
+	suite.assert.True(
+		foundFile,
+		"file in offline-created directory should appear in StreamDir output",
+	)
+}
+
 func (suite *fileCacheTestSuite) TestDeleteDir() {
 	defer suite.cleanupTest()
 	// Setup
@@ -524,6 +616,67 @@ func (suite *fileCacheTestSuite) TestDeleteDir() {
 	suite.assert.NoError(err)
 	// Directory should not be cached
 	suite.assert.NoDirExists(filepath.Join(suite.cache_path, dir))
+}
+
+func (suite *fileCacheTestSuite) TestDeleteDirOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "offline-delete-dir"
+	err := os.MkdirAll(filepath.Join(suite.cache_path, dir), 0777)
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		DeleteDir(internal.DeleteDirOptions{Name: dir}).
+		Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.DeleteDir(internal.DeleteDirOptions{Name: dir})
+	suite.assert.NoError(err)
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, dir))
+
+	op, exists := suite.fileCache.pendingOps.Load(dir)
+	suite.assert.True(exists, "directory delete should be queued in pendingOps")
+	if exists {
+		suite.assert.Equal(pendingFlags{isDir: true, isDeletion: true}, op)
+	}
+}
+
+func (suite *fileCacheTestSuite) TestOfflineCreateThenDeleteDirKeepsPendingKeyAsProvided() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "offline-create-delete-dir"
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: dir}).
+		Return(nil, os.ErrNotExist)
+	err := suite.fileCache.CreateDir(internal.CreateDirOptions{Name: dir, Mode: 0777})
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		DeleteDir(internal.DeleteDirOptions{Name: dir}).
+		Return(&common.CloudUnreachableError{})
+	err = suite.fileCache.DeleteDir(internal.DeleteDirOptions{Name: dir})
+	suite.assert.NoError(err)
+
+	op, found := suite.fileCache.pendingOps.Load(dir)
+	suite.assert.True(found, "directory key should be present as provided")
+	if found {
+		suite.assert.Equal(pendingFlags{isDir: true, isDeletion: true}, op)
+	}
 }
 
 func (suite *fileCacheTestSuite) TestStreamDirError() {
@@ -2361,6 +2514,28 @@ func (suite *fileCacheTestSuite) TestUpdateObjectOfflineErrorKeepsPending() {
 		stillPending,
 		"pending op should remain queued when updateObject fails offline",
 	)
+}
+
+func (suite *fileCacheTestSuite) TestUpdateObjectDeletionMissingLocalFile() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "async-delete-missing-local"
+	suite.fileCache.addPendingOp(name, pendingFlags{isDeletion: true})
+	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: name}).Return(nil)
+
+	err := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
+	suite.assert.NoError(err)
+
+	_, stillPending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.False(stillPending, "delete should be synced and removed from pendingOps")
 }
 
 func (suite *fileCacheTestSuite) TestServicePendingOpsOfflineKeepsPending() {
