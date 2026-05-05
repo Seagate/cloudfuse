@@ -1246,6 +1246,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("FileCache::DeleteFile : name=%s", options.Name)
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	offlineOkay := false
+	_, hadPendingOp := fc.pendingOps.Load(options.Name)
 
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
@@ -1267,8 +1268,10 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	// update file state
 	flock.LazyOpen = false
-	// update pending ops
-	if offlineOkay {
+	// update pending ops:
+	// - offline delete must be deferred
+	// - deleting a file that already has a deferred op must convert it to deletion
+	if offlineOkay || hadPendingOp {
 		fc.addPendingOp(options.Name, pendingFlags{isDeletion: true})
 	}
 
