@@ -2164,6 +2164,10 @@ loopbackfs:
 	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 	_, exists = suite.fileCache.pendingOps.Load(file)
+	for i := 0; i < 100 && exists; i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, exists = suite.fileCache.pendingOps.Load(file)
+	}
 	suite.assert.False(exists, "File should have been removed from pendingOps after upload")
 }
 
@@ -2717,7 +2721,11 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	// File should be uploaded immediately as we're in an upload window
-	time.Sleep(100 * time.Millisecond)
+	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file1))
+	for i := 0; i < 10 && os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.fake_storage_path, file1))
+	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file1),
 		"File should be uploaded immediately during first window")
 
@@ -2731,7 +2739,11 @@ loopbackfs:
 	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
 
-	time.Sleep(100 * time.Millisecond)
+	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file2))
+	for i := 0; i < 10 && os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.fake_storage_path, file2))
+	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file2),
 		"File should be uploaded immediately during second window")
 
@@ -2753,10 +2765,14 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	// Verify updated data was uploaded
-	time.Sleep(100 * time.Millisecond)
+	expectedData := append(data1, updatedData...)
 	cloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file1))
+	for i := 0; i < 10 && (err != nil || !bytes.Equal(cloudData, expectedData)); i++ {
+		time.Sleep(10 * time.Millisecond)
+		cloudData, err = os.ReadFile(filepath.Join(suite.fake_storage_path, file1))
+	}
 	suite.assert.NoError(err)
-	suite.assert.Equal(append(data1, updatedData...), cloudData,
+	suite.assert.Equal(expectedData, cloudData,
 		"File should be updated immediately in the second window")
 }
 
