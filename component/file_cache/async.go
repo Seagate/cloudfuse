@@ -271,16 +271,17 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
 	info, localErr := os.Stat(localPath)
+	localMissing := os.IsNotExist(localErr)
 	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
 	if !flags.isDeletion && localErr != nil {
 		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, localErr)
 		fc.pendingOps.Delete(name)
 		return localErr
 	}
-	if flags.isDeletion && !os.IsNotExist(localErr) {
+	if flags.isDeletion && !localMissing {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
 	}
-	if flags.isDir != info.IsDir() {
+	if !localMissing && flags.isDir != info.IsDir() {
 		log.Err("FileCache::updateObject : %s has wrong dir flag (%t)!", name, flags.isDir)
 	}
 
@@ -288,7 +289,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	op := "deletion"
 	objType := "directory"
 	var cloudErr error
-	if os.IsNotExist(localErr) {
+	if localMissing {
 		if flags.isDir {
 			// delete folder
 			options := internal.DeleteDirOptions{Name: name}
