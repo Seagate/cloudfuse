@@ -1428,7 +1428,11 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 
 	if flags&os.O_TRUNC != 0 {
-		fc.setHandleDirty(handle)
+		// handle is already locked by openFileInternal; avoid recursive lock in setHandleDirty.
+		if !handle.Dirty() {
+			handle.Flags.Set(handlemap.HandleFlagDirty)
+			fc.fileLocks.Get(handle.Path).IncDirty()
+		}
 	}
 
 	inf, err := f.Stat()

@@ -1666,10 +1666,13 @@ func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingAttrsWithOverwrite() 
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, localData)
 
-	// Avoid upload-on-close in this mock test; the target behavior is open/write path selection.
-	suite.fileCache.clearHandleDirty(handle)
-	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
+	// Keep this test focused on branch selection and local write behavior.
+	// Close the fd directly and avoid ReleaseFile/upload behavior in mock mode.
+	f := handle.GetFileObject()
+	if f != nil {
+		err = f.Close()
+		suite.assert.NoError(err)
+	}
 }
 
 func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
