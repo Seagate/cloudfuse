@@ -2483,7 +2483,6 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	log.Trace("FileCache::Chown : Change owner of path %s", options.Name)
 
-	var offlineOkay bool
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -2497,27 +2496,40 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	err = fc.resolveCloudNotFoundError(options.Name, err, "Chown", false)
 	switch {
 	// for offline access to work, there needs to be a cached file on which to write the owner
+	// note: we don't add to pending ops since we have no mechanism to replay chown to cloud
 	case isOffline(err) && fc.offlineAccess && localErr == nil:
-		log.Debug("FileCache::Chown : %s Offline chown allowed", options.Name)
-		offlineOkay = true
-	// validateStorageError codes case 2 as EIO
+		log.Debug("FileCache::Chown : %s operating on cache (offline)", options.Name)
+	// EIO means local-only file (pending upload) - we can't sync ownership to cloud
 	case err == syscall.EIO:
-		log.Info("FileCache::Chown : %s operating on cache (object not found)", options.Name)
+		log.Info(
+			"FileCache::Chown : %s local-only file, cannot sync ownership to cloud",
+			options.Name,
+		)
+		return err
 	// return all other cloud errors
 	case err != nil:
 		log.Err("FileCache::Chown : %s failed to change owner [%s]", options.Name, err.Error())
 		return err
 	}
 
+	// Cloud succeeded (or offline with local file)
 	if localErr != nil {
-		return localErr
+		// File not in cache - verify cloud actually has it (protects against nil-returning backends)
+		cloudStateKnown, inCloud, _ := fc.checkCloud(options.Name)
+		if cloudStateKnown && inCloud {
+			// Cloud confirms object exists, chown succeeded there, nothing local to update
+			return nil
+		}
+		// Can't confirm cloud state or object doesn't exist
+		log.Err("FileCache::Chown : %s not in cache and cloud state uncertain", options.Name)
+		return syscall.ENOENT
 	}
 
 	// Update the owner and group of the file in the local cache
 	fc.policy.CacheValid(localPath)
 
 	// locally, do nothing on Windows
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "windows" {
 		return nil
 	}
 
@@ -2526,10 +2538,6 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	if err != nil {
 		log.Err("FileCache::Chown : %s owner change failed [%v]", localPath, err)
 		return err
-	} else if offlineOkay {
-		// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
-		log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
-		fc.addPendingOp(options.Name, pendingFlags{})
 	}
 
 	return nil
