@@ -614,9 +614,9 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
-	name := internal.ExtendDirName(options.Name)
+	lockName := internal.ExtendDirName(options.Name)
 	offlineOkay := false
-	flock := fc.fileLocks.Get(name)
+	flock := fc.fileLocks.Get(lockName)
 	flock.Lock()
 	defer flock.Unlock()
 
@@ -640,7 +640,8 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	}
 	// record pending op
 	if offlineOkay {
-		fc.addPendingOp(name, pendingFlags{isDir: true, isDeletion: true})
+		fc.addPendingOp(options.Name, pendingFlags{isDir: true, isDeletion: true})
+		return nil
 	}
 
 	return err
@@ -925,8 +926,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				directoriesToPurge = append(directoriesToPurge, path)
 				// update pending cloud ops
 				fc.renamePendingOp(
-					internal.ExtendDirName(fc.getObjectName(path)),
-					internal.ExtendDirName(fc.getObjectName(newPath)),
+					fc.getObjectName(path),
+					fc.getObjectName(newPath),
 				)
 			}
 		} else {
