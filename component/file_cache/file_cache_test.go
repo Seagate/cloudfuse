@@ -536,6 +536,62 @@ func (suite *fileCacheTestSuite) TestStreamDirError() {
 	suite.assert.Empty(dir)
 }
 
+func (suite *fileCacheTestSuite) TestStreamDirOfflineCachedData() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "offline-stream"
+	attrs := []*internal.ObjAttr{
+		{Path: name + "/file1", Name: "file1"},
+	}
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: name, Token: ""}).
+		Return(attrs, "", &common.CloudUnreachableError{})
+
+	dir, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
+	suite.assert.NoError(err)
+	suite.assert.Equal("", token)
+	suite.assert.Len(dir, 1)
+	suite.assert.Equal(name+"/file1", dir[0].Path)
+}
+
+func (suite *fileCacheTestSuite) TestStreamDirOfflineNoCachedData() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "offline-stream-no-cache"
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: name, Token: ""}).
+		Return(
+			nil,
+			"",
+			common.NoCachedDataError{
+				Message:    "no cached metadata",
+				CacheError: &common.CloudUnreachableError{},
+			},
+		)
+
+	dir, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
+	suite.assert.Error(err)
+	suite.assert.Equal("", token)
+	suite.assert.Empty(dir)
+}
+
 func (suite *fileCacheTestSuite) TestStreamDirCase1() {
 	defer suite.cleanupTest()
 	// Setup
@@ -808,6 +864,108 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	for i, entry := range dstEntries {
 		suite.assert.Equal("file"+strconv.Itoa(i), entry.Name())
 	}
+}
+
+func (suite *fileCacheTestSuite) TestRenameDirOfflineFullyCached() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	src := "offline-rename-dir-src"
+	dst := "offline-rename-dir-dst"
+	file1 := src + "/file1"
+	file2 := src + "/file2"
+
+	err := os.MkdirAll(filepath.Join(suite.cache_path, src), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(suite.cache_path, file1), []byte("f1"), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(suite.cache_path, file2), []byte("f2"), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.addPendingOp(file1, pendingFlags{})
+
+	cloudAttrs := []*internal.ObjAttr{
+		{Path: file1, Name: "file1"},
+		{Path: file2, Name: "file2"},
+	}
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: src, Token: ""}).
+		Return(cloudAttrs, "", &common.CloudUnreachableError{})
+	suite.mock.EXPECT().
+		RenameDir(internal.RenameDirOptions{Src: src, Dst: dst}).
+		Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
+	suite.assert.NoError(err)
+
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, src))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, dst, "file1"))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, dst, "file2"))
+
+	opSrc, srcFound := suite.fileCache.pendingOps.Load(file1)
+	suite.assert.True(srcFound, "Src file deletion should be queued after offline directory rename")
+	if srcFound {
+		suite.assert.True(opSrc.(pendingFlags).isDeletion)
+	}
+
+	opDst, dstFound := suite.fileCache.pendingOps.Load(dst + "/file1")
+	suite.assert.True(dstFound, "Dst file creation should be queued after offline directory rename")
+	if dstFound {
+		suite.assert.False(opDst.(pendingFlags).isDeletion)
+	}
+}
+
+func (suite *fileCacheTestSuite) TestRenameDirOfflineNotFullyCached() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	src := "offline-rename-dir-incomplete-src"
+	dst := "offline-rename-dir-incomplete-dst"
+	localFile := src + "/filez"
+	file1 := src + "/file1"
+	file2 := src + "/file2"
+
+	err := os.MkdirAll(filepath.Join(suite.cache_path, src), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(suite.cache_path, localFile), []byte("cached-only-one"), 0777)
+	suite.assert.NoError(err)
+
+	cloudAttrs := []*internal.ObjAttr{
+		{Path: file1, Name: "file1"},
+		{Path: file2, Name: "file2"},
+	}
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: src, Token: ""}).
+		Return(cloudAttrs, "", &common.CloudUnreachableError{})
+	suite.mock.EXPECT().
+		RenameDir(internal.RenameDirOptions{Src: src, Dst: dst}).
+		Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+
+	suite.assert.FileExists(filepath.Join(suite.cache_path, localFile))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, dst, "file1"))
+
+	_, foundDst := suite.fileCache.pendingOps.Load(dst + "/file1")
+	suite.assert.False(
+		foundDst,
+		"No destination pending op should exist when offline directory rename is blocked",
+	)
 }
 
 // Combined test for all three cases
@@ -1408,6 +1566,110 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 
 	// File should exist in cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+}
+
+func (suite *fileCacheTestSuite) TestOpenFileOfflineCachedData() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-open-cached"
+	localPath := filepath.Join(suite.cache_path, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("cached data"), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.policy.CacheValid(localPath)
+
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: path}).
+		Return(nil, &common.CloudUnreachableError{}).
+		AnyTimes()
+
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(handle)
+	suite.assert.Equal(path, handle.Path)
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingData() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-open-missing"
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: path}).
+		Return(nil, &common.CloudUnreachableError{}).
+		AnyTimes()
+
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY, Mode: 0777},
+	)
+	suite.assert.Error(err)
+	suite.assert.NotNil(handle)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+}
+
+func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingAttrsWithOverwrite() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	path := "offline-open-overwrite-no-attrs"
+	noCachedDataErr := common.NoCachedDataError{
+		Message:    "no cached metadata",
+		CacheError: &common.CloudUnreachableError{},
+	}
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: path}).
+		Return(nil, noCachedDataErr).
+		AnyTimes()
+
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR | os.O_TRUNC, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(handle)
+
+	data := []byte("overwrite while offline")
+	n, err := suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), n)
+
+	localData, err := os.ReadFile(filepath.Join(suite.cache_path, path))
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, localData)
+
+	// Avoid upload-on-close in this mock test; the target behavior is open/write path selection.
+	suite.fileCache.clearHandleDirty(handle)
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
@@ -2041,6 +2303,107 @@ loopbackfs:
 		"File should not be in pendingOps after deletion")
 }
 
+func (suite *fileCacheTestSuite) TestAddPendingOpSignalsChannel() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "async-signal-file"
+	suite.fileCache.addPendingOp(name, pendingFlags{})
+
+	_, exists := suite.fileCache.pendingOps.Load(name)
+	suite.assert.True(exists)
+
+	select {
+	case <-suite.fileCache.pendingOpAdded:
+		// expected signal
+	case <-time.After(200 * time.Millisecond):
+		suite.Fail("pendingOpAdded should be signaled when adding pending op")
+	}
+}
+
+func (suite *fileCacheTestSuite) TestUpdateObjectOfflineErrorKeepsPending() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "async-update-offline"
+	localPath := filepath.Join(suite.cache_path, name)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("local data"), 0777)
+	suite.assert.NoError(err)
+
+	suite.fileCache.addPendingOp(name, pendingFlags{})
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.updateObject(name, pendingFlags{})
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+
+	_, stillPending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.True(
+		stillPending,
+		"pending op should remain queued when updateObject fails offline",
+	)
+}
+
+func (suite *fileCacheTestSuite) TestServicePendingOpsOfflineKeepsPending() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "async-service-offline"
+	suite.fileCache.addPendingOp(name, pendingFlags{})
+
+	// servicePendingOps should leave queued ops untouched while CloudConnected() is false.
+	time.Sleep(1200 * time.Millisecond)
+	_, stillPending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.True(stillPending)
+}
+
+func (suite *fileCacheTestSuite) TestServicePendingOpsProcessesPendingOnline() {
+	defer suite.cleanupTest()
+
+	name := "async-service-online"
+	localPath := filepath.Join(suite.cache_path, name)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("async online data"), 0777)
+	suite.assert.NoError(err)
+
+	suite.fileCache.addPendingOp(name, pendingFlags{})
+
+	for i := 0; i < 50; i++ {
+		_, pending := suite.fileCache.pendingOps.Load(name)
+		if !pending {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	_, pending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.False(pending, "pending op should be processed by async uploader when online")
+}
+
 func (suite *fileCacheTestSuite) TestCreateEmptyFileEqualTrue() {
 	defer suite.cleanupTest()
 
@@ -2433,6 +2796,65 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.NoError(openErr)
 }
 
+func (suite *fileCacheTestSuite) TestGetAttrOfflineCachedMetadata() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	file := "offline-getattr-metadata"
+	attrs := &internal.ObjAttr{Path: file, Name: "offline-getattr-metadata", Size: 11}
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(attrs, &common.CloudUnreachableError{})
+
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(attr)
+	suite.assert.Equal(file, attr.Path)
+	suite.assert.EqualValues(11, attr.Size)
+}
+
+func (suite *fileCacheTestSuite) TestGetAttrOfflineLocalFallback() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	file := "offline-getattr-local"
+	localData := []byte("local cached data")
+	localPath := filepath.Join(suite.cache_path, file)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, localData, 0777)
+	suite.assert.NoError(err)
+
+	offlineNoCacheErr := common.NoCachedDataError{
+		Message:    "no cached metadata",
+		CacheError: &common.CloudUnreachableError{},
+	}
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(nil, offlineNoCacheErr).
+		Times(2)
+
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(attr)
+	suite.assert.Equal(file, attr.Path)
+	suite.assert.EqualValues(len(localData), attr.Size)
+}
+
 // func (suite *fileCacheTestSuite) TestGetAttrError() {
 // defer suite.cleanupTest()
 // 	// Setup
@@ -2462,6 +2884,68 @@ func (suite *fileCacheTestSuite) TestRenameFileNotInCache() {
 	// Path in fake storage should be updated
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src)) // Src does not exist
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))   // Dst does exist
+}
+
+func (suite *fileCacheTestSuite) TestRenameFileOfflineCachedSrc() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	src := "offline-rename-src"
+	dst := "offline-rename-dst"
+	srcLocalPath := filepath.Join(suite.cache_path, src)
+	err := os.MkdirAll(filepath.Dir(srcLocalPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(srcLocalPath, []byte("cached data"), 0777)
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().
+		RenameFile(internal.RenameFileOptions{Src: src, Dst: dst}).
+		Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	suite.assert.NoError(err)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, src))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, dst))
+
+	opSrc, srcFound := suite.fileCache.pendingOps.Load(src)
+	suite.assert.True(srcFound, "Src deletion should be in pendingOps after offline rename")
+	suite.assert.True(opSrc.(pendingFlags).isDeletion)
+
+	opDst, dstFound := suite.fileCache.pendingOps.Load(dst)
+	suite.assert.True(dstFound, "Dst creation should be in pendingOps after offline rename")
+	suite.assert.False(opDst.(pendingFlags).isDeletion)
+}
+
+func (suite *fileCacheTestSuite) TestRenameFileOfflineMissingSrc() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	src := "offline-rename-missing-src"
+	dst := "offline-rename-missing-dst"
+	suite.mock.EXPECT().
+		RenameFile(internal.RenameFileOptions{Src: src, Dst: dst}).
+		Return(&common.CloudUnreachableError{})
+
+	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+
+	_, dstFound := suite.fileCache.pendingOps.Load(dst)
+	suite.assert.False(dstFound, "Dst should not be queued when offline rename fails")
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileInCache() {
