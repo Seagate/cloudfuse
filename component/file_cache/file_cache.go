@@ -714,25 +714,23 @@ func (fc *FileCache) StreamDir(
 	if token == "" {
 		for _, entry := range dirents {
 			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-			// This is an overhead for StreamDir for now
-			// As list is paginated we have no way to know whether this particular item exists both in local cache
-			// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
-			// If entry does not exists on storage then only return a local item here.
-			_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
-			if err != nil && isNotExist(err) {
-				// get the lock on the file, to allow any pending operation to complete
-				flock := fc.fileLocks.Get(entryPath)
-				flock.RLock()
-				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
-				info, err := os.Stat(
-					filepath.Join(localPath, entry.Name()),
-				) // Grab local cache attributes
-				flock.RUnlock()
-				if err == nil {
-					// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
-					log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
-					attrs = append(attrs, newObjAttr(entryPath, info))
-				}
+			// skip any entries that exist in cloud storage
+			cloudStateKnown, inCloud, _ := fc.checkCloud(entryPath)
+			if cloudStateKnown && inCloud {
+				continue
+			}
+			// get the lock on the file, to allow any pending operation to complete
+			flock := fc.fileLocks.Get(entryPath)
+			flock.RLock()
+			// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
+			info, err := os.Stat(
+				filepath.Join(localPath, entry.Name()),
+			) // Grab local cache attributes
+			flock.RUnlock()
+			if err == nil {
+				// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
+				log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
+				attrs = append(attrs, newObjAttr(entryPath, info))
 			}
 		}
 	}
