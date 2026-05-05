@@ -478,7 +478,9 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			}
 		} else {
 			// invalidate existing directory entry (this is redundant but readable)
-			dirAttrCacheItem.invalidate()
+			if found {
+				dirAttrCacheItem.invalidate()
+			}
 			// add (or replace) the directory entry
 			newDirAttr := internal.CreateObjAttrDir(options.Name)
 			dirAttrCacheItem = ac.cache.insert(insertOptions{
