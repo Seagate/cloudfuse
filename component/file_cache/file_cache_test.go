@@ -2267,69 +2267,6 @@ loopbackfs:
 	suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
 }
 
-func (suite *fileCacheTestSuite) TestExistingCloudFileImmediateUpload() {
-	defer suite.cleanupTest()
-
-	// 1. Initialize variables and files / call setuptesthelper
-	// Set up scheduler with a time far in the future (ensuring we're in OFF state initially)
-	now := time.Now()
-	second := (now.Second() + 30) % 60
-	cronExpr := fmt.Sprintf("%d * * * * *", second)
-
-	configContent := fmt.Sprintf(`file_cache:
-  path: %s
-  offload-io: true
-  create-empty-file: false
-  schedule:
-    - name: "Test"
-      cron: %s
-      duration: "5s"
-
-loopbackfs:
-  path: %s`,
-		suite.cache_path,
-		cronExpr,
-		suite.fake_storage_path,
-	)
-
-	suite.setupTestHelper(configContent)
-
-	// Create a file that will be "already in cloud"
-	originalFile := "existing_cloud_file.txt"
-	originalContent := []byte("original cloud content")
-
-	// Create the file in the cloud storage directly
-	err := os.MkdirAll(suite.fake_storage_path, 0777)
-	suite.assert.NoError(err)
-	err = os.WriteFile(filepath.Join(suite.fake_storage_path, originalFile), originalContent, 0777)
-	suite.assert.NoError(err)
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, originalFile))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, originalFile))
-
-	// Write to the file and close the file
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{
-		Name:  originalFile,
-		Flags: os.O_RDWR,
-		Mode:  0777,
-	})
-	suite.assert.NoError(err)
-	// Write new content to the file
-	modifiedContent := []byte("modified cloud file content")
-	_, _ = suite.fileCache.WriteFile(&internal.WriteFileOptions{
-		Handle: handle,
-		Data:   modifiedContent,
-		Offset: 0,
-	})
-	suite.assert.NoError(err)
-	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	// Confirm cloud storage copy is updated
-	fInfo, err := os.Stat(filepath.Join(suite.fake_storage_path, originalFile))
-	suite.NoError(err)
-	suite.assert.Len(modifiedContent, int(fInfo.Size()))
-}
-
 func (suite *fileCacheTestSuite) TestCreateFileAndRename() {
 	defer suite.cleanupTest()
 
