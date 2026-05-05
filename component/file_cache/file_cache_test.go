@@ -2529,6 +2529,7 @@ func (suite *fileCacheTestSuite) TestUpdateObjectDeletionMissingLocalFile() {
 
 	name := "async-delete-missing-local"
 	suite.fileCache.addPendingOp(name, pendingFlags{isDeletion: true})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: name}).Return(nil, nil)
 	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: name}).Return(nil)
 
 	err := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})

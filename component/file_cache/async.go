@@ -290,6 +290,11 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	objType := "directory"
 	var cloudErr error
 	if localMissing {
+		if flags.isDeletion && fc.notInCloud(name) {
+			log.Info("FileCache::updateObject : %s skipping cloud deletion (not in cloud)", name)
+			fc.pendingOps.Delete(name)
+			return nil
+		}
 		if flags.isDir {
 			// delete folder
 			options := internal.DeleteDirOptions{Name: name}
