@@ -2334,7 +2334,7 @@ loopbackfs:
 	suite.assert.False(opDst.(pendingFlags).isDeletion, "Dst pending op should be creation")
 }
 
-func (suite *fileCacheTestSuite) TestDeleteFileAndPendingOps() {
+func (suite *fileCacheTestSuite) TestDeleteScheduledFile() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
@@ -2390,10 +2390,14 @@ loopbackfs:
 	suite.assert.NoFileExists(filepath.Join(suite.cache_path, testFile),
 		"File should not exist in local cache after deletion")
 
-	// Check if the file has been deleted in pendingOps
-	_, existsInScheduleAfterDelete := suite.fileCache.pendingOps.Load(testFile)
-	suite.assert.False(existsInScheduleAfterDelete,
-		"File should not be in pendingOps after deletion")
+	// Check pendingOps tracks deletion for deferred cloud sync.
+	op, existsInScheduleAfterDelete := suite.fileCache.pendingOps.Load(testFile)
+	suite.assert.True(existsInScheduleAfterDelete,
+		"File should remain in pendingOps after deletion")
+	if existsInScheduleAfterDelete {
+		suite.assert.True(op.(pendingFlags).isDeletion,
+			"Pending op should be marked as deletion after deletion")
+	}
 }
 
 func (suite *fileCacheTestSuite) TestAddPendingOpSignalsChannel() {
