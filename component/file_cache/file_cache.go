@@ -2447,7 +2447,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 	case isOffline(cloudErr) && fc.offlineAccess && localErr == nil:
 		log.Debug("FileCache::Chmod : %s operating on cache (offline)", options.Name)
 		offlineOkay = true
-	// validateStorageError codes case 2 as EIO
+	// EIO means local-only file (pending upload)
 	case cloudErr == syscall.EIO:
 		log.Info("FileCache::Chmod : %s operating on cache (object not found)", options.Name)
 	// return all other cloud errors
@@ -2456,7 +2456,16 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 		return cloudErr
 	}
 
+	// Cloud succeeded (or offline with local file)
 	if localErr != nil {
+		// File not in cache - verify cloud actually has it (protects against nil-returning backends)
+		cloudStateKnown, inCloud, _ := fc.checkCloud(options.Name)
+		if cloudStateKnown && inCloud {
+			// Cloud confirms object exists, chmod succeeded there, nothing local to update
+			return nil
+		}
+		// Can't confirm cloud state or object doesn't exist
+		log.Err("FileCache::Chmod : %s not in cache and cloud state uncertain", options.Name)
 		return localErr
 	}
 
@@ -2522,7 +2531,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 		}
 		// Can't confirm cloud state or object doesn't exist
 		log.Err("FileCache::Chown : %s not in cache and cloud state uncertain", options.Name)
-		return syscall.ENOENT
+		return localErr
 	}
 
 	// Update the owner and group of the file in the local cache
