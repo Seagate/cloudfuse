@@ -11,9 +11,9 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.15
-	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.17
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.1
-	github.com/aws/smithy-go v1.25.0
+	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.18
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
+	github.com/aws/smithy-go v1.25.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/go-viper/mapstructure/v2 v2.5.0
