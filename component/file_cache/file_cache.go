@@ -2264,9 +2264,11 @@ func (fc *FileCache) renameOpenHandles(
 		// update any open handles to the file with its new name
 		handlemap.GetHandles().Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
+			handle.Lock()
 			if handle.Path == srcName {
 				handle.Path = dstName
 			}
+			handle.Unlock()
 			return true
 		})
 		// copy the number of open handles to the new name
