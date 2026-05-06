@@ -48,7 +48,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-	"github.com/netresearch/go-cron"
+	cron "github.com/netresearch/go-cron"
 )
 
 // Common structure for Component
@@ -83,9 +83,9 @@ type FileCache struct {
 
 	componentStopping     chan struct{}
 	schedule              WeeklySchedule
-	cronScheduler         *cron.Cron
 	activeWindows         atomic.Int32
 	startScheduledUploads chan struct{}
+	cronScheduler         *cron.Cron
 }
 
 // Structure defining your config parameters
@@ -203,6 +203,13 @@ func (fc *FileCache) Stop() error {
 
 	// stop async uploads
 	close(fc.componentStopping)
+
+	// Stop the cron scheduler and wait for running jobs to complete
+	if fc.cronScheduler != nil {
+		log.Info("FileCache::Stop : Stopping cron scheduler")
+		<-fc.cronScheduler.Stop().Done()
+		log.Info("FileCache::Stop : Cron scheduler stopped")
+	}
 
 	// Wait for all async upload to complete if any
 	if fc.lazyWrite {

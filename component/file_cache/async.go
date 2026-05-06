@@ -65,6 +65,10 @@ func (fc *FileCache) configureScheduler() error {
 	}
 	// initialize the scheduler
 	fc.cronScheduler = cron.New(cron.WithSeconds())
+	// create parser for cron expressions
+	parser := cron.MustNewParser(
+		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
+	)
 	// Convert raw schedule to WeeklySchedule
 	fc.schedule = make(WeeklySchedule, 0, len(rawSchedule))
 	for _, rawWindow := range rawSchedule {
@@ -87,8 +91,28 @@ func (fc *FileCache) configureScheduler() error {
 				return err
 			}
 		}
-		// load schedules into cron
+		// Determine if we're joining a window that's already active by
+		// finding the most recent scheduled start via Prev().
+		now := time.Now()
 		var initialWindowEndTime time.Time
+		var jobOpts []cron.JobOption
+		schedule, _ := parser.Parse(window.cronExpr)
+		if sp, ok := schedule.(cron.ScheduleWithPrev); ok {
+			prevStart := sp.Prev(now)
+			if !prevStart.IsZero() && prevStart.Add(window.duration).After(now) {
+				// We're inside an active window that started at prevStart.
+				initialWindowEndTime = prevStart.Add(window.duration)
+				// Run immediately to join the in-progress window with shortened duration.
+				jobOpts = append(jobOpts, cron.WithRunImmediately())
+				log.Info(
+					"FileCache::scheduleUploads : [%s] joining active window (started %s, ends %s)",
+					window.name,
+					prevStart.Format(time.Kitchen),
+					initialWindowEndTime.Format(time.Kitchen),
+				)
+			}
+		}
+		// add cron callback
 		entryId, err := fc.cronScheduler.AddFunc(window.cronExpr, func() {
 			// Is this a transition from inactive?
 			windowCount := fc.activeWindows.Add(1)
@@ -148,12 +172,6 @@ func (fc *FileCache) configureScheduler() error {
 				err,
 			)
 			return err
-		}
-		// calculate end time for windows that will start open
-		now := time.Now()
-		entry := fc.cronScheduler.Entry(entryId)
-		for t := entry.Schedule.Next(now.Add(-window.duration)); now.After(t); t = entry.Schedule.Next(t) {
-			initialWindowEndTime = t.Add(window.duration)
 		}
 		// save window to fc.schedule
 		window.cronEntryID = int(entryId)
