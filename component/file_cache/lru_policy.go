@@ -82,10 +82,11 @@ type lruPolicy struct {
 // LRUPolicySnapshot represents the *persisted state* of lruPolicy.
 // It contains only the fields that need to be saved, and they are exported.
 type LRUPolicySnapshot struct {
-	NodeList           []string // Just node names, *without their fc.tmp prefix*, in linked list order
-	SyncPendingFlags   []bool   // whether each file in NodeList belongs in the pendingOps map
-	CurrMarkerPosition uint64   // Node index of currMarker
-	LastMarkerPosition uint64   // Node index of lastMarker
+	NodeList           []string                // Just node names, *without their fc.tmp prefix*, in linked list order
+	SyncPendingFlags   []bool                  // whether each file in NodeList belongs in the pendingOps map (kept for backward compat)
+	CurrMarkerPosition uint64                  // Node index of currMarker
+	LastMarkerPosition uint64                  // Node index of lastMarker
+	PendingOps         map[string]pendingFlags // Complete pendingOps map with full flags (stored as interface{} for flexibility)
 }
 
 const (
@@ -123,6 +124,8 @@ func (p *lruPolicy) StartPolicy() error {
 	p.lastMarker.next = nil
 	p.head = p.currMarker
 	gob.Register(LRUPolicySnapshot{})
+	// Register types that can be stored in pendingOps map for serialization
+	gob.Register(pendingFlags{})
 	snapshot, err := readSnapshotFromFile(p.tmpPath)
 	if err == nil && snapshot != nil {
 		p.loadSnapshot(snapshot)
@@ -191,6 +194,14 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 		}
 		index++
 	}
+
+	// Capture complete pendingOps map for reliable restoration
+	snapshot.PendingOps = make(map[string]pendingFlags)
+	p.pendingOps.Range(func(key, value interface{}) bool {
+		snapshot.PendingOps[key.(string)] = value.(pendingFlags)
+		return true
+	})
+
 	return &snapshot
 }
 
@@ -198,23 +209,32 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	if snapshot == nil {
 		return
 	}
-	// maintain backward compatibility
-	loadPendingOps := len(snapshot.NodeList) == len(snapshot.SyncPendingFlags)
 	p.Lock()
 	defer p.Unlock()
+	// Restore pendingOps from new field if available, otherwise fall back to old method
+	loadPendingOps := false
+	if len(snapshot.PendingOps) > 0 {
+		for key, value := range snapshot.PendingOps {
+			p.pendingOps.Store(key, value)
+		}
+	} else {
+		// Backward compatibility: use SyncPendingFlags if PendingOps is not available
+		loadPendingOps = len(snapshot.NodeList) == len(snapshot.SyncPendingFlags)
+	}
+
 	// walk the slice and write the entries into the policy
 	// remember that the markers are actual nodes, with indices preceding the item at the same NodeList index
 	nodeIndex := 0
 	nextNode := p.head
 	tail := p.lastMarker
 	for i, v := range snapshot.NodeList {
+		fullPath := filepath.Join(p.tmpPath, v)
 		// populate pendingOps
 		if loadPendingOps && snapshot.SyncPendingFlags[i] {
 			objName := v[1:]
-			p.pendingOps.Store(objName, struct{}{})
+			p.pendingOps.Store(objName, pendingFlags{})
 		}
 		// recreate the node
-		fullPath := filepath.Join(p.tmpPath, v)
 		newNode := &lruNode{
 			name:    fullPath,
 			next:    nil,
