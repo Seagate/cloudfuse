@@ -117,7 +117,9 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 				jobOpts = append(jobOpts, cron.WithRunImmediately())
 				log.Info(
 					"FileCache::scheduleUploads : [%s] joining active window (started %s, ends %s)",
-					windowName, prevStart.Format(time.Kitchen), initialWindowEndTime.Format(time.Kitchen),
+					windowName,
+					prevStart.Format(time.Kitchen),
+					initialWindowEndTime.Format(time.Kitchen),
 				)
 			}
 		}
