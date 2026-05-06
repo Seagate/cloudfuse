@@ -1539,9 +1539,10 @@ func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	defer suite.cleanupTest()
 
-	testStartTime := time.Now()
-	second := (testStartTime.Second() + 2) % 60
-	cronExpr := fmt.Sprintf("%d * * * * *", second)
+	// Schedule 3 seconds in the future to allow setup and file creation time
+	now := time.Now()
+	startSecond := (now.Second() + 3) % 60
+	cronExpr := fmt.Sprintf("%d * * * * *", startSecond)
 
 	configContent := fmt.Sprintf(`file_cache:
   path: %s
@@ -1579,11 +1580,16 @@ loopbackfs:
 	_, exists := suite.fileCache.scheduleOps.Load(file)
 	suite.assert.True(exists, "File should be in scheduleOps after creation")
 
-	// wait for uploads to start
-	time.Sleep(time.Until(testStartTime.Add(2 * time.Second).Truncate(time.Second)))
+	// Wait until the cron window starts, then poll for the upload
+	windowStart := now.Truncate(time.Minute).Add(time.Duration(startSecond) * time.Second)
+	if windowStart.Before(now) {
+		windowStart = windowStart.Add(time.Minute)
+	}
+	time.Sleep(time.Until(windowStart) + 100*time.Millisecond)
+
 	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
-	for i := 0; i < 200 && os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < 300 && os.IsNotExist(err); i++ {
+		time.Sleep(20 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
 	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
