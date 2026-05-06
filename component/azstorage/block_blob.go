@@ -721,8 +721,7 @@ func (bb *BlockBlob) List(
 
 func (bb *BlockBlob) getListPath(prefix string) string {
 	listPath := bb.getFormattedPath(prefix)
-	if (prefix != "" && prefix[len(prefix)-1] == '/') ||
-		(prefix == "" && bb.Config.prefixPath != "") {
+	if strings.HasSuffix(prefix, "/") || (prefix == "" && bb.Config.prefixPath != "") {
 		listPath += "/"
 	}
 	return listPath

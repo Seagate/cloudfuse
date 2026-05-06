@@ -429,16 +429,14 @@ func (cl *Client) List(
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := cl.getKey(prefix, false, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
-	if (prefix != "" && prefix[len(prefix)-1] == '/') ||
-		(prefix == "" && cl.Config.prefixPath != "") {
+	if strings.HasSuffix(prefix, "/") || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
 
 	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
 	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
 	// For example, it would find "filet-of-fish/" when searching for "file".
-	// Check for an empty path to prevent indexing to [-1]
-	findCommonPrefixes := listPath == "" || listPath[len(listPath)-1] == '/'
+	findCommonPrefixes := strings.HasSuffix(listPath, "/")
 
 	var nextMarker *string
 	var token *string
