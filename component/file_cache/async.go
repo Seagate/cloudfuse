@@ -164,7 +164,7 @@ func (fc *FileCache) configureScheduler() error {
 					return
 				}
 			}
-		})
+		}, jobOpts...)
 		if err != nil {
 			log.Err(
 				"FileCache::Configure : Schedule %s invalid cron expression (%v)",
