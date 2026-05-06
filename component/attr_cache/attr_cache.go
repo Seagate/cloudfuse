@@ -241,15 +241,6 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 	return nil
 }
 
-// does the cache show this path as existing?
-func (ac *AttrCache) getItemIfExists(path string) *attrCacheItem {
-	item, found := ac.cache.get(path)
-	if found && item.exists() {
-		return item
-	}
-	return nil
-}
-
 // returns the parent directory (without a trailing slash)
 func getParentDir(childPath string) string {
 	parentDir := path.Dir(internal.TruncateDirName(childPath))
@@ -775,9 +766,9 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	// Is the directory in our cache?
 	ac.cacheLock.RLock()
 	defer ac.cacheLock.RUnlock()
-	item := ac.getItemIfExists(options.Name)
+	item, found := ac.cache.get(options.Name)
 	// If the directory does not exist in the attribute cache then let the next component answer
-	if item == nil {
+	if !found || !item.exists() {
 		log.Debug(
 			"AttrCache::IsDirEmpty : %s not found in attr_cache. Checking with container",
 			options.Name,
@@ -828,7 +819,7 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 		if ac.cacheDirs {
 			// if attr_cache is tracking directories, validate this rename
 			// First, check if the destination directory already exists
-			if ac.getItemIfExists(options.Dst) != nil {
+			if item, found := ac.cache.get(options.Dst); found && item.exists() {
 				return os.ErrExist
 			}
 		} else {
@@ -1191,15 +1182,40 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	ac.cacheLock.RLock()
 	value, found := ac.cache.get(options.Name)
-	ac.cacheLock.RUnlock()
 	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-		// Try to serve the request from the attribute cache
-		// Is the entry marked deleted?
+		ac.cacheLock.RUnlock()
+		// Serve the request from the attribute cache
 		if !value.exists() {
 			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
 			return nil, syscall.ENOENT
 		} else {
 			return value.attr, nil
+		}
+	}
+	if ac.cacheDirs {
+		// drill up for the nearest valid parent directory attribute cache
+		foundCachedParent := false
+		for parent := getParentDir(options.Name); ; parent = getParentDir(parent) {
+			value, found = ac.cache.get(parent)
+			// skip invalid data
+			if !found || !value.valid() {
+				if parent == "" {
+					// no valid parent found
+					break
+				}
+				continue
+			}
+			// don't trust expired entries
+			if time.Since(value.cachedAt).Seconds() > float64(ac.cacheTimeout) {
+				break
+			}
+			// found the nearest cached parent
+			// if it does not exist, or has a complete listing, then our target does not exist
+			foundCachedParent = !value.exists() || value.listingComplete
+		}
+		ac.cacheLock.RUnlock()
+		if foundCachedParent {
+			return nil, syscall.ENOENT
 		}
 	}
 
