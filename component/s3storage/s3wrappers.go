@@ -208,47 +208,6 @@ func (cl *Client) deleteObject(name string, isSymLink bool, isDir bool) error {
 	return parseS3Err(err, attemptedAction)
 }
 
-// Wrapper for awsS3Client.DeleteObjects.
-// names is a list of paths to the objects.
-func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
-	if objects == nil {
-		return nil
-	}
-	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
-	// build list to send to DeleteObjects
-	keyList := make([]types.ObjectIdentifier, len(objects))
-	for i, object := range objects {
-		key := cl.getKey(object.Path, object.IsSymlink(), object.IsDir())
-		keyList[i] = types.ObjectIdentifier{
-			Key: &key,
-		}
-	}
-	// send keyList for deletion
-	result, err := cl.AwsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
-		Bucket: &cl.Config.AuthConfig.BucketName,
-		Delete: &types.Delete{
-			Objects: keyList,
-			Quiet:   aws.Bool(true),
-		},
-	})
-	if err != nil {
-		log.Err(
-			"Client::DeleteDirectory : Failed to delete %d files. Here's why: %v",
-			len(objects),
-			err,
-		)
-		for i := 0; i < len(result.Errors); i++ {
-			log.Err(
-				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
-				*result.Errors[i].Key,
-				*result.Errors[i].Message,
-			)
-		}
-	}
-
-	return err
-}
-
 // Wrapper for awsS3Client.HeadObject.
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
