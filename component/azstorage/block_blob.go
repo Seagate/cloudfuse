@@ -271,13 +271,13 @@ func (bb *BlockBlob) IsAccountADLS() bool {
 	return false
 }
 
-func (bb *BlockBlob) ListContainers() ([]string, error) {
+func (bb *BlockBlob) ListContainers(ctx context.Context) ([]string, error) {
 	log.Trace("BlockBlob::ListContainers : Listing containers")
 	cntList := make([]string, 0)
 
 	pager := bb.Service.NewListContainersPager(nil)
 	for pager.More() {
-		resp, err := pager.NextPage(context.Background())
+		resp, err := pager.NextPage(ctx)
 		if err != nil {
 			log.Err("BlockBlob::ListContainers : Failed to get container list [%s]", err.Error())
 			return cntList, err
@@ -290,6 +290,13 @@ func (bb *BlockBlob) ListContainers() ([]string, error) {
 	return cntList, nil
 }
 
+// check the connection to the service by calling GetProperties on the container
+func (bb *BlockBlob) ConnectionOkay(ctx context.Context) error {
+	log.Trace("BlockBlob::ConnectionOkay : checking connection to cloud service")
+	_, err := bb.Container.GetProperties(ctx, nil)
+	return err
+}
+
 func (bb *BlockBlob) SetPrefixPath(path string) error {
 	log.Trace("BlockBlob::SetPrefixPath : path %s", path)
 	bb.Config.prefixPath = path
@@ -297,38 +304,38 @@ func (bb *BlockBlob) SetPrefixPath(path string) error {
 }
 
 // CreateFile : Create a new file in the container/virtual directory
-func (bb *BlockBlob) CreateFile(name string, mode os.FileMode) error {
+func (bb *BlockBlob) CreateFile(ctx context.Context, name string, mode os.FileMode) error {
 	log.Trace("BlockBlob::CreateFile : name %s", name)
 	var data []byte
-	return bb.WriteFromBuffer(name, nil, data)
+	return bb.WriteFromBuffer(ctx, name, nil, data)
 }
 
 // CreateDirectory : Create a new directory in the container/virtual directory
-func (bb *BlockBlob) CreateDirectory(name string) error {
+func (bb *BlockBlob) CreateDirectory(ctx context.Context, name string) error {
 	log.Trace("BlockBlob::CreateDirectory : name %s", name)
 
 	var data []byte
 	metadata := make(map[string]*string)
 	metadata[folderKey] = new("true")
 
-	return bb.WriteFromBuffer(name, metadata, data)
+	return bb.WriteFromBuffer(ctx, name, metadata, data)
 }
 
 // CreateLink : Create a symlink in the container/virtual directory
-func (bb *BlockBlob) CreateLink(source string, target string) error {
+func (bb *BlockBlob) CreateLink(ctx context.Context, source string, target string) error {
 	log.Trace("BlockBlob::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 	metadata := make(map[string]*string)
 	metadata[symlinkKey] = new("true")
-	return bb.WriteFromBuffer(source, metadata, data)
+	return bb.WriteFromBuffer(ctx, source, metadata, data)
 }
 
 // DeleteFile : Delete a blob in the container/virtual directory
-func (bb *BlockBlob) DeleteFile(name string) (err error) {
+func (bb *BlockBlob) DeleteFile(ctx context.Context, name string) (err error) {
 	log.Trace("BlockBlob::DeleteFile : name %s", name)
 
 	blobClient := bb.getBlobClient(name)
-	_, err = blobClient.Delete(context.Background(), &blob.DeleteOptions{
+	_, err = blobClient.Delete(ctx, &blob.DeleteOptions{
 		DeleteSnapshots: to.Ptr(blob.DeleteSnapshotsOptionTypeInclude),
 	})
 	if err != nil {
@@ -350,9 +357,9 @@ func (bb *BlockBlob) DeleteFile(name string) (err error) {
 }
 
 // DeleteDirectory : Delete a virtual directory in the container/virtual directory
-func (bb *BlockBlob) DeleteDirectory(name string) (err error) {
+func (bb *BlockBlob) DeleteDirectory(ctx context.Context, name string) (err error) {
 	log.Trace("BlockBlob::DeleteDirectory : name %s", name)
-	err = bb.DeleteFile(name)
+	err = bb.DeleteFile(ctx, name)
 	// libfuse deletes the files in the directory before this method is called.
 	// If the marker blob for directory is not present, ignore the ENOENT error.
 	if err == syscall.ENOENT {
@@ -368,7 +375,12 @@ func (bb *BlockBlob) DeleteDirectory(name string) (err error) {
 // Etag of the destination blob changes.
 // Copy the LMT to the src attr if the copy is success.
 // https://learn.microsoft.com/en-us/rest/api/storageservices/copy-blob?tabs=microsoft-entra-id
-func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.ObjAttr) error {
+func (bb *BlockBlob) RenameFile(
+	ctx context.Context,
+	source string,
+	target string,
+	srcAttr *internal.ObjAttr,
+) error {
 	log.Trace("BlockBlob::RenameFile : %s -> %s", source, target)
 
 	blobClient := bb.getBlobClient(source)
@@ -377,7 +389,7 @@ func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.
 	// not specifying source blob metadata, since passing empty metadata headers copies
 	// the source blob metadata to destination blob
 	copyResponse, err := newBlobClient.StartCopyFromURL(
-		context.Background(),
+		ctx,
 		blobClient.URL(),
 		&blob.StartCopyFromURLOptions{
 			Tier: bb.Config.defaultTier,
@@ -405,7 +417,7 @@ func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.
 	for copyStatus != nil && *copyStatus == blob.CopyStatusTypePending {
 		time.Sleep(time.Second * 1)
 		pollCnt++
-		prop, err = newBlobClient.GetProperties(context.Background(), &blob.GetPropertiesOptions{
+		prop, err = newBlobClient.GetProperties(ctx, &blob.GetPropertiesOptions{
 			CPKInfo: bb.blobCPKOpt,
 		})
 		if err != nil {
@@ -430,7 +442,7 @@ func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.
 	log.Trace("BlockBlob::RenameFile : %s -> %s done", source, target)
 
 	// Copy of the file is done so now delete the older file
-	err = bb.DeleteFile(source)
+	err = bb.DeleteFile(ctx, source)
 	for retry := 0; retry < 3 && err == syscall.ENOENT; retry++ {
 		// Sometimes backend is able to copy source file to destination but when we try to delete the
 		// source files it returns back with ENOENT. If file was just created on backend it might happen
@@ -442,7 +454,7 @@ func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.
 			retry,
 		)
 		time.Sleep(1 * time.Second)
-		err = bb.DeleteFile(source)
+		err = bb.DeleteFile(ctx, source)
 	}
 
 	if err == syscall.ENOENT {
@@ -455,7 +467,7 @@ func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.
 }
 
 // RenameDirectory : Rename the directory
-func (bb *BlockBlob) RenameDirectory(source string, target string) error {
+func (bb *BlockBlob) RenameDirectory(ctx context.Context, source string, target string) error {
 	log.Trace("BlockBlob::RenameDirectory : %s -> %s", source, target)
 
 	srcDirPresent := false
@@ -463,7 +475,7 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 		Prefix: new(bb.getFormattedPath(source) + "/"),
 	})
 	for pager.More() {
-		listBlobResp, err := pager.NextPage(context.Background())
+		listBlobResp, err := pager.NextPage(ctx)
 		if err != nil {
 			log.Err("BlockBlob::RenameDirectory : Failed to get list of blobs %s", err.Error())
 			return err
@@ -473,7 +485,7 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 		for _, blobInfo := range listBlobResp.Segment.BlobItems {
 			srcDirPresent = true
 			srcPath := removePrefixPath(bb.Config.prefixPath, *blobInfo.Name)
-			err = bb.RenameFile(srcPath, strings.Replace(srcPath, source, target, 1), nil)
+			err = bb.RenameFile(ctx, srcPath, strings.Replace(srcPath, source, target, 1), nil)
 			if err != nil {
 				log.Err(
 					"BlockBlob::RenameDirectory : Failed to rename file %s [%s]",
@@ -486,7 +498,7 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 
 	// To rename source marker blob check its properties before calling rename on it.
 	blobClient := bb.Container.NewBlockBlobClient(filepath.Join(bb.Config.prefixPath, source))
-	_, err := blobClient.GetProperties(context.Background(), &blob.GetPropertiesOptions{
+	_, err := blobClient.GetProperties(ctx, &blob.GetPropertiesOptions{
 		CPKInfo: bb.blobCPKOpt,
 	})
 	if err != nil {
@@ -510,14 +522,17 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 		}
 	}
 
-	return bb.RenameFile(source, target, nil)
+	return bb.RenameFile(ctx, source, target, nil)
 }
 
-func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
+func (bb *BlockBlob) getAttrUsingRest(
+	ctx context.Context,
+	name string,
+) (attr *internal.ObjAttr, err error) {
 	log.Trace("BlockBlob::getAttrUsingRest : name %s", name)
 
 	blobClient := bb.getBlockBlobClient(name)
-	prop, err := blobClient.GetProperties(context.Background(), &blob.GetPropertiesOptions{
+	prop, err := blobClient.GetProperties(ctx, &blob.GetPropertiesOptions{
 		CPKInfo: bb.blobCPKOpt,
 	})
 
@@ -566,7 +581,10 @@ func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err 
 	return attr, nil
 }
 
-func (bb *BlockBlob) getAttrUsingList(name string) (attr *internal.ObjAttr, err error) {
+func (bb *BlockBlob) getAttrUsingList(
+	ctx context.Context,
+	name string,
+) (attr *internal.ObjAttr, err error) {
 	log.Trace("BlockBlob::getAttrUsingList : name %s", name)
 
 	iteration := 0
@@ -575,7 +593,7 @@ func (bb *BlockBlob) getAttrUsingList(name string) (attr *internal.ObjAttr, err 
 	blobsRead := 0
 
 	for marker != nil || iteration == 0 {
-		blobs, new_marker, err = bb.List(name, marker, bb.Config.maxResultsForList)
+		blobs, new_marker, err = bb.List(ctx, name, marker, bb.Config.maxResultsForList)
 		if err != nil {
 			e := storeBlobErrToErr(err)
 			switch e {
@@ -632,14 +650,14 @@ func (bb *BlockBlob) getAttrUsingList(name string) (attr *internal.ObjAttr, err 
 }
 
 // GetAttr : Retrieve attributes of the blob
-func (bb *BlockBlob) GetAttr(name string) (attr *internal.ObjAttr, err error) {
+func (bb *BlockBlob) GetAttr(ctx context.Context, name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("BlockBlob::GetAttr : name %s", name)
 
 	// To support virtual directories with no marker blob, we call list instead of get properties since list will not return a 404
 	if bb.Config.virtualDirectory {
-		attr, err = bb.getAttrUsingList(name)
+		attr, err = bb.getAttrUsingList(ctx, name)
 	} else {
-		attr, err = bb.getAttrUsingRest(name)
+		attr, err = bb.getAttrUsingRest(ctx, name)
 	}
 
 	if bb.Config.filter != nil && attr != nil {
@@ -660,6 +678,7 @@ func (bb *BlockBlob) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
 func (bb *BlockBlob) List(
+	ctx context.Context,
 	prefix string,
 	marker *string,
 	count int32,
@@ -686,7 +705,7 @@ func (bb *BlockBlob) List(
 		Include:    bb.listDetails,
 	})
 
-	listBlob, err := pager.NextPage(context.Background())
+	listBlob, err := pager.NextPage(ctx)
 
 	// Note: Since we make a list call with a prefix, we will not fail here for a non-existent directory.
 	// The blob service will not validate for us whether or not the path exists.
@@ -701,7 +720,7 @@ func (bb *BlockBlob) List(
 	// Process the blobs returned in this result segment (if the segment is empty, the loop body won't execute)
 	// Since block blob does not support acls, we set mode to 0 and FlagModeDefault to true so the fuse layer can return the default permission.
 
-	blobList, dirList, err := bb.processBlobItems(listBlob.Segment.BlobItems)
+	blobList, dirList, err := bb.processBlobItems(ctx, listBlob.Segment.BlobItems)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -711,7 +730,7 @@ func (bb *BlockBlob) List(
 	// dirList contains all dirs for which we got 0 byte meta file in this iteration, so exclude those and add rest to the list
 	// Note: Since listing is paginated, sometimes the marker file may come in a different iteration from the BlobPrefix. For such
 	// cases we manually call GetAttr to check the existence of the marker file.
-	err = bb.processBlobPrefixes(listBlob.Segment.BlobPrefixes, dirList, &blobList)
+	err = bb.processBlobPrefixes(ctx, listBlob.Segment.BlobPrefixes, dirList, &blobList)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -729,6 +748,7 @@ func (bb *BlockBlob) getListPath(prefix string) string {
 }
 
 func (bb *BlockBlob) processBlobItems(
+	ctx context.Context,
 	blobItems []*container.BlobItem,
 ) ([]*internal.ObjAttr, map[string]bool, error) {
 	blobList := make([]*internal.ObjAttr, 0)
@@ -738,7 +758,7 @@ func (bb *BlockBlob) processBlobItems(
 
 	for _, blobInfo := range blobItems {
 		blobInfo.Name = bb.getFileName(*blobInfo.Name)
-		blobAttr, err := bb.getBlobAttr(blobInfo)
+		blobAttr, err := bb.getBlobAttr(ctx, blobInfo)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -767,13 +787,16 @@ func (bb *BlockBlob) processBlobItems(
 	return blobList, dirList, nil
 }
 
-func (bb *BlockBlob) getBlobAttr(blobInfo *container.BlobItem) (*internal.ObjAttr, error) {
+func (bb *BlockBlob) getBlobAttr(
+	ctx context.Context,
+	blobInfo *container.BlobItem,
+) (*internal.ObjAttr, error) {
 	if blobInfo.Properties.CustomerProvidedKeySHA256 != nil &&
 		*blobInfo.Properties.CustomerProvidedKeySHA256 != "" {
 		log.Trace(
 			"BlockBlob::List : blob is encrypted with customer provided key so fetching metadata explicitly using REST",
 		)
-		return bb.getAttrUsingRest(*blobInfo.Name)
+		return bb.getAttrUsingRest(ctx, *blobInfo.Name)
 	}
 	mode, err := bb.getFileMode(blobInfo.Properties.Permissions)
 	if err != nil {
@@ -829,6 +852,7 @@ func (bb *BlockBlob) dereferenceTime(input *time.Time, defaultTime time.Time) ti
 }
 
 func (bb *BlockBlob) processBlobPrefixes(
+	ctx context.Context,
 	blobPrefixes []*container.BlobPrefix,
 	dirList map[string]bool,
 	blobList *[]*internal.ObjAttr,
@@ -848,7 +872,7 @@ func (bb *BlockBlob) processBlobPrefixes(
 				*blobList = append(*blobList, attr)
 			} else {
 				// marker file not found in current iteration, so we need to manually check attributes via REST
-				_, err := bb.getAttrUsingRest(*blobInfo.Name)
+				_, err := bb.getAttrUsingRest(ctx, *blobInfo.Name)
 				// marker file also not found via manual check, safe to add to list
 				// For HNS accounts mounted as FNS we used to list directories and files in blobfusev1,
 				// in blobfusev2 to replicate this behaviour the below check of blobInfo.Properties != nil is added.
@@ -946,7 +970,13 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 }
 
 // ReadToFile : Download a blob to a local file
-func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
+func (bb *BlockBlob) ReadToFile(
+	ctx context.Context,
+	name string,
+	offset int64,
+	count int64,
+	fi *os.File,
+) (err error) {
 	log.Trace("BlockBlob::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
 	//defer exectime.StatTimeCurrentBlock("BlockBlob::ReadToFile")()
 
@@ -968,7 +998,7 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 		Count:  count,
 	}
 
-	_, err = blobClient.DownloadFile(context.Background(), fi, &dlOpts)
+	_, err = blobClient.DownloadFile(ctx, fi, &dlOpts)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
@@ -992,7 +1022,7 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 			log.Warn("BlockBlob::ReadToFile : Failed to generate MD5 Sum for %s", name)
 		} else {
 			// Get latest properties from container to get the md5 of blob
-			prop, err := blobClient.GetProperties(context.Background(), &blob.GetPropertiesOptions{
+			prop, err := blobClient.GetProperties(ctx, &blob.GetPropertiesOptions{
 				CPKInfo: bb.blobCPKOpt,
 			})
 			if err != nil {
@@ -1020,11 +1050,16 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 }
 
 // ReadBuffer : Download a specific range from a blob to a buffer
-func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte, error) {
+func (bb *BlockBlob) ReadBuffer(
+	ctx context.Context,
+	name string,
+	offset int64,
+	length int64,
+) ([]byte, error) {
 	log.Trace("BlockBlob::ReadBuffer : name %s, offset %v, len %v", name, offset, length)
 	var buff []byte
 	if length == 0 {
-		attr, err := bb.GetAttr(name)
+		attr, err := bb.GetAttr(ctx, name)
 		if err != nil {
 			return buff, err
 		}
@@ -1040,7 +1075,7 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte
 		Count:  length,
 	}
 
-	_, err := blobClient.DownloadBuffer(context.Background(), buff, &dlOpts)
+	_, err := blobClient.DownloadBuffer(ctx, buff, &dlOpts)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
@@ -1060,6 +1095,7 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
 func (bb *BlockBlob) ReadInBuffer(
+	ctx context.Context,
 	name string,
 	offset int64,
 	length int64,
@@ -1072,8 +1108,7 @@ func (bb *BlockBlob) ReadInBuffer(
 	}
 
 	blobClient := bb.getBlobClient(name)
-
-	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, max_context_timeout*time.Minute)
 	defer cancel()
 
 	opt := &blob.DownloadStreamOptions{
@@ -1206,6 +1241,7 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 
 // WriteFromFile : Upload local file to blob
 func (bb *BlockBlob) WriteFromFile(
+	ctx context.Context,
 	name string,
 	metadata map[string]*string,
 	fi *os.File,
@@ -1265,7 +1301,7 @@ func (bb *BlockBlob) WriteFromFile(
 		}
 	}
 
-	_, err = blobClient.UploadFile(context.Background(), fi, uploadOptions)
+	_, err = blobClient.UploadFile(ctx, fi, uploadOptions)
 
 	if err != nil {
 		serr := storeBlobErrToErr(err)
@@ -1301,13 +1337,18 @@ func (bb *BlockBlob) WriteFromFile(
 }
 
 // WriteFromBuffer : Upload from a buffer to a blob
-func (bb *BlockBlob) WriteFromBuffer(name string, metadata map[string]*string, data []byte) error {
+func (bb *BlockBlob) WriteFromBuffer(
+	ctx context.Context,
+	name string,
+	metadata map[string]*string,
+	data []byte,
+) error {
 	log.Trace("BlockBlob::WriteFromBuffer : name %s", name)
 	blobClient := bb.getBlockBlobClient(name)
 
 	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromBuffer", name)
 
-	_, err := blobClient.UploadBuffer(context.Background(), data, &blockblob.UploadBufferOptions{
+	_, err := blobClient.UploadBuffer(ctx, data, &blockblob.UploadBufferOptions{
 		BlockSize:   bb.Config.blockSize,
 		Concurrency: bb.Config.maxConcurrency,
 		Metadata:    metadata,
@@ -1327,13 +1368,16 @@ func (bb *BlockBlob) WriteFromBuffer(name string, metadata map[string]*string, d
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets
-func (bb *BlockBlob) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
+func (bb *BlockBlob) GetFileBlockOffsets(
+	ctx context.Context,
+	name string,
+) (*common.BlockOffsetList, error) {
 	var blockOffset int64 = 0
 	blockList := common.BlockOffsetList{}
 	blobClient := bb.getBlockBlobClient(name)
 
 	storageBlockList, err := blobClient.GetBlockList(
-		context.Background(),
+		ctx,
 		blockblob.BlockListTypeCommitted,
 		nil,
 	)
@@ -1439,6 +1483,7 @@ func (bb *BlockBlob) createNewBlocks(
 // This function is called when the file is expanded using truncate operation and the new size is greater than the old
 // size of the file.
 func (bb *BlockBlob) createNewBlocksTruncate(
+	ctx context.Context,
 	blockList *common.BlockOffsetList,
 	options *internal.TruncateFileOptions,
 ) error {
@@ -1501,6 +1546,7 @@ func (bb *BlockBlob) createNewBlocksTruncate(
 				lastBlock.Id = common.GetBlockID(blockList.BlockIdLength)
 
 				err := bb.ReadInBuffer(
+					ctx,
 					options.Name,
 					lastBlock.StartIndex,
 					lastBlock.EndIndex-lastBlock.StartIndex,
@@ -1537,6 +1583,7 @@ func (bb *BlockBlob) createNewBlocksTruncate(
 }
 
 func (bb *BlockBlob) removeBlocksTruncate(
+	ctx context.Context,
 	blockList *common.BlockOffsetList,
 	options *internal.TruncateFileOptions,
 ) error {
@@ -1579,6 +1626,7 @@ func (bb *BlockBlob) removeBlocksTruncate(
 		blk.Id = common.GetBlockID(blockList.BlockIdLength)
 
 		err := bb.ReadInBuffer(
+			ctx,
 			options.Name,
 			blk.StartIndex,
 			blk.EndIndex-blk.StartIndex,
@@ -1601,13 +1649,13 @@ func (bb *BlockBlob) removeBlocksTruncate(
 	return nil
 }
 
-func (bb *BlockBlob) TruncateFile(options internal.TruncateFileOptions) error {
+func (bb *BlockBlob) TruncateFile(ctx context.Context, options internal.TruncateFileOptions) error {
 	log.Trace("BlockBlob::TruncateFile : name: %s, old size: %d, new size: %d",
 		options.Name, options.OldSize, options.NewSize)
 
 	// If old size is not specified, get it from the storage.
 	if options.OldSize == -1 {
-		attr, err := bb.GetAttr(options.Name)
+		attr, err := bb.GetAttr(ctx, options.Name)
 		if err != nil {
 			log.Err(
 				"BlockBlob::TruncateFile : Failed to get attributes of file %s [%v]",
@@ -1633,7 +1681,7 @@ func (bb *BlockBlob) TruncateFile(options internal.TruncateFileOptions) error {
 
 	if options.NewSize == 0 {
 		var buf []byte
-		if err := bb.WriteFromBuffer(options.Name, nil, buf); err != nil {
+		if err := bb.WriteFromBuffer(ctx, options.Name, nil, buf); err != nil {
 			log.Err(
 				"BlockBlob::TruncateFile : Failed to truncate file %s to zero size [%v]",
 				options.Name,
@@ -1646,7 +1694,7 @@ func (bb *BlockBlob) TruncateFile(options internal.TruncateFileOptions) error {
 
 	// Handle files whose new size <= 256MiB && when block size is not specified.
 	if options.NewSize <= blockblob.MaxUploadBlobBytes && options.BlockSize == 0 {
-		if err := bb.TruncateFileWithoutBlocks(&options); err != nil {
+		if err := bb.TruncateFileWithoutBlocks(ctx, &options); err != nil {
 			log.Err("BlockBlob::TruncateFile : Failed to truncate file %s[%v]", options.Name, err)
 			return err
 		}
@@ -1654,7 +1702,7 @@ func (bb *BlockBlob) TruncateFile(options internal.TruncateFileOptions) error {
 	}
 
 	// Truncate file by managing blocks
-	if err := bb.TruncateFileUsingBlocks(&options); err != nil {
+	if err := bb.TruncateFileUsingBlocks(ctx, &options); err != nil {
 		log.Err("BlockBlob::TruncateFile : Failed to truncate file %s[%v]", options.Name, err)
 		return err
 	}
@@ -1662,7 +1710,10 @@ func (bb *BlockBlob) TruncateFile(options internal.TruncateFileOptions) error {
 	return nil
 }
 
-func (bb *BlockBlob) TruncateFileWithoutBlocks(options *internal.TruncateFileOptions) error {
+func (bb *BlockBlob) TruncateFileWithoutBlocks(
+	ctx context.Context,
+	options *internal.TruncateFileOptions,
+) error {
 	log.Trace(
 		"BlockBlob::TruncateFileWithoutBlocks : name: %s, old size: %d, new size: %d",
 		options.Name,
@@ -1675,7 +1726,7 @@ func (bb *BlockBlob) TruncateFileWithoutBlocks(options *internal.TruncateFileOpt
 
 	if options.OldSize > 0 {
 		// Read the file
-		err = bb.ReadInBuffer(options.Name, 0, min(options.NewSize, options.OldSize), buf, nil)
+		err = bb.ReadInBuffer(ctx, options.Name, 0, min(options.NewSize, options.OldSize), buf, nil)
 		if err != nil {
 			log.Err(
 				"BlockBlob::TruncateFileWithoutBlocks : Failed to read small file %s[%v]",
@@ -1687,7 +1738,7 @@ func (bb *BlockBlob) TruncateFileWithoutBlocks(options *internal.TruncateFileOpt
 	}
 
 	// Write the file
-	err = bb.WriteFromBuffer(options.Name, nil, buf)
+	err = bb.WriteFromBuffer(ctx, options.Name, nil, buf)
 	if err != nil {
 		log.Err(
 			"BlockBlob::TruncateFileWithoutBlocks : Failed to write from buffer file %s[%v]",
@@ -1700,7 +1751,10 @@ func (bb *BlockBlob) TruncateFileWithoutBlocks(options *internal.TruncateFileOpt
 	return nil
 }
 
-func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptions) error {
+func (bb *BlockBlob) TruncateFileUsingBlocks(
+	ctx context.Context,
+	options *internal.TruncateFileOptions,
+) error {
 	log.Trace(
 		"BlockBlob::TruncateFileUsingBlocks : name: %s, old size: %d, new size: %d",
 		options.Name,
@@ -1709,7 +1763,7 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 	)
 	var err error
 
-	blob, err := bb.GetFileBlockOffsets(options.Name)
+	blob, err := bb.GetFileBlockOffsets(ctx, options.Name)
 	if err != nil {
 		log.Err(
 			"BlockBlob::TruncateFileUsingBlocks : Failed to get block offsets for file %s[%v]",
@@ -1734,7 +1788,7 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 		buf := make([]byte, options.OldSize)
 
 		// Read the file
-		err = bb.ReadInBuffer(options.Name, 0, options.OldSize, buf, nil)
+		err = bb.ReadInBuffer(ctx, options.Name, 0, options.OldSize, buf, nil)
 		if err != nil {
 			log.Err(
 				"BlockBlob::TruncateFileUsingBlocks : Failed to read small file %s[%v]",
@@ -1774,7 +1828,7 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 	}
 
 	if options.NewSize < options.OldSize {
-		err = bb.removeBlocksTruncate(blob, options)
+		err = bb.removeBlocksTruncate(ctx, blob, options)
 		if err != nil {
 			log.Err(
 				"BlockBlob::TruncateFileUsingBlocks : Failed to Remove Blocks from Blocklist for file %s[%v]",
@@ -1784,7 +1838,7 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 			return err
 		}
 	} else {
-		err = bb.createNewBlocksTruncate(blob, options)
+		err = bb.createNewBlocksTruncate(ctx, blob, options)
 		if err != nil {
 			log.Err(
 				"BlockBlob::TruncateFileUsingBlocks : Failed to Create New Blocks for file %s[%v]",
@@ -1796,7 +1850,7 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 	}
 
 	// Stage and commit the blocks.
-	err = bb.StageAndCommit(options.Name, blob)
+	err = bb.StageAndCommit(ctx, options.Name, blob)
 	if err != nil {
 		log.Err(
 			"BlockBlob::TruncateFileUsingBlocks : Failed to Stage and Commit blocks for file %s[%v]",
@@ -1810,7 +1864,7 @@ func (bb *BlockBlob) TruncateFileUsingBlocks(options *internal.TruncateFileOptio
 }
 
 // Write : write data at given offset to a blob
-func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
+func (bb *BlockBlob) Write(ctx context.Context, options *internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	defer log.TimeTrack(time.Now(), "BlockBlob::Write", options.Handle.Path)
@@ -1818,7 +1872,7 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 	// when the file offset mapping is cached we don't need to make a get block list call
-	fileOffsets, err := bb.GetFileBlockOffsets(name)
+	fileOffsets, err := bb.GetFileBlockOffsets(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -1827,7 +1881,7 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 	// case 1: file consists of no blocks (small file)
 	if fileOffsets.HasNoBlocks() {
 		// get all the data
-		oldData, _ := bb.ReadBuffer(name, 0, 0)
+		oldData, _ := bb.ReadBuffer(ctx, name, 0, 0)
 		// update the data with the new data
 		// if we're only overwriting existing data
 		if int64(len(oldData)) >= offset+length {
@@ -1853,7 +1907,7 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 			}
 		}
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
-		err := bb.WriteFromBuffer(name, options.Metadata, *dataBuffer)
+		err := bb.WriteFromBuffer(ctx, name, options.Metadata, *dataBuffer)
 		if err != nil {
 			log.Err("BlockBlob::Write : Failed to upload to blob %s [%s]", name, err.Error())
 			return err
@@ -1884,6 +1938,7 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 		if !appendOnly {
 			// fetch the blocks that will be impacted by the new changes so we can overwrite them
 			err = bb.ReadInBuffer(
+				ctx,
 				name,
 				fileOffsets.BlockList[index].StartIndex,
 				oldDataSize,
@@ -1901,7 +1956,7 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
 		blockOffset := offset - fileOffsets.BlockList[index].StartIndex
 		copy(oldDataBuffer[blockOffset:], data)
-		err := bb.stageAndCommitModifiedBlocks(name, oldDataBuffer, fileOffsets)
+		err := bb.stageAndCommitModifiedBlocks(ctx, name, oldDataBuffer, fileOffsets)
 		return err
 	}
 	return nil
@@ -1909,6 +1964,7 @@ func (bb *BlockBlob) Write(options *internal.WriteFileOptions) error {
 
 // TODO: make a similar method facing stream that would enable us to write to cached blocks then stage and commit
 func (bb *BlockBlob) stageAndCommitModifiedBlocks(
+	ctx context.Context,
 	name string,
 	data []byte,
 	offsetList *common.BlockOffsetList,
@@ -1920,7 +1976,7 @@ func (bb *BlockBlob) stageAndCommitModifiedBlocks(
 		blockIDList = append(blockIDList, blk.Id)
 		if blk.Dirty() {
 			_, err := blobClient.StageBlock(
-				context.Background(),
+				ctx,
 				blk.Id,
 				streaming.NopCloser(
 					bytes.NewReader(data[blockOffset:(blk.EndIndex-blk.StartIndex)+blockOffset]),
@@ -1942,7 +1998,7 @@ func (bb *BlockBlob) stageAndCommitModifiedBlocks(
 			blockOffset = (blk.EndIndex - blk.StartIndex) + blockOffset
 		}
 	}
-	_, err := blobClient.CommitBlockList(context.Background(),
+	_, err := blobClient.CommitBlockList(ctx,
 		blockIDList,
 		&blockblob.CommitBlockListOptions{
 			HTTPHeaders: &blob.HTTPHeaders{
@@ -1963,7 +2019,11 @@ func (bb *BlockBlob) stageAndCommitModifiedBlocks(
 	return nil
 }
 
-func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) error {
+func (bb *BlockBlob) StageAndCommit(
+	ctx context.Context,
+	name string,
+	bol *common.BlockOffsetList,
+) error {
 	// lock on the blob name so that no stage and commit race condition occur causing failure
 	blobMtx := bb.blockLocks.GetLock(name)
 	blobMtx.Lock()
@@ -2005,7 +2065,7 @@ func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) er
 		}
 
 		if blk.Dirty() {
-			_, err := blobClient.StageBlock(context.Background(),
+			_, err := blobClient.StageBlock(ctx,
 				blk.Id,
 				streaming.NopCloser(bytes.NewReader(data)),
 				&blockblob.StageBlockOptions{
@@ -2027,7 +2087,7 @@ func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) er
 	}
 
 	if staged {
-		_, err := blobClient.CommitBlockList(context.Background(),
+		_, err := blobClient.CommitBlockList(ctx,
 			blockIDList,
 			&blockblob.CommitBlockListOptions{
 				HTTPHeaders: &blob.HTTPHeaders{
@@ -2052,7 +2112,7 @@ func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) er
 }
 
 // ChangeMod : Change mode of a blob
-func (bb *BlockBlob) ChangeMod(name string, _ os.FileMode) error {
+func (bb *BlockBlob) ChangeMod(ctx context.Context, name string, _ os.FileMode) error {
 	log.Trace("BlockBlob::ChangeMod : name %s", name)
 
 	if bb.Config.ignoreAccessModifiers {
@@ -2066,7 +2126,7 @@ func (bb *BlockBlob) ChangeMod(name string, _ os.FileMode) error {
 }
 
 // ChangeOwner : Change owner of a blob
-func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
+func (bb *BlockBlob) ChangeOwner(ctx context.Context, name string, _ int, _ int) error {
 	log.Trace("BlockBlob::ChangeOwner : name %s", name)
 
 	if bb.Config.ignoreAccessModifiers {
@@ -2080,13 +2140,16 @@ func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
 }
 
 // GetCommittedBlockList : Get the list of committed blocks
-func (bb *BlockBlob) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+func (bb *BlockBlob) GetCommittedBlockList(
+	ctx context.Context,
+	name string,
+) (*internal.CommittedBlockList, error) {
 	blobClient := bb.Container.NewBlockBlobClient(
 		common.JoinUnixFilepath(bb.Config.prefixPath, name),
 	)
 
 	storageBlockList, err := blobClient.GetBlockList(
-		context.Background(),
+		ctx,
 		blockblob.BlockListTypeCommitted,
 		nil,
 	)
@@ -2121,10 +2184,10 @@ func (bb *BlockBlob) GetCommittedBlockList(name string) (*internal.CommittedBloc
 }
 
 // StageBlock : stages a block and returns its blockid
-func (bb *BlockBlob) StageBlock(name string, data []byte, id string) error {
+func (bb *BlockBlob) StageBlock(ctx context.Context, name string, data []byte, id string) error {
 	log.Trace("BlockBlob::StageBlock : name %s, ID %v, length %v", name, id, len(data))
 
-	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, max_context_timeout*time.Minute)
 	defer cancel()
 
 	blobClient := bb.Container.NewBlockBlobClient(
@@ -2151,10 +2214,15 @@ func (bb *BlockBlob) StageBlock(name string, data []byte, id string) error {
 }
 
 // CommitBlocks : persists the block list
-func (bb *BlockBlob) CommitBlocks(name string, blockList []string, newEtag *string) error {
+func (bb *BlockBlob) CommitBlocks(
+	ctx context.Context,
+	name string,
+	blockList []string,
+	newEtag *string,
+) error {
 	log.Trace("BlockBlob::CommitBlocks : name %s", name)
 
-	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, max_context_timeout*time.Minute)
 	defer cancel()
 
 	blobClient := bb.Container.NewBlockBlobClient(
