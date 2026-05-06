@@ -826,13 +826,13 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 	err = s.client.DeleteDirectory(ctx, dirName)
 	s.assert.NoError(err)
 
-	// file in directory should still be there (only marker is deleted, not contents)
+	// file in directory should no longer be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(path.Join(dirName, fileName)),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
-	s.assert.NoError(err)
+	s.assert.Error(err)
 }
 func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
