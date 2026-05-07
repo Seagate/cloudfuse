@@ -79,14 +79,19 @@ type lruPolicy struct {
 	duPresent bool
 }
 
-// LRUPolicySnapshot represents the *persisted state* of lruPolicy.
+type pendingOpSnapshot struct {
+	IsDir      bool
+	IsDeletion bool
+}
+
+// lruPolicySnapshot represents the *persisted state* of lruPolicy.
 // It contains only the fields that need to be saved, and they are exported.
-type LRUPolicySnapshot struct {
-	NodeList           []string                // Just node names, *without their fc.tmp prefix*, in linked list order
-	SyncPendingFlags   []bool                  // whether each file in NodeList belongs in the pendingOps map (kept for backward compat)
-	CurrMarkerPosition uint64                  // Node index of currMarker
-	LastMarkerPosition uint64                  // Node index of lastMarker
-	PendingOps         map[string]pendingFlags // Complete pendingOps map with full flags (stored as interface{} for flexibility)
+type lruPolicySnapshot struct {
+	NodeList           []string                     // Just node names, *without their fc.tmp prefix*, in linked list order
+	SyncPendingFlags   []bool                       // whether each file in NodeList belongs in the pendingOps map (kept for backward compat)
+	CurrMarkerPosition uint64                       // Node index of currMarker
+	LastMarkerPosition uint64                       // Node index of lastMarker
+	PendingOps         map[string]pendingOpSnapshot // Complete pendingOps map with full flags
 }
 
 const (
@@ -123,9 +128,8 @@ func (p *lruPolicy) StartPolicy() error {
 	p.lastMarker.prev = p.currMarker
 	p.lastMarker.next = nil
 	p.head = p.currMarker
-	gob.Register(LRUPolicySnapshot{})
-	// Register types that can be stored in pendingOps map for serialization
-	gob.Register(pendingFlags{})
+	gob.Register(lruPolicySnapshot{})
+	gob.Register(pendingOpSnapshot{})
 	snapshot, err := readSnapshotFromFile(p.tmpPath)
 	if err == nil && snapshot != nil {
 		p.loadSnapshot(snapshot)
@@ -168,9 +172,9 @@ func (p *lruPolicy) ShutdownPolicy() error {
 	return p.createSnapshot().writeToFile(p.tmpPath)
 }
 
-func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
+func (p *lruPolicy) createSnapshot() *lruPolicySnapshot {
 	log.Trace("lruPolicy::saveSnapshot")
-	var snapshot LRUPolicySnapshot
+	var snapshot lruPolicySnapshot
 	var index uint64
 	p.Lock()
 	defer p.Unlock()
@@ -196,16 +200,20 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 	}
 
 	// Capture complete pendingOps map for reliable restoration
-	snapshot.PendingOps = make(map[string]pendingFlags)
+	snapshot.PendingOps = make(map[string]pendingOpSnapshot)
 	p.pendingOps.Range(func(key, value interface{}) bool {
-		snapshot.PendingOps[key.(string)] = value.(pendingFlags)
+		flags := value.(pendingFlags)
+		snapshot.PendingOps[key.(string)] = pendingOpSnapshot{
+			IsDir:      flags.isDir,
+			IsDeletion: flags.isDeletion,
+		}
 		return true
 	})
 
 	return &snapshot
 }
 
-func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
+func (p *lruPolicy) loadSnapshot(snapshot *lruPolicySnapshot) {
 	if snapshot == nil {
 		return
 	}
@@ -215,7 +223,7 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	loadPendingOps := false
 	if len(snapshot.PendingOps) > 0 {
 		for key, value := range snapshot.PendingOps {
-			p.pendingOps.Store(key, value)
+			p.pendingOps.Store(key, pendingFlags{isDir: value.IsDir, isDeletion: value.IsDeletion})
 		}
 	} else {
 		// Backward compatibility: use SyncPendingFlags if PendingOps is not available
@@ -278,7 +286,7 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	}
 }
 
-func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
+func (ss *lruPolicySnapshot) writeToFile(tmpPath string) error {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(ss)
@@ -289,7 +297,7 @@ func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
 	return os.WriteFile(filepath.Join(tmpPath, snapshotPath), buf.Bytes(), 0644)
 }
 
-func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
+func readSnapshotFromFile(tmpPath string) (*lruPolicySnapshot, error) {
 	fullSnapshotPath := filepath.Join(tmpPath, snapshotPath)
 	defer os.Remove(fullSnapshotPath)
 	snapshotData, err := os.ReadFile(fullSnapshotPath)
@@ -302,7 +310,7 @@ func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
 		}
 		return nil, err
 	}
-	var snapshot LRUPolicySnapshot
+	var snapshot lruPolicySnapshot
 	dec := gob.NewDecoder(bytes.NewReader(snapshotData))
 	err = dec.Decode(&snapshot)
 	if err != nil {

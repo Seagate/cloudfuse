@@ -260,7 +260,7 @@ func (suite *lruPolicyTestSuite) TestDeleteItemSkipsSyncPending() {
 	// Simulate eviction flow where the node has already been removed.
 	suite.policy.nodeMap.Delete(localPath)
 
-	suite.policy.pendingOps.Store("sync_pending", struct{}{})
+	suite.policy.pendingOps.Store("sync_pending", pendingFlags{})
 
 	suite.policy.deleteItem(localPath)
 
@@ -379,7 +379,7 @@ func (suite *lruPolicyTestSuite) TestCreateSnapshot() {
 	for i := 1; i <= numFiles; i++ {
 		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
 		if i > 3 {
-			suite.policy.pendingOps.Store("temp"+fmt.Sprint(i), struct{}{})
+			suite.policy.pendingOps.Store("temp"+fmt.Sprint(i), pendingFlags{})
 		}
 	}
 	originalPolicy := suite.policy
@@ -537,11 +537,16 @@ func (suite *lruPolicyTestSuite) TestCreateSnapshotLeadingMarkers() {
 func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
 	defer suite.cleanupTest()
 	// setup
-	snapshot := &LRUPolicySnapshot{
+	snapshot := &lruPolicySnapshot{
 		NodeList:           []string{"a", "b", "c"},
 		CurrMarkerPosition: 1,
 		LastMarkerPosition: 2,
 		SyncPendingFlags:   []bool{true, false, false},
+		PendingOps: map[string]pendingOpSnapshot{
+			"a":              {},
+			"deleted-file":   {IsDeletion: true},
+			"deleted-folder": {IsDir: true, IsDeletion: true},
+		},
 	}
 	// test
 	err := snapshot.writeToFile(cache_path)
@@ -552,6 +557,60 @@ func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
 	suite.assert.Equal(snapshot, snapshotFromFile) // this checks deep equality
 }
 
+func (suite *lruPolicyTestSuite) TestLoadSnapshotRestoresExplicitPendingOps() {
+	defer suite.cleanupTest()
+
+	snapshot := &lruPolicySnapshot{
+		NodeList:           []string{"/cached-file", "/cached-dir"},
+		CurrMarkerPosition: 1,
+		LastMarkerPosition: 3,
+		SyncPendingFlags:   []bool{false, false},
+		PendingOps: map[string]pendingOpSnapshot{
+			"cached-file": {IsDeletion: true},
+			"cached-dir":  {IsDir: true},
+			"deleted-dir": {IsDir: true, IsDeletion: true},
+		},
+	}
+
+	suite.policy.loadSnapshot(snapshot)
+
+	for name, expected := range snapshot.PendingOps {
+		value, found := suite.policy.pendingOps.Load(name)
+		suite.assert.True(found, "expected pending op %s to be restored", name)
+		if found {
+			suite.assert.Equal(
+				pendingFlags{isDir: expected.IsDir, isDeletion: expected.IsDeletion},
+				value,
+			)
+		}
+	}
+
+	suite.assert.True(suite.policy.IsCached(filepath.Join(cache_path, "cached-file")))
+	suite.assert.True(suite.policy.IsCached(filepath.Join(cache_path, "cached-dir")))
+}
+
+func (suite *lruPolicyTestSuite) TestLoadSnapshotFallsBackToSyncPendingFlags() {
+	defer suite.cleanupTest()
+
+	snapshot := &lruPolicySnapshot{
+		NodeList:           []string{"/legacy-file", "/other-file"},
+		CurrMarkerPosition: 0,
+		LastMarkerPosition: 3,
+		SyncPendingFlags:   []bool{true, false},
+	}
+
+	suite.policy.loadSnapshot(snapshot)
+
+	value, found := suite.policy.pendingOps.Load("legacy-file")
+	suite.assert.True(found)
+	if found {
+		suite.assert.Equal(pendingFlags{}, value)
+	}
+
+	_, found = suite.policy.pendingOps.Load("other-file")
+	suite.assert.False(found)
+}
+
 func (suite *lruPolicyTestSuite) TestNoEvictionIfInPendingOps() {
 	defer suite.cleanupTest()
 
@@ -559,7 +618,7 @@ func (suite *lruPolicyTestSuite) TestNoEvictionIfInPendingOps() {
 	fileName := filepath.Join(cache_path, name)
 	suite.policy.CacheValid(fileName)
 
-	suite.policy.pendingOps.Store(name, struct{}{})
+	suite.policy.pendingOps.Store(name, pendingFlags{})
 
 	time.Sleep(2 * time.Second)
 
@@ -580,8 +639,8 @@ func (suite *lruPolicyTestSuite) TestEvictionRespectsPendingOps() {
 		suite.policy.CacheValid(name)
 	}
 
-	suite.policy.pendingOps.Store(objNames[1], struct{}{})
-	suite.policy.pendingOps.Store(objNames[3], struct{}{})
+	suite.policy.pendingOps.Store(objNames[1], pendingFlags{})
+	suite.policy.pendingOps.Store(objNames[3], pendingFlags{})
 
 	time.Sleep(3 * time.Second)
 
