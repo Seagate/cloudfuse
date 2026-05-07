@@ -563,7 +563,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
-	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
+	explicitDirLookup := strings.HasSuffix(name, "/")
 	dirName := internal.ExtendDirName(name)
 
 	// first let's suppose the caller is looking for a file
