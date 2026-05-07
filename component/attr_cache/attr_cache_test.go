@@ -109,7 +109,7 @@ func (suite *attrCacheTestSuite) assertNotInCache(path string) {
 }
 
 func (suite *attrCacheTestSuite) addPathToCache(path string, metadata bool) {
-	isDir := path[len(path)-1] == '/'
+	isDir := strings.HasSuffix(path, "/")
 	path = internal.TruncateDirName(path)
 	pathAttr := getPathAttr(path, defaultSize, fs.FileMode(defaultMode), metadata)
 	if isDir {
@@ -241,7 +241,7 @@ func generateNestedPathAttr(path string, size int64, mode os.FileMode) []*intern
 	pathAttrs := make([]*internal.ObjAttr, 0)
 	for p := a.Front(); p != nil; p = p.Next() {
 		pString := p.Value.(string)
-		isDir := pString[len(pString)-1] == '/'
+		isDir := strings.HasSuffix(pString, "/")
 		pString = internal.TruncateDirName(pString)
 		newPathAttr := getPathAttr(pString, size, mode, true)
 		if isDir {
@@ -1321,7 +1321,7 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 			// directory cache is enabled, so a dir paths should NOT be invalid
 			for p := a.Front(); p != nil; p = p.Next() {
 				path := p.Value.(string)
-				isDir := path[len(path)-1] == '/'
+				isDir := strings.HasSuffix(path, "/")
 				truncatedPath = internal.TruncateDirName(path)
 				if isDir {
 					suite.assertUntouched(truncatedPath)
