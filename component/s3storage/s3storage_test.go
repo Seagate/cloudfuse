@@ -530,7 +530,7 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 			)
 			s.assert.NoError(err)
 
-			// Directory should be in the account
+			// Directory marker should be in the account
 			key := internal.ExtendDirName(
 				common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path),
 			)
@@ -546,7 +546,7 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 			s.assert.NoError(err)
 
 			s.assert.NoError(err)
-			// Directory should not be in the account
+			// Directory marker should not be in the account
 			key = internal.ExtendDirName(
 				common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path),
 			)
@@ -559,9 +559,9 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 			})
 			s.assert.Error(err)
 
-			// Directory be empty
+			// Directory is not empty (file still exists)
 			dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: obj_path})
-			s.assert.True(dirEmpty)
+			s.assert.False(dirEmpty)
 		})
 	}
 }
@@ -657,13 +657,24 @@ func (s *s3StorageTestSuite) TestDeleteDirHierarchy() {
 
 	s.assert.NoError(err)
 
-	/// a paths should be deleted
+	// Only the directory marker for base is deleted, all nested paths still exist
+	// Check that the directory marker is removed
+	baseMarkerKey := internal.ExtendDirName(
+		common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base),
+	)
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(
+			s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName,
+		),
+		Key:          aws.String(baseMarkerKey),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.Error(err)
+
+	// But all nested paths should still exist
+	a.PushBackList(ab)
+	a.PushBackList(ac)
 	for p := a.Front(); p != nil; p = p.Next() {
-		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Error(err)
-	}
-	ab.PushBackList(ac) // ab and ac paths should exist
-	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
 		s.assert.NoError(err)
 	}
@@ -690,14 +701,11 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 
 	err = s.s3Storage.Storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
 	s.assert.NoError(err)
-	// a paths under c1 should be deleted
+	// Only the c1 directory marker is deleted, nested paths under c1 still exist
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		if strings.HasPrefix(p.Value.(string), base+"/c1") {
-			s.assert.Error(err)
-		} else {
-			s.assert.NoError(err)
-		}
+		// All nested paths should still exist (marker deletion doesn't affect children)
+		s.assert.NoError(err)
 	}
 	ab.PushBackList(ac) // ab and ac paths should exist
 	for p := ab.Front(); p != nil; p = p.Next() {

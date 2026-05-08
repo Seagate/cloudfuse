@@ -217,47 +217,6 @@ func (cl *Client) deleteObject(ctx context.Context, name string, isSymLink bool,
 	return parseS3Err(err, attemptedAction)
 }
 
-// Wrapper for awsS3Client.DeleteObjects.
-// names is a list of paths to the objects.
-func (cl *Client) deleteObjects(ctx context.Context, objects []*internal.ObjAttr) error {
-	if objects == nil {
-		return nil
-	}
-	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
-	// build list to send to DeleteObjects
-	keyList := make([]types.ObjectIdentifier, len(objects))
-	for i, object := range objects {
-		key := cl.getKey(object.Path, object.IsSymlink(), object.IsDir())
-		keyList[i] = types.ObjectIdentifier{
-			Key: &key,
-		}
-	}
-	// send keyList for deletion
-	result, err := cl.AwsS3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-		Bucket: &cl.Config.AuthConfig.BucketName,
-		Delete: &types.Delete{
-			Objects: keyList,
-			Quiet:   aws.Bool(true),
-		},
-	})
-	if err != nil {
-		log.Err(
-			"Client::DeleteDirectory : Failed to delete %d files. Here's why: %v",
-			len(objects),
-			err,
-		)
-		for i := 0; i < len(result.Errors); i++ {
-			log.Err(
-				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
-				*result.Errors[i].Key,
-				*result.Errors[i].Message,
-			)
-		}
-	}
-
-	return err
-}
-
 // Wrapper for awsS3Client.HeadObject.
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
@@ -442,16 +401,14 @@ func (cl *Client) List(
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := cl.getKey(prefix, false, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
-	if (prefix != "" && prefix[len(prefix)-1] == '/') ||
-		(prefix == "" && cl.Config.prefixPath != "") {
+	if strings.HasSuffix(prefix, "/") || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
 
 	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
 	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
 	// For example, it would find "filet-of-fish/" when searching for "file".
-	// Check for an empty path to prevent indexing to [-1]
-	findCommonPrefixes := listPath == "" || listPath[len(listPath)-1] == '/'
+	findCommonPrefixes := strings.HasSuffix(listPath, "/")
 
 	var nextMarker *string
 	var token *string

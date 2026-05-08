@@ -459,85 +459,23 @@ func (cl *Client) DeleteFile(ctx context.Context, name string) error {
 	return nil
 }
 
-// DeleteDirectory : Recursively delete all objects with the given prefix.
+// DeleteDirectory : Delete the directory marker in the container
 // If name is given without a trailing slash, a slash will be added.
-// If the directory does not exist, no error will be returned.
+// If the directory marker does not exist, no error will be returned.
+// Deletion is carried out regardless of the enableDirMarker flag
 func (cl *Client) DeleteDirectory(ctx context.Context, name string) error {
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
+	// Delete the current directory
 	// make sure name has a trailing slash
 	name = internal.ExtendDirName(name)
-
-	done := false
-	var marker *string
-	var err error
-	for !done {
-		// list all objects with the prefix
-		objects, marker, err := cl.List(ctx, name, marker, 0)
-		if err != nil {
-			log.Warn(
-				"Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v",
-				name,
-				err,
-			)
-			return err
-		}
-
-		// we have no way of indicating empty folders in the bucket
-		// so if there are no objects with this prefix we can either:
-		// 1. return an error when the user tries to delete an empty directory, or
-		// 2. fail to return an error when trying to delete a non-existent directory
-		// the second one seems much less risky, so we don't check for an empty list here
-
-		// List only returns the objects and prefixes up to the next "/" character after the prefix
-		// This is because List is setting the Delimiter field to "/"
-		// This means that recursive directory deletion actually needs to be recursive.
-		// Delete all found objects *and prefixes ("directories")*.
-		// For improved performance, we'll use one call to delete all objects in this directory.
-		// 	To make one call, we need to make a list of objects to delete first.
-		var objectsToDelete []*internal.ObjAttr
-		for _, object := range objects {
-			if object.IsDir() {
-				err = cl.DeleteDirectory(ctx, object.Path)
-				if err != nil {
-					log.Err(
-						"Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v",
-						object.Path,
-						err,
-					)
-				}
-			} else {
-				objectsToDelete = append(
-					objectsToDelete,
-					object,
-				) //consider just object instead of object.path to pass down attributes that come from list.
-			}
-		}
-		// Delete the collected files
-		err = cl.deleteObjects(ctx, objectsToDelete)
-		if err != nil {
-			log.Err(
-				"Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v",
-				len(objectsToDelete),
-				err,
-			)
-		}
-
-		if marker == nil {
-			done = true
-		}
-	}
-
-	// Delete the current directory
-	if cl.Config.enableDirMarker {
-		err = cl.deleteObject(ctx, name, false, true)
-		if err != nil {
-			log.Err(
-				"Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v",
-				name,
-				err,
-			)
-		}
+	err := cl.deleteObject(ctx, name, false, true)
+	if err != nil {
+		log.Err(
+			"Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v",
+			name,
+			err,
+		)
 	}
 
 	return err
@@ -643,7 +581,7 @@ func (cl *Client) RenameDirectory(ctx context.Context, source string, target str
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(ctx context.Context, name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
-	explicitDirLookup := len(name) > 0 && name[len(name)-1] == '/'
+	explicitDirLookup := strings.HasSuffix(name, "/")
 	dirName := internal.ExtendDirName(name)
 
 	// first let's suppose the caller is looking for a file
@@ -686,23 +624,8 @@ func (cl *Client) getDirectoryAttr(
 ) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
-
-	// Otherwise, the cloud does not support directory markers, or there is no
-	// marker, so look for an object in the directory.
-	if listErr != nil {
-		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
-		return nil, listErr
-	}
-	if len(objects) > 0 {
-		// create and return an objAttr for the directory
-		attr := internal.CreateObjAttrDir(dirName)
-		return attr, nil
-	}
-
-	// Only check for explicit empty directory markers when needed.
-	// For file-like names, this saves one extra HeadObject
-	// call on miss-heavy paths that are not directories.
+	// When directory markers are enabled, check for the marker first via
+	// HeadObject (cheap, single-key lookup) before falling back to a List.
 	if cl.Config.enableDirMarker && shouldProbeDirMarker(dirName, explicitDirLookup) {
 		headAttr, headErr := cl.headObject(ctx, dirName, false, true)
 		if headErr == nil {
@@ -716,6 +639,20 @@ func (cl *Client) getDirectoryAttr(
 			)
 			return nil, headErr
 		}
+	}
+
+	// Either directory markers are disabled, there is no marker, or the name
+	// was skipped by shouldProbeDirMarker. Fall back to listing objects under
+	// the prefix to detect a non-empty directory.
+	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
+	if listErr != nil {
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
+		return nil, listErr
+	}
+	if len(objects) > 0 {
+		// create and return an objAttr for the directory
+		attr := internal.CreateObjAttrDir(dirName)
+		return attr, nil
 	}
 
 	// directory not found in bucket
