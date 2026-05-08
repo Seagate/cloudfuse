@@ -434,7 +434,7 @@ func (ac *AttrCache) cleanupExpiredEntries() {
 					time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 					if item.parent != nil {
 						if item.exists() {
-							item.parent.listCache = nil
+							item.parent.clearListCache()
 						}
 						delete(item.parent.children, item.attr.Name)
 					}
@@ -484,7 +484,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 					dirAttrCacheItem.markInCloud(false)
 				}
 				// this is a new directory, so we have a complete (empty) listing for it
-				dirAttrCacheItem.listingComplete = true
+				dirAttrCacheItem.markListingComplete(currentTime)
 			}
 			// if this is a new entry, update the parent directory timestamps
 			if err == nil {
@@ -602,7 +602,7 @@ func (ac *AttrCache) StreamDir(
 		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
 		// if the listing is complete, record the fact that we have a complete listing
 		if nextToken == "" {
-			ac.markListingComplete(options.Name)
+			ac.markListingComplete(options.Name, time.Now())
 		}
 	} else {
 		log.Err("AttrCache::StreamDir : %s encountered error [%v]", options.Name, err)
@@ -726,12 +726,12 @@ func (ac *AttrCache) cacheListSegment(
 		listDirPath, token, nextToken, len(pathList))
 }
 
-func (ac *AttrCache) markListingComplete(listDirPath string) {
+func (ac *AttrCache) markListingComplete(listDirPath string, listedAt time.Time) {
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 	listDirItem, found := ac.cache.get(listDirPath)
 	if found {
-		listDirItem.listingComplete = true
+		listDirItem.markListingComplete(listedAt)
 	}
 }
 
@@ -767,7 +767,7 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		return false
 	}
 	// do we have a complete listing?
-	if item.listingComplete {
+	if time.Since(item.listingCompletedAt).Seconds() < float64(ac.cacheTimeout) {
 		// we know the directory is empty
 		return true
 	}
@@ -1177,31 +1177,23 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			return value.attr, nil
 		}
 	}
+	// try to use a parent directory
+	doesNotExist := false
 	if ac.cacheDirs {
 		// drill up for the nearest valid parent directory attribute cache
-		foundCachedParent := false
-		for parent := getParentDir(options.Name); ; parent = getParentDir(parent) {
-			value, found = ac.cache.get(parent)
-			// skip invalid data
-			if !found || !value.valid() {
-				if parent == "" {
-					// no valid parent found
-					break
-				}
-				continue
+		parent, found := ac.cache.getCachedParent(options.Name)
+		// did we find a fresh entry?
+		if found && time.Since(parent.cachedAt).Seconds() <= float64(ac.cacheTimeout) {
+			// if it does not exist, then the target does not exist
+			if !parent.exists() ||
+				time.Since(parent.listingCompletedAt).Seconds() <= float64(ac.cacheTimeout) {
+				doesNotExist = true
 			}
-			// don't trust expired entries
-			if time.Since(value.cachedAt).Seconds() > float64(ac.cacheTimeout) {
-				break
-			}
-			// found the nearest cached parent
-			// if it does not exist, or has a complete listing, then our target does not exist
-			foundCachedParent = !value.exists() || value.listingComplete
 		}
-		ac.cacheLock.RUnlock()
-		if foundCachedParent {
-			return nil, syscall.ENOENT
-		}
+	}
+	ac.cacheLock.RUnlock()
+	if doesNotExist {
+		return nil, syscall.ENOENT
 	}
 
 	// Get the attributes from next component and cache them

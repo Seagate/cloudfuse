@@ -957,6 +957,43 @@ func (suite *attrCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	suite.assert.False(empty)
 }
 
+func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingFresh() {
+	defer suite.cleanupTest()
+
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{Name: path}
+	suite.addPathToCache(path, false)
+
+	item, found := suite.attrCache.cache.get(internal.TruncateDirName(path))
+	suite.assert.True(found)
+	item.markListingComplete(time.Now())
+
+	suite.mock.EXPECT().IsDirEmpty(options).MaxTimes(0)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.True(empty)
+}
+
+func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingExpired() {
+	defer suite.cleanupTest()
+	suite.cleanupTest()
+	config := "attr_cache:\n  timeout-sec: 1"
+	suite.setupTestHelper(config)
+
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{Name: path}
+	suite.addPathToCache(path, false)
+
+	item, found := suite.attrCache.cache.get(internal.TruncateDirName(path))
+	suite.assert.True(found)
+	item.markListingComplete(time.Now().Add(-2 * time.Second))
+
+	suite.mock.EXPECT().IsDirEmpty(options).Return(false)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.False(empty)
+}
+
 // Tests Rename Directory
 func (suite *attrCacheTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()
@@ -1833,6 +1870,28 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 			suite.assert.NotNil(checkItem.cachedAt)
 		})
 	}
+}
+
+func (suite *attrCacheTestSuite) TestGetAttrWithCompleteParentListing() {
+	defer suite.cleanupTest()
+
+	parentPath := "dir"
+	childPath := "dir/missing"
+
+	parentItem := suite.attrCache.cache.insert(insertOptions{
+		attr:     internal.CreateObjAttrDir(parentPath),
+		exists:   true,
+		cachedAt: time.Now(),
+	})
+	suite.assert.NotNil(parentItem)
+	parentItem.markListingComplete(time.Now())
+
+	options := internal.GetAttrOptions{Name: childPath}
+	suite.mock.EXPECT().GetAttr(options).MaxTimes(0)
+
+	result, err := suite.attrCache.GetAttr(options)
+	suite.assert.Equal(syscall.ENOENT, err)
+	suite.assert.Nil(result)
 }
 
 // Tests Cache Timeout
