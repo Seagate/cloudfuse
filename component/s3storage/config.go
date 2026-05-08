@@ -66,7 +66,7 @@ type ConfigSecrets struct {
 
 const (
 	defaultHealthCheckInterval = 2 * time.Second
-	maxHealthCheckInterval     = 90 * time.Second
+	maxHealthCheckInterval     = 30 * time.Second
 )
 
 // ParseAndValidateConfig : Parse and validate config
