@@ -27,6 +27,8 @@ package file_cache
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -748,17 +750,18 @@ func (fc *FileCache) StreamDir(
 func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("FileCache::IsDirEmpty : %s", options.Name)
 
-	// Check if directory is empty at remote or not, if container is not empty then return false
+	// Check if directory is empty at remote
 	emptyAtRemote := fc.NextComponent().IsDirEmpty(options)
-	if !emptyAtRemote {
+	connected := fc.NextComponent().CloudConnected()
+	if !emptyAtRemote && connected {
 		log.Debug("FileCache::IsDirEmpty : %s is not empty at remote", options.Name)
 		return emptyAtRemote
 	}
 
-	// Remote is empty so we need to check for the local directory
+	// we need to check for the local directory
 	// While checking local directory we need to ensure that we delete all empty directories and then
 	// return the result.
-	cleanup, err := fc.deleteEmptyDirs(internal.DeleteDirOptions(options))
+	emptyAfterCleanup, err := fc.deleteEmptyDirs(internal.DeleteDirOptions(options))
 	if err != nil {
 		log.Debug(
 			"FileCache::IsDirEmpty : %s failed to delete empty directories [%s]",
@@ -767,8 +770,39 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		)
 		return false
 	}
+	// if the directory is not empty locally after cleanup, return false
+	// if we are connected, then the emptyAtRemote is reliable
+	if !emptyAfterCleanup || connected {
+		return emptyAfterCleanup && emptyAtRemote
+	}
+	// we are offline - is access allowed?
+	if !fc.offlineAccess {
+		log.Err("FileCache::IsDirEmpty : %s blocking offline access", options.Name)
+		return false
+	}
+	// offline access is allowed - pull directory contents from attribute cache
+	sdOptions := internal.StreamDirOptions{Name: options.Name, Count: 1}
+	attrs, _, err := fc.NextComponent().StreamDir(sdOptions)
+	if !cachedData(err) {
+		log.Err("FileCache::IsDirEmpty : %s no attribute cache data (offline)", options.Name)
+		return false
+	}
+	if len(attrs) > 0 {
+		log.Debug("FileCache::IsDirEmpty : %s not empty in attribute cache (offline)", options.Name)
+		return false
+	}
+	// attribute cache has no entries for this directory, but we need to check if it has a complete listing
+	// call GetAttr with a bogus random file name to see if the attribute cache listing is complete
+	b := make([]byte, 12)
+	_, _ = rand.Read(b)
+	bogusFilename := common.JoinUnixFilepath(options.Name, base64.URLEncoding.EncodeToString(b))
+	_, err = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: bogusFilename})
+	if isOffline(err) && isNotExist(err) {
+		log.Info("FileCache::IsDirEmpty : %s proven empty using heroics (offline)", options.Name)
+		return true
+	}
 
-	return cleanup
+	return false
 }
 
 // DeleteEmptyDirs: delete empty directories in local cache, return error if directory is not empty
