@@ -1871,6 +1871,25 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 	}
 }
 
+func (suite *attrCacheTestSuite) TestGetAttrWithCompleteParentListing() {
+	defer suite.cleanupTest()
+
+	parentPath := "dir/"
+	childPath := "dir/missing"
+
+	suite.addPathToCache(parentPath, false)
+	parentItem, found := suite.attrCache.cache.get(parentPath)
+	suite.assert.True(found)
+	parentItem.listingComplete = true
+
+	options := internal.GetAttrOptions{Name: childPath}
+	suite.mock.EXPECT().GetAttr(options).MaxTimes(0)
+
+	result, err := suite.attrCache.GetAttr(options)
+	suite.assert.Equal(syscall.ENOENT, err)
+	suite.assert.Nil(result)
+}
+
 // Tests Cache Timeout
 func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	defer suite.cleanupTest()
