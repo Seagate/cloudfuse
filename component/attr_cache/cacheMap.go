@@ -59,7 +59,7 @@ type attrCacheItem struct {
 	children  map[string]*attrCacheItem
 	parent    *attrCacheItem
 
-	listingCompletedAt time.Time
+	listingComplete bool
 }
 
 // all cache entries are organized into this structure
@@ -152,9 +152,9 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	// add the parent to this item
 	newItem.parent = parentItem
 	// if this changes the parent directory's contents
-	// invalidate the parent's listing cache state
+	// invalidate the parent's listing cache
 	if !fromDirList && newItem.exists() {
-		parentItem.clearListCache()
+		parentItem.listCache = nil
 	}
 	// add the new item to the tree and the map
 	if parentItem.children == nil {
@@ -164,36 +164,12 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	ctm.cacheMap[path] = newItem
 }
 
-func (ctm *cacheTreeMap) getCachedParent(name string) (*attrCacheItem, bool) {
-	if name == "" {
-		return nil, false
-	}
-	parent := getParentDir(name)
-	item, found := ctm.get(parent)
-	if !found || !item.valid() {
-		// drill up recursively
-		return ctm.getCachedParent(parent)
-	}
-	return item, found
-}
-
 func (value *attrCacheItem) valid() bool {
 	return value.attrFlag.IsSet(AttrFlagValid)
 }
 
 func (value *attrCacheItem) exists() bool {
 	return value.valid() && value.attrFlag.IsSet(AttrFlagExists)
-}
-
-func (value *attrCacheItem) clearListCache() {
-	value.listCache = nil
-	value.listingCompletedAt = time.Time{}
-}
-
-func (value *attrCacheItem) markListingComplete(listedAt time.Time) {
-	value.listingCompletedAt = listedAt
-	// Update cachedAt for the directory itself, since a complete listing is fresh information
-	value.cachedAt = listedAt
 }
 
 // TODO: don't return true for deleted files.
@@ -221,11 +197,11 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	for _, val := range value.children {
 		val.markDeleted(deletedTime)
 	}
-	// invalidate the parent's listing cache state
+	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::markDeleted : %s has no pointer to its parent", value.attr.Path)
 	} else {
-		value.parent.clearListCache()
+		value.parent.listCache = nil
 	}
 	// update flags and timestamp
 	value.attrFlag.Clear(AttrFlagExists)
@@ -249,11 +225,11 @@ func (value *attrCacheItem) invalidate() {
 	}
 	// set invalid
 	value.attrFlag.Clear(AttrFlagValid)
-	// invalidate the parent's listing cache state
+	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
 	} else if value.exists() {
-		value.parent.clearListCache()
+		value.parent.listCache = nil
 	}
 }
 
