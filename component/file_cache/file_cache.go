@@ -37,6 +37,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -743,6 +744,21 @@ func (fc *FileCache) StreamDir(
 			}
 		}
 	}
+	// values should be returned in ascending order by key, without duplicates
+	// sort
+	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](
+		attrs,
+		func(a, b *internal.ObjAttr) int {
+			return strings.Compare(a.Path, b.Path)
+		},
+	)
+	// remove duplicates
+	attrs = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](
+		attrs,
+		func(a, b *internal.ObjAttr) bool {
+			return a.Path == b.Path
+		},
+	)
 	return attrs, token, err
 }
 
