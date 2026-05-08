@@ -202,6 +202,7 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 	// get the entry to be marked deleted
 	item, found := ac.cache.get(path)
 	// handle errors and unexpected behavior
+	// TODO: should we avoid throwing a fit when there is no entry?
 	dirExists := found && item.exists()
 	if !dirExists {
 		log.Err("AttrCache::deleteDirectory : %s does not exist", path)
