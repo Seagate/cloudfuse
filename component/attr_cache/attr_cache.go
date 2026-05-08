@@ -405,6 +405,10 @@ func (ac *AttrCache) backgroundCleanup() {
 // cleanupExpiredEntries: removes expired entries from the cache map
 // This runs in a background goroutine to prevent memory leaks
 func (ac *AttrCache) cleanupExpiredEntries() {
+	// do not cleanup when offline
+	if !ac.NextComponent().CloudConnected() {
+		return
+	}
 	// First pass: collect keys to delete under read lock to minimize write lock duration
 	var keysToDelete []string
 
