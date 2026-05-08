@@ -174,6 +174,8 @@ func (suite *fileTestSuite) TestOpenFlag_O_TRUNC() {
 	suite.Equal(0, read)
 	err = srcFile.Close()
 	suite.NoError(err)
+
+	suite.fileTestCleanup([]string{fileName})
 }
 
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {
@@ -471,7 +473,7 @@ func (suite *fileTestSuite) TestFileCopy() {
 	err = dstFile.Close()
 	suite.NoError(err)
 
-	suite.fileTestCleanup([]string{dirName})
+	suite.fileTestCleanup([]string{dirName, fileName})
 }
 
 // # Get stats of a file
