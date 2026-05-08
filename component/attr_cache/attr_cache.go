@@ -430,14 +430,13 @@ func (ac *AttrCache) cleanupExpiredEntries() {
 	if len(keysToDelete) > 0 {
 		ac.cacheLock.Lock()
 		for _, path := range keysToDelete {
-			// Re-check if entry still exists and is still expired
-			if item, exists := ac.cache.cacheMap[path]; exists {
-				if len(item.children) == 0 &&
-					time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+			// Re-check if entry still exists, has no children, and is still expired
+			if item, found := ac.cache.cacheMap[path]; found && len(item.children) == 0 {
+				if time.Since(item.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+					if item.exists() {
+						item.invalidate()
+					}
 					if item.parent != nil {
-						if item.exists() {
-							item.parent.listCache = nil
-						}
 						delete(item.parent.children, item.attr.Name)
 					}
 					delete(ac.cache.cacheMap, path)
@@ -470,7 +469,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		} else {
 			// invalidate existing directory entry (this is redundant but readable)
 			if found {
-				dirAttrCacheItem.invalidate()
+				dirAttrCacheItem.markDeleted(currentTime)
 			}
 			// add (or replace) the directory entry
 			newDirAttr := internal.CreateObjAttrDir(options.Name)
@@ -747,6 +746,7 @@ func (ac *AttrCache) markListingComplete(listDirPath string) {
 	listDirItem, found := ac.cache.get(listDirPath)
 	if found {
 		listDirItem.listingComplete = true
+		listDirItem.cachedAt = time.Now()
 	}
 }
 
@@ -782,7 +782,7 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		return false
 	}
 	// do we have a complete listing?
-	if item.listingComplete {
+	if item.listingComplete && time.Since(item.cachedAt).Seconds() < float64(ac.cacheTimeout) {
 		// we know the directory is empty
 		return true
 	}
@@ -1079,18 +1079,10 @@ func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("AttrCache::CopyToFile : %s", options.Name)
 
 	err := ac.NextComponent().CopyToFile(options)
-	if err != nil {
+	if os.IsNotExist(err) {
 		entry, found := ac.cache.get(options.Name)
-		if found {
-			entry.markDeleted(time.Now())
-		}
-		// todo: invalidating path here rather than updating with etag
-		// due to some changes that are required in az storage comp which
-		// were not necessarily required. Once they were done invalidation
-		// of the attribute can be removed.
-		value, found := ac.cache.get(internal.TruncateDirName(options.Name))
-		if found {
-			value.invalidate()
+		if found && entry.exists() {
+			entry.invalidate()
 		}
 	}
 	return err
@@ -1108,8 +1100,17 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 			return err
 		}
 	}
+	// preserve existing metadata
 	if attr != nil {
-		options.Metadata = attr.Metadata
+		if options.Metadata == nil {
+			options.Metadata = attr.Metadata
+		} else {
+			for key, value := range attr.Metadata {
+				if _, exists := options.Metadata[key]; !exists {
+					options.Metadata[key] = value
+				}
+			}
+		}
 	}
 
 	err = ac.NextComponent().CopyFromFile(options)
@@ -1132,6 +1133,9 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 			entry, found := ac.cache.get(options.Name)
 			if found {
 				entry.invalidate()
+			} else if parent, found := ac.cache.get(getParentDir(options.Name)); found && parent.exists() {
+				parent.listCache = nil
+				parent.listingComplete = false
 			}
 		} else {
 			// replace entry
@@ -1180,55 +1184,53 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// Don't log these by default, as it noticeably affects performance
 	// log.Trace("AttrCache::GetAttr : %s", options.Name)
 
+	// is the answer in the cache?
+	respondFromCache := false
+	var attrFromCache *internal.ObjAttr
+	var errFromCache error
 	ac.cacheLock.RLock()
 	value, found := ac.cache.get(options.Name)
-	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-		ac.cacheLock.RUnlock()
-		// Serve the request from the attribute cache
+	if found && value.valid() {
+		// record cache response
 		if !value.exists() {
-			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
-			return nil, syscall.ENOENT
+			errFromCache = syscall.ENOENT
 		} else {
-			return value.attr, nil
+			attrFromCache = value.attr
+		}
+		// only serve this response if it's not expired
+		if time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
+			respondFromCache = true
 		}
 	}
 	if ac.cacheDirs {
 		// drill up for the nearest valid parent directory attribute cache
-		foundCachedParent := false
-		for parent := getParentDir(options.Name); ; parent = getParentDir(parent) {
-			value, found = ac.cache.get(parent)
-			// skip invalid data
-			if !found || !value.valid() {
-				if parent == "" {
-					// no valid parent found
-					break
-				}
-				continue
+		if parent, found := ac.cache.getCachedParent(options.Name); found {
+			// Remember, we have no entry for options.Name
+			// parent is its nearest valid ancestor
+			// So, if parent doesn't exist, options.Name must not exist
+			// Or, if parent does exist, and the full list of its contents are cached,
+			// then since options.Name is *not* in the cache, it must not exist
+			if !parent.exists() || parent.listingComplete {
+				errFromCache = syscall.ENOENT
+				// only serve this response if it's not expired
+				respondFromCache = time.Since(parent.cachedAt).Seconds() < float64(ac.cacheTimeout)
 			}
-			// don't trust expired entries
-			if time.Since(value.cachedAt).Seconds() > float64(ac.cacheTimeout) {
-				break
-			}
-			// found the nearest cached parent
-			// if it does not exist, or has a complete listing, then our target does not exist
-			foundCachedParent = !value.exists() || value.listingComplete
-		}
-		ac.cacheLock.RUnlock()
-		if foundCachedParent {
-			return nil, syscall.ENOENT
 		}
 	}
+	ac.cacheLock.RUnlock()
+	if respondFromCache {
+		return attrFromCache, errFromCache
+	}
 
-	// Get the attributes from next component and cache them
+	// The answer is not cached, or it's expired
+	// Get the attributes from next component
 	pathAttr, err := ac.NextComponent().GetAttr(options)
-
-	ac.cacheLock.Lock()
-	defer ac.cacheLock.Unlock()
-
 	switch {
 	case err == nil:
 		// Retrieved attributes so cache them
 		log.Debug("AttrCache::GetAttr : %s Caching record from cloud", options.Name)
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
 			exists:   true,
@@ -1240,6 +1242,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	case err == syscall.ENOENT:
 		// cache this entity not existing
 		log.Debug("AttrCache::GetAttr : %s Caching ENOENT from cloud", options.Name)
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
 			exists:   false,
@@ -1247,45 +1251,14 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		})
 	case errors.Is(err, &common.CloudUnreachableError{}):
 		// the cloud connection is down
-		// do we have an entry, but it's expired? Let's serve that.
-		if found && value.valid() {
-			// Serve the request from the attribute cache
-			if !value.exists() {
-				log.Debug("AttrCache::GetAttr : %s ENOENT found in cache (offline)", options.Name)
-				return nil, errors.Join(syscall.ENOENT, err)
-			} else {
-				log.Debug("AttrCache::GetAttr : %s Entry found in cache (offline)", options.Name)
-				return value.attr, err
-			}
-		}
-		// drill up to the nearest parent with valid cached attributes
-		// to infer whether this entity could exist in cloud storage
-		log.Debug("AttrCache::GetAttr : %s drilling up... (offline)", options.Name)
-		for parent := getParentDir(options.Name); ; parent = getParentDir(parent) {
-			value, found = ac.cache.get(parent)
-			if !found || !value.valid() {
-				if parent == "" {
-					log.Warn("AttrCache::GetAttr : %s no root listing (offline)", options.Name)
-					return nil, common.NewNoCachedDataError(err)
-				}
-				log.Debug(
-					"AttrCache::GetAttr : %s - %s drilling up... (offline)",
-					options.Name,
-					parent,
-				)
-				continue
-			}
-			switch {
-			case !value.exists():
-				log.Debug("AttrCache::GetAttr : %s - %s ENOENT (offline)", options.Name, parent)
-				return nil, errors.Join(syscall.ENOENT, err)
-			case value.listingComplete:
-				log.Debug("AttrCache::GetAttr : %s - %s no entry (offline)", options.Name, parent)
-				return nil, errors.Join(syscall.ENOENT, err)
-			default:
-				log.Err("AttrCache::GetAttr : %s No cached data (offline)", options.Name)
-				return nil, common.NewNoCachedDataError(err)
-			}
+		// do we have an expired response from cache? Let's serve that.
+		haveExpiredResponse := attrFromCache != nil || errFromCache != nil
+		if haveExpiredResponse {
+			log.Warn("AttrCache::GetAttr : %s Serving expired cached data (offline)", options.Name)
+			return attrFromCache, errors.Join(errFromCache, err)
+		} else {
+			log.Err("AttrCache::GetAttr : %s No cached data (offline)", options.Name)
+			return nil, common.NewNoCachedDataError(err)
 		}
 	}
 	return pathAttr, err
@@ -1331,6 +1304,12 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 		toBeInvalid, found := ac.cache.get(options.Handle.Path)
 		if found {
 			toBeInvalid.invalidate()
+		} else if parent, found := ac.cache.get(getParentDir(options.Handle.Path)); found && parent.exists() {
+			parent.listCache = nil
+			parent.listingComplete = false
+		}
+		if ac.cacheDirs {
+			ac.markAncestorsInCloud(getParentDir(options.Handle.Path), time.Now())
 		}
 	}
 	return err
@@ -1378,6 +1357,12 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 		entry, found := ac.cache.get(options.Name)
 		if found {
 			entry.invalidate()
+		} else if parent, found := ac.cache.get(getParentDir(options.Name)); found && parent.exists() {
+			parent.listCache = nil
+			parent.listingComplete = false
+		}
+		if ac.cacheDirs {
+			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	}
 	return err

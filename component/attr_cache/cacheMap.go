@@ -164,6 +164,19 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	ctm.cacheMap[path] = newItem
 }
 
+func (ctm *cacheTreeMap) getCachedParent(name string) (*attrCacheItem, bool) {
+	if name == "" {
+		return nil, false
+	}
+	parent := getParentDir(name)
+	item, found := ctm.get(parent)
+	if !found || !item.valid() {
+		// drill up recursively
+		return ctm.getCachedParent(parent)
+	}
+	return item, found
+}
+
 func (value *attrCacheItem) valid() bool {
 	return value.attrFlag.IsSet(AttrFlagValid)
 }
@@ -230,6 +243,7 @@ func (value *attrCacheItem) invalidate() {
 		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
 	} else if value.exists() {
 		value.parent.listCache = nil
+		value.parent.listingComplete = false
 	}
 }
 
