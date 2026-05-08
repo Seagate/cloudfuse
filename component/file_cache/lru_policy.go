@@ -336,7 +336,7 @@ func (p *lruPolicy) UpdateConfig(c cachePolicyConfig) error {
 func (p *lruPolicy) CacheValid(name string) {
 	_, found := p.nodeMap.Load(name)
 	if !found {
-		p.cacheValidate(name)
+		p.cacheValidate(name, true)
 	} else {
 		p.validateChan <- name
 	}
@@ -383,11 +383,8 @@ func (p *lruPolicy) asyncCacheValid() {
 		case name := <-p.validateChan:
 			// validateChan only gets names that are already cached
 			// if the file is not in the map anymore, then it was deleted,
-			// which means calling cacheValidate now would be a bug
-			_, found := p.nodeMap.Load(name)
-			if found {
-				p.cacheValidate(name)
-			}
+			// so call cacheValidate with create=false (don't resurrect deleted nodes)
+			p.cacheValidate(name, false)
 
 		case <-p.closeSignalValidate:
 			return
@@ -395,15 +392,25 @@ func (p *lruPolicy) asyncCacheValid() {
 	}
 }
 
-func (p *lruPolicy) cacheValidate(name string) {
+func (p *lruPolicy) cacheValidate(name string, create bool) {
 
-	// get existing entry, or if it doesn't exist then
-	//  write a new one and return it
-	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
-		name: name,
-		next: nil,
-		prev: nil,
-	})
+	var val any
+	if create {
+		// get existing entry, or if it doesn't exist then
+		//  write a new one and return it
+		val, _ = p.nodeMap.LoadOrStore(name, &lruNode{
+			name: name,
+			next: nil,
+			prev: nil,
+		})
+	} else {
+		// get existing entry, and quit if missing
+		var found bool
+		val, found = p.nodeMap.Load(name)
+		if !found {
+			return
+		}
+	}
 	node := val.(*lruNode)
 
 	// protect node data
