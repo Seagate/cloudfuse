@@ -957,6 +957,42 @@ func (suite *attrCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	suite.assert.False(empty)
 }
 
+func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingFresh() {
+	defer suite.cleanupTest()
+
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{Name: path}
+	suite.addPathToCache(path, false)
+
+	item, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	item.listingComplete = true
+
+	suite.mock.EXPECT().IsDirEmpty(options).MaxTimes(0)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.True(empty)
+}
+
+func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingExpired() {
+	defer suite.cleanupTest()
+
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{Name: path}
+	suite.addPathToCache(path, false)
+
+	item, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	item.listingComplete = true
+	item.cachedAt = time.Now().
+		Add(-(time.Duration(suite.attrCache.cacheTimeout) * time.Second) - time.Minute)
+
+	suite.mock.EXPECT().IsDirEmpty(options).Return(false)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.False(empty)
+}
+
 // Tests Rename Directory
 func (suite *attrCacheTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()
