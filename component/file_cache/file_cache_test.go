@@ -986,6 +986,102 @@ func (suite *fileCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	suite.assert.False(empty)
 }
 
+func (suite *fileCacheTestSuite) TestIsDirEmptyOfflineEmptyDir() {
+	// Offline: attribute cache has no entries and GetAttr confirms listing is complete -> empty
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "offline-empty-dir"
+	suite.mock.EXPECT().
+		IsDirEmpty(internal.IsDirEmptyOptions{Name: dir}).
+		Return(false)
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: dir, Count: 1}).
+		Return(nil, "", &common.CloudUnreachableError{})
+	suite.mock.EXPECT().
+		GetAttr(gomock.Any()).
+		Return(nil, common.NewCloudUnreachableError(os.ErrNotExist))
+
+	empty := suite.fileCache.IsDirEmpty(internal.IsDirEmptyOptions{Name: dir})
+	suite.assert.True(empty)
+}
+
+func (suite *fileCacheTestSuite) TestIsDirEmptyOfflineEmptyDirListingIncomplete() {
+	// Offline: attribute cache has no entries and GetAttr confirms listing is complete -> empty
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "offline-empty-dir"
+	suite.mock.EXPECT().
+		IsDirEmpty(internal.IsDirEmptyOptions{Name: dir}).
+		Return(false)
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: dir, Count: 1}).
+		Return(nil, "", &common.CloudUnreachableError{})
+	suite.mock.EXPECT().GetAttr(gomock.Any()).
+		Return(nil, common.NewNoCachedDataError(common.NewCloudUnreachableError(nil)))
+
+	empty := suite.fileCache.IsDirEmpty(internal.IsDirEmptyOptions{Name: dir})
+	suite.assert.False(empty)
+}
+
+func (suite *fileCacheTestSuite) TestIsDirEmptyOfflineEmptyDirBlocked() {
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  block-offline-access: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "offline-empty-dir"
+	suite.mock.EXPECT().
+		IsDirEmpty(internal.IsDirEmptyOptions{Name: dir}).
+		Return(false)
+
+	empty := suite.fileCache.IsDirEmpty(internal.IsDirEmptyOptions{Name: dir})
+	suite.assert.False(empty)
+}
+
+func (suite *fileCacheTestSuite) TestIsDirEmptyOfflineNonEmptyDir() {
+	// Offline: attribute cache has entries -> not empty
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "offline-nonempty-dir"
+	attrs := []*internal.ObjAttr{
+		{Path: dir + "/file1", Name: "file1"},
+	}
+	suite.mock.EXPECT().
+		IsDirEmpty(internal.IsDirEmptyOptions{Name: dir}).
+		Return(false)
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: dir, Count: 1}).
+		Return(attrs, "", &common.CloudUnreachableError{})
+
+	empty := suite.fileCache.IsDirEmpty(internal.IsDirEmptyOptions{Name: dir})
+	suite.assert.False(empty)
+}
+
 func (suite *fileCacheTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()
 
