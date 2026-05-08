@@ -65,7 +65,7 @@ type ConfigSecrets struct {
 }
 
 const (
-	defaultHealthCheckInterval = 10 * time.Second
+	defaultHealthCheckInterval = 2 * time.Second
 	maxHealthCheckInterval     = 90 * time.Second
 )
 
