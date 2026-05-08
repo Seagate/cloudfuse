@@ -872,9 +872,14 @@ func TestFileTestSuite(t *testing.T) {
 		fmt.Printf("Could not cleanup feature dir before testing [%s]\n", err.Error())
 	}
 
+	// Validate mount path exists before trying to create subdirectories
+	if _, err := os.Stat(fileTestPathPtr); err != nil {
+		t.Fatalf("Mount path does not exist or is not accessible: %s [%v]", fileTestPathPtr, err)
+	}
+
 	err = os.Mkdir(fileTest.testPath, 0777)
 	if err != nil {
-		t.Errorf("Failed to create test directory [%s]\n", err.Error())
+		t.Fatalf("Failed to create test directory [%s]", err.Error())
 	}
 	_, _ = rand.Read(fileTest.minBuff)
 	_, _ = rand.Read(fileTest.medBuff)
