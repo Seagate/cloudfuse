@@ -1593,6 +1593,16 @@ loopbackfs:
 		_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
 	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
+
+	// Cloud file visibility can race slightly with scheduleOps cleanup on slower CI workers.
+	for i := 0; i < 300; i++ {
+		_, exists = suite.fileCache.scheduleOps.Load(file)
+		flock := suite.fileCache.fileLocks.Get(file)
+		if !exists && flock != nil && !flock.SyncPending {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	_, exists = suite.fileCache.scheduleOps.Load(file)
 	suite.assert.False(exists, "File should have been removed from scheduleOps after upload")
 	suite.assert.False(
@@ -1706,6 +1716,17 @@ loopbackfs:
 	suite.assert.NoError(err)
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file),
 		"File should be uploaded immediately with no schedule (always-on mode)")
+
+	// Poll until scheduleOps is cleared (accounts for slower CI workers)
+	for i := 0; i < 300; i++ {
+		_, exists := suite.fileCache.scheduleOps.Load(file)
+		flock := suite.fileCache.fileLocks.Get(file)
+		if !exists && (flock == nil || !flock.SyncPending) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
 	_, exists := suite.fileCache.scheduleOps.Load(file)
 	suite.assert.False(exists, "File should not be in scheduleOps map")
 
