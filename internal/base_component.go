@@ -84,6 +84,13 @@ func (base *BaseComponent) Stop() error {
 	return nil
 }
 
+func (base *BaseComponent) CloudConnected() bool {
+	if base.next != nil {
+		return base.next.CloudConnected()
+	}
+	return false
+}
+
 // Directory operations
 func (base *BaseComponent) CreateDir(options CreateDirOptions) error {
 	if base.next != nil {
