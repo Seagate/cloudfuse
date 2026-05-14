@@ -581,14 +581,14 @@ func (ac *AttrCache) StreamDir(
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
-	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](
+	slices.SortFunc(
 		pathList,
 		func(a, b *internal.ObjAttr) int {
 			return strings.Compare(a.Path, b.Path)
 		},
 	)
 	// remove duplicates
-	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](
+	pathList = slices.CompactFunc(
 		pathList,
 		func(a, b *internal.ObjAttr) bool {
 			return a.Path == b.Path
