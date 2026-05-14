@@ -224,7 +224,7 @@ func (s3 *S3Storage) timeToRetry() bool {
 	case timeSinceLastAttempt < s3.stConfig.healthCheckInterval:
 		// minimum delay before retrying
 		return false
-	case timeSinceLastAttempt > 90*time.Second:
+	case timeSinceLastAttempt > maxHealthCheckInterval:
 		// maximum delay
 		return true
 	default:

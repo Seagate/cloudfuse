@@ -1826,6 +1826,7 @@ func (suite *attrCacheTestSuite) TestGetAttrDoesNotExist() {
 func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 	defer suite.cleanupTest()
 	var paths = []string{"a", "a/"}
+	errOther := errors.New("some other error")
 
 	for _, path := range paths {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -1835,10 +1836,10 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 			truncatedPath := internal.TruncateDirName(path)
 
 			options := internal.GetAttrOptions{Name: path}
-			suite.mock.EXPECT().GetAttr(options).Return(nil, os.ErrNotExist)
+			suite.mock.EXPECT().GetAttr(options).Return(nil, errOther)
 
 			result, err := suite.attrCache.GetAttr(options)
-			suite.assert.Equal(err, os.ErrNotExist)
+			suite.assert.Equal(errOther, err)
 			suite.assert.Nil(result)
 			suite.assertNotInCache(truncatedPath)
 		})

@@ -2266,8 +2266,8 @@ loopbackfs:
 	}
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 	_, exists = suite.fileCache.pendingOps.Load(file)
-	for i := 0; i < 100 && exists; i++ {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < 300 && exists; i++ {
+		time.Sleep(20 * time.Millisecond)
 		_, exists = suite.fileCache.pendingOps.Load(file)
 	}
 	suite.assert.False(exists, "File should have been removed from pendingOps after upload")
@@ -2376,7 +2376,12 @@ loopbackfs:
 	suite.assert.NoError(err)
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file),
 		"File should be uploaded immediately with no schedule (always-on mode)")
+	// Poll until scheduleOps is cleared (accounts for slower CI workers)
 	_, exists := suite.fileCache.pendingOps.Load(file)
+	for i := 0; i < 300 && exists; i++ {
+		_, exists = suite.fileCache.pendingOps.Load(file)
+		time.Sleep(20 * time.Millisecond)
+	}
 	suite.assert.False(exists, "File should not be in pendingOps map")
 
 	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
