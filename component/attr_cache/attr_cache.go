@@ -750,8 +750,17 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	}
 	// Is the directory in our cache?
 	ac.cacheLock.RLock()
-	defer ac.cacheLock.RUnlock()
 	item, found := ac.cache.get(options.Name)
+	// Check if the cached directory is empty or not
+	hasChildren := false
+	if found && item.exists() {
+		for _, childItem := range item.children {
+			if childItem.exists() {
+				hasChildren = true
+			}
+		}
+	}
+	ac.cacheLock.RUnlock()
 	// If the directory does not exist in the attribute cache then let the next component answer
 	if !found || !item.exists() {
 		log.Debug(
@@ -761,8 +770,7 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		return ac.NextComponent().IsDirEmpty(options)
 	}
 	log.Debug("AttrCache::IsDirEmpty : %s found in attr_cache", options.Name)
-	// Check if the cached directory is empty or not
-	if item.hasExistingChildren() {
+	if hasChildren {
 		log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache", options.Name)
 		return false
 	}
@@ -777,15 +785,6 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		options.Name,
 	)
 	return ac.NextComponent().IsDirEmpty(options)
-}
-
-func (value *attrCacheItem) hasExistingChildren() bool {
-	for _, childItem := range value.children {
-		if childItem.exists() {
-			return true
-		}
-	}
-	return false
 }
 
 // RenameDir : Mark the source directory and all its contents deleted.
