@@ -1214,7 +1214,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// response is valid - cache it
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
-	if err == nil {
+	switch err {
+	case nil:
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -1224,7 +1225,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	} else {
+	case syscall.ENOENT:
 		// cache this entity not existing
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
