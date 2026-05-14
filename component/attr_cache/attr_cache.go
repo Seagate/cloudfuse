@@ -478,12 +478,12 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			})
 			// insert returns nil when entries are maxed out
 			if dirAttrCacheItem != nil {
-				// update flag for tracking directory existence
 				if ac.cacheDirs {
+					// update flag for tracking directory existence
 					dirAttrCacheItem.markInCloud(false)
+					// this is a new directory, so we have a complete (empty) listing for it
+					dirAttrCacheItem.listingComplete = true
 				}
-				// this is a new directory, so we have a complete (empty) listing for it
-				dirAttrCacheItem.listingComplete = true
 			}
 			// if this is a new entry, update the parent directory timestamps
 			if err == nil {
