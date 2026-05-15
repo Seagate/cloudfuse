@@ -1331,13 +1331,15 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 	log.Trace("AttrCache::CommitData : %s", options.Name)
 	err := ac.NextComponent().CommitData(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		entry, found := ac.cache.get(options.Name)
 		if found {
 			entry.invalidate()
-		} else if parent, found := ac.cache.get(getParentDir(options.Name)); found && parent.exists() {
+		}
+		// make sure parent gets a fresh listing after this change
+		if parent, found := ac.cache.get(getParentDir(options.Name)); found && parent.exists() {
 			parent.listCache = nil
 			parent.listingComplete = false
 		}
