@@ -375,5 +375,5 @@ func offlineDataAvailable(err error) bool {
 
 // checks whether we have usable metadata, despite being offline
 func cachedData(err error) bool {
-	return !errors.Is(err, &common.NoCachedDataError{}) || !isOffline(err)
+	return !(isOffline(err) && errors.Is(err, &common.NoCachedDataError{}))
 }
