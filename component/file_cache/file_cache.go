@@ -568,7 +568,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 	}
 
 	// we are offline
-	// check if the directory inCloud in cloud storage
+	// check if the directory exists in cloud storage
 	cloudStateKnown, inCloud, err := fc.checkCloud(options.Name)
 	notInCloud := cloudStateKnown && !inCloud
 	switch {
@@ -606,7 +606,6 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		)
 	default:
 		// the directory already exists in cloud storage
-		err = os.ErrExist
 		// use distinct log messages for when the attribute cache entry is valid or expired
 		if err == nil { // valid
 			log.Warn("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
@@ -616,6 +615,8 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 				options.Name,
 			)
 		}
+		// return EEXIST
+		err = os.ErrExist
 	}
 	return err
 }
