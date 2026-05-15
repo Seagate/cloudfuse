@@ -308,7 +308,7 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-file-path=stdout --log-level=LOG_DEBUG --foreground=true &
 
           READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
