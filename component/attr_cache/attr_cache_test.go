@@ -993,6 +993,37 @@ func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingExpired() {
 	suite.assert.False(empty)
 }
 
+func (suite *attrCacheTestSuite) TestCommitData() {
+	defer suite.cleanupTest()
+
+	path := "dir/file"
+	parentPath := "dir"
+
+	suite.addPathToCache(path, false)
+
+	parentItem, found := suite.attrCache.cache.get(parentPath)
+	suite.assert.True(found)
+	parentItem.listingComplete = true
+	parentItem.listCache = map[string]listCacheSegment{
+		"": {
+			cachedAt: time.Now(),
+		},
+	}
+
+	entry, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	suite.assert.True(entry.valid())
+
+	options := internal.CommitDataOptions{Name: path}
+	suite.mock.EXPECT().CommitData(options).Return(nil)
+
+	err := suite.attrCache.CommitData(options)
+	suite.assert.NoError(err)
+	suite.assert.False(entry.valid())
+	suite.assert.False(parentItem.listingComplete)
+	suite.assert.Nil(parentItem.listCache)
+}
+
 // Tests Rename Directory
 func (suite *attrCacheTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()
