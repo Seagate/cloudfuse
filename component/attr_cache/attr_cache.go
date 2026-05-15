@@ -525,21 +525,20 @@ func (ac *AttrCache) addDirsNotInCloudToListing(
 	pathList []*internal.ObjAttr,
 ) ([]*internal.ObjAttr, int) {
 	numAdded := 0
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
 
 	dir, found := ac.cache.get(listPath)
 	if !found || !dir.exists() {
 		log.Err("AttrCache:: addDirsNotInCloudToListing : %s does not exist in cache", listPath)
 		return pathList, 0
 	}
-
-	ac.cacheLock.RLock()
 	for _, child := range dir.children {
 		if child.exists() && !child.isInCloud() {
 			pathList = append(pathList, child.attr)
 			numAdded++
 		}
 	}
-	ac.cacheLock.RUnlock()
 
 	return pathList, numAdded
 }
