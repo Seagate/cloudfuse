@@ -128,10 +128,10 @@ type NoCachedDataError struct {
 	CacheError error
 }
 
-func NewNoCachedDataError(originalError error) CloudUnreachableError {
-	return CloudUnreachableError{
-		Message:           "Failed to connect to cloud storage",
-		CloudStorageError: originalError,
+func NewNoCachedDataError(originalError error) NoCachedDataError {
+	return NoCachedDataError{
+		Message:    "Failed to connect to cloud storage",
+		CacheError: originalError,
 	}
 }
 func (e NoCachedDataError) Error() string {
