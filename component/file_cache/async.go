@@ -225,6 +225,8 @@ func (fc *FileCache) servicePendingOps() {
 			return
 		case <-fc.startScheduledUploads:
 			// check if we're connected
+			// exponential backoff is implemented inside CloudConnected(),
+			//  so we're safe to call it naively every second like this
 			if !fc.NextComponent().CloudConnected() {
 				// we are offline, wait for a while before checking again
 				select {
