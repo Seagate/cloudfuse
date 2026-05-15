@@ -305,6 +305,7 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
           set +e
           rm -rf ${MOUNT_DIR}/*
@@ -333,7 +334,7 @@ jobs:
           cd -
 
           echo "::group::cloudfuse block-cache logs (tail)"
-          tail -n 400 ${CF_LOG_PATH} || true
+          tail -n 4000 ${CF_LOG_PATH} || true
           echo "::endgroup::"
 
           sudo fusermount -u ${MOUNT_DIR} -z
@@ -1305,6 +1306,7 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
           set +e
           rm -rf ${BLOCK_TEMP_DIR}/*
@@ -1333,7 +1335,7 @@ jobs:
           kill $pid
 
           echo "::group::cloudfuse block-cache logs (tail)"
-          tail -n 400 ${CF_LOG_PATH} || true
+          tail -n 4000 ${CF_LOG_PATH} || true
           echo "::endgroup::"
 
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
