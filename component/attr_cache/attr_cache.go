@@ -1183,8 +1183,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		} else {
 			attrFromCache = value.attr
 		}
-	}
-	if ac.cacheDirs {
+	} else if ac.cacheDirs {
 		// drill up for the nearest valid parent directory attribute cache
 		parent, found := ac.cache.getCachedParent(options.Name)
 		if found && time.Since(parent.cachedAt).Seconds() < float64(ac.cacheTimeout) {
