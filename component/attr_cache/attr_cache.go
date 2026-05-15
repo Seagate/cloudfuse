@@ -1178,9 +1178,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Serve the request from the attribute cache
 		respondFromCache = true
 		if !value.exists() {
-			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
+			log.Debug("AttrCache::GetAttr : %s found, (ENOENT) served from cache", options.Name)
 			errFromCache = syscall.ENOENT
 		} else {
+			log.Debug("AttrCache::GetAttr : %s found, served from cache", options.Name)
 			attrFromCache = value.attr
 		}
 	} else if ac.cacheDirs {
@@ -1193,6 +1194,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// Or, if parent does exist, and the full list of its contents are cached,
 			// then since options.Name is *not* in the cache, it must not exist
 			if !parent.exists() || parent.listingComplete {
+				log.Debug(
+					"AttrCache::GetAttr : %s not found, but parent exists(%t) or has a complete listing. ENOENT served from cache",
+					options.Name,
+					parent.exists(),
+				)
 				respondFromCache = true
 				errFromCache = syscall.ENOENT
 			}
@@ -1208,6 +1214,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	pathAttr, err := ac.NextComponent().GetAttr(options)
 	// return unexpected errors immediately (no valid response to cache)
 	if err != nil && !os.IsNotExist(err) {
+		log.Debug("AttrCache::GetAttr : %s encountered error [%v]", options.Name, err)
 		return pathAttr, err
 	}
 	// response is valid - cache it
@@ -1215,6 +1222,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	defer ac.cacheLock.Unlock()
 	switch err {
 	case nil:
+		log.Debug("AttrCache::GetAttr : %s got attributes from cloud, caching result", options.Name)
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -1225,6 +1233,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	case syscall.ENOENT:
+		log.Debug("AttrCache::GetAttr : %s not found, caching ENOENT result", options.Name)
 		// cache this entity not existing
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
