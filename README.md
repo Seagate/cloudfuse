@@ -310,9 +310,9 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 
 ## Offline Access (New)
 
-Cloudfuse now supports offline access through the `file_cache` component. When cloud storage is unreachable, reads and writes continue against the local cache and are flushed to cloud storage once connectivity is restored. The feature is enabled by default and can be disabled via the `block-offline-access` flag.
+Cloudfuse now supports offline access through the `file_cache` component. When cloud storage is unreachable, reads and writes continue against the local cache and are flushed to cloud storage once connectivity is restored. The feature is **enabled by default** and can be disabled via the `block-offline-access` flag.
 
-> **Note:** Because Cloudfuse uses eventual consistency with last-writer-wins semantics, offline access can extend the consistency window indefinitely and increases the risk of data conflicts in multi-client setups. See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
+> **Note:** Cloudfuse uses eventual consistency with last-writer-wins semantics. Offline access can extend the consistency window indefinitely and **increases the risk of data conflicts in multi-client setups!** See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
 
 ## Limitations
 
