@@ -810,6 +810,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	}
 	// attribute cache has no entries for this directory, but we need to check if it has a complete listing
 	// call GetAttr with a bogus random file name to see if the attribute cache listing is complete
+	// this is janky, but it improves offline access while preserving a simple IsDirEmpty interface
 	b := make([]byte, 12)
 	_, _ = rand.Read(b)
 	bogusFilename := common.JoinUnixFilepath(options.Name, base64.URLEncoding.EncodeToString(b))
