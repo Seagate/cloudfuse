@@ -236,15 +236,15 @@ func (value *attrCacheItem) invalidate() {
 	for _, val := range value.children {
 		val.invalidate()
 	}
-	// set invalid
-	value.attrFlag.Clear(AttrFlagValid)
 	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
-	} else if value.exists() {
+	} else if value.parent.exists() {
 		value.parent.listCache = nil
 		value.parent.listingComplete = false
 	}
+	// set invalid
+	value.attrFlag.Clear(AttrFlagValid)
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {

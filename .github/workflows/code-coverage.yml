@@ -305,6 +305,7 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
@@ -1047,6 +1048,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      MOUNT_READY_TIMEOUT: 60
       GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
@@ -1291,6 +1293,7 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
           rm -rf ${BLOCK_TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &

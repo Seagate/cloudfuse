@@ -531,21 +531,20 @@ func (ac *AttrCache) addDirsNotInCloudToListing(
 	pathList []*internal.ObjAttr,
 ) ([]*internal.ObjAttr, int) {
 	numAdded := 0
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
 
 	dir, found := ac.cache.get(listPath)
 	if !found || !dir.exists() {
 		log.Err("AttrCache:: addDirsNotInCloudToListing : %s does not exist in cache", listPath)
 		return pathList, 0
 	}
-
-	ac.cacheLock.RLock()
 	for _, child := range dir.children {
 		if child.exists() && !child.isInCloud() {
 			pathList = append(pathList, child.attr)
 			numAdded++
 		}
 	}
-	ac.cacheLock.RUnlock()
 
 	return pathList, numAdded
 }
@@ -647,8 +646,8 @@ func (ac *AttrCache) fetchCachedDirList(
 		return nil, "", fmt.Errorf("cache on list is disabled")
 	}
 	// start accessing the cache
-	ac.cacheLock.RLock()
-	defer ac.cacheLock.RUnlock()
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
 	// get directory cache item
 	listDirCache, found := ac.cache.get(path)
 	if !found {
@@ -1083,6 +1082,8 @@ func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
 
 	err := ac.NextComponent().CopyToFile(options)
 	if os.IsNotExist(err) {
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		entry, found := ac.cache.get(options.Name)
 		if found && entry.exists() {
 			entry.invalidate()
@@ -1196,8 +1197,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	if found && value.valid() {
 		// record cache response
 		if !value.exists() {
+			// log.Debug("AttrCache::GetAttr : %s found, (ENOENT) served from cache", options.Name)
 			errFromCache = syscall.ENOENT
 		} else {
+			// log.Debug("AttrCache::GetAttr : %s found, served from cache", options.Name)
 			attrFromCache = value.attr
 		}
 		// only serve this response if it's not expired
@@ -1205,7 +1208,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			respondFromCache = true
 		}
 	}
-	if ac.cacheDirs {
+	if ac.cacheDirs && !respondFromCache {
 		// drill up for the nearest valid parent directory attribute cache
 		if parent, found := ac.cache.getCachedParent(options.Name); found {
 			// Remember, we have no entry for options.Name
@@ -1214,6 +1217,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// Or, if parent does exist, and the full list of its contents are cached,
 			// then since options.Name is *not* in the cache, it must not exist
 			if !parent.exists() || parent.listingComplete {
+				// log.Debug(
+				// 	"AttrCache::GetAttr : %s not found, but parent exists(%t) or has a complete listing. ENOENT served from cache",
+				// 	options.Name,
+				// 	parent.exists(),
+				// )
 				errFromCache = syscall.ENOENT
 				// only serve this response if it's not expired
 				respondFromCache = time.Since(parent.cachedAt).Seconds() < float64(ac.cacheTimeout)
@@ -1263,6 +1271,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			log.Err("AttrCache::GetAttr : %s No cached data (offline)", options.Name)
 			return nil, common.NewNoCachedDataError(err)
 		}
+	default:
+		log.Err("AttrCache::GetAttr : %s encountered error [%v]", options.Name, err)
 	}
 	return pathAttr, err
 }
@@ -1354,8 +1364,8 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 	log.Trace("AttrCache::CommitData : %s", options.Name)
 	err := ac.NextComponent().CommitData(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		entry, found := ac.cache.get(options.Name)
 		if found {
