@@ -621,8 +621,8 @@ func (ac *AttrCache) fetchCachedDirList(
 		return nil, "", fmt.Errorf("cache on list is disabled")
 	}
 	// start accessing the cache
-	ac.cacheLock.RLock()
-	defer ac.cacheLock.RUnlock()
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
 	// get directory cache item
 	listDirCache, found := ac.cache.get(path)
 	if !found {
@@ -1063,6 +1063,8 @@ func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
 
 	err := ac.NextComponent().CopyToFile(options)
 	if os.IsNotExist(err) {
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		entry, found := ac.cache.get(options.Name)
 		if found && entry.exists() {
 			entry.invalidate()
@@ -1177,10 +1179,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Serve the request from the attribute cache
 		respondFromCache = true
 		if !value.exists() {
-			log.Debug("AttrCache::GetAttr : %s found, (ENOENT) served from cache", options.Name)
+			// log.Debug("AttrCache::GetAttr : %s found, (ENOENT) served from cache", options.Name)
 			errFromCache = syscall.ENOENT
 		} else {
-			log.Debug("AttrCache::GetAttr : %s found, served from cache", options.Name)
+			// log.Debug("AttrCache::GetAttr : %s found, served from cache", options.Name)
 			attrFromCache = value.attr
 		}
 	} else if ac.cacheDirs {
@@ -1193,11 +1195,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// Or, if parent does exist, and the full list of its contents are cached,
 			// then since options.Name is *not* in the cache, it must not exist
 			if !parent.exists() || parent.listingComplete {
-				log.Debug(
-					"AttrCache::GetAttr : %s not found, but parent exists(%t) or has a complete listing. ENOENT served from cache",
-					options.Name,
-					parent.exists(),
-				)
+				// log.Debug(
+				// 	"AttrCache::GetAttr : %s not found, but parent exists(%t) or has a complete listing. ENOENT served from cache",
+				// 	options.Name,
+				// 	parent.exists(),
+				// )
 				respondFromCache = true
 				errFromCache = syscall.ENOENT
 			}

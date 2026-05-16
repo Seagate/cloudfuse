@@ -307,13 +307,9 @@ jobs:
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
           CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
-          set +e
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
-          CF_LOG_PATH=${WORK_DIR}/cloudfuse_block_cache_debug.log
-          rm -f ${CF_LOG_PATH}
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-file-path=${CF_LOG_PATH} --log-level=LOG_DEBUG --foreground=true &
-          CFL_PID=$!
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
           READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
@@ -330,12 +326,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
-          TEST_RC=$?
           cd -
-
-          echo "::group::cloudfuse block-cache logs (tail)"
-          tail -n 4000 ${CF_LOG_PATH} || true
-          echo "::endgroup::"
 
           sudo fusermount -u ${MOUNT_DIR} -z
 
@@ -348,10 +339,6 @@ jobs:
             sleep $POLL_INTERVAL
             SECONDS_WAITED_UNMOUNT=$((SECONDS_WAITED_UNMOUNT + POLL_INTERVAL))
           done
-
-          if [ ${TEST_RC} -ne 0 ]; then
-            exit ${TEST_RC}
-          fi
 
       - name: Create Config File - ADLS
         env:
@@ -1308,11 +1295,8 @@ jobs:
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
           CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
-          set +e
           rm -rf ${BLOCK_TEMP_DIR}/*
-          CF_LOG_PATH=${WORK_DIR}/cloudfuse_block_cache_debug.log
-          rm -f ${CF_LOG_PATH}
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-file-path=${CF_LOG_PATH} --log-level=LOG_DEBUG --foreground=true &
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
           READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
@@ -1330,13 +1314,8 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR} -quick-test=true -stream-direct-test=true
-          TEST_RC=$?
           cd -
           kill $pid
-
-          echo "::group::cloudfuse block-cache logs (tail)"
-          tail -n 4000 ${CF_LOG_PATH} || true
-          echo "::endgroup::"
 
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
@@ -1347,10 +1326,6 @@ jobs:
             sleep $POLL_INTERVAL
             SECONDS_WAITED_EXIT=$((SECONDS_WAITED_EXIT + POLL_INTERVAL))
           done
-
-          if [ ${TEST_RC} -ne 0 ]; then
-            exit ${TEST_RC}
-          fi
 
       - name: Create Config File - ADLS
         shell: bash
