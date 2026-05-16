@@ -327,7 +327,6 @@ jobs:
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
           cd -
-
           sudo fusermount -u ${MOUNT_DIR} -z
 
           UNMOUNT_TIMEOUT=30
