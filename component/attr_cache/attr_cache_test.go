@@ -265,7 +265,6 @@ func generateListPathAttr(path string, numEntries int) []*internal.ObjAttr {
 
 func (suite *attrCacheTestSuite) addDirectoryToCache(
 	path string,
-	metadata bool,
 ) (*list.List, *list.List, *list.List) {
 	// TODO: flag directories as such, or else recursion based on IsDir() won't work...
 	aPaths, abPaths, acPaths := generateDirectory(path)
@@ -505,7 +504,7 @@ func (suite *attrCacheTestSuite) TestDeleteDir() {
 			suite.assertNotInCache(truncatedPath)
 
 			// Entry Exists
-			a, ab, ac := suite.addDirectoryToCache(path, false)
+			a, ab, ac := suite.addDirectoryToCache(path)
 
 			suite.mock.EXPECT().DeleteDir(options).Return(nil)
 
@@ -654,7 +653,7 @@ func (suite *attrCacheTestSuite) TestStreamDirExists() {
 
 			// Success
 			// Entries Already Exist
-			a, ab, ac := suite.addDirectoryToCache(path, false)
+			a, ab, ac := suite.addDirectoryToCache(path)
 
 			// cache entries should be untouched before read dir call
 			for _, p := range aAttr {
@@ -798,7 +797,7 @@ func (suite *attrCacheTestSuite) TestStreamDirOfflineNoData() {
 func (suite *attrCacheTestSuite) TestDirInCloud() {
 	defer suite.cleanupTest()
 	// build up the attribute cache
-	suite.addDirectoryToCache("a", true)
+	suite.addDirectoryToCache("a")
 	deepPath := "a/b/c/d"
 	suite.addPathToCache(deepPath)
 
@@ -859,7 +858,7 @@ func (suite *attrCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	options := internal.IsDirEmptyOptions{
 		Name: path,
 	}
-	suite.addDirectoryToCache(path, false)
+	suite.addDirectoryToCache(path)
 	// make sure the attribute cache handles the request itself
 	suite.mock.EXPECT().IsDirEmpty(options).MaxTimes(0)
 
@@ -977,7 +976,7 @@ func (suite *attrCacheTestSuite) TestRenameDir() {
 
 			// Error
 			// Destination Entry (ab) Already Exists
-			a, ab, ac := suite.addDirectoryToCache(input.src, false)
+			a, ab, ac := suite.addDirectoryToCache(input.src)
 
 			suite.mock.EXPECT().RenameDir(options).Return(nil)
 
@@ -1216,7 +1215,7 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 			suite.assertNotInCache(truncatedPath)
 
 			// Entry Already Exists
-			a, ab, ac := suite.addDirectoryToCache(path, false)
+			a, ab, ac := suite.addDirectoryToCache(path)
 
 			suite.mock.EXPECT().SyncDir(options).Return(nil)
 
@@ -1487,7 +1486,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsDeleted() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 
-			suite.addDirectoryToCache("a", false)
+			suite.addDirectoryToCache("a")
 			// delete directory a and file ac
 			suite.mock.EXPECT().DeleteDir(gomock.Any()).Return(nil)
 			suite.mock.EXPECT().DeleteFile(gomock.Any()).Return(nil)
@@ -1513,10 +1512,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithMetadata() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			suite.addDirectoryToCache(
-				"a",
-				true,
-			) // add the paths to the cache with IsMetadataRetrieved=true
+			suite.addDirectoryToCache("a")
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since attributes are accessible
@@ -1543,10 +1539,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
 		) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			suite.addDirectoryToCache(
-				"a",
-				true,
-			) // add the paths to the cache with IsMetadataRetrived=true
+			suite.addDirectoryToCache("a")
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since metadata is not needed in noSymlinks mode
@@ -1565,10 +1558,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 	for _, path := range paths {
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			suite.addDirectoryToCache(
-				"a",
-				true,
-			) // add the paths to the cache with IsMetadataRetrieved=true
+			suite.addDirectoryToCache("a")
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since metadata is not needed when symlinks are disabled
@@ -1596,14 +1586,11 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataWithSymlinks() 
 		suite.assert.Equal(enableSymlinks, suite.attrCache.enableSymlinks)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			suite.addDirectoryToCache(
-				"a",
-				false,
-			) // add the paths to the cache with IsMetadataRetrieved=false
+			suite.addDirectoryToCache("a")
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
-			//suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
+			//suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode)), nil)
 
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.NoError(err)
@@ -1841,8 +1828,8 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	suite.assert.NoError(err)
 
 	// Add a nested directory with a child (both old/expired)
-	parentDir := "parentdir"
-	childFile := parentDir + "/childfile"
+	parentDir := "parentDir"
+	childFile := parentDir + "/childFile"
 	parentOptions := internal.GetAttrOptions{Name: parentDir}
 	childOptions := internal.GetAttrOptions{Name: childFile}
 
@@ -1861,7 +1848,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	suite.assert.Len(
 		suite.attrCache.cache.cacheMap,
 		5,
-	) // root + file1 + file2 + parentdir + parentdir/childfile
+	) // root + file1 + file2 + parentDir + parentDir/childFile
 	suite.assertUntouched(path1)
 	suite.assertUntouched(path2)
 	suite.assertUntouched(childFile)
