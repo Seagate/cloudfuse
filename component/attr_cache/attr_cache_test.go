@@ -1932,6 +1932,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 		config,
 	) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 	suite.assert.EqualValues(cacheTimeout, suite.attrCache.cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
 
 	path := "a"
 	options := internal.GetAttrOptions{Name: path}
@@ -1968,6 +1969,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
 
 	path1 := "file1"
 	path2 := "file2"
@@ -2056,6 +2058,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupDuringBulkCaching() {
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
 
 	// Add some items to cache manually with old timestamps
 	path1 := "oldfile1"
