@@ -2074,7 +2074,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	cacheTimeout := 2
+	cacheTimeout := 1
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
@@ -2130,10 +2130,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	suite.assertUntouched(childFile)
 
 	// Wait for cache timeout to expire, plus additional time for background cleanup to run
-	time.Sleep(time.Second * time.Duration(cacheTimeout+1))
-
-	// Wait a bit more if cleanup is still in progress
-	maxWait := 3 * time.Second
+	maxWait := time.Duration(cacheTimeout*2) * time.Second
 	waitInterval := 100 * time.Millisecond
 	waited := time.Duration(0)
 
@@ -2196,7 +2193,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntriesOffline() {
 func (suite *attrCacheTestSuite) TestCacheCleanupDuringBulkCaching() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	cacheTimeout := 3   // Use a longer timeout for this test
+	cacheTimeout := 1
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
@@ -2206,25 +2203,22 @@ func (suite *attrCacheTestSuite) TestCacheCleanupDuringBulkCaching() {
 	path1 := "oldfile1"
 	path2 := "oldfile2"
 	oldTime := time.Now().Add(-time.Second * time.Duration(cacheTimeout+1))
-	suite.attrCache.cache.cacheMap[path1] = newAttrCacheItem(
-		getPathAttr(path1, defaultSize, fs.FileMode(defaultMode), true),
-		true,
-		oldTime,
-	)
-	suite.attrCache.cache.cacheMap[path2] = newAttrCacheItem(
-		getPathAttr(path2, defaultSize, fs.FileMode(defaultMode), true),
-		true,
-		oldTime,
-	)
+	suite.attrCache.cache.insert(insertOptions{
+		attr:     getPathAttr(path1, defaultSize, fs.FileMode(defaultMode), true),
+		exists:   true,
+		cachedAt: oldTime,
+	})
+	suite.attrCache.cache.insert(insertOptions{
+		attr:     getPathAttr(path2, defaultSize, fs.FileMode(defaultMode), true),
+		exists:   true,
+		cachedAt: oldTime,
+	})
 
 	// Verify both old items are in cache plus root
 	suite.assert.Len(suite.attrCache.cache.cacheMap, 3)
 
-	// Wait a bit for background cleanup to run and remove expired items
-	time.Sleep(time.Second * time.Duration(cacheTimeout+1))
-
 	// Wait for cleanup to complete
-	maxWait := 2 * time.Second
+	maxWait := time.Duration(cacheTimeout*2) * time.Second
 	waitInterval := 100 * time.Millisecond
 	waited := time.Duration(0)
 
