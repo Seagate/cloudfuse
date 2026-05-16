@@ -1285,9 +1285,7 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 		toBeInvalid, found := ac.cache.get(options.Handle.Path)
 		if found {
 			toBeInvalid.invalidate()
-		}
-		if parent, found := ac.cache.get(getParentDir(options.Handle.Path)); found &&
-			parent.exists() {
+		} else if parent, found := ac.cache.get(getParentDir(options.Handle.Path)); found && parent.exists() {
 			parent.listCache = nil
 			parent.listingComplete = false
 		}
@@ -1340,9 +1338,7 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 		entry, found := ac.cache.get(options.Name)
 		if found {
 			entry.invalidate()
-		}
-		// make sure parent gets a fresh listing after this change
-		if parent, found := ac.cache.get(getParentDir(options.Name)); found && parent.exists() {
+		} else if parent, found := ac.cache.get(getParentDir(options.Name)); found && parent.exists() {
 			parent.listCache = nil
 			parent.listingComplete = false
 		}
