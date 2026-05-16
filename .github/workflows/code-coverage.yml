@@ -1048,6 +1048,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      MOUNT_READY_TIMEOUT: 60
       GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
