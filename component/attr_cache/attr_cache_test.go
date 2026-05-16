@@ -884,6 +884,52 @@ func (suite *attrCacheTestSuite) TestStreamDirError() {
 	}
 }
 
+func (suite *attrCacheTestSuite) TestStreamDirOfflineExpired() {
+	defer suite.cleanupTest()
+
+	dirPath := "dir"
+	entry := getPathAttr("dir/file", defaultSize, fs.FileMode(defaultMode), true)
+	oldTime := time.Now().Add(
+		-(time.Duration(suite.attrCache.cacheTimeout) * time.Second) - time.Minute,
+	)
+
+	suite.addPathToCache(dirPath+"/", false)
+	dirItem, found := suite.attrCache.cache.get(dirPath)
+	suite.assert.True(found)
+	dirItem.listCache = map[string]listCacheSegment{
+		"": {
+			entries:   []*internal.ObjAttr{entry},
+			nextToken: "",
+			cachedAt:  oldTime,
+		},
+	}
+
+	options := internal.StreamDirOptions{Name: dirPath}
+	cloudErr := common.NewCloudUnreachableError(errors.New("network unavailable"))
+	suite.mock.EXPECT().StreamDir(options).Return(nil, "", cloudErr)
+
+	result, token, err := suite.attrCache.StreamDir(options)
+	suite.assert.Equal([]*internal.ObjAttr{entry}, result)
+	suite.assert.Empty(token)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+}
+
+func (suite *attrCacheTestSuite) TestStreamDirOfflineNoData() {
+	defer suite.cleanupTest()
+
+	options := internal.StreamDirOptions{Name: "dir"}
+	cloudErr := common.NewCloudUnreachableError(errors.New("network unavailable"))
+	suite.mock.EXPECT().StreamDir(options).Return(nil, "", cloudErr)
+
+	result, token, err := suite.attrCache.StreamDir(options)
+	suite.assert.Nil(result)
+	suite.assert.Empty(token)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.NoCachedDataError{})
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+}
+
 // Test whether the attribute cache correctly tracks which directories are in cloud storage
 func (suite *attrCacheTestSuite) TestDirInCloud() {
 	defer suite.cleanupTest()
@@ -1922,6 +1968,69 @@ func (suite *attrCacheTestSuite) TestGetAttrWithCompleteParentListing() {
 	suite.assert.Nil(result)
 }
 
+func (suite *attrCacheTestSuite) TestGetAttrOfflineExpired() {
+	defer suite.cleanupTest()
+
+	path := "file"
+	options := internal.GetAttrOptions{Name: path}
+	oldTime := time.Now().Add(
+		-(time.Duration(suite.attrCache.cacheTimeout) * time.Second) - time.Minute,
+	)
+
+	suite.addPathToCache(path, true)
+	cacheItem, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	cacheItem.cachedAt = oldTime
+
+	cloudErr := common.NewCloudUnreachableError(errors.New("network unavailable"))
+	suite.mock.EXPECT().GetAttr(options).Return(nil, cloudErr)
+
+	result, err := suite.attrCache.GetAttr(options)
+	suite.assert.Equal(cacheItem.attr, result)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+}
+
+func (suite *attrCacheTestSuite) TestGetAttrOfflineWithCompleteParentListingExpired() {
+	defer suite.cleanupTest()
+
+	parentPath := "dir/"
+	childPath := "dir/missing"
+	options := internal.GetAttrOptions{Name: childPath}
+	oldTime := time.Now().Add(
+		-(time.Duration(suite.attrCache.cacheTimeout) * time.Second) - time.Minute,
+	)
+
+	suite.addPathToCache(parentPath, false)
+	parentItem, found := suite.attrCache.cache.get(internal.TruncateDirName(parentPath))
+	suite.assert.True(found)
+	parentItem.listingComplete = true
+	parentItem.cachedAt = oldTime
+
+	cloudErr := common.NewCloudUnreachableError(errors.New("network unavailable"))
+	suite.mock.EXPECT().GetAttr(options).Return(nil, cloudErr)
+
+	result, err := suite.attrCache.GetAttr(options)
+	suite.assert.Nil(result)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, syscall.ENOENT)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+}
+
+func (suite *attrCacheTestSuite) TestGetAttrOfflineNoData() {
+	defer suite.cleanupTest()
+
+	options := internal.GetAttrOptions{Name: "missing"}
+	cloudErr := common.NewCloudUnreachableError(errors.New("network unavailable"))
+	suite.mock.EXPECT().GetAttr(options).Return(nil, cloudErr)
+
+	result, err := suite.attrCache.GetAttr(options)
+	suite.assert.Nil(result)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, &common.NoCachedDataError{})
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+}
+
 // Tests Cache Timeout
 func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	defer suite.cleanupTest()
@@ -1932,6 +2041,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 		config,
 	) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 	suite.assert.EqualValues(cacheTimeout, suite.attrCache.cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
 
 	path := "a"
 	options := internal.GetAttrOptions{Name: path}
@@ -1964,10 +2074,11 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	cacheTimeout := 2
+	cacheTimeout := 1
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
 
 	path1 := "file1"
 	path2 := "file2"
@@ -2019,10 +2130,7 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	suite.assertUntouched(childFile)
 
 	// Wait for cache timeout to expire, plus additional time for background cleanup to run
-	time.Sleep(time.Second * time.Duration(cacheTimeout+1))
-
-	// Wait a bit more if cleanup is still in progress
-	maxWait := 3 * time.Second
+	maxWait := time.Duration(cacheTimeout*2) * time.Second
 	waitInterval := 100 * time.Millisecond
 	waited := time.Duration(0)
 
@@ -2049,37 +2157,68 @@ func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntries() {
 	suite.assert.Contains(suite.attrCache.cache.cacheMap, "")
 }
 
+func (suite *attrCacheTestSuite) TestCacheCleanupExpiredEntriesOffline() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default attr cache generated
+	cacheTimeout := 60
+	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
+	suite.setupTestHelper(config)
+	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().Return(false)
+
+	oldTime := time.Now().Add(
+		-(time.Duration(cacheTimeout) * time.Second) - time.Minute,
+	)
+	suite.addPathToCache("offline-file", true)
+	suite.addPathToCache("offline-dir/", false)
+
+	fileItem, found := suite.attrCache.cache.get("offline-file")
+	suite.assert.True(found)
+	fileItem.cachedAt = oldTime
+
+	dirItem, found := suite.attrCache.cache.get("offline-dir")
+	suite.assert.True(found)
+	dirItem.cachedAt = oldTime
+
+	suite.attrCache.cleanupExpiredEntries()
+
+	suite.assert.Contains(suite.attrCache.cache.cacheMap, "")
+	suite.assert.Contains(suite.attrCache.cache.cacheMap, "offline-file")
+	suite.assert.Contains(suite.attrCache.cache.cacheMap, "offline-dir")
+	child, found := suite.attrCache.cache.get("offline-file")
+	suite.assert.True(found)
+	suite.assert.Equal(oldTime, child.cachedAt)
+}
+
 func (suite *attrCacheTestSuite) TestCacheCleanupDuringBulkCaching() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	cacheTimeout := 3   // Use a longer timeout for this test
+	cacheTimeout := 1
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
 
 	// Add some items to cache manually with old timestamps
 	path1 := "oldfile1"
 	path2 := "oldfile2"
 	oldTime := time.Now().Add(-time.Second * time.Duration(cacheTimeout+1))
-	suite.attrCache.cache.cacheMap[path1] = newAttrCacheItem(
-		getPathAttr(path1, defaultSize, fs.FileMode(defaultMode), true),
-		true,
-		oldTime,
-	)
-	suite.attrCache.cache.cacheMap[path2] = newAttrCacheItem(
-		getPathAttr(path2, defaultSize, fs.FileMode(defaultMode), true),
-		true,
-		oldTime,
-	)
+	suite.attrCache.cache.insert(insertOptions{
+		attr:     getPathAttr(path1, defaultSize, fs.FileMode(defaultMode), true),
+		exists:   true,
+		cachedAt: oldTime,
+	})
+	suite.attrCache.cache.insert(insertOptions{
+		attr:     getPathAttr(path2, defaultSize, fs.FileMode(defaultMode), true),
+		exists:   true,
+		cachedAt: oldTime,
+	})
 
 	// Verify both old items are in cache plus root
 	suite.assert.Len(suite.attrCache.cache.cacheMap, 3)
 
-	// Wait a bit for background cleanup to run and remove expired items
-	time.Sleep(time.Second * time.Duration(cacheTimeout+1))
-
 	// Wait for cleanup to complete
-	maxWait := 2 * time.Second
+	maxWait := time.Duration(cacheTimeout*2) * time.Second
 	waitInterval := 100 * time.Millisecond
 	waited := time.Duration(0)
 

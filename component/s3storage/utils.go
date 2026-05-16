@@ -155,9 +155,9 @@ func parseS3Err(err error, attemptedAction string) error {
 		}
 	}
 
-	var maErr *retry.MaxAttemptsError
-	qeErr := &ratelimit.QuotaExceededError{}
-	if errors.As(err, &maErr) || errors.As(err, qeErr) || errors.Is(err, context.Canceled) ||
+	var maerr *retry.MaxAttemptsError
+	qeerr := &ratelimit.QuotaExceededError{}
+	if errors.As(err, &maerr) || errors.As(err, qeerr) || errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) {
 		log.Err(
 			"%s : Failed to %s because cloud storage is unreachable",
