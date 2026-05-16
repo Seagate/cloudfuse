@@ -41,6 +41,7 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
+      MOUNT_READY_TIMEOUT: 60
       zig: 0.15.2
       GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -210,7 +211,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -221,7 +222,7 @@ jobs:
             SECONDS_WAITED=$((SECONDS_WAITED + POLL_INTERVAL))
           done
           ps -aux | grep cloudfuse
-          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
@@ -257,7 +258,7 @@ jobs:
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -268,7 +269,7 @@ jobs:
             SECONDS_WAITED=$((SECONDS_WAITED + POLL_INTERVAL))
           done
           ps -aux | grep cloudfuse
-          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
@@ -304,12 +305,13 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -321,7 +323,7 @@ jobs:
           done
 
           ps -aux | grep cloudfuse
-          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
           cd -
@@ -363,7 +365,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -374,7 +376,7 @@ jobs:
             SECONDS_WAITED=$((SECONDS_WAITED + POLL_INTERVAL))
           done
           ps -aux | grep cloudfuse
-          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=true -tmp-path=${TEMP_DIR}
           cd -
@@ -410,7 +412,7 @@ jobs:
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -421,7 +423,7 @@ jobs:
             SECONDS_WAITED=$((SECONDS_WAITED + POLL_INTERVAL))
           done
           ps -aux | grep cloudfuse
-          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
@@ -465,7 +467,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -510,7 +512,7 @@ jobs:
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -558,7 +560,7 @@ jobs:
           rm -rf ${BLOCK_TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -613,7 +615,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -666,7 +668,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_STREAM_CFG: ${{ env.cloudfuse_STREAM_CFG }}
-        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_stream.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_STREAM_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
+        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_stream.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_STREAM_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/* || true\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
 
       - name: Create Config File - Block Blob
         env:
@@ -855,7 +857,7 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           CONTAINER_NAME: ${{ matrix.containerName }}
-        run: "set +x\nrm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test unmount all\n./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}\n\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt.cov secure encrypt --config-file=${cloudfuse_CFG} --output-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 \nif [ $? -ne 0 ]; then\n  exit 1\nfi\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_secure.cov mount ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=false -tmp-path=${TEMP_DIR}\ncd -\n\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_set.cov secure set --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --key=logging.level --value=log_debug\n./cloudfuse.test unmount all\nsleep 5"
+        run: "set +x\nrm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test unmount all\n./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}\n\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt.cov secure encrypt --config-file=${cloudfuse_CFG} --output-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 \nif [ $? -ne 0 ]; then\n  exit 1\nfi\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_secure.cov mount ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/* || true\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=false -tmp-path=${TEMP_DIR}\ncd -\n\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_set.cov secure set --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --key=logging.level --value=log_debug\n./cloudfuse.test unmount all\nsleep 5"
 
       - name: "CLI : Health monitor stop pid"
         shell: bash {0}
@@ -875,7 +877,7 @@ jobs:
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test mount ${MOUNT_DIR}/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -906,7 +908,7 @@ jobs:
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test mount ${MOUNT_DIR}/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -957,7 +959,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
+        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/* || true\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
 
       - name: Create Config File - ADLS Proxy
         env:
@@ -983,7 +985,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -994,7 +996,7 @@ jobs:
             SECONDS_WAITED=$((SECONDS_WAITED + POLL_INTERVAL))
           done
           ps -aux | grep cloudfuse
-          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=true -tmp-path=${TEMP_DIR}
           cd -
@@ -1046,6 +1048,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      MOUNT_READY_TIMEOUT: 60
       GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
@@ -1193,7 +1196,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1241,7 +1244,7 @@ jobs:
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1290,12 +1293,13 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          CLOUDFUSE_DISABLE_SDK_LOG: "true"
         run: |-
           rm -rf ${BLOCK_TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1349,7 +1353,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1398,7 +1402,7 @@ jobs:
           cat ${cloudfuse_ADLS_CFG_HMON}
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_profiler.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1458,7 +1462,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1505,7 +1509,7 @@ jobs:
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_profiler.cov mount ${MOUNT_DIR} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1558,7 +1562,7 @@ jobs:
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1618,7 +1622,7 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1859,7 +1863,7 @@ jobs:
           cat ${cloudfuse_ADLS_CFG_HMON}
           ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
@@ -1899,7 +1903,7 @@ jobs:
           cat ${cloudfuse_ADLS_CFG_HMON}
           ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
 
-          READY_TIMEOUT=20  # Seconds to wait for mount to be ready
+          READY_TIMEOUT=${MOUNT_READY_TIMEOUT}  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do

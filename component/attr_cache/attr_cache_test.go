@@ -957,6 +957,73 @@ func (suite *attrCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	suite.assert.False(empty)
 }
 
+func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingFresh() {
+	defer suite.cleanupTest()
+
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{Name: path}
+	suite.addPathToCache(path, false)
+
+	item, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	item.listingComplete = true
+
+	suite.mock.EXPECT().IsDirEmpty(options).MaxTimes(0)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.True(empty)
+}
+
+func (suite *attrCacheTestSuite) TestIsDirEmptyCompleteListingExpired() {
+	defer suite.cleanupTest()
+
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{Name: path}
+	suite.addPathToCache(path, false)
+
+	item, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	item.listingComplete = true
+	item.cachedAt = time.Now().
+		Add(-(time.Duration(suite.attrCache.cacheTimeout) * time.Second) - time.Minute)
+
+	suite.mock.EXPECT().IsDirEmpty(options).Return(false)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.False(empty)
+}
+
+func (suite *attrCacheTestSuite) TestCommitData() {
+	defer suite.cleanupTest()
+
+	path := "dir/file"
+	parentPath := "dir"
+
+	suite.addPathToCache(path, false)
+
+	parentItem, found := suite.attrCache.cache.get(parentPath)
+	suite.assert.True(found)
+	parentItem.listingComplete = true
+	parentItem.listCache = map[string]listCacheSegment{
+		"": {
+			cachedAt: time.Now(),
+		},
+	}
+
+	entry, found := suite.attrCache.cache.get(path)
+	suite.assert.True(found)
+	suite.assert.True(entry.valid())
+
+	options := internal.CommitDataOptions{Name: path}
+	suite.mock.EXPECT().CommitData(options).Return(nil)
+
+	err := suite.attrCache.CommitData(options)
+	suite.assert.NoError(err)
+	suite.assert.False(entry.valid())
+	suite.assert.False(parentItem.listingComplete)
+	suite.assert.Nil(parentItem.listCache)
+}
+
 // Tests Rename Directory
 func (suite *attrCacheTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()
@@ -1790,6 +1857,7 @@ func (suite *attrCacheTestSuite) TestGetAttrDoesNotExist() {
 func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 	defer suite.cleanupTest()
 	var paths = []string{"a", "a/"}
+	errOther := errors.New("some other error")
 
 	for _, path := range paths {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -1799,10 +1867,10 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 			truncatedPath := internal.TruncateDirName(path)
 
 			options := internal.GetAttrOptions{Name: path}
-			suite.mock.EXPECT().GetAttr(options).Return(nil, os.ErrNotExist)
+			suite.mock.EXPECT().GetAttr(options).Return(nil, errOther)
 
 			result, err := suite.attrCache.GetAttr(options)
-			suite.assert.Equal(err, os.ErrNotExist)
+			suite.assert.Equal(errOther, err)
 			suite.assert.Nil(result)
 			suite.assertNotInCache(truncatedPath)
 		})
@@ -1833,6 +1901,25 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 			suite.assert.NotNil(checkItem.cachedAt)
 		})
 	}
+}
+
+func (suite *attrCacheTestSuite) TestGetAttrWithCompleteParentListing() {
+	defer suite.cleanupTest()
+
+	parentPath := "dir/"
+	childPath := "dir/missing"
+
+	suite.addPathToCache(parentPath, false)
+	parentItem, found := suite.attrCache.cache.get(parentPath)
+	suite.assert.True(found)
+	parentItem.listingComplete = true
+
+	options := internal.GetAttrOptions{Name: childPath}
+	suite.mock.EXPECT().GetAttr(options).MaxTimes(0)
+
+	result, err := suite.attrCache.GetAttr(options)
+	suite.assert.Equal(syscall.ENOENT, err)
+	suite.assert.Nil(result)
 }
 
 // Tests Cache Timeout
