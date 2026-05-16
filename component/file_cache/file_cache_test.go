@@ -530,7 +530,7 @@ func (suite *fileCacheTestSuite) TestStreamDirShowsOfflineCreatedDirectory() {
 
 	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: ""})
 	suite.assert.NoError(err)
-	suite.assert.Equal("", token)
+	suite.assert.Empty(token)
 
 	foundDir := false
 	for _, attr := range attrs {
@@ -579,7 +579,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInsideOfflineCreatedDirectory() {
 
 	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: dirName})
 	suite.assert.NoError(err)
-	suite.assert.Equal("", token)
+	suite.assert.Empty(token)
 
 	foundFile := false
 	for _, attr := range attrs {
@@ -711,7 +711,7 @@ func (suite *fileCacheTestSuite) TestStreamDirOfflineCachedData() {
 
 	dir, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
 	suite.assert.NoError(err)
-	suite.assert.Equal("", token)
+	suite.assert.Empty(token)
 	suite.assert.Len(dir, 1)
 	suite.assert.Equal(name+"/file1", dir[0].Path)
 }
@@ -741,7 +741,7 @@ func (suite *fileCacheTestSuite) TestStreamDirOfflineNoCachedData() {
 
 	dir, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
 	suite.assert.Error(err)
-	suite.assert.Equal("", token)
+	suite.assert.Empty(token)
 	suite.assert.Empty(dir)
 }
 

@@ -1367,7 +1367,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	localPath := filepath.Join(fc.tmpPath, handle.Path)
 
 	fc.policy.CacheValid(localPath)
-	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
+	downloadRequired, fileExists, attr, _ := fc.isDownloadRequired(localPath, handle.Path, flock)
 
 	// handle offline cases
 	if !fc.NextComponent().CloudConnected() {
@@ -1749,7 +1749,7 @@ func (fc *FileCache) releaseFileInternal(
 
 	if !noCachedHandle {
 		// update the cache policy
-		fc.FileUsed(options.Handle.Path)
+		_ = fc.FileUsed(options.Handle.Path)
 		// sync
 		if options.Handle.Dirty() {
 			// flush the local file
@@ -1825,7 +1825,7 @@ func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, e
 	options.Handle.OptCnt++
 	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
-		fc.FileUsed(options.Handle.Path)
+		_ = fc.FileUsed(options.Handle.Path)
 	}
 
 	// Removing Pread as it is not supported on Windows
@@ -1874,7 +1874,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	options.Handle.OptCnt++
 	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
-		fc.FileUsed(options.Handle.Path)
+		_ = fc.FileUsed(options.Handle.Path)
 	}
 
 	// Removing Pwrite as it is not supported on Windows
@@ -1927,7 +1927,7 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 	// update the cache policy
-	fc.FileUsed(options.Handle.Path)
+	_ = fc.FileUsed(options.Handle.Path)
 
 	// ignore clean handles
 	if !options.Handle.Dirty() {
