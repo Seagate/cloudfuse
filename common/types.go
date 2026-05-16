@@ -123,6 +123,28 @@ func (e CloudUnreachableError) Is(target error) bool {
 	return ok
 }
 
+type NoCachedDataError struct {
+	Message    string
+	CacheError error
+}
+
+func NewNoCachedDataError(originalError error) NoCachedDataError {
+	return NoCachedDataError{
+		Message:    "Failed to connect to cloud storage",
+		CacheError: originalError,
+	}
+}
+func (e NoCachedDataError) Error() string {
+	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CacheError)
+}
+func (e NoCachedDataError) Unwrap() error {
+	return e.CacheError
+}
+func (e NoCachedDataError) Is(target error) bool {
+	_, ok := target.(*NoCachedDataError)
+	return ok
+}
+
 var DefaultWorkDir string
 var DefaultLogFilePath string
 var StatsConfigFilePath string
