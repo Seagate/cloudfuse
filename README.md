@@ -35,6 +35,7 @@ Cloudfuse supports clouds with an S3 or Azure interface.
   - [From Source](#from-source)
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
+- [Offline Access (New)](#offline-access-new)
 - [Command Line Interface](#command-line-interface)
 - [Limitations](#limitations)
 - [License](#license)
@@ -306,6 +307,12 @@ This command should then print out "Verified OK" is the checksum file is valid. 
 Cloudfuse also supports a health monitor.
 The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
 Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
+
+## Offline Access (New)
+
+Cloudfuse now supports offline access through the `file_cache` component. When cloud storage is unreachable, reads and writes continue against the local cache and are flushed to cloud storage once connectivity is restored. The feature is **enabled by default** and can be disabled via the `block-offline-access` flag.
+
+> **Note:** Cloudfuse uses eventual consistency with last-writer-wins semantics. Offline access can extend the consistency window indefinitely and **increases the risk of data conflicts in multi-client setups!** See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
 
 ## Limitations
 

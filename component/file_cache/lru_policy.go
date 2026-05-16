@@ -77,17 +77,21 @@ type lruPolicy struct {
 
 	// DU utility was found on the path or not
 	duPresent bool
-
-	// Tracks scheduled files to skip during eviction
-	schedule *FileCache
 }
 
-// LRUPolicySnapshot represents the *persisted state* of lruPolicy.
+type pendingOpSnapshot struct {
+	IsDir      bool
+	IsDeletion bool
+}
+
+// lruPolicySnapshot represents the *persisted state* of lruPolicy.
 // It contains only the fields that need to be saved, and they are exported.
-type LRUPolicySnapshot struct {
-	NodeList           []string // Just node names, *without their fc.tmp prefix*, in linked list order
-	CurrMarkerPosition uint64   // Node index of currMarker
-	LastMarkerPosition uint64   // Node index of lastMarker
+type lruPolicySnapshot struct {
+	NodeList           []string                     // Just node names, *without their fc.tmp prefix*, in linked list order
+	SyncPendingFlags   []bool                       // whether each file in NodeList belongs in the pendingOps map (kept for backward compat)
+	CurrMarkerPosition uint64                       // Node index of currMarker
+	LastMarkerPosition uint64                       // Node index of lastMarker
+	PendingOps         map[string]pendingOpSnapshot // Complete pendingOps map with full flags
 }
 
 const (
@@ -124,7 +128,8 @@ func (p *lruPolicy) StartPolicy() error {
 	p.lastMarker.prev = p.currMarker
 	p.lastMarker.next = nil
 	p.head = p.currMarker
-	gob.Register(LRUPolicySnapshot{})
+	gob.Register(lruPolicySnapshot{})
+	gob.Register(pendingOpSnapshot{})
 	snapshot, err := readSnapshotFromFile(p.tmpPath)
 	if err == nil && snapshot != nil {
 		p.loadSnapshot(snapshot)
@@ -167,14 +172,9 @@ func (p *lruPolicy) ShutdownPolicy() error {
 	return p.createSnapshot().writeToFile(p.tmpPath)
 }
 
-func (fc *FileCache) IsScheduled(objName string) bool {
-	_, inSchedule := fc.scheduleOps.Load(objName)
-	return inSchedule
-}
-
-func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
+func (p *lruPolicy) createSnapshot() *lruPolicySnapshot {
 	log.Trace("lruPolicy::saveSnapshot")
-	var snapshot LRUPolicySnapshot
+	var snapshot lruPolicySnapshot
 	var index uint64
 	p.Lock()
 	defer p.Unlock()
@@ -188,29 +188,61 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 		case current == p.lastMarker:
 			snapshot.LastMarkerPosition = index
 		case strings.HasPrefix(current.name, p.tmpPath):
-			snapshot.NodeList = append(snapshot.NodeList, current.name[len(p.tmpPath):])
+			relName := current.name[len(p.tmpPath):]
+			snapshot.NodeList = append(snapshot.NodeList, relName)
+			objName := common.NormalizeObjectName(relName[1:])
+			_, isPending := p.pendingOps.Load(objName)
+			snapshot.SyncPendingFlags = append(snapshot.SyncPendingFlags, isPending)
 		default:
 			log.Err("lruPolicy::saveSnapshot : %s Ignoring unrecognized cache path", current.name)
 		}
 		index++
 	}
+
+	// Capture complete pendingOps map for reliable restoration
+	snapshot.PendingOps = make(map[string]pendingOpSnapshot)
+	p.pendingOps.Range(func(key, value interface{}) bool {
+		flags := value.(pendingFlags)
+		snapshot.PendingOps[key.(string)] = pendingOpSnapshot{
+			IsDir:      flags.isDir,
+			IsDeletion: flags.isDeletion,
+		}
+		return true
+	})
+
 	return &snapshot
 }
 
-func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
+func (p *lruPolicy) loadSnapshot(snapshot *lruPolicySnapshot) {
 	if snapshot == nil {
 		return
 	}
 	p.Lock()
 	defer p.Unlock()
+	// Restore pendingOps from new field if available, otherwise fall back to old method
+	loadPendingOps := false
+	if len(snapshot.PendingOps) > 0 {
+		for key, value := range snapshot.PendingOps {
+			p.pendingOps.Store(key, pendingFlags{isDir: value.IsDir, isDeletion: value.IsDeletion})
+		}
+	} else {
+		// Backward compatibility: use SyncPendingFlags if PendingOps is not available
+		loadPendingOps = len(snapshot.NodeList) == len(snapshot.SyncPendingFlags)
+	}
+
 	// walk the slice and write the entries into the policy
 	// remember that the markers are actual nodes, with indices preceding the item at the same NodeList index
 	nodeIndex := 0
 	nextNode := p.head
 	tail := p.lastMarker
-	for _, v := range snapshot.NodeList {
-		// recreate the node
+	for i, v := range snapshot.NodeList {
 		fullPath := filepath.Join(p.tmpPath, v)
+		// populate pendingOps
+		if loadPendingOps && snapshot.SyncPendingFlags[i] {
+			objName := v[1:]
+			p.pendingOps.Store(objName, pendingFlags{})
+		}
+		// recreate the node
 		newNode := &lruNode{
 			name:    fullPath,
 			next:    nil,
@@ -254,7 +286,7 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	}
 }
 
-func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
+func (ss *lruPolicySnapshot) writeToFile(tmpPath string) error {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(ss)
@@ -265,7 +297,7 @@ func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
 	return os.WriteFile(filepath.Join(tmpPath, snapshotPath), buf.Bytes(), 0644)
 }
 
-func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
+func readSnapshotFromFile(tmpPath string) (*lruPolicySnapshot, error) {
 	fullSnapshotPath := filepath.Join(tmpPath, snapshotPath)
 	defer os.Remove(fullSnapshotPath)
 	snapshotData, err := os.ReadFile(fullSnapshotPath)
@@ -278,7 +310,7 @@ func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
 		}
 		return nil, err
 	}
-	var snapshot LRUPolicySnapshot
+	var snapshot lruPolicySnapshot
 	dec := gob.NewDecoder(bytes.NewReader(snapshotData))
 	err = dec.Decode(&snapshot)
 	if err != nil {
@@ -304,7 +336,7 @@ func (p *lruPolicy) UpdateConfig(c cachePolicyConfig) error {
 func (p *lruPolicy) CacheValid(name string) {
 	_, found := p.nodeMap.Load(name)
 	if !found {
-		p.cacheValidate(name)
+		p.cacheValidate(name, true)
 	} else {
 		p.validateChan <- name
 	}
@@ -351,11 +383,8 @@ func (p *lruPolicy) asyncCacheValid() {
 		case name := <-p.validateChan:
 			// validateChan only gets names that are already cached
 			// if the file is not in the map anymore, then it was deleted,
-			// which means calling cacheValidate now would be a bug
-			_, found := p.nodeMap.Load(name)
-			if found {
-				p.cacheValidate(name)
-			}
+			// so call cacheValidate with create=false (don't resurrect deleted nodes)
+			p.cacheValidate(name, false)
 
 		case <-p.closeSignalValidate:
 			return
@@ -363,15 +392,25 @@ func (p *lruPolicy) asyncCacheValid() {
 	}
 }
 
-func (p *lruPolicy) cacheValidate(name string) {
+func (p *lruPolicy) cacheValidate(name string, create bool) {
 
-	// get existing entry, or if it doesn't exist then
-	//  write a new one and return it
-	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
-		name: name,
-		next: nil,
-		prev: nil,
-	})
+	var val any
+	if create {
+		// get existing entry, or if it doesn't exist then
+		//  write a new one and return it
+		val, _ = p.nodeMap.LoadOrStore(name, &lruNode{
+			name: name,
+			next: nil,
+			prev: nil,
+		})
+	} else {
+		// get existing entry, and quit if missing
+		var found bool
+		val, found = p.nodeMap.Load(name)
+		if !found {
+			return
+		}
+	}
 	node := val.(*lruNode)
 
 	// protect node data
@@ -519,7 +558,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 		if objName[0] == '/' {
 			objName = objName[1:]
 		}
-		if p.schedule != nil && p.schedule.IsScheduled(objName) {
+		if _, syncPending := p.pendingOps.Load(objName); syncPending {
 			continue
 		}
 
@@ -582,8 +621,15 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	// Check if there are any open handles to this file or not
-	if flock.Count() > 0 || flock.SyncPending {
+	if flock.Count() > 0 {
 		log.Warn("lruPolicy::DeleteItem : File in use %s", name)
+		p.CacheValid(name)
+		return
+	}
+
+	// check if the file is pending upload (it was modified offline)
+	if _, syncPending := p.pendingOps.Load(objName); syncPending {
+		log.Warn("lruPolicy::DeleteItem : %s File is not synchronized to cloud storage", name)
 		p.CacheValid(name)
 		return
 	}
