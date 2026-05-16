@@ -808,10 +808,10 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
 	suite.assert.Len(dir, 4)
-	suite.assert.Equal(subdir, dir[0].Path)
-	suite.assert.Equal(file1, dir[1].Path)
-	suite.assert.Equal(file2, dir[2].Path)
-	suite.assert.Equal(file3, dir[3].Path)
+	suite.assert.Equal(file1, dir[0].Path)
+	suite.assert.Equal(file2, dir[1].Path)
+	suite.assert.Equal(file3, dir[2].Path)
+	suite.assert.Equal(subdir, dir[3].Path)
 }
 
 func (suite *fileCacheTestSuite) TestStreamDirCase3() {
