@@ -59,6 +59,7 @@ type connectionState struct {
 	lastConnectionAttempt *time.Time
 	firstOffline          *time.Time
 	retryTicker           *time.Ticker
+	contextEpoch          uint64
 }
 
 const compName = "s3storage"
@@ -204,17 +205,18 @@ func (s3 *S3Storage) Stop() error {
 
 // Online check
 func (s3 *S3Storage) CloudConnected() bool {
-	log.Trace("S3Storage::CloudConnected")
 	connected := s3.state.firstOffline == nil
 	// don't check the connection when it's up, or if we are not ready to retry
 	if connected || !s3.timeToRetry() {
 		return connected
 	}
+	_, epoch := s3.requestContext()
 	// check connection
+	log.Info("S3Storage::CloudConnected : Checking connection...")
 	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancelFun()
 	err := s3.Storage.ConnectionOkay(ctx)
-	nowConnected := s3.updateConnectionState(err)
+	nowConnected := s3.updateConnectionState(err, epoch)
 	return nowConnected
 }
 
@@ -234,9 +236,20 @@ func (s3 *S3Storage) timeToRetry() bool {
 	}
 }
 
-func (s3 *S3Storage) updateConnectionState(err error) bool {
+func (s3 *S3Storage) requestContext() (context.Context, uint64) {
 	s3.state.Lock()
 	defer s3.state.Unlock()
+	return s3.ctx, s3.state.contextEpoch
+}
+
+func (s3 *S3Storage) updateConnectionState(err error, requestEpoch uint64) bool {
+	s3.state.Lock()
+	defer s3.state.Unlock()
+
+	if errors.Is(err, &common.CloudUnreachableError{}) && requestEpoch != s3.state.contextEpoch {
+		return s3.state.firstOffline == nil
+	}
+
 	currentTime := time.Now()
 	s3.state.lastConnectionAttempt = &currentTime
 	connected := !errors.Is(err, &common.CloudUnreachableError{})
@@ -247,6 +260,7 @@ func (s3 *S3Storage) updateConnectionState(err error) bool {
 		if connected {
 			s3.state.firstOffline = nil
 			// reset the context to allow new requests
+			s3.state.contextEpoch++
 			s3.ctx, s3.cancelFn = context.WithCancel(context.Background())
 			// stop the retry ticker
 			s3.state.retryTicker.Stop()
@@ -277,9 +291,10 @@ func (s3 *S3Storage) ListAuthorizedBuckets() ([]string, error) {
 func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("S3Storage::CreateDir : %s", options.Name)
 
-	err := s3.Storage.CreateDirectory(s3.ctx, internal.TruncateDirName(options.Name))
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.CreateDirectory(ctx, internal.TruncateDirName(options.Name))
 	if s3.stConfig.enableDirMarker {
-		s3.updateConnectionState(err)
+		s3.updateConnectionState(err, epoch)
 	}
 
 	if err == nil {
@@ -297,8 +312,9 @@ func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 func (s3 *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("S3Storage::DeleteDir : %s", options.Name)
 
-	err := s3.Storage.DeleteDirectory(s3.ctx, internal.TruncateDirName(options.Name))
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.DeleteDirectory(ctx, internal.TruncateDirName(options.Name))
+	s3.updateConnectionState(err, epoch)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(deleteDir, options.Name, nil)
@@ -322,8 +338,9 @@ func formatListDirName(path string) string {
 func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
 	// List up to two objects, since one could be the directory with a trailing slash
-	list, _, err := s3.Storage.List(s3.ctx, formatListDirName(options.Name), nil, 2)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	list, _, err := s3.Storage.List(ctx, formatListDirName(options.Name), nil, 2)
+	s3.updateConnectionState(err, epoch)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -352,8 +369,9 @@ func (s3 *S3Storage) StreamDir(
 		entriesRemaining = maxResultsPerListCall
 	}
 	for entriesRemaining > 0 {
-		newList, nextMarker, err := s3.Storage.List(s3.ctx, path, marker, entriesRemaining)
-		s3.updateConnectionState(err)
+		ctx, epoch := s3.requestContext()
+		newList, nextMarker, err := s3.Storage.List(ctx, path, marker, entriesRemaining)
+		s3.updateConnectionState(err, epoch)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
@@ -402,8 +420,9 @@ func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 	options.Src = internal.TruncateDirName(options.Src)
 	options.Dst = internal.TruncateDirName(options.Dst)
 
-	err := s3.Storage.RenameDirectory(s3.ctx, options.Src, options.Dst)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.RenameDirectory(ctx, options.Src, options.Dst)
+	s3.updateConnectionState(err, epoch)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -428,8 +447,9 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := s3.Storage.CreateFile(s3.ctx, options.Name, options.Mode)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.CreateFile(ctx, options.Name, options.Mode)
+	s3.updateConnectionState(err, epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -450,8 +470,9 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("S3Storage::OpenFile : %s", options.Name)
 
-	attr, err := s3.Storage.GetAttr(s3.ctx, options.Name)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	attr, err := s3.Storage.GetAttr(ctx, options.Name)
+	s3.updateConnectionState(err, epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -484,8 +505,9 @@ func (s3 *S3Storage) ReleaseFile(options internal.ReleaseFileOptions) error {
 func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("S3Storage::DeleteFile : %s", options.Name)
 
-	err := s3.Storage.DeleteFile(s3.ctx, options.Name)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.DeleteFile(ctx, options.Name)
+	s3.updateConnectionState(err, epoch)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(deleteFile, options.Name, nil)
@@ -499,9 +521,10 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
 	isSymLink := options.SrcAttr != nil && options.SrcAttr.IsSymlink()
-	err := s3.Storage.RenameFile(s3.ctx, options.Src, options.Dst, isSymLink)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.RenameFile(ctx, options.Src, options.Dst, isSymLink)
 
-	s3.updateConnectionState(err)
+	s3.updateConnectionState(err, epoch)
 	if err == nil {
 		s3StatsCollector.PushEvents(
 			renameFile,
@@ -530,14 +553,15 @@ func (s3 *S3Storage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, e
 		return 0, nil
 	}
 
+	ctx, epoch := s3.requestContext()
 	err := s3.Storage.ReadInBuffer(
-		s3.ctx,
+		ctx,
 		options.Handle.Path,
 		options.Offset,
 		dataLen,
 		options.Data,
 	)
-	s3.updateConnectionState(err)
+	s3.updateConnectionState(err, epoch)
 	if err != nil {
 		log.Err(
 			"S3Storage::ReadInBuffer : Failed to read %s [%s]",
@@ -551,8 +575,9 @@ func (s3 *S3Storage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, e
 }
 
 func (s3 *S3Storage) WriteFile(options *internal.WriteFileOptions) (int, error) {
-	err := s3.Storage.Write(s3.ctx, options)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.Write(ctx, options)
+	s3.updateConnectionState(err, epoch)
 	return len(options.Data), err
 }
 
@@ -565,8 +590,9 @@ func (s3 *S3Storage) GetFileBlockOffsets(
 
 func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.NewSize)
-	err := s3.Storage.TruncateFile(s3.ctx, options.Name, options.NewSize)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.TruncateFile(ctx, options.Name, options.NewSize)
+	s3.updateConnectionState(err, epoch)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -581,15 +607,17 @@ func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 
 func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("S3Storage::CopyToFile : Read file %s", options.Name)
-	err := s3.Storage.ReadToFile(s3.ctx, options.Name, options.Offset, options.Count, options.File)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.ReadToFile(ctx, options.Name, options.Offset, options.Count, options.File)
+	s3.updateConnectionState(err, epoch)
 	return err
 }
 
 func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
-	err := s3.Storage.WriteFromFile(s3.ctx, options.Name, options.Metadata, options.File)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.WriteFromFile(ctx, options.Name, options.Metadata, options.File)
+	s3.updateConnectionState(err, epoch)
 	return err
 }
 
@@ -604,9 +632,10 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 		return syscall.ENOTSUP
 	}
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := s3.Storage.CreateLink(s3.ctx, options.Name, options.Target, true)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.CreateLink(ctx, options.Name, options.Target, true)
 
-	s3.updateConnectionState(err)
+	s3.updateConnectionState(err, epoch)
 	if err == nil {
 		s3StatsCollector.PushEvents(
 			createLink,
@@ -626,8 +655,9 @@ func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 	}
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 
-	data, err := s3.Storage.ReadBuffer(s3.ctx, options.Name, 0, 0, true)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	data, err := s3.Storage.ReadBuffer(ctx, options.Name, 0, 0, true)
+	s3.updateConnectionState(err, epoch)
 
 	if err != nil {
 		s3StatsCollector.PushEvents(readLink, options.Name, nil)
@@ -640,8 +670,9 @@ func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 // Attribute operations
 func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	//log.Trace("S3Storage::GetAttr : Get attributes of file %s", name)
-	attr, err := s3.Storage.GetAttr(s3.ctx, options.Name)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	attr, err := s3.Storage.GetAttr(ctx, options.Name)
+	s3.updateConnectionState(err, epoch)
 	return attr, err
 }
 
@@ -670,18 +701,20 @@ func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
+	ctx, epoch := s3.requestContext()
 	err := s3.Storage.StageAndCommit(
-		s3.ctx,
+		ctx,
 		options.Handle.Path,
 		options.Handle.CacheObj.BlockOffsetList,
 	)
-	s3.updateConnectionState(err)
+	s3.updateConnectionState(err, epoch)
 	return err
 }
 
 func (s3 *S3Storage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	cbl, err := s3.Storage.GetCommittedBlockList(s3.ctx, name)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	cbl, err := s3.Storage.GetCommittedBlockList(ctx, name)
+	s3.updateConnectionState(err, epoch)
 	return cbl, err
 }
 
@@ -690,8 +723,9 @@ func (s3 *S3Storage) StageData(opt internal.StageDataOptions) error {
 }
 
 func (s3 *S3Storage) CommitData(opt internal.CommitDataOptions) error {
-	err := s3.Storage.CommitBlocks(s3.ctx, opt.Name, opt.List)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	err := s3.Storage.CommitBlocks(ctx, opt.Name, opt.List)
+	s3.updateConnectionState(err, epoch)
 	return err
 }
 
@@ -707,8 +741,9 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
 	// if cache size is set to 0 then we have the root mount usage
-	sizeUsed, err := s3.Storage.GetUsedSize(s3.ctx)
-	s3.updateConnectionState(err)
+	ctx, epoch := s3.requestContext()
+	sizeUsed, err := s3.Storage.GetUsedSize(ctx)
+	s3.updateConnectionState(err, epoch)
 	if err != nil {
 		// TODO: will returning EIO break any applications that depend on StatFs?
 		return nil, true, err
