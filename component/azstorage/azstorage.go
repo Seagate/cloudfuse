@@ -264,6 +264,13 @@ func (az *AzStorage) timeToRetry() bool {
 func (az *AzStorage) updateConnectionState(err error) bool {
 	az.state.Lock()
 	defer az.state.Unlock()
+
+	// A context.Canceled error means az.ctx was already cancelled by us when we went offline.
+	// It carries no new connectivity information, so we must not update state.
+	if errors.Is(err, context.Canceled) {
+		return az.state.firstOffline == nil
+	}
+
 	currentTime := time.Now()
 	az.state.lastConnectionAttempt = &currentTime
 	connected := !isOfflineError(err)
