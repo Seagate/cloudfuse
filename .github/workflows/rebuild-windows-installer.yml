@@ -1,0 +1,93 @@
+name: Rebuild Windows Installer for Existing Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to rebuild (e.g. v1.2.3)'
+        required: true
+        type: string
+
+jobs:
+  rebuild-installer:
+    name: Rebuild Windows Installer
+    runs-on: windows-latest
+    env:
+      go: "1.26"
+      cgo: "0"
+      winfsp: winfsp-2.1.25156.msi
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+          cache: false
+
+      - name: Set CGO
+        shell: bash
+        run: echo 'CGO_ENABLED=0' >> $GITHUB_ENV
+
+      - name: Build
+        shell: bash
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          commitDate=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)
+          ldflags="-s -w -X github.com/Seagate/cloudfuse/common.GitCommit=${SHA} -X github.com/Seagate/cloudfuse/common.CommitDate=$commitDate"
+          go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
+          go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
+          go build -trimpath -ldflags ''"$ldflags"'' -o windows-startup.exe ./tools/windows-startup/
+          go build -trimpath -ldflags ''"$ldflags"'' -o windows-service.exe ./tools/windows-service/
+          touch -m -d $commitDate cloudfuse.exe
+          touch -m -d $commitDate cfusemon.exe
+          touch -m -d $commitDate windows-startup.exe
+          touch -m -d $commitDate windows-service.exe
+
+      - name: Get cached WinFSP installer
+        id: restore-winfsp-installer
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ env.winfsp }}
+          key: ${{ env.winfsp }}
+
+      - name: Download WinFSP installer
+        if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
+        shell: bash
+        run: curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
+
+      - name: Cache WinFSP installer
+        if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ env.winfsp }}
+          key: ${{ env.winfsp }}
+
+      - name: Set Version
+        id: get_version
+        shell: bash
+        run: echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+        env:
+          TAG: ${{ inputs.tag }}
+
+      - name: Run Inno Setup
+        working-directory: ./build
+        shell: bash
+        run: '"C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build.iss'
+
+      - name: Rename installer
+        shell: bash
+        run: mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64
+          path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+          retention-days: 7
