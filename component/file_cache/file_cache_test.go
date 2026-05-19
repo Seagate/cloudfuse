@@ -1944,9 +1944,6 @@ func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
 	suite.NotNil(attr)
 }
 
-// Tests for GetProperties in OpenFile should be done in E2E tests
-// - there is no good way to test it here with a loopback FS without a mock component.
-
 func (suite *fileCacheTestSuite) TestReleaseFileOffline() {
 	// enable mock component
 	suite.cleanupTest()
