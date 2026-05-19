@@ -2022,6 +2022,7 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 	switch {
 	case err == nil:
 		fc.clearHandleDirty(options.Handle)
+		fc.pendingOps.Delete(options.Handle.Path)
 	case isOffline(err) && fc.offlineAccess:
 		log.Warn("FileCache::flushFileCloud : %s upload delayed (offline)", options.Handle.Path)
 		// add file to upload queue

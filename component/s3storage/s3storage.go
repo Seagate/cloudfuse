@@ -204,13 +204,13 @@ func (s3 *S3Storage) Stop() error {
 
 // Online check
 func (s3 *S3Storage) CloudConnected() bool {
-	log.Trace("S3Storage::CloudConnected")
 	connected := s3.state.firstOffline == nil
 	// don't check the connection when it's up, or if we are not ready to retry
 	if connected || !s3.timeToRetry() {
 		return connected
 	}
 	// check connection
+	log.Info("S3Storage::CloudConnected : Checking connection...")
 	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancelFun()
 	err := s3.Storage.ConnectionOkay(ctx)
@@ -237,6 +237,13 @@ func (s3 *S3Storage) timeToRetry() bool {
 func (s3 *S3Storage) updateConnectionState(err error) bool {
 	s3.state.Lock()
 	defer s3.state.Unlock()
+
+	// A context.Canceled error means s3.ctx was already cancelled by us when we went offline.
+	// It carries no new connectivity information, so we must not update state.
+	if errors.Is(err, context.Canceled) {
+		return s3.state.firstOffline == nil
+	}
+
 	currentTime := time.Now()
 	s3.state.lastConnectionAttempt = &currentTime
 	connected := !errors.Is(err, &common.CloudUnreachableError{})
