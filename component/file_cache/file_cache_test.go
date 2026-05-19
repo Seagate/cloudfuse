@@ -2197,6 +2197,50 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	suite.assert.Equal(data, d)
 }
 
+func (suite *fileCacheTestSuite) TestFlushFileOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	file := "offline-flush-file"
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(nil, &common.CloudUnreachableError{})
+
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	data := []byte("offline flush data")
+	bytesWritten, err := suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), bytesWritten)
+
+	suite.mock.EXPECT().
+		CopyFromFile(gomock.Any()).
+		Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	localData, err := os.ReadFile(filepath.Join(suite.cache_path, file))
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, localData)
+
+	op, exists := suite.fileCache.pendingOps.Load(file)
+	suite.assert.True(exists, "File should be queued in pendingOps for deferred upload")
+	if exists {
+		suite.assert.Equal(pendingFlags{}, op)
+	}
+}
+
 func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 	defer suite.cleanupTest()
 	// Setup
@@ -2389,7 +2433,7 @@ loopbackfs:
 	suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
 }
 
-func (suite *fileCacheTestSuite) TestCreateFileAndRename() {
+func (suite *fileCacheTestSuite) TestRenamePendingOp() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
