@@ -2158,7 +2158,7 @@ func (suite *fileCacheTestSuite) TestConnectedToOffline() {
 		&internal.ReadInBufferOptions{Handle: openHandle, Offset: 0, Data: buf},
 	)
 	suite.assert.NoError(err, "read from completely-open file should succeed when offline")
-	suite.assert.Greater(n, 0)
+	suite.assert.Positive(n)
 
 	// Write to the completely-open file while offline
 	newData := []byte("offline write")
