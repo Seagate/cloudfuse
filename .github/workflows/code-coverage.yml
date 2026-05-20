@@ -43,7 +43,6 @@ jobs:
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
       MOUNT_READY_TIMEOUT: 60
       zig: 0.15.2
-      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1049,7 +1048,6 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       MOUNT_READY_TIMEOUT: 60
-      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
