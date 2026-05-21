@@ -944,9 +944,18 @@ func TestDataValidationTestSuite(t *testing.T) {
 		fmt.Printf("Could not cleanup cache dir before testing [%s]\n", err.Error())
 	}
 
+	// Validate mount path exists before trying to create subdirectories
+	if _, err := os.Stat(dataValidationMntPathPtr); err != nil {
+		t.Fatalf(
+			"Mount path does not exist or is not accessible: %s [%v]",
+			dataValidationMntPathPtr,
+			err,
+		)
+	}
+
 	err = os.Mkdir(tObj.testMntPath, 0777)
 	if err != nil {
-		t.Errorf("Failed to create test directory [%s]\n", err.Error())
+		t.Fatalf("Failed to create test directory [%s]", err.Error())
 	}
 	_, _ = rand.Read(minBuff)
 	_, _ = rand.Read(medBuff)
