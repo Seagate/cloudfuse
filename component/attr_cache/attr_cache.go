@@ -27,6 +27,7 @@ package attr_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -36,6 +37,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -403,6 +405,10 @@ func (ac *AttrCache) backgroundCleanup() {
 // cleanupExpiredEntries: removes expired entries from the cache map
 // This runs in a background goroutine to prevent memory leaks
 func (ac *AttrCache) cleanupExpiredEntries() {
+	// do not cleanup when offline
+	if !ac.NextComponent().CloudConnected() {
+		return
+	}
 	// First pass: collect keys to delete under read lock to minimize write lock duration
 	var keysToDelete []string
 
@@ -577,6 +583,25 @@ func (ac *AttrCache) StreamDir(
 					options.Name, numAdded, len(pathList))
 			}
 		}
+	} else if errors.Is(err, &common.CloudUnreachableError{}) {
+		// return expired cachedPathList
+		if cachedPathList != nil {
+			pathList = cachedPathList
+			nextToken = cachedToken
+		} else {
+			// return whatever entries we have (but only if the token is empty)
+			entry, found := ac.cache.get(options.Name)
+			if options.Token == "" && found {
+				for _, v := range entry.children {
+					if v.exists() && v.valid() {
+						pathList = append(pathList, v.attr)
+					}
+				}
+			} else {
+				// the cloud is unavailable, and we have nothing to provide
+				err = common.NewNoCachedDataError(err)
+			}
+		}
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
@@ -627,7 +652,9 @@ func (ac *AttrCache) fetchCachedDirList(
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Warn("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
-		return nil, "", fmt.Errorf("%s directory not found in cache", path)
+		return nil, "", common.NewNoCachedDataError(
+			fmt.Errorf("%s directory not found in cache", path),
+		)
 	}
 	// is the requested data cached?
 	cachedListSegment, found := listDirCache.listCache[token]
@@ -640,9 +667,7 @@ func (ac *AttrCache) fetchCachedDirList(
 	// check timeout
 	if time.Since(cachedListSegment.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
-		// drop the invalid segment from the list cache
-		delete(listDirCache.listCache, token)
-		return nil, "", fmt.Errorf(
+		return cachedListSegment.entries, "", fmt.Errorf(
 			"%s directory listing segment %s cache expired",
 			path,
 			token,
@@ -714,12 +739,6 @@ func (ac *AttrCache) cacheListSegment(
 	}
 	// add the new entry
 	listDirItem.listCache[token] = newListCacheSegment
-	// scan the listing cache and remove expired entries
-	for k, v := range listDirItem.listCache {
-		if currTime.Sub(v.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
-			delete(listDirItem.listCache, k)
-		}
-	}
 	log.Trace("AttrCache::cacheListSegment : %s cached list entries \"%s\"-\"%s\" (%d items)",
 		listDirPath, token, nextToken, len(pathList))
 }
@@ -1175,9 +1194,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	var errFromCache error
 	ac.cacheLock.RLock()
 	value, found := ac.cache.get(options.Name)
-	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-		// Serve the request from the attribute cache
-		respondFromCache = true
+	if found && value.valid() {
+		// record cache response
 		if !value.exists() {
 			// log.Debug("AttrCache::GetAttr : %s found, (ENOENT) served from cache", options.Name)
 			errFromCache = syscall.ENOENT
@@ -1185,10 +1203,14 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// log.Debug("AttrCache::GetAttr : %s found, served from cache", options.Name)
 			attrFromCache = value.attr
 		}
-	} else if ac.cacheDirs {
+		// only serve this response if it's not expired
+		if time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
+			respondFromCache = true
+		}
+	}
+	if ac.cacheDirs && !respondFromCache {
 		// drill up for the nearest valid parent directory attribute cache
-		parent, found := ac.cache.getCachedParent(options.Name)
-		if found && time.Since(parent.cachedAt).Seconds() < float64(ac.cacheTimeout) {
+		if parent, found := ac.cache.getCachedParent(options.Name); found {
 			// Remember, we have no entry for options.Name
 			// parent is its nearest valid ancestor
 			// So, if parent doesn't exist, options.Name must not exist
@@ -1200,8 +1222,9 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 				// 	options.Name,
 				// 	parent.exists(),
 				// )
-				respondFromCache = true
 				errFromCache = syscall.ENOENT
+				// only serve this response if it's not expired
+				respondFromCache = time.Since(parent.cachedAt).Seconds() < float64(ac.cacheTimeout)
 			}
 		}
 	}
@@ -1213,18 +1236,12 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// The answer is not cached, or it's expired
 	// Get the attributes from next component
 	pathAttr, err := ac.NextComponent().GetAttr(options)
-	// return unexpected errors immediately (no valid response to cache)
-	if err != nil && !os.IsNotExist(err) {
-		log.Debug("AttrCache::GetAttr : %s encountered error [%v]", options.Name, err)
-		return pathAttr, err
-	}
-	// response is valid - cache it
-	ac.cacheLock.Lock()
-	defer ac.cacheLock.Unlock()
-	switch err {
-	case nil:
-		log.Debug("AttrCache::GetAttr : %s got attributes from cloud, caching result", options.Name)
+	switch {
+	case err == nil:
 		// Retrieved attributes so cache them
+		log.Debug("AttrCache::GetAttr : %s Caching record from cloud", options.Name)
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
 			exists:   true,
@@ -1233,14 +1250,29 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	case syscall.ENOENT:
-		log.Debug("AttrCache::GetAttr : %s not found, caching ENOENT result", options.Name)
+	case err == syscall.ENOENT:
 		// cache this entity not existing
+		log.Debug("AttrCache::GetAttr : %s Caching ENOENT from cloud", options.Name)
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
 			exists:   false,
 			cachedAt: time.Now(),
 		})
+	case errors.Is(err, &common.CloudUnreachableError{}):
+		// the cloud connection is down
+		// do we have an expired response from cache? Let's serve that.
+		haveExpiredResponse := attrFromCache != nil || errFromCache != nil
+		if haveExpiredResponse {
+			log.Warn("AttrCache::GetAttr : %s Serving expired cached data (offline)", options.Name)
+			return attrFromCache, errors.Join(errFromCache, err)
+		} else {
+			log.Err("AttrCache::GetAttr : %s No cached data (offline)", options.Name)
+			return nil, common.NewNoCachedDataError(err)
+		}
+	default:
+		log.Err("AttrCache::GetAttr : %s encountered error [%v]", options.Name, err)
 	}
 	return pathAttr, err
 }

@@ -1139,6 +1139,16 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	name := generateFileName()
 
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	// log error information to debug log
+	unwrappedErr := err
+	for unwrappedErr != nil {
+		fmt.Printf(
+			"Uncaught AZ error is of type \"%T\" and value %v.\n",
+			unwrappedErr,
+			unwrappedErr,
+		)
+		unwrappedErr = errors.Unwrap(unwrappedErr)
+	}
 
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
