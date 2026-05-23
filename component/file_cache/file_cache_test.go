@@ -526,7 +526,7 @@ func (suite *fileCacheTestSuite) TestStreamDirShowsOfflineCreatedDirectory() {
 		Return([]*internal.ObjAttr{}, "", &common.CloudUnreachableError{})
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: dirName}).
-		Return(nil, os.ErrNotExist)
+		Return(nil, &common.CloudUnreachableError{})
 
 	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: ""})
 	suite.assert.NoError(err)
@@ -575,7 +575,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInsideOfflineCreatedDirectory() {
 		Return([]*internal.ObjAttr{}, "", &common.CloudUnreachableError{})
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: filePath}).
-		Return(nil, os.ErrNotExist)
+		Return(nil, &common.CloudUnreachableError{})
 
 	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: dirName})
 	suite.assert.NoError(err)
