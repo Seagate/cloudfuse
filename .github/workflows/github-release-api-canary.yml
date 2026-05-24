@@ -1,0 +1,115 @@
+name: GitHub Release API Canary
+permissions: {}
+
+on:
+  schedule:
+    # Weekly on Sunday at 06:15 UTC
+    - cron: "15 6 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    name: Live API Contract Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+
+    env:
+      go: "1.26"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+
+      - name: Run live release API canary
+        id: canary
+        continue-on-error: true
+        env:
+          GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          go test -v -timeout=10m ./cmd -run TestGitHubReleaseAPICanary --tags=liveapi,fuse3 2>&1 | tee canary.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+
+          if [[ "$status" -eq 0 ]]; then
+            echo "issue_worthy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if grep -q "CANARY_TRANSIENT:" canary.log; then
+            echo "issue_worthy=false" >> "$GITHUB_OUTPUT"
+            echo "classification=transient" >> "$GITHUB_OUTPUT"
+          else
+            echo "issue_worthy=true" >> "$GITHUB_OUTPUT"
+            echo "classification=api-break" >> "$GITHUB_OUTPUT"
+          fi
+
+          exit "$status"
+
+      - name: Upload canary logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-release-api-canary-log-${{ github.run_id }}
+          path: canary.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Create issue for API break
+        if: steps.canary.outputs.issue_worthy == 'true' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          title="[canary] GitHub release API contract failure"
+          existing=$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --search "$title in:title" \
+            --json number \
+            --jq '.[0].number')
+
+          if [[ -n "$existing" && "$existing" != "null" ]]; then
+            echo "Existing canary issue #$existing is already open; skipping create."
+            exit 0
+          fi
+
+          body=$(cat <<'EOF'
+          Weekly GitHub release API canary failed with a non-transient contract error.
+
+          - Repository: ${{ github.repository }}
+          - Workflow: ${{ github.workflow }}
+          - Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - Commit: ${{ github.sha }}
+
+          This issue is auto-created only when the failure is classified as an API-contract break.
+          Rate-limit/auth/transient failures are intentionally not auto-filed.
+          EOF
+          )
+
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$title" \
+            --body "$body"
+
+      - name: Fail if canary failed
+        if: steps.canary.outputs.exit_code != '0'
+        run: |
+          echo "GitHub release API canary failed (classification: ${{ steps.canary.outputs.classification }})."
+          exit 1
