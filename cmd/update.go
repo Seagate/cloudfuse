@@ -54,6 +54,10 @@ type Options struct {
 
 var opt = Options{}
 
+var fetchReleaseForUpdate = getRelease
+var downloadUpdateAsset = downloadUpdate
+var verifyUpdateHash = verifyHash
+
 type asset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
@@ -107,7 +111,7 @@ var updateCmd = &cobra.Command{
 
 // installUpdate performs the self-update
 func installUpdate(ctx context.Context, opt *Options, out io.Writer) error {
-	relInfo, err := getRelease(ctx, opt.Version)
+	relInfo, err := fetchReleaseForUpdate(ctx, opt.Version)
 	if err != nil {
 		return fmt.Errorf("unable to detect new version: %w", err)
 	}
@@ -139,14 +143,14 @@ func installUpdate(ctx context.Context, opt *Options, out io.Writer) error {
 		}
 	}
 
-	fileName, err := downloadUpdate(ctx, relInfo, opt.Output)
+	fileName, err := downloadUpdateAsset(ctx, relInfo, opt.Output)
 	if err != nil {
 		return fmt.Errorf("unable to download release: %w", err)
 	}
 
 	// Only verify hash for Linux releases as Windows releases are not hashed by goreleaser
 	if opt.Package != "exe" {
-		if err := verifyHash(ctx, fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
+		if err := verifyUpdateHash(ctx, fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
 			return fmt.Errorf("unable to verify checksum: %w", err)
 		}
 	}

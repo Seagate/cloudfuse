@@ -26,6 +26,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -42,6 +43,13 @@ type updateTestSuite struct {
 	assert *assert.Assertions
 }
 
+var mockReleaseInfo = &releaseInfo{
+	Version:   "999.0.0",
+	AssetURL:  "https://example.invalid/cloudfuse.rpm",
+	AssetName: "cloudfuse_test_linux_amd64.rpm",
+	HashURL:   "https://example.invalid/checksums_sha256.txt",
+}
+
 func (suite *updateTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
 
@@ -51,11 +59,32 @@ func (suite *updateTestSuite) SetupTest() {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 
+	fetchReleaseForUpdate = func(_ context.Context, _ string) (*releaseInfo, error) {
+		return mockReleaseInfo, nil
+	}
+	downloadUpdateAsset = func(_ context.Context, _ *releaseInfo, output string) (string, error) {
+		if output != "" {
+			return output, nil
+		}
+		tmpFile, err := os.CreateTemp("", "update-file*")
+		if err != nil {
+			return "", err
+		}
+		defer tmpFile.Close()
+		return tmpFile.Name(), nil
+	}
+	verifyUpdateHash = func(_ context.Context, _, _, _ string) error {
+		return nil
+	}
+
 }
 
 func (suite *updateTestSuite) cleanupTest() {
 	resetCLIFlags(*updateCmd)
 	resetCLIFlags(*rootCmd)
+	fetchReleaseForUpdate = getRelease
+	downloadUpdateAsset = downloadUpdate
+	verifyUpdateHash = verifyHash
 }
 
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {
