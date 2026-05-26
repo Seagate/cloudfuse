@@ -721,15 +721,52 @@ func (fc *FileCache) StreamDir(
 		}
 	}
 
-	// Case 2: file is only in local cache
-	if token == "" {
-		for _, entry := range dirents {
-			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-			// skip any entries that exist in cloud storage
-			cloudStateKnown, inCloud, _ := fc.checkCloud(entryPath)
-			if cloudStateKnown && inCloud {
+	// Case 2: handle files only in local cache.
+	// prep page info
+	var firstInPage, lastInPage string
+	if len(attrs) > 0 {
+		firstInPage = attrs[0].Name
+		lastInPage = attrs[len(attrs)-1].Name
+	}
+	isFirstPage := options.Token == ""
+	isLastPage := token == ""
+	inListing := make(map[string]struct{}, len(attrs))
+	for _, a := range attrs {
+		inListing[a.Name] = struct{}{}
+	}
+	// iterate over local entries
+	for _, entry := range dirents {
+		name := entry.Name()
+		// already covered by the listing
+		if _, found := inListing[name]; found {
+			continue
+		}
+		// we usually add case 2 entries to the last page
+		addEntryToCurrentPage := token == ""
+		// does this entry belong to another page?
+		// does it exists in cloud storage?
+		entryPath := common.JoinUnixFilepath(options.Name, name)
+		cloudStateKnown, inCloud, _ := fc.checkCloud(entryPath)
+		if cloudStateKnown && inCloud {
+			// GetAttr says it exists in cloud, but it's not in the current page of the listing.
+			// If it's in cloud, *should* it have been in the current page?
+			belongsInPage := name < firstInPage && isFirstPage ||
+				name > firstInPage && name < lastInPage ||
+				name > lastInPage && isLastPage
+			if belongsInPage {
+				// Note: we check this to account for eventually consistency. If this entry was *just*
+				// created, attr_cache cached its attributes on creation, and it's possible the cloud
+				// listing just hasn't caught up yet. So, if it clearly belongs in this page, include it.
+				log.Debug("FileCache::StreamDir : fixing eventual consistency for %s", entryPath)
+				addEntryToCurrentPage = true
+			} else {
+				// if it doesn't belong in this page, assume it's handled by another page
+				// in the tiny chance that eventual consistency makes us miss an entry between pages,
+				// the listing will just have to miss the entry. Avoiding that requires heroics.
 				continue
 			}
+		}
+		if addEntryToCurrentPage {
 			// get the lock on the file, to allow any pending operation to complete
 			flock := fc.fileLocks.Get(entryPath)
 			flock.RLock()
