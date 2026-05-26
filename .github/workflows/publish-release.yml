@@ -17,7 +17,6 @@ jobs:
     runs-on: windows-latest
     env:
       go: "1.26"
-      cgo: "0"
       winfsp: winfsp-2.1.25156.msi
     steps:
       - name: Checkout code
@@ -34,8 +33,7 @@ jobs:
 
       - name: Set CGO
         shell: bash
-        run: |
-          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
+        run: echo 'CGO_ENABLED=0' >> $GITHUB_ENV
 
       - name: Build
         shell: bash
@@ -50,7 +48,7 @@ jobs:
           go build -trimpath -ldflags ''"$ldflags"'' -o windows-service.exe ./tools/windows-service/
           touch -m -d $commitDate cloudfuse.exe
           touch -m -d $commitDate cfusemon.exe
-          touch -m -d $commitDate windows-startup.
+          touch -m -d $commitDate windows-startup.exe
           touch -m -d $commitDate windows-service.exe
 
         # Get the WinFSP installer (from cache or download)
@@ -64,10 +62,7 @@ jobs:
       - name: Download WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         shell: bash
-        env:
-          WINFSP: ${{ env.winfsp }}
-        run: |
-          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
+        run: curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
 
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
@@ -93,8 +88,8 @@ jobs:
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build.iss
 
       - name: Rename installer
-        run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+        shell: bash
+        run: mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -142,7 +137,7 @@ jobs:
           cache: false
 
       - name: Set up Cosign
-        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Set Version
         id: get_version
@@ -161,7 +156,7 @@ jobs:
 
         # Run GoReleaser (see .goreleaser.yaml)
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@e24998b8b67b290c2fa8b7c14fcfa7de2c5c9b8c # v7.1.0
+        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
         with:
           args: release --clean
         env:

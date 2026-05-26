@@ -486,6 +486,23 @@ func (s *s3StorageTestSuite) TestCloudOfflineContext() {
 	s.s3Storage.updateConnectionState(nil)
 }
 
+func (s *s3StorageTestSuite) TestStaleContextErrorDoesNotRevertOnlineState() {
+	defer s.cleanupTest()
+
+	s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(s.s3Storage.CloudConnected())
+
+	connected := s.s3Storage.updateConnectionState(nil)
+	s.assert.True(connected)
+	s.assert.True(s.s3Storage.CloudConnected())
+
+	connected = s.s3Storage.updateConnectionState(
+		common.NewCloudUnreachableError(context.Canceled),
+	)
+	s.assert.True(connected)
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
 func (s *s3StorageTestSuite) TestCreateDir() {
 	defer s.cleanupTest()
 	// Testing dir and dir/
