@@ -63,7 +63,6 @@ jobs:
       cgo: "1"
       go: "1.26"
       zig: 0.15.2
-      containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
       AWS_REGION: us-east-1
@@ -204,7 +203,6 @@ jobs:
     env:
       go: "1.26"
       cgo: "0"
-      containerName: "test-cnt-win"
 
     steps:
       - name: Checkout code
@@ -254,7 +252,7 @@ jobs:
       - name: Set CGO
         shell: bash
         env:
-          CGO: ${{ env.go }}
+          CGO: ${{ env.cgo }}
         run: |
           if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
 
