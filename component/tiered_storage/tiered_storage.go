@@ -180,14 +180,6 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	return nil
 }
 
-func (c *TieredStorage) CopyToFile(options internal.CopyToFileOptions) error {
-	return nil
-}
-
-func (c *TieredStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
-	return nil
-}
-
 func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {
 	return nil
 }
