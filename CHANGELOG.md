@@ -2,7 +2,7 @@
 
 ## **2.3.0** ##
 
-May 16th 2026
+May 28th 2026
 This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
 
 ### Features ###
@@ -10,6 +10,7 @@ This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storag
 - [#705](https://github.com/Seagate/cloudfuse/pull/705) Add offline access feature (see [documentation](component/file_cache/OfflineAccess.md))
 - [#910](https://github.com/Seagate/cloudfuse/pull/910) Make cloud storage components connection-aware
 - [#909](https://github.com/Seagate/cloudfuse/pull/909) Improve GetAttr performance by avoiding unnecessary cloud storage calls
+- [#848](https://github.com/Seagate/cloudfuse/pull/848) Add hard limit to size tracker if size is over bucket capacity
 
 ### Changes ###
 
