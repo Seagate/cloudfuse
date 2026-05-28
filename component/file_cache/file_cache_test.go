@@ -526,7 +526,7 @@ func (suite *fileCacheTestSuite) TestStreamDirShowsOfflineCreatedDirectory() {
 		Return([]*internal.ObjAttr{}, "", &common.CloudUnreachableError{})
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: dirName}).
-		Return(nil, os.ErrNotExist)
+		Return(nil, &common.CloudUnreachableError{})
 
 	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: ""})
 	suite.assert.NoError(err)
@@ -575,7 +575,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInsideOfflineCreatedDirectory() {
 		Return([]*internal.ObjAttr{}, "", &common.CloudUnreachableError{})
 	suite.mock.EXPECT().
 		GetAttr(internal.GetAttrOptions{Name: filePath}).
-		Return(nil, os.ErrNotExist)
+		Return(nil, &common.CloudUnreachableError{})
 
 	attrs, token, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: dirName})
 	suite.assert.NoError(err)
@@ -1944,8 +1944,239 @@ func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
 	suite.NotNil(attr)
 }
 
-// Tests for GetProperties in OpenFile should be done in E2E tests
-// - there is no good way to test it here with a loopback FS without a mock component.
+func (suite *fileCacheTestSuite) TestReleaseFileOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	// Create a file in the local cache to simulate a previous download
+	path := "release-offline-file"
+	localPath := filepath.Join(suite.cache_path, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("cached data"), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.policy.CacheValid(localPath)
+
+	// GetAttr fails: cloud is unreachable
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: path}).
+		Return(nil, &common.CloudUnreachableError{}).
+		AnyTimes()
+
+	// Open the file while offline (succeeds from local cache)
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(handle)
+
+	// Write data to make the handle dirty
+	data := []byte("new data written offline")
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+
+	// Upload attempt fails (still offline)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
+
+	// ReleaseFile should succeed: upload is deferred to pendingOps
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// The file should be queued for later upload
+	_, pending := suite.fileCache.pendingOps.Load(path)
+	suite.assert.True(pending, "dirty file should be queued for upload when released offline")
+}
+
+func (suite *fileCacheTestSuite) TestOfflineToConnected() {
+	// Set up mock manually so CloudConnected can change during the test
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.assert = assert.New(suite.T())
+	err := config.ReadConfigFromReader(strings.NewReader(defaultConfig))
+	suite.assert.NoError(err)
+	suite.mockCtrl = gomock.NewController(suite.T())
+	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.fileCache = newTestFileCache(suite.mock)
+	suite.useMock = true
+
+	connected := false
+	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(func() bool {
+		return connected
+	})
+
+	err = suite.fileCache.Start(context.Background())
+	suite.assert.NoError(err)
+	defer suite.cleanupTest()
+
+	// Create a file in the local cache to simulate a previous download
+	path := "offline-to-connected-file"
+	localPath := filepath.Join(suite.cache_path, path)
+	err = os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(localPath, []byte("initial cached data"), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.policy.CacheValid(localPath)
+
+	// GetAttr always returns offline error for this test
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: path}).
+		Return(nil, &common.CloudUnreachableError{}).
+		AnyTimes()
+
+	// Open the file while offline: succeeds from local cache
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(handle)
+
+	// Simulate connection restored
+	connected = true
+
+	// Write to the file (now connected, but write is purely local)
+	newData := []byte("written after reconnect")
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: newData},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+
+	// Upload succeeds (now connected)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(nil)
+
+	// Release should upload successfully
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty(), "handle should be clean after successful upload")
+
+	// File should not be in pendingOps after a successful upload
+	_, pending := suite.fileCache.pendingOps.Load(path)
+	suite.assert.False(pending, "file should not be queued after successful upload on reconnect")
+}
+
+func (suite *fileCacheTestSuite) TestConnectedToOffline() {
+	// Set up mock manually so CloudConnected can change during the test
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.assert = assert.New(suite.T())
+	err := config.ReadConfigFromReader(strings.NewReader(defaultConfig))
+	suite.assert.NoError(err)
+	suite.mockCtrl = gomock.NewController(suite.T())
+	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.fileCache = newTestFileCache(suite.mock)
+	suite.useMock = true
+
+	connected := true
+	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(func() bool {
+		return connected
+	})
+
+	err = suite.fileCache.Start(context.Background())
+	suite.assert.NoError(err)
+	defer suite.cleanupTest()
+
+	// --- Lazy-open file: exists in cloud but not in local cache ---
+	// When opened while connected, download is deferred (lazy open).
+	// When accessed after going offline, the open should fail.
+	// When closed while offline, it should succeed without error.
+	lazyPath := "connected-to-offline-lazy"
+	lazyAttr := &internal.ObjAttr{Path: lazyPath, Size: 10, Mtime: time.Now()}
+	// First GetAttr call (during OpenFile): cloud is reachable
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: lazyPath}).
+		Return(lazyAttr, nil).
+		Times(1)
+	// Subsequent GetAttr calls (during deferred open attempts while offline)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: lazyPath}).
+		Return(nil, &common.CloudUnreachableError{}).
+		AnyTimes()
+
+	lazyHandle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: lazyPath, Flags: os.O_RDONLY, Mode: 0444},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(lazyHandle)
+	// File was not downloaded: still in lazy open state
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, lazyPath))
+
+	// --- Completely-open file: already cached locally ---
+	// When opened while connected, it opens immediately from local cache.
+	openPath := "connected-to-offline-open"
+	openLocalPath := filepath.Join(suite.cache_path, openPath)
+	err = os.MkdirAll(filepath.Dir(openLocalPath), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(openLocalPath, []byte("cached content"), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.policy.CacheValid(openLocalPath)
+
+	openAttr := &internal.ObjAttr{Path: openPath, Size: 14, Mtime: time.Now()}
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: openPath}).
+		Return(openAttr, nil).
+		AnyTimes()
+
+	openHandle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: openPath, Flags: os.O_RDWR, Mode: 0644},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(openHandle)
+	suite.assert.FileExists(openLocalPath)
+
+	// Simulate connection drop
+	connected = false
+
+	// Access the lazy-open file: should fail (data unavailable offline)
+	buf := make([]byte, 10)
+	_, err = suite.fileCache.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: lazyHandle, Offset: 0, Data: buf},
+	)
+	suite.assert.Error(err, "read on lazy-open file should fail when going offline")
+
+	// Close the lazy-open file: should succeed with no error even while offline
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: lazyHandle})
+	suite.assert.NoError(err, "releasing a lazy-open file should succeed even when offline")
+
+	// Access the completely-open file: should still succeed (local data is available)
+	n, err := suite.fileCache.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: openHandle, Offset: 0, Data: buf},
+	)
+	suite.assert.NoError(err, "read from completely-open file should succeed when offline")
+	suite.assert.Positive(n)
+
+	// Write to the completely-open file while offline
+	newData := []byte("offline write")
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: openHandle, Offset: 0, Data: newData},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(openHandle.Dirty())
+
+	// Release should succeed: upload is deferred to pendingOps
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: openHandle})
+	suite.assert.NoError(err, "releasing a completely-open file should succeed when offline")
+
+	// The dirty file should be queued for upload
+	_, pending := suite.fileCache.pendingOps.Load(openPath)
+	suite.assert.True(pending, "dirty file should be queued for upload when released offline")
+}
 
 func (suite *fileCacheTestSuite) TestCloseFileAndEvict() {
 	defer suite.cleanupTest()
@@ -2197,6 +2428,50 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	suite.assert.Equal(data, d)
 }
 
+func (suite *fileCacheTestSuite) TestFlushFileOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	file := "offline-flush-file"
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(nil, &common.CloudUnreachableError{})
+
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	data := []byte("offline flush data")
+	bytesWritten, err := suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), bytesWritten)
+
+	suite.mock.EXPECT().
+		CopyFromFile(gomock.Any()).
+		Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	localData, err := os.ReadFile(filepath.Join(suite.cache_path, file))
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, localData)
+
+	op, exists := suite.fileCache.pendingOps.Load(file)
+	suite.assert.True(exists, "File should be queued in pendingOps for deferred upload")
+	if exists {
+		suite.assert.Equal(pendingFlags{}, op)
+	}
+}
+
 func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 	defer suite.cleanupTest()
 	// Setup
@@ -2389,7 +2664,7 @@ loopbackfs:
 	suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
 }
 
-func (suite *fileCacheTestSuite) TestCreateFileAndRename() {
+func (suite *fileCacheTestSuite) TestRenamePendingOp() {
 	defer suite.cleanupTest()
 
 	now := time.Now()

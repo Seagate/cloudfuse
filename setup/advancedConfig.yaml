@@ -134,12 +134,12 @@ attr_cache:
   no-cache-on-list: true|false <do not cache attributes or directory contents during listing. Enabling may cause performance problems.>
   enable-symlinks: true|false <enable symlink support. When false, symlinks will be treated like regular files. Enabling may cause performance problems.>
   max-files: <maximum number of files in the attribute cache at a time. Default - 5000000>
-  no-cache-dirs: true|false <to prevent double-listing directories and to make timestamps accurate, disable caching directories. Breaks s3storage.>
 
 # Size tracker related configuration
 size_tracker:
   journal-name: <custom name for the size journal file. Default - generated from container/bucket name>
   bucket-capacity-fallback: <total bucket capacity in MB for StatFs calculations. Used for display and eviction mode management. Default - not set>
+  hard-limit: true|false <enforce bucket capacity; writes beyond capacity return ENOSPC. Default - false>
 
 # Loopback configuration
 loopbackfs:

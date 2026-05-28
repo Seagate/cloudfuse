@@ -28,6 +28,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -48,6 +49,7 @@ type SizeTracker struct {
 	evictionMode        EvictionMode
 	bucketUsage         uint64
 	statSizeOffset      uint64
+	hardLimitEnabled    bool
 }
 
 type EvictionMode int
@@ -74,6 +76,7 @@ func (e EvictionMode) String() string {
 type SizeTrackerOptions struct {
 	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
+	HardLimit           bool   `config:"hard-limit"               yaml:"hard-limit,omitempty"`
 }
 
 const compName = "size_tracker"
@@ -148,6 +151,13 @@ func (st *SizeTracker) Configure(_ bool) error {
 		// calculate server count
 		// round to the nearest whole number
 		st.serverCount = (st.totalBucketCapacity + st.displayCapacity/2) / st.displayCapacity
+	}
+
+	st.hardLimitEnabled = conf.HardLimit
+	if st.hardLimitEnabled && st.totalBucketCapacity == 0 {
+		log.Warn(
+			"SizeTracker::Configure : hard-limit enabled but bucket-capacity-fallback is not set",
+		)
 	}
 
 	journalName := defaultJournalName
@@ -231,6 +241,21 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
+func (st *SizeTracker) checkCapacityDelta(delta int64) error {
+	if !st.hardLimitEnabled || st.totalBucketCapacity == 0 || delta <= 0 {
+		return nil
+	}
+	current := st.mountSize.GetSize()
+	if current >= st.totalBucketCapacity {
+		return syscall.ENOSPC
+	}
+	remaining := st.totalBucketCapacity - current
+	if uint64(delta) > remaining {
+		return syscall.ENOSPC
+	}
+	return nil
+}
+
 func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error) {
 	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().
@@ -245,14 +270,15 @@ func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error
 		)
 	}
 
+	newSize := max(oldSize, options.Offset+int64(len(options.Data)))
+	diff := newSize - oldSize
+	if err := st.checkCapacityDelta(diff); err != nil {
+		return 0, err
+	}
 	bytesWritten, err := st.NextComponent().WriteFile(options)
 	if err != nil {
 		return bytesWritten, err
 	}
-	newSize := max(oldSize, options.Offset+int64(len(options.Data)))
-
-	diff := newSize - oldSize
-
 	// File already exists and WriteFile succeeded subtract difference in file size
 	st.mountSize.Add(diff)
 
@@ -273,6 +299,10 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 		)
 	}
 
+	if err := st.checkCapacityDelta(options.NewSize - origSize); err != nil {
+		return err
+	}
+
 	err := st.NextComponent().TruncateFile(options)
 	if err != nil {
 		return err
@@ -291,15 +321,20 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 		origSize = attr.Size
 	}
 
+	fileInfo, statErr := options.File.Stat()
+	if statErr == nil {
+		if err := st.checkCapacityDelta(fileInfo.Size() - origSize); err != nil {
+			return err
+		}
+	}
+
 	err = st.NextComponent().CopyFromFile(options)
 	if err != nil {
 		return err
 	}
-	fileInfo, err := options.File.Stat()
-	if err != nil {
-		return nil
+	if statErr == nil {
+		st.mountSize.Add(fileInfo.Size() - origSize)
 	}
-	st.mountSize.Add(fileInfo.Size() - origSize)
 	return nil
 }
 
