@@ -1183,37 +1183,6 @@ func (fc *FileCache) getObjectName(localPath string) string {
 	return common.NormalizeObjectName(relPath)
 }
 
-func (fc *FileCache) checkCacheSpace(
-	opName string,
-	targetPath string,
-	existingSize int64,
-	newSize int64,
-	bufferBytes int64,
-) error {
-	currSize, err := common.GetUsage(fc.tmpPath)
-	if err != nil {
-		log.Err(
-			"FileCache::%s : error getting current usage of cache [%s]",
-			opName,
-			err.Error(),
-		)
-		return nil
-	}
-
-	additionalSpace := max(int64(0), newSize-existingSize)
-	if currSize+float64(additionalSpace) > fc.diskHighWaterMark+float64(bufferBytes) {
-		log.Err(
-			"FileCache::%s : cache size limit reached [%f] failed to open %s",
-			opName,
-			fc.maxCacheSizeMB,
-			targetPath,
-		)
-		return syscall.ENOSPC
-	}
-
-	return nil
-}
-
 func unlockAll(flocks []*common.LockMapItem) {
 	for _, flock := range flocks {
 		flock.Unlock()
