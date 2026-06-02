@@ -2404,14 +2404,30 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			log.Err(
-				"FileCache::TruncateFile : error [couldn't find fd in handle] %s",
-				options.Handle.Path,
-			)
-			return syscall.EBADF
+			// File object is missing, try to recover by reopening the file
+			localPath := filepath.Join(fc.tmpPath, options.Name)
+			newFile, err := common.OpenFile(localPath, os.O_RDWR, 0666)
+			if err != nil {
+				log.Err(
+					"FileCache::TruncateFile : error recovering file object for %s [%v]",
+					options.Handle.Path,
+					err,
+				)
+				return err
+			}
+			options.Handle.SetFileObject(newFile)
+			options.Handle.UnixFD = uint64(newFile.Fd())
+			f = newFile
 		}
 
-		err := f.Truncate(options.NewSize)
+		// Get current file size before truncating
+		currentSize := int64(0)
+		info, err := f.Stat()
+		if err == nil {
+			currentSize = info.Size()
+		}
+
+		err = f.Truncate(options.NewSize)
 		if err != nil {
 			log.Err(
 				"FileCache::TruncateFile : error truncating file %s [%s]",
@@ -2421,7 +2437,10 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			return err
 		}
 
-		fc.setHandleDirty(options.Handle)
+		// Only mark handle dirty if the size actually changed
+		if currentSize != options.NewSize {
+			fc.setHandleDirty(options.Handle)
+		}
 
 		return nil
 	}
