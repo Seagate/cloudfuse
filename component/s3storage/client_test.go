@@ -912,7 +912,7 @@ func (s *clientTestSuite) TestRenameFileDstDir() {
 	})
 	s.assert.NoError(err)
 
-	err = s.client.RenameFile(src, dstDir, false)
+	err = s.client.RenameFile(context.Background(), src, dstDir, false)
 	s.assert.EqualValues(syscall.EISDIR, err)
 
 	// Src should still be in the account

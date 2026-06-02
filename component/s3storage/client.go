@@ -490,7 +490,7 @@ func (cl *Client) RenameFile(
 ) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	isDir, err := cl.directoryExistsForTarget(target)
+	isDir, err := cl.directoryExistsForTarget(ctx, target)
 	if err != nil {
 		return err
 	}
@@ -514,13 +514,13 @@ func (cl *Client) RenameFile(
 	return err
 }
 
-func (cl *Client) directoryExistsForTarget(name string) (bool, error) {
+func (cl *Client) directoryExistsForTarget(ctx context.Context, name string) (bool, error) {
 	dirName := internal.ExtendDirName(name)
 	if !shouldProbeDirMarker(dirName, false, cl.Config.skipDirProbeOnFileExt) {
 		return false, nil
 	}
 
-	_, err := cl.getDirectoryAttr(dirName, false)
+	_, err := cl.getDirectoryAttr(ctx, dirName, false)
 	if err == nil {
 		return true, nil
 	}
@@ -648,7 +648,7 @@ func (cl *Client) getDirectoryAttr(
 ) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	objects, _, listErr := cl.List(dirName, nil, 1)
+	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
 
 	// Otherwise, the cloud does not support directory markers, or there is no
 	// marker, so look for an object in the directory.
@@ -687,7 +687,7 @@ func (cl *Client) getDirectoryAttr(
 	// Either directory markers are disabled, there is no marker, or the name
 	// was skipped by shouldProbeDirMarker. Fall back to listing objects under
 	// the prefix to detect a non-empty directory.
-	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
+	objects, _, listErr = cl.List(ctx, dirName, nil, 1)
 	if listErr != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
 		return nil, listErr
