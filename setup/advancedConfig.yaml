@@ -1,6 +1,6 @@
 # MUST READ :
 #   If you are creating a cloudfuse config file using this kindly take care of below points
-#   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory, sync-to-flush) are set to 'false' by default.
+#   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory) are set to 'false' by default.
 #      No need to mention them in your config file unless you are setting them to true.
 #   2. 'loopbackfs' is purely for testing and shall not be used in production configuration.
 #   3. 'stream', 'block-cache', and 'file_cache' can not co-exist and config file shall have only one of them based on your use case.
@@ -78,6 +78,7 @@ libfuse:
   disable-writeback-cache: true|false <disallow libfuse to buffer write requests if you must strictly open files in O_WRONLY or O_APPEND mode. alternatively, you can set ignore-open-flags.>
   ignore-open-flags: true|false <ignore the append and write only flag since O_APPEND and O_WRONLY is not supported with writeback caching. alternatively, you can disable-writeback-cache. Default value is true>
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
+  umask: <FUSE mount permission mask in octal. Ex. 022 -> files 0644 and directories 0755.>
   direct-io: true|false <enable to bypass the kernel cache. It also disables cloudfuse data and metadata caching.>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
   display-capacity-mb: <number of MB to display as the mounted storage capacity. Default - 1PB (1073741824 MB)>
@@ -124,9 +125,7 @@ file_cache:
   cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
   policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
   offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>
-  sync-to-flush: true|false <sync call to a file will force upload of the contents to storage account. Default - true>
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
-  ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
 
 # Attribute cache related configuration
@@ -135,12 +134,12 @@ attr_cache:
   no-cache-on-list: true|false <do not cache attributes or directory contents during listing. Enabling may cause performance problems.>
   enable-symlinks: true|false <enable symlink support. When false, symlinks will be treated like regular files. Enabling may cause performance problems.>
   max-files: <maximum number of files in the attribute cache at a time. Default - 5000000>
-  no-cache-dirs: true|false <to prevent double-listing directories and to make timestamps accurate, disable caching directories. Breaks s3storage.>
 
 # Size tracker related configuration
 size_tracker:
   journal-name: <custom name for the size journal file. Default - generated from container/bucket name>
   bucket-capacity-fallback: <total bucket capacity in MB for StatFs calculations. Used for display and eviction mode management. Default - not set>
+  hard-limit: true|false <enforce bucket capacity; writes beyond capacity return ENOSPC. Default - false>
 
 # Loopback configuration
 loopbackfs:
@@ -214,6 +213,7 @@ s3storage:
   disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
   skip-dir-probe-on-file-ext: true|false <skip directory probing when the final path segment looks like a file extension of 1-4 alphanumeric characters. Default - true>
+  health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>
 
 # Mount all configuration
 mountall:

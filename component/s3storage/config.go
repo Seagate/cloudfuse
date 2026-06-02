@@ -28,6 +28,7 @@ package s3storage
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -56,12 +57,18 @@ type Options struct {
 	DisableUsage              bool                    `config:"disable-usage"                 yaml:"disable-usage,omitempty"`
 	EnableDirMarker           bool                    `config:"enable-dir-marker"             yaml:"enable-dir-marker,omitempty"`
 	SkipDirProbeOnFileExt     bool                    `config:"skip-dir-probe-on-file-ext"    yaml:"skip-dir-probe-on-file-ext,omitempty"`
+	HealthCheckIntervalSec    int                     `config:"health-check-interval-sec"     yaml:"health-check-interval-sec,omitempty"`
 }
 
 type ConfigSecrets struct {
 	KeyID     *memguard.Enclave
 	SecretKey *memguard.Enclave
 }
+
+const (
+	defaultHealthCheckInterval = 2 * time.Second
+	maxHealthCheckInterval     = 30 * time.Second
+)
 
 // ParseAndValidateConfig : Parse and validate config
 func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) error {
@@ -158,6 +165,27 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 		}
 	}
 	s3.stConfig.disableSymlink = !enableSymlinks
+
+	s3.stConfig.healthCheckInterval = defaultHealthCheckInterval
+	if config.IsSet("s3storage.health-check-interval-sec") {
+		specifiedInterval := time.Duration(opt.HealthCheckIntervalSec) * time.Second
+		switch {
+		case specifiedInterval < 1*time.Second:
+			log.Warn(
+				"S3storage : health-check-interval-sec=%d... using 1s instead",
+				opt.HealthCheckIntervalSec,
+			)
+			s3.stConfig.healthCheckInterval = 1 * time.Second
+		case specifiedInterval > maxHealthCheckInterval:
+			log.Warn(
+				"S3storage : health-check-interval-sec=%d... using %.0fs instead",
+				opt.HealthCheckIntervalSec,
+				maxHealthCheckInterval.Seconds(),
+			)
+		default:
+			s3.stConfig.healthCheckInterval = specifiedInterval
+		}
+	}
 
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 

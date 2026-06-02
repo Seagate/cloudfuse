@@ -39,7 +39,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "2.1.1"
+	cloudfuseVersion_ = "2.3.0"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -98,6 +98,51 @@ var CloudfuseVersion = CloudfuseVersion_()
 
 func CloudfuseVersion_() string {
 	return cloudfuseVersion_
+}
+
+// custom errors shared by different components
+type CloudUnreachableError struct {
+	Message           string
+	CloudStorageError error
+}
+
+func NewCloudUnreachableError(originalError error) CloudUnreachableError {
+	return CloudUnreachableError{
+		Message:           "Failed to connect to cloud storage",
+		CloudStorageError: originalError,
+	}
+}
+func (e CloudUnreachableError) Error() string {
+	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CloudStorageError)
+}
+func (e CloudUnreachableError) Unwrap() error {
+	return e.CloudStorageError
+}
+func (e CloudUnreachableError) Is(target error) bool {
+	_, ok := target.(*CloudUnreachableError)
+	return ok
+}
+
+type NoCachedDataError struct {
+	Message    string
+	CacheError error
+}
+
+func NewNoCachedDataError(originalError error) NoCachedDataError {
+	return NoCachedDataError{
+		Message:    "Failed to connect to cloud storage",
+		CacheError: originalError,
+	}
+}
+func (e NoCachedDataError) Error() string {
+	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CacheError)
+}
+func (e NoCachedDataError) Unwrap() error {
+	return e.CacheError
+}
+func (e NoCachedDataError) Is(target error) bool {
+	_, ok := target.(*NoCachedDataError)
+	return ok
 }
 
 var DefaultWorkDir string

@@ -100,6 +100,10 @@ func (lfs *LoopbackFS) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.Consumer()
 }
 
+func (lfs *LoopbackFS) CloudConnected() bool {
+	return true
+}
+
 func (lfs *LoopbackFS) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("LoopbackFS::CreateDir : name=%s", options.Name)
 	dirPath := filepath.Join(lfs.path, options.Name)
@@ -159,11 +163,14 @@ func (lfs *LoopbackFS) StreamDir(
 			Size:  info.Size(),
 			Mode:  info.Mode(),
 			Mtime: info.ModTime(),
+			Atime: info.ModTime(),
+			Ctime: info.ModTime(),
 			MD5:   md5,
 		}
-		attr.Flags.Set(internal.PropFlagModeDefault)
 
-		if file.IsDir() {
+		if info.Mode()&os.ModeSymlink != 0 {
+			attr.Flags.Set(internal.PropFlagSymlink)
+		} else if file.IsDir() {
 			attr.Flags.Set(internal.PropFlagIsDir)
 		}
 
@@ -406,8 +413,9 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 		Size:  info.Size(),
 		Mode:  info.Mode(),
 		Mtime: info.ModTime(),
+		Atime: info.ModTime(),
+		Ctime: info.ModTime(),
 	}
-	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	if info.Mode()&os.ModeSymlink != 0 {
 		_, err := os.Readlink(path)

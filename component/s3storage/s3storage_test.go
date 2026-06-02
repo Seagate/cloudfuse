@@ -455,6 +455,54 @@ func (s *s3StorageTestSuite) TestListBuckets() {
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 
+func (s *s3StorageTestSuite) TestCloudConnected() {
+	defer s.cleanupTest()
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
+func (s *s3StorageTestSuite) TestUpdateConnectionState() {
+	defer s.cleanupTest()
+	connected := s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(connected)
+	s.assert.False(s.s3Storage.CloudConnected())
+	connected = s.s3Storage.updateConnectionState(nil)
+	s.assert.True(connected)
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
+func (s *s3StorageTestSuite) TestCloudOfflineCached() {
+	defer s.cleanupTest()
+	s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(s.s3Storage.CloudConnected())
+	s.s3Storage.updateConnectionState(nil)
+}
+
+func (s *s3StorageTestSuite) TestCloudOfflineContext() {
+	defer s.cleanupTest()
+	s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "file" + randomString(8)})
+	s.assert.Nil(h)
+	s.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	s.s3Storage.updateConnectionState(nil)
+}
+
+func (s *s3StorageTestSuite) TestStaleContextErrorDoesNotRevertOnlineState() {
+	defer s.cleanupTest()
+
+	s.s3Storage.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(s.s3Storage.CloudConnected())
+
+	connected := s.s3Storage.updateConnectionState(nil)
+	s.assert.True(connected)
+	s.assert.True(s.s3Storage.CloudConnected())
+
+	connected = s.s3Storage.updateConnectionState(
+		common.NewCloudUnreachableError(context.Canceled),
+	)
+	s.assert.True(connected)
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
 func (s *s3StorageTestSuite) TestCreateDir() {
 	defer s.cleanupTest()
 	// Testing dir and dir/
@@ -499,7 +547,7 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 			)
 			s.assert.NoError(err)
 
-			// Directory should be in the account
+			// Directory marker should be in the account
 			key := internal.ExtendDirName(
 				common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path),
 			)
@@ -515,7 +563,7 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 			s.assert.NoError(err)
 
 			s.assert.NoError(err)
-			// Directory should not be in the account
+			// Directory marker should not be in the account
 			key = internal.ExtendDirName(
 				common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path),
 			)
@@ -528,9 +576,9 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 			})
 			s.assert.Error(err)
 
-			// Directory be empty
+			// Directory is not empty (file still exists)
 			dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: obj_path})
-			s.assert.True(dirEmpty)
+			s.assert.False(dirEmpty)
 		})
 	}
 }
@@ -626,13 +674,24 @@ func (s *s3StorageTestSuite) TestDeleteDirHierarchy() {
 
 	s.assert.NoError(err)
 
-	/// a paths should be deleted
+	// Only the directory marker for base is deleted, all nested paths still exist
+	// Check that the directory marker is removed
+	baseMarkerKey := internal.ExtendDirName(
+		common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base),
+	)
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(
+			s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName,
+		),
+		Key:          aws.String(baseMarkerKey),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.Error(err)
+
+	// But all nested paths should still exist
+	a.PushBackList(ab)
+	a.PushBackList(ac)
 	for p := a.Front(); p != nil; p = p.Next() {
-		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Error(err)
-	}
-	ab.PushBackList(ac) // ab and ac paths should exist
-	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
 		s.assert.NoError(err)
 	}
@@ -659,14 +718,11 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 
 	err = s.s3Storage.Storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
 	s.assert.NoError(err)
-	// a paths under c1 should be deleted
+	// Only the c1 directory marker is deleted, nested paths under c1 still exist
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		if strings.HasPrefix(p.Value.(string), base+"/c1") {
-			s.assert.Error(err)
-		} else {
-			s.assert.NoError(err)
-		}
+		// All nested paths should still exist (marker deletion doesn't affect children)
+		s.assert.NoError(err)
 	}
 	ab.PushBackList(ac) // ab and ac paths should exist
 	for p := ab.Front(); p != nil; p = p.Next() {
@@ -2520,6 +2576,42 @@ func (s *s3StorageTestSuite) TestRenameFileDstDir() {
 	s.assert.Error(err)
 }
 
+func (s *s3StorageTestSuite) TestRenameFileSymlink() {
+	defer s.cleanupTest()
+	config := generateConfigYaml(
+		storageTestConfigurationParameters,
+	) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
+
+	target := generateFileName()
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+	s.assert.NoError(err)
+
+	src := generateFileName()
+	err = s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: src, Target: target})
+	s.assert.NoError(err)
+
+	srcAttr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: src})
+	s.assert.NoError(err)
+	s.assert.True(srcAttr.IsSymlink())
+
+	dst := generateFileName()
+	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst, SrcAttr: srcAttr})
+	s.assert.NoError(err)
+
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: src})
+	s.assert.Error(err)
+
+	dstAttr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dst})
+	s.assert.NoError(err)
+	s.assert.True(dstAttr.IsSymlink())
+
+	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: dst})
+	s.assert.NoError(err)
+	s.assert.Equal(target, result)
+}
+
 func (s *s3StorageTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
 	// enable symlinks in config
@@ -3104,6 +3196,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	_, _ = rand.Read(updatedBlock)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes)
 	err = s.s3Storage.Storage.ReadInBuffer(
+		context.Background(),
 		name,
 		int64(blockSizeBytes),
 		int64(blockSizeBytes),
@@ -3161,6 +3254,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSizeBytes + blockSizeBytes/2)
 	err = s.s3Storage.Storage.ReadInBuffer(
+		context.Background(),
 		name,
 		int64(blockSizeBytes),
 		int64(blockSizeBytes)/2,

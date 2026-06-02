@@ -58,6 +58,8 @@ type attrCacheItem struct {
 	attrFlag  common.BitMap64
 	children  map[string]*attrCacheItem
 	parent    *attrCacheItem
+
+	listingComplete bool
 }
 
 // all cache entries are organized into this structure
@@ -162,6 +164,19 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	ctm.cacheMap[path] = newItem
 }
 
+func (ctm *cacheTreeMap) getCachedParent(name string) (*attrCacheItem, bool) {
+	if name == "" {
+		return nil, false
+	}
+	parent := getParentDir(name)
+	item, found := ctm.get(parent)
+	if !found || !item.valid() {
+		// drill up recursively
+		return ctm.getCachedParent(parent)
+	}
+	return item, found
+}
+
 func (value *attrCacheItem) valid() bool {
 	return value.attrFlag.IsSet(AttrFlagValid)
 }
@@ -221,14 +236,15 @@ func (value *attrCacheItem) invalidate() {
 	for _, val := range value.children {
 		val.invalidate()
 	}
-	// set invalid
-	value.attrFlag.Clear(AttrFlagValid)
 	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
-	} else if value.exists() {
+	} else if value.parent.exists() {
 		value.parent.listCache = nil
+		value.parent.listingComplete = false
 	}
+	// set invalid
+	value.attrFlag.Clear(AttrFlagValid)
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {
@@ -251,12 +267,27 @@ func (value *attrCacheItem) markInCloud(inCloud bool) {
 
 func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
 	value.attr.Mtime = changedAt
+	value.attr.Ctime = changedAt
 	value.attr.Size = size
 	value.cachedAt = changedAt
 }
 
+func (value *attrCacheItem) touchModifyAndChangeTimes(changedAt time.Time) {
+	if value == nil || !value.exists() {
+		return
+	}
+	value.attr.Mtime = changedAt
+	value.attr.Ctime = changedAt
+	value.cachedAt = changedAt
+}
+
 func (value *attrCacheItem) setMode(mode os.FileMode) {
-	value.attr.Mode = mode
+	currentType := value.attr.Mode & os.ModeType
+	if currentType == 0 {
+		currentType = mode & os.ModeType
+	}
+	modeBits := mode & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+	value.attr.Mode = currentType | modeBits
 	value.attr.Flags.Clear(internal.PropFlagModeDefault)
 	value.attr.Ctime = time.Now()
 	value.cachedAt = time.Now()

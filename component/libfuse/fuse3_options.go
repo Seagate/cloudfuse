@@ -64,7 +64,7 @@ func createFuseOptions(
 	}
 
 	if umask != 0 {
-		options += fmt.Sprintf(",umask=%04d", umask)
+		options += fmt.Sprintf(",umask=%04o", umask)
 	}
 
 	// direct_io option is used to bypass the kernel cache. It disables the use of

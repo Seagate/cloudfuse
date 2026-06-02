@@ -127,9 +127,8 @@ func (suite *hmonTestSuite) TestBuildHmonCliParams() {
 		OutputPath:      "/tmp/health_monitor",
 	}
 	cacheMonitorOptions = file_cache.FileCacheOptions{
-		TmpPath:     "/tmp/file_cache",
-		MaxSizeMB:   200,
-		SyncToFlush: true,
+		TmpPath:   "/tmp/file_cache",
+		MaxSizeMB: 200,
 	}
 
 	cliParams := buildCliParamForMonitor()

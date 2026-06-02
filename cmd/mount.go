@@ -416,9 +416,9 @@ var mountCmd = &cobra.Command{
 					options.NonEmpty = true
 					config.Set("nonempty", "true")
 				} else if hasEq && key == "umask" {
-					umask, err := strconv.ParseUint(val, 10, 32)
+					umask, err := parseUmaskOption(val)
 					if err != nil {
-						return fmt.Errorf("failed to parse umask [%s]", err.Error())
+						return err
 					}
 					config.Set("lfuse.umask", fmt.Sprint(umask))
 				} else if hasEq && key == "uid" {
@@ -676,6 +676,17 @@ func ignoreFuseOptions(opt string) bool {
 		}
 	}
 	return false
+}
+
+func parseUmaskOption(raw string) (uint32, error) {
+	umask, err := strconv.ParseUint(raw, 8, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse umask [%s]", err.Error())
+	}
+	if umask > 0o777 {
+		return 0, fmt.Errorf("failed to parse umask [value out of range: %s]", raw)
+	}
+	return uint32(umask), nil
 }
 
 func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {

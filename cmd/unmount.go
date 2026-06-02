@@ -34,7 +34,6 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -137,7 +136,6 @@ func unmountCloudfuse(mntPath string, lazy bool, silent bool) error {
 		_, err = cliOut.Output()
 
 		if err == nil {
-			log.Info("unmountCloudfuse : successfully unmounted %s", mntPath)
 			if !silent {
 				fmt.Println("Successfully unmounted", mntPath)
 			}

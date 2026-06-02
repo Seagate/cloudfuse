@@ -148,6 +148,7 @@ func (suite *LoopbackFSTestSuite) TestStreamDir() {
 	assert.Equal("lorem.txt", attr.Name, "StreamDir: FileName not equal")
 	assert.Equal(attr.Size, info.Size(), "StreamDir: File size not equal")
 	assert.Equal(attr.Mode, info.Mode(), "StreamDir: File Mode not equal")
+	assert.False(attr.IsModeDefault(), "StreamDir: Mode should not fall back to defaults")
 }
 
 func (suite *LoopbackFSTestSuite) TestRenameDir() {
@@ -456,6 +457,7 @@ func (suite *LoopbackFSTestSuite) TestGetAttr() {
 	assert.Equal(attr.Name, info.Name())
 	assert.Equal(attr.Mode, info.Mode())
 	assert.Equal(attr.IsDir(), info.IsDir())
+	assert.False(attr.IsModeDefault())
 }
 
 func (suite *LoopbackFSTestSuite) TestStageAndCommitData() {

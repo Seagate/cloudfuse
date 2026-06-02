@@ -174,6 +174,8 @@ func (suite *fileTestSuite) TestOpenFlag_O_TRUNC() {
 	suite.Equal(0, read)
 	err = srcFile.Close()
 	suite.NoError(err)
+
+	suite.fileTestCleanup([]string{fileName})
 }
 
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {
@@ -249,7 +251,8 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 			found = true
 		}
 	}
-	suite.True(found)
+	// flaky (Code Coverage on Windows: S3 Coverage with Size Tracker)
+	suite.True(found, "%s should be in listing: %v", speclChar, files)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -471,7 +474,7 @@ func (suite *fileTestSuite) TestFileCopy() {
 	err = dstFile.Close()
 	suite.NoError(err)
 
-	suite.fileTestCleanup([]string{dirName})
+	suite.fileTestCleanup([]string{dirName, fileName})
 }
 
 // # Get stats of a file
@@ -870,9 +873,14 @@ func TestFileTestSuite(t *testing.T) {
 		fmt.Printf("Could not cleanup feature dir before testing [%s]\n", err.Error())
 	}
 
+	// Validate mount path exists before trying to create subdirectories
+	if _, err := os.Stat(fileTestPathPtr); err != nil {
+		t.Fatalf("Mount path does not exist or is not accessible: %s [%v]", fileTestPathPtr, err)
+	}
+
 	err = os.Mkdir(fileTest.testPath, 0777)
 	if err != nil {
-		t.Errorf("Failed to create test directory [%s]\n", err.Error())
+		t.Fatalf("Failed to create test directory [%s]", err.Error())
 	}
 	_, _ = rand.Read(fileTest.minBuff)
 	_, _ = rand.Read(fileTest.medBuff)

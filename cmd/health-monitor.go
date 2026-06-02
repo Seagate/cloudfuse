@@ -56,7 +56,6 @@ var configFile string
 func resetMonitorOptions() {
 	options.MonitorOpt = monitorOptions{}
 	cacheMonitorOptions = file_cache.FileCacheOptions{}
-	cacheMonitorOptions.SyncToFlush = true
 }
 
 var healthMonCmd = &cobra.Command{

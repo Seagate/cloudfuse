@@ -4,6 +4,7 @@
 [![Release][release-badge]][release-url]
 [![GitHub Releases Stats of cloudfuse][stats-badge]][stats-url]
 [![Go Report Card][go-report-badge]][go-report-url]
+[![OpenSSF Best Practices][best-practice-badge]][best-practice-url]
 [![OpenSSF Scorecard][openssf-badge]][openssf-url]
 
 [license-badge]: https://img.shields.io/github/license/Seagate/cloudfuse
@@ -14,6 +15,8 @@
 [stats-url]: https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse
 [go-report-badge]: https://goreportcard.com/badge/github.com/Seagate/cloudfuse
 [go-report-url]: https://goreportcard.com/report/github.com/Seagate/cloudfuse
+[best-practice-badge]: https://www.bestpractices.dev/projects/12540/badge
+[best-practice-url]: https://www.bestpractices.dev/projects/12540
 [openssf-badge]: https://img.shields.io/ossf-scorecard/github.com/Seagate/cloudfuse?label=openssf%20scorecard
 [openssf-url]: https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse
 
@@ -32,6 +35,7 @@ Cloudfuse supports clouds with an S3 or Azure interface.
   - [From Source](#from-source)
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
+- [Offline Access (New)](#offline-access-new)
 - [Command Line Interface](#command-line-interface)
 - [Limitations](#limitations)
 - [License](#license)
@@ -71,24 +75,24 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 
 1. **Add the GPG key for the repository:**
 
-    ```bash
-    sudo apt-get update
-    sudo apt-get install -y curl gpg
-    curl -fsSL https://seagate.github.io/cloudfuse/public.key | sudo gpg --dearmor -o /usr/share/keyrings/cloudfuse-archive-keyring.gpg
-    ```
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y curl gpg
+   curl -fsSL https://seagate.github.io/cloudfuse/public.key | sudo gpg --dearmor -o /usr/share/keyrings/cloudfuse-archive-keyring.gpg
+   ```
 
 2. **Add the repository to your APT sources:**
 
-    ```bash
-    echo "deb [signed-by=/usr/share/keyrings/cloudfuse-archive-keyring.gpg] https://seagate.github.io/cloudfuse stable main" | sudo tee /etc/apt/sources.list.d/cloudfuse.list > /dev/null
-    ```
+   ```bash
+   echo "deb [signed-by=/usr/share/keyrings/cloudfuse-archive-keyring.gpg] https://seagate.github.io/cloudfuse stable main" | sudo tee /etc/apt/sources.list.d/cloudfuse.list > /dev/null
+   ```
 
 3. **Install `cloudfuse`:**
 
-    ```bash
-    sudo apt-get update
-    sudo apt-get install cloudfuse
-    ```
+   ```bash
+   sudo apt-get update
+   sudo apt-get install cloudfuse
+   ```
 
 > Note: The Cloudfuse APT repository provides only the FUSE 3 build.
 
@@ -104,22 +108,22 @@ Download the .rpm file from our latest release [here](https://github.com/Seagate
 
 1. **Add the `cloudfuse` repository:**
 
-    ```bash
-    sudo tee /etc/yum.repos.d/cloudfuse.repo <<EOF
-    [cloudfuse]
-    name=cloudfuse Repository
-    baseurl=https://seagate.github.io/cloudfuse/rpm-repo/
-    enabled=1
-    gpgcheck=1
-    gpgkey=https://seagate.github.io/cloudfuse/public.key
-    EOF
-    ```
+   ```bash
+   sudo tee /etc/yum.repos.d/cloudfuse.repo <<EOF
+   [cloudfuse]
+   name=cloudfuse Repository
+   baseurl=https://seagate.github.io/cloudfuse/rpm-repo/
+   enabled=1
+   gpgcheck=1
+   gpgkey=https://seagate.github.io/cloudfuse/public.key
+   EOF
+   ```
 
 2. **Install `cloudfuse`:**
 
-    ```bash
-    sudo dnf install cloudfuse
-    ```
+   ```bash
+   sudo dnf install cloudfuse
+   ```
 
 > Note: The Cloudfuse DNF repository provides only the FUSE 3 build.
 
@@ -144,8 +148,8 @@ manually install Cloudfuse.
 The following describes how to use the Cloudfuse CLI. If you would like to use a GUI checkout the Cloudfuse GUI repo at <https://github.com/Seagate/cloudfuse-gui>.
 
 1. Create a basic configuration file (TUI):
-  If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
-  
+   If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
+
    ```bash
    cloudfuse config
    ```
@@ -203,9 +207,9 @@ The following describes how to use the Cloudfuse CLI. If you would like to use a
    ```
 
    Common flags:
-   - --foreground  (stay in foreground)
-   - --read-only   (prevent writes)
-   - --lazy-write  (defer writes until handle close)
+   - --foreground (stay in foreground)
+   - --read-only (prevent writes)
+   - --lazy-write (defer writes until handle close)
 
 5. Verify:
 
@@ -304,18 +308,24 @@ Cloudfuse also supports a health monitor.
 The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
 Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
 
+## Offline Access (New)
+
+Cloudfuse now supports offline access through the `file_cache` component. When cloud storage is unreachable, reads and writes continue against the local cache and are flushed to cloud storage once connectivity is restored. The feature is **enabled by default** and can be disabled via the `block-offline-access` flag.
+
+> **Note:** Cloudfuse uses eventual consistency with last-writer-wins semantics. Offline access can extend the consistency window indefinitely and **increases the risk of data conflicts in multi-client setups!** See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
+
 ## Limitations
 
 ### NOTICE
 
 - We have seen some customer issues around files getting corrupted when `streaming` is used in write mode.
-Kindly avoid using this feature for write while we investigate and resolve it.
+  Kindly avoid using this feature for write while we investigate and resolve it.
 
 ### Un-Supported File system operations
 
 - mkfifo : fifo creation is not supported by cloudfuse and this will result in
   "function not implemented" error
-- chown  : Change of ownership is not supported by Azure Storage hence Cloudfuse
+- chown : Change of ownership is not supported by Azure Storage hence Cloudfuse
   does not support this.
 - Creation of device files or pipes is not supported by Cloudfuse.
 - Cloudfuse does not support extended-attributes (x-attrs) operations
@@ -352,8 +362,8 @@ Kindly avoid using this feature for write while we investigate and resolve it.
   for it to interact with the fuse driver. If container is created without the
   privilege, mount will fail. Sample command to spawn a docker container is
 
-    `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
-    apparmor:unconfined <environment variables> <docker image>`
+  `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
+apparmor:unconfined <environment variables> <docker image>`
 
 ## License
 

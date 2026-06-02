@@ -51,8 +51,9 @@ type LogFileConfig struct {
 }
 
 type BaseLogger struct {
-	channel    chan (string)
-	workerDone sync.WaitGroup
+	channel     chan (string)
+	workerDone  sync.WaitGroup
+	destroyOnce sync.Once
 
 	logger        *log.Logger
 	logFileHandle io.WriteCloser
@@ -202,18 +203,27 @@ func (l *BaseLogger) init() error {
 }
 
 func (l *BaseLogger) Destroy() error {
-	close(l.channel)
-	l.workerDone.Wait()
+	var destroyErr error
+	l.destroyOnce.Do(func() {
+		if l.channel != nil {
+			close(l.channel)
+			l.channel = nil
+		}
+		l.workerDone.Wait()
 
-	// Never close stdout/stderr
-	if l.logFileHandle == os.Stdout || l.logFileHandle == os.Stderr {
-		return nil
-	}
+		// Never close stdout/stderr
+		if l.logFileHandle == os.Stdout || l.logFileHandle == os.Stderr {
+			return
+		}
+		if l.logFileHandle == nil {
+			return
+		}
+		if err := l.logFileHandle.Close(); err != nil {
+			destroyErr = err
+		}
+	})
 
-	if err := l.logFileHandle.Close(); err != nil {
-		return err
-	}
-	return nil
+	return destroyErr
 }
 
 // logEvent : Enqueue the log to the channel
