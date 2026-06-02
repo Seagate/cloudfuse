@@ -28,6 +28,7 @@ package tiered_storage
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -46,6 +47,27 @@ import (
 // Common structure for Component
 type TieredStorage struct {
 	internal.BaseComponent
+	fileMap  map[string]*FileNode
+	lruQueue *LRUQueue
+	mu       sync.Mutex
+}
+
+// define a file node structure to hold file related information
+type FileNode struct {
+	name        string
+	size        uint64
+	prev        *FileNode
+	next        *FileNode
+	cloudBacked bool
+	// Add more attributes as needed, e.g., last accessed time, etc.
+}
+
+// Add more attributes as needed, e.g., last accessed time, etc.
+type LRUQueue struct {
+	head        *FileNode
+	tail        *FileNode
+	maxSize     uint64 //figure this out later based on config or some heuristics
+	currentSize uint64
 }
 
 // Structure defining your config parameters
@@ -53,7 +75,11 @@ type TieredStorageOptions struct {
 	// e.g. var1 uint32 `config:"var1"`
 }
 
-const compName = "tiered_storage"
+const (
+	compName           = "tiered_storage"
+	defaultMaxEviction = 000000 //placeholder until we figure out
+
+)
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &TieredStorage{}
