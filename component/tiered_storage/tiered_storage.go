@@ -29,6 +29,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -54,6 +55,7 @@ type TieredStorage struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
 
+	maxCacheSize float64
 }
 
 // define a file node structure to hold file related information
@@ -190,10 +192,8 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	flock.Lock()
 	defer flock.Unlock()
 
-	// Check if file exists in local cache, make sure to consider if file is not found
+	// Check if file exists in local cache, otherwise check cloud
 	info, err := os.Stat(c.tmpPath + options.Name)
-
-	//File exists in local cache
 	if err == nil {
 		//Read from local disk, create file node and add to file map
 		node := &FileNode{
@@ -215,23 +215,98 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			size:        uint64(info.Size),
 			cloudBacked: true,
 		}
+		// check if we are over the local cache limit
+		if c.isOverLocalLimit(uint64(info.Size), options.Name, "open") {
+			// we are over the local cache limit, return error for now, later we can add eviction logic here
+			//some sort of eviction logic here
+		}
+		//download it to the local cache and add to file map
+		err = c.openFileHelper(options)
+		if err != nil {
+			return nil, err
+		}
 		c.fileMap[options.Name] = localCopyNode
 
 	}
-
-	// If not, check if file exists in cloud storage
-
-	// If exists in cloud storage, fetch the file to local cache and return handle
-	// If not exists in cloud storage, return error (file not found)
-
 	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
-	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
 	if options.Flags&os.O_APPEND != 0 {
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 
-	return nil, nil
+	//increase handle count
+	flock.Inc()
+
+	return handle, nil
+}
+
+// openFileHelper : function to download copy from cloud and add to local cache
+func (c *TieredStorage) openFileHelper(options internal.OpenFileOptions) error {
+
+	//create folder if not exists, wait check what 0755 does
+	localPath := filepath.Join(c.tmpPath, options.Name)
+	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+	if err != nil {
+		return err
+	}
+	//Open temporary download handle to the local file path
+	localFileHandle, err := common.OpenFile(
+		localPath,
+		os.O_CREATE|os.O_TRUNC|os.O_RDWR,
+		options.Mode,
+	)
+	if err != nil {
+		return err
+	}
+	//Download
+	err = c.NextComponent().CopyToFile(internal.CopyToFileOptions{
+		Name:   options.Name,
+		Offset: 0,
+		Count:  0,
+		File:   localFileHandle,
+	})
+	if err != nil {
+		localFileHandle.Close()
+		os.Remove(localPath)
+		return err
+	}
+	localFileHandle.Close()
+	return nil
+}
+
+// rough rough rough implementation of checking limit of cache,
+// need to figure out eviction and other details before finalizing
+func (c *TieredStorage) isOverLocalLimit(
+	newFileSize uint64,
+	fileName string,
+	requestType string,
+) bool {
+
+	//find ExistingSize of file if exists
+	existingSize := uint64(0)
+	if node, ok := c.fileMap[fileName]; ok {
+		existingSize = node.size
+	}
+
+	addedFileSize := newFileSize - existingSize
+
+	//if we didn't modify the size of the file then
+	if addedFileSize <= 0 {
+		return false
+	}
+
+	//get current cache size
+	currSize, err := common.GetUsage(c.tmpPath)
+	if err != nil {
+		log.Err("FileCache::IsOverLocalLimit : failed to get current cache size [%v]", err)
+		return false
+	}
+
+	if uint(currSize)+uint(addedFileSize) > uint(c.maxCacheSize) {
+		//should include some error message
+		return true
+	}
+	return false
 }
 
 func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
