@@ -427,6 +427,11 @@ func (xl *Xload) downloadFile(fileName string) error {
 		fileMode = attr.Mode
 	}
 
+	dataLen, ok := common.Int64ToUint64(attr.Size)
+	if !ok {
+		return fmt.Errorf("invalid file size for %s: %d", fileName, attr.Size)
+	}
+
 	// create the local path where the file will be downloaded
 	err = os.MkdirAll(filepath.Dir(filepath.Join(xl.path, fileName)), xl.defaultPermission)
 	if err != nil {
@@ -441,7 +446,7 @@ func (xl *Xload) downloadFile(fileName string) error {
 	_, err = splitter.Process(&WorkItem{
 		CompName: splitter.GetName(),
 		Path:     fileName,
-		DataLen:  uint64(attr.Size),
+		DataLen:  dataLen,
 		Priority: true,
 		Mode:     fileMode,
 		Atime:    attr.Atime,

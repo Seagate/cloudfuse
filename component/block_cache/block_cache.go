@@ -30,7 +30,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -184,8 +183,19 @@ func (bc *BlockCache) Stop() error {
 func (bc *BlockCache) GenConfig() string {
 	log.Info("BlockCache::Configure : config generation started")
 
-	prefetch := uint32(math.Max((MIN_PREFETCH*2)+1, (float64)(2*runtime.NumCPU())))
-	memSize := uint32(bc.getDefaultMemSize() / _1MB)
+	prefetch, ok := common.IntToUint32(2 * runtime.NumCPU())
+	if !ok {
+		prefetch = ^uint32(0)
+	}
+	minPrefetch := uint32((MIN_PREFETCH * 2) + 1)
+	if prefetch < minPrefetch {
+		prefetch = minPrefetch
+	}
+
+	memSize, ok := common.Uint64ToUint32(bc.getDefaultMemSize() / _1MB)
+	if !ok {
+		memSize = ^uint32(0)
+	}
 	if (prefetch * defaultBlockSize) > memSize {
 		prefetch = (MIN_PREFETCH * 2) + 1
 	}
@@ -196,7 +206,11 @@ func (bc *BlockCache) GenConfig() string {
 	fmt.Fprintf(&sb, "\n  block-size-mb: %v", defaultBlockSize)
 	fmt.Fprintf(&sb, "\n  mem-size-mb: %v", memSize)
 	fmt.Fprintf(&sb, "\n  prefetch: %v", prefetch)
-	fmt.Fprintf(&sb, "\n  parallelism: %v", uint32(3*runtime.NumCPU()))
+	parallelism, ok := common.IntToUint32(3 * runtime.NumCPU())
+	if !ok {
+		parallelism = ^uint32(0)
+	}
+	fmt.Fprintf(&sb, "\n  parallelism: %v", parallelism)
 
 	var tmpPath = ""
 	_ = config.UnmarshalKey("tmp-path", &tmpPath)
@@ -249,7 +263,15 @@ func (bc *BlockCache) Configure(_ bool) error {
 	bc.consistency = conf.Consistency
 
 	bc.prefetchOnOpen = conf.PrefetchOnOpen
-	bc.prefetch = uint32(math.Max((MIN_PREFETCH*2)+1, (float64)(2*runtime.NumCPU())))
+	workers, ok := common.IntToUint32(2 * runtime.NumCPU())
+	if !ok {
+		workers = ^uint32(0)
+	}
+	bc.prefetch = workers
+	minPrefetch := uint32((MIN_PREFETCH * 2) + 1)
+	if bc.prefetch < minPrefetch {
+		bc.prefetch = minPrefetch
+	}
 	bc.noPrefetch = false
 
 	if (!config.IsSet(compName + ".mem-size-mb")) &&
@@ -278,7 +300,10 @@ func (bc *BlockCache) Configure(_ bool) error {
 
 	bc.maxDiskUsageHit = false
 
-	bc.workers = uint32(3 * runtime.NumCPU())
+	bc.workers, ok = common.IntToUint32(3 * runtime.NumCPU())
+	if !ok {
+		bc.workers = ^uint32(0)
+	}
 	if config.IsSet(compName + ".parallelism") {
 		bc.workers = conf.Workers
 	}
@@ -339,8 +364,16 @@ func (bc *BlockCache) Configure(_ bool) error {
 	}
 
 	if bc.tmpPath != "" {
+		diskBlocks, ok := common.Uint64ToUint32((bc.diskSize) / bc.blockSize)
+		if !ok {
+			return fmt.Errorf(
+				"config error in %s [disk size is too large for tlru blocks]",
+				bc.Name(),
+			)
+		}
+
 		bc.diskPolicy, err = tlru.New(
-			uint32((bc.diskSize)/bc.blockSize),
+			diskBlocks,
 			bc.diskTimeout,
 			bc.diskEvict,
 			60,
@@ -488,7 +521,12 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 
 	if handle.Size > 0 {
 		// This shall be done after the refresh only as this will populate the queues created by above method
-		if handle.Size < int64(bc.blockSize) {
+		blockSizeInt64, ok := common.Uint64ToInt64(bc.blockSize)
+		if !ok {
+			return nil, fmt.Errorf("block size is too large: %d", bc.blockSize)
+		}
+
+		if handle.Size < blockSizeInt64 {
 			// File is small and can fit in one block itself
 			_ = bc.refreshBlock(handle, 0, false)
 		} else if bc.prefetchOnOpen && !bc.noPrefetch {
@@ -681,7 +719,12 @@ func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, 
 	// Keep getting next blocks until you read the request amount of data
 	dataRead := int(0)
 	for dataRead < len(options.Data) {
-		block, err := bc.getBlock(options.Handle, uint64(options.Offset))
+		offset, ok := common.Int64ToUint64(options.Offset)
+		if !ok {
+			return dataRead, fmt.Errorf("invalid negative read offset: %d", options.Offset)
+		}
+
+		block, err := bc.getBlock(options.Handle, offset)
 		if err != nil {
 			if err != io.EOF {
 				log.Err(
@@ -696,8 +739,13 @@ func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, 
 		}
 
 		// Copy data from this block to user buffer
-		readOffset := uint64(options.Offset) - block.offset
-		blockSize := bc.getBlockSize(uint64(options.Handle.Size), block)
+		readOffset := offset - block.offset
+		handleSize, ok := common.Int64ToUint64(options.Handle.Size)
+		if !ok {
+			return dataRead, fmt.Errorf("invalid handle size: %d", options.Handle.Size)
+		}
+
+		blockSize := bc.getBlockSize(handleSize, block)
 
 		bytesRead := copy(options.Data[dataRead:], block.data[readOffset:blockSize])
 
@@ -748,7 +796,8 @@ if you are first reader of this block
 Return this block once prefetch is queued and block is marked open for all
 */
 func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Block, error) {
-	if readoffset >= uint64(handle.Size) {
+	handleSize, ok := common.Int64ToUint64(handle.Size)
+	if !ok || readoffset >= handleSize {
 		return nil, io.EOF
 	}
 
@@ -759,7 +808,12 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 
 		// block is not present in the buffer list, check if it is uncommitted
 		// If yes, commit all the uncommitted blocks first and then download this block
-		shouldCommit, shouldDownload := shouldCommitAndDownload(int64(index), handle)
+		index64, ok := common.Uint64ToInt64(index)
+		if !ok {
+			return nil, fmt.Errorf("block index out of range: %d", index)
+		}
+
+		shouldCommit, shouldDownload := shouldCommitAndDownload(index64, handle)
 		if shouldCommit {
 			// commit all the uncommitted blocks to storage
 			log.Debug(
@@ -793,7 +847,8 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 				return nil, err
 			}
 
-			if readoffset >= uint64(prop.Size) {
+			propSize, ok := common.Int64ToUint64(prop.Size)
+			if !ok || readoffset >= propSize {
 				//create a null block and return
 				block, err := bc.blockPool.MustGet()
 				if err != nil {
@@ -911,7 +966,8 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			if !bc.noPrefetch && handle.OptCnt <= MIN_RANDREAD {
 				// So far this file has been read sequentially so prefetch more
 				val, _ := handle.GetValue("#")
-				if int64(val.(uint64)*bc.blockSize) < handle.Size {
+				nextOffset, ok := common.Uint64ToInt64(val.(uint64) * bc.blockSize)
+				if ok && nextOffset < handle.Size {
 					_ = bc.startPrefetch(handle, val.(uint64), true)
 				}
 			}
@@ -1065,7 +1121,12 @@ func (bc *BlockCache) startPrefetch(handle *handlemap.Handle, index uint64, pref
 		if !found {
 			// Check if the block is an uncommitted block or not
 			// For uncommitted block we need to commit the block first
-			shouldCommit, _ := shouldCommitAndDownload(int64(index), handle)
+			index64, ok := common.Uint64ToInt64(index)
+			if !ok {
+				return fmt.Errorf("block index out of range: %d", index)
+			}
+
+			shouldCommit, _ := shouldCommitAndDownload(index64, handle)
 			if shouldCommit {
 				// This shall happen only for the first uncommitted block and shall flush all the uncommitted blocks to storage
 				log.Debug(
@@ -1110,7 +1171,12 @@ func (bc *BlockCache) refreshBlock(handle *handlemap.Handle, index uint64, prefe
 
 	// Convert index to offset
 	offset := index * bc.blockSize
-	if int64(offset) >= handle.Size {
+	offsetInt64, ok := common.Uint64ToInt64(offset)
+	if !ok {
+		return fmt.Errorf("offset too large: %d", offset)
+	}
+
+	if offsetInt64 >= handle.Size {
 		// We have reached EOF so return back no need to download anything here
 		return io.EOF
 	}
@@ -1163,7 +1229,12 @@ func (bc *BlockCache) refreshBlock(handle *handlemap.Handle, index uint64, prefe
 
 		// Reuse this block and lineup for download
 		block.ReUse()
-		block.id = int64(index)
+		index64, ok := common.Uint64ToInt64(index)
+		if !ok {
+			return fmt.Errorf("block index too large: %d", index)
+		}
+
+		block.id = index64
 		block.offset = offset
 
 		// Add this entry to handle map so that others can refer to the same block if required
@@ -1257,11 +1328,32 @@ func (bc *BlockCache) download(item *workItem) {
 					_ = root.Remove(fileName)
 				}
 
-				if numberOfBytes != int(bc.blockSize) &&
-					item.block.offset+uint64(numberOfBytes) != uint64(item.handle.Size) {
+				blockSizeInt, ok := common.Uint64ToInt(bc.blockSize)
+				if !ok {
+					successfulRead = false
+					f.Close()
+					_ = root.Remove(fileName)
+				}
+
+				bytesU64, ok := common.IntToUint64(numberOfBytes)
+				if !ok {
+					successfulRead = false
+					f.Close()
+					_ = root.Remove(fileName)
+				}
+
+				handleSize, ok := common.Int64ToUint64(item.handle.Size)
+				if !ok {
+					successfulRead = false
+					f.Close()
+					_ = root.Remove(fileName)
+				}
+
+				if successfulRead && numberOfBytes != blockSizeInt &&
+					item.block.offset+bytesU64 != handleSize {
 					log.Err(
 						"BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v",
-						bc.getBlockSize(uint64(item.handle.Size), item.block),
+						bc.getBlockSize(handleSize, item.block),
 						numberOfBytes,
 						item.handle.Size,
 					)
@@ -1294,10 +1386,17 @@ func (bc *BlockCache) download(item *workItem) {
 	}
 
 	var etag string
+	offset, ok := common.Uint64ToInt64(item.block.offset)
+	if !ok {
+		item.block.Failed()
+		item.block.Ready(BlockStatusDownloadFailed)
+		return
+	}
+
 	// If file does not exists then download the block from the container
 	n, err := bc.NextComponent().ReadInBuffer(&internal.ReadInBufferOptions{
 		Handle: item.handle,
-		Offset: int64(item.block.offset),
+		Offset: offset,
 		Data:   item.block.data,
 		Etag:   &etag,
 	})
@@ -1438,7 +1537,12 @@ func (bc *BlockCache) WriteFile(options *internal.WriteFileOptions) (int, error)
 	// Keep getting next blocks until you read the request amount of data
 	dataWritten := int(0)
 	for dataWritten < len(options.Data) {
-		block, err := bc.getOrCreateBlock(options.Handle, uint64(options.Offset))
+		offset, ok := common.Int64ToUint64(options.Offset)
+		if !ok {
+			return dataWritten, fmt.Errorf("invalid negative write offset: %d", options.Offset)
+		}
+
+		block, err := bc.getOrCreateBlock(options.Handle, offset)
 		if err != nil {
 			// Failed to get block for writing
 			log.Err(
@@ -1452,7 +1556,7 @@ func (bc *BlockCache) WriteFile(options *internal.WriteFileOptions) (int, error)
 		// log.Debug("BlockCache::WriteFile : Writing to block %v, offset %v for handle %v=>%v", block.id, options.Offset, options.Handle.ID, options.Handle.Path)
 
 		// Copy the incoming data to block
-		writeOffset := uint64(options.Offset) - block.offset
+		writeOffset := offset - block.offset
 		bytesWritten := copy(block.data[writeOffset:], options.Data[dataWritten:])
 
 		// Mark this block has been updated
@@ -1510,10 +1614,16 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 		}
 
 		block.node = nil
-		block.id = int64(index)
+		index64, ok := common.Uint64ToInt64(index)
+		if !ok {
+			return nil, fmt.Errorf("block index too large: %d", index)
+		}
+
+		block.id = index64
 		block.offset = index * bc.blockSize
 
-		if block.offset < uint64(handle.Size) {
+		handleSize, ok := common.Int64ToUint64(handle.Size)
+		if ok && block.offset < handleSize {
 			shouldCommit, shouldDownload := shouldCommitAndDownload(block.id, handle)
 
 			// if a block has been staged and deleted from the buffer list, then we should commit the existing blocks
@@ -1756,16 +1866,21 @@ func (bc *BlockCache) lineupUpload(
 	listMap map[int64]*blockInfo,
 ) {
 	id := common.GetBlockID(common.BlockIDLength)
+	handleSize, ok := common.Int64ToUint64(handle.Size)
+	if !ok {
+		return
+	}
+
 	listMap[block.id] = &blockInfo{
 		id:        id,
 		committed: false,
-		size:      bc.getBlockSize(uint64(handle.Size), block),
+		size:      bc.getBlockSize(handleSize, block),
 	}
 
 	log.Debug(
 		"BlockCache::lineupUpload : block %v, size %v for %v=>%s, blockId %v",
 		block.id,
-		bc.getBlockSize(uint64(handle.Size), block),
+		bc.getBlockSize(handleSize, block),
 		handle.ID,
 		handle.Path,
 		id,
@@ -1854,12 +1969,19 @@ func (bc *BlockCache) upload(item *workItem) {
 	flock := bc.fileLocks.Get(fileName)
 	flock.Lock()
 	defer flock.Unlock()
-	blockSize := bc.getBlockSize(uint64(item.handle.Size), item.block)
+	handleSize, ok := common.Int64ToUint64(item.handle.Size)
+	if !ok {
+		item.block.Failed()
+		item.block.Ready(BlockStatusUploadFailed)
+		return
+	}
+
+	blockSize := bc.getBlockSize(handleSize, item.block)
 	// This block is updated so we need to stage it now
 	err := bc.NextComponent().StageData(internal.StageDataOptions{
 		Name:   item.handle.Path,
 		Data:   item.block.data[0:blockSize],
-		Offset: uint64(item.block.offset),
+		Offset: item.block.offset,
 		Id:     item.blockId})
 	if err != nil {
 		// Fail to write the data so just reschedule this request
@@ -1949,7 +2071,15 @@ func (bc *BlockCache) upload(item *workItem) {
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
 			if bc.consistency {
-				err = setBlockChecksum(localPath, item.block.data, int(blockSize))
+				blockSizeInt, ok := common.Uint64ToInt(blockSize)
+				if !ok {
+					log.Err(
+						"BlockCache::download : Block size is out of int range for checksum %s",
+						localPath,
+					)
+				} else {
+					err = setBlockChecksum(localPath, item.block.data, blockSizeInt)
+				}
 				if err != nil {
 					log.Err(
 						"BlockCache::download : Failed to set md5sum for file %s [%v]",
@@ -2113,7 +2243,19 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, []stri
 				// For simplicity we will fill the gap with a new block and later merge both these blocks in one block
 				id := common.GetBlockID(common.BlockIDLength)
 				fillerSize := (bc.blockSize - listMap[offsets[i]].size)
-				fillerOffset := uint64(offsets[i]*int64(bc.blockSize)) + listMap[offsets[i]].size
+				blockSizeInt64, ok := common.Uint64ToInt64(bc.blockSize)
+				if !ok {
+					return nil, nil, fmt.Errorf("block size out of int64 range: %d", bc.blockSize)
+				}
+
+				fillerOffset, ok := common.Int64ToUint64(offsets[i] * blockSizeInt64)
+				if !ok {
+					return nil, nil, fmt.Errorf(
+						"filler offset is invalid for block index %d",
+						offsets[i],
+					)
+				}
+				fillerOffset += listMap[offsets[i]].size
 
 				log.Debug(
 					"BlockCache::getBlockIDList : Staging semi zero block for %v=>%v offset %v, size %v",
@@ -2445,7 +2587,12 @@ func (bc *BlockCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("BlockCache::TruncateFile : path=%s, size=%d", options.Name, options.NewSize)
 
 	// Set the block size that need to used by the next component
-	options.BlockSize = int64(bc.blockSize)
+	blockSize, ok := common.Uint64ToInt64(bc.blockSize)
+	if !ok {
+		return fmt.Errorf("block size out of range for truncate: %d", bc.blockSize)
+	}
+
+	options.BlockSize = blockSize
 
 	err := bc.NextComponent().TruncateFile(options)
 	if err != nil {
@@ -2477,16 +2624,25 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 		return nil, false, err
 	}
 
-	blockSize := int64(bc.blockSize)
+	blockSize := bc.blockSize
+	blockSizeInt64, ok := common.Uint64ToInt64(blockSize)
+	if !ok {
+		return nil, false, fmt.Errorf("block size is out of int64 range: %d", blockSize)
+	}
+
+	avail := uint64(0)
+	if available > 0 && available < float64(^uint64(0)) {
+		avail = uint64(available)
+	}
 
 	statfs := &common.Statfs_t{
-		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
-		Bavail:  uint64(max(0, available)) / uint64(blockSize),
+		Blocks:  maxCacheSize / blockSize,
+		Bavail:  avail / blockSize,
 		Bfree:   free,
-		Bsize:   blockSize,
+		Bsize:   blockSizeInt64,
 		Ffree:   1e9,
 		Files:   1e9,
-		Frsize:  blockSize,
+		Frsize:  blockSizeInt64,
 		Namemax: 255,
 	}
 

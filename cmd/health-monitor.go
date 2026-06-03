@@ -109,9 +109,15 @@ var healthMonCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to start health monitor: %w", err)
 			}
+			//nolint:gosec // G204: executable path is resolved explicitly; args are passed directly without shell.
 			hmcmd = exec.Command(path, cliParams...)
 		} else {
-			hmcmd = exec.Command(hmcommon.CfuseMon, cliParams...)
+			monPath, err := exec.LookPath(hmcommon.CfuseMon)
+			if err != nil {
+				return fmt.Errorf("failed to locate health monitor binary: %w", err)
+			}
+			//nolint:gosec // G204: executable is resolved via LookPath; args are not interpreted by a shell.
+			hmcmd = exec.Command(monPath, cliParams...)
 		}
 		cliOut, err := hmcmd.Output()
 		if len(cliOut) > 0 {

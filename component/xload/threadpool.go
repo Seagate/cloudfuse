@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -163,7 +164,11 @@ func (threadPool *ThreadPool) process(item *WorkItem) {
 	// add this error in response channel
 	if cap(item.ResponseChannel) > 0 {
 		item.Err = err
-		item.DataLen = (uint64)(dataLength)
+		if dataLen, ok := common.IntToUint64(dataLength); ok {
+			item.DataLen = dataLen
+		} else {
+			item.DataLen = 0
+		}
 		item.ResponseChannel <- item
 	}
 }

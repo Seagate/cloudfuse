@@ -28,11 +28,23 @@
 package e2e_tests
 
 import (
+	"github.com/Seagate/cloudfuse/common"
 	"golang.org/x/sys/unix"
 )
 
 func DiskSize(path string) int {
 	buf := &unix.Statfs_t{}
 	_ = unix.Statfs(path, buf)
-	return int((buf.Blocks - buf.Bavail) * uint64(buf.Bsize))
+	bsize, ok := common.Int64ToUint64(buf.Bsize)
+	if !ok {
+		return 0
+	}
+
+	sizeBytes := (buf.Blocks - buf.Bavail) * bsize
+	size, ok := common.Uint64ToInt(sizeBytes)
+	if !ok {
+		return 0
+	}
+
+	return size
 }

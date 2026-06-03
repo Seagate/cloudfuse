@@ -493,7 +493,17 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 				return err
 			}
 
-			n, err = blob.WriteAt(data, int64(idx*(int)(options.BlockSize)))
+			idxU64, ok := common.IntToUint64(idx)
+			if !ok {
+				return fmt.Errorf("invalid block index: %d", idx)
+			}
+
+			writeOffset, ok := common.Uint64ToInt64(idxU64 * options.BlockSize)
+			if !ok {
+				return fmt.Errorf("block write offset out of range")
+			}
+
+			n, err = blob.WriteAt(data, writeOffset)
 			if err != nil {
 				return err
 			}

@@ -30,6 +30,7 @@ package block_cache
 import (
 	"fmt"
 
+	"github.com/Seagate/cloudfuse/common"
 	"golang.org/x/sys/unix"
 )
 
@@ -40,7 +41,12 @@ func AllocateBlock(size uint64) (*Block, error) {
 	}
 
 	prot, flags := unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE
-	addr, err := unix.Mmap(-1, 0, int(size), prot, flags)
+	mmapSize, ok := common.Uint64ToInt(size)
+	if !ok {
+		return nil, fmt.Errorf("invalid mmap size: %d", size)
+	}
+
+	addr, err := unix.Mmap(-1, 0, mmapSize, prot, flags)
 
 	if err != nil {
 		return nil, fmt.Errorf("mmap error: %v", err)

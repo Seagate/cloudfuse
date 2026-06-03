@@ -293,7 +293,12 @@ func EncryptData(plainData []byte, password *memguard.Enclave) ([]byte, error) {
 	}
 	outputBuffer.Write(salt)
 
-	err = binary.Write(outputBuffer, binary.LittleEndian, uint16(gcm.NonceSize()))
+	nonceSize, ok := IntToUint16(gcm.NonceSize())
+	if !ok {
+		return nil, fmt.Errorf("gcm nonce size is out of uint16 range: %d", gcm.NonceSize())
+	}
+
+	err = binary.Write(outputBuffer, binary.LittleEndian, nonceSize)
 	if err != nil {
 		return nil, err
 	}
@@ -709,5 +714,9 @@ func PrettyOpenFlags(f int) string {
 // from the GO internal runtime data structures, instead of making expensive
 // runtime.Stack calls.
 func GetGoroutineID() uint64 {
-	return (uint64)(goid.Get())
+	id, ok := Int64ToUint64(goid.Get())
+	if !ok {
+		return 0
+	}
+	return id
 }

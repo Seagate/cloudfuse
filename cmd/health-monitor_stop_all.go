@@ -30,8 +30,6 @@ import (
 	"os/exec"
 	"runtime"
 
-	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
-
 	"github.com/spf13/cobra"
 )
 
@@ -63,7 +61,9 @@ func stopAll() error {
 		}
 		return nil
 	}
-	cliOut := exec.Command("killall", hmcommon.CfuseMon)
+	const healthMonProcessName = "cfusemon"
+	//nolint:gosec // G204: command and arguments are fixed literals with no external input.
+	cliOut := exec.Command("killall", healthMonProcessName)
 	_, err := cliOut.Output()
 	if err != nil {
 		return err

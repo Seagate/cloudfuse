@@ -270,9 +270,13 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	permBits := modePermBits(attr.Mode)
 	if attr.IsModeDefault() {
 		if typeBits == fuse.S_IFDIR {
-			permBits = uint32(lf.dirPermission)
+			if val, ok := common.UintToUint32(lf.dirPermission); ok {
+				permBits = val
+			}
 		} else {
-			permBits = uint32(lf.filePermission)
+			if val, ok := common.UintToUint32(lf.filePermission); ok {
+				permBits = val
+			}
 		}
 	}
 
@@ -408,8 +412,17 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 
 	// if populated then we need to overwrite root attributes
 	if populated {
-		stat.Bsize = uint64(attr.Bsize)
-		stat.Frsize = uint64(attr.Frsize)
+		bsize, ok := common.Int64ToUint64(attr.Bsize)
+		if !ok {
+			return -fuse.EIO
+		}
+		frsize, ok := common.Int64ToUint64(attr.Frsize)
+		if !ok {
+			return -fuse.EIO
+		}
+
+		stat.Bsize = bsize
+		stat.Frsize = frsize
 		// cloud storage always sets free and avail to zero
 		statsFromCloudStorage := attr.Bfree == 0 && attr.Bavail == 0
 		// calculate blocks used from attr
@@ -417,9 +430,7 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		blocksUsed := attr.Blocks - attr.Bfree
 		// we only use displayCapacity to complement used size from cloud storage
 		if statsFromCloudStorage {
-			displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / uint64(
-				attr.Bsize,
-			)
+			displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / bsize
 			// if used > displayCapacity, then report used and show that we are out of space
 			stat.Blocks = max(displayCapacityBlocks, blocksUnavailable)
 		} else {
@@ -548,7 +559,10 @@ func (cf *CgofuseFS) Readdir(
 	cacheInfo := val.(*dirChildCache)
 
 	// figure out what we need to provide to the OS
-	offset := uint64(ofst)
+	offset, ok := common.Int64ToUint64(ofst)
+	if !ok {
+		return -fuse.EINVAL
+	}
 	// is this a brand new request (not the continuation of a previous one)?
 	newRequest := offset == 0
 	if newRequest {
@@ -691,7 +705,12 @@ func serveCachedEntries(
 		name := cacheInfo.children[cacheIndex].Name
 		// call fill with name, stat buffer, and the offset for the *next* entry
 		nextOffset++
-		done = !fill(name, &stbuf, int64(nextOffset))
+		nextOffsetInt64, ok := common.Uint64ToInt64(nextOffset)
+		if !ok {
+			done = true
+			break
+		}
+		done = !fill(name, &stbuf, nextOffsetInt64)
 	}
 	// also quit when the directory has no more entries
 	done = done || cacheInfo.lastPage
@@ -772,7 +791,12 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 		internal.OpenFileOptions{
 			Name:  name,
 			Flags: flags,
-			Mode:  fs.FileMode(fuseFS.filePermission),
+			Mode: func() fs.FileMode {
+				if perm, ok := common.UintToUint32(fuseFS.filePermission); ok {
+					return fs.FileMode(perm)
+				}
+				return 0
+			}(),
 		})
 
 	if err != nil {
@@ -806,7 +830,15 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		return -fuse.EBADF
 	}
 
-	offset := uint64(ofst)
+	offset, ok := common.Int64ToUint64(ofst)
+	if !ok {
+		return -fuse.EINVAL
+	}
+
+	offsetInt64, ok := common.Uint64ToInt64(offset)
+	if !ok {
+		return -fuse.EOVERFLOW
+	}
 
 	var err error
 	var bytesRead int
@@ -814,12 +846,12 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	if handle.Cached() {
 		// Remove Pread as not supported on Windows
 		//bytesRead, err = syscall.Pread(handle.FD(), buff, int64(offset))
-		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
+		bytesRead, err = handle.FObj.ReadAt(buff, offsetInt64)
 	} else {
 		bytesRead, err = fuseFS.NextComponent().ReadInBuffer(
 			&internal.ReadInBufferOptions{
 				Handle: handle,
-				Offset: int64(offset),
+				Offset: offsetInt64,
 				Data:   buff,
 			})
 	}

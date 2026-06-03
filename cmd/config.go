@@ -28,6 +28,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
@@ -505,9 +506,11 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 	secretLabel := ""
 	if tui.config.storageProtocol == "azstorage" {
 		accessLabel = "🔑 Account Name: "
+		//nolint:gosec // G101: UI label text; no credential value is embedded.
 		secretLabel = "🔑 Account Key: "
 	} else {
 		accessLabel = "🔑 Access Key: "
+		//nolint:gosec // G101: UI label text; no credential value is embedded.
 		secretLabel = "🔑 Secret Key: "
 	}
 
@@ -1381,9 +1384,11 @@ func (tui *appContext) getAvailableCacheSize() error {
 
 	const blockSize = 4096
 	availableCacheSizeBytes := availableBlocks * blockSize // Convert blocks to bytes
-	tui.config.availableCacheSizeGB = int(
-		availableCacheSizeBytes / (1024 * 1024 * 1024),
-	) // Convert to GB
+	cacheSizeGB := availableCacheSizeBytes / (1024 * 1024 * 1024)
+	if cacheSizeGB > uint64(math.MaxInt) {
+		return fmt.Errorf("available cache size is too large to represent in int: %d", cacheSizeGB)
+	}
+	tui.config.availableCacheSizeGB = int(cacheSizeGB) // Convert to GB
 	cacheSizeInt, _ := strconv.Atoi(tui.config.cacheSize)
 	tui.config.currentCacheSizeGB = int(tui.config.availableCacheSizeGB) * cacheSizeInt / 100
 
@@ -1497,9 +1502,17 @@ func (tui *appContext) createYAMLConfig() error {
 	}
 
 	if tui.config.cacheMode == "file_cache" {
+		timeout, ok := common.IntToUint32(tui.config.cacheRetentionDurationSec)
+		if !ok {
+			return fmt.Errorf(
+				"cache retention duration is out of range for uint32: %d",
+				tui.config.cacheRetentionDurationSec,
+			)
+		}
+
 		config.FileCache = file_cache.FileCacheOptions{
 			TmpPath:       tui.config.cacheLocation,
-			Timeout:       uint32(tui.config.cacheRetentionDurationSec),
+			Timeout:       timeout,
 			AllowNonEmpty: !tui.config.clearCacheOnStart,
 		}
 		// If cache size is not set to 80%, convert currentCacheSizeGB to MB and set file_cache.max-size-mb to it

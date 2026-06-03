@@ -1007,6 +1007,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
+				//nolint:gosec // G122: newPath is from filepath.WalkDir callback, safe for operations within WalkDir
 				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
 				if mkdirErr != nil {
 					// log any error but do nothing about it

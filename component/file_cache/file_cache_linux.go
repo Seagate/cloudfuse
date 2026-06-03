@@ -28,11 +28,13 @@
 package file_cache
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"syscall"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"golang.org/x/sys/unix"
@@ -68,7 +70,12 @@ func (fc *FileCache) getAvailableSize() (uint64, error) {
 		return 0, err
 	}
 
-	available := statfs.Bavail * uint64(statfs.Bsize)
+	bsize, ok := common.Int64ToUint64(statfs.Bsize)
+	if !ok {
+		return 0, fmt.Errorf("invalid statfs block size: %d", statfs.Bsize)
+	}
+
+	available := statfs.Bavail * bsize
 	return available, nil
 }
 
