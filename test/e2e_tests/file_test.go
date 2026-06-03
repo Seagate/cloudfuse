@@ -251,7 +251,8 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 			found = true
 		}
 	}
-	suite.True(found)
+	// flaky (Code Coverage on Windows: S3 Coverage with Size Tracker)
+	suite.True(found, "%s should be in listing: %v", speclChar, files)
 
 	suite.fileTestCleanup([]string{fileName})
 }

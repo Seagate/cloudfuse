@@ -63,7 +63,6 @@ jobs:
       cgo: "1"
       go: "1.26"
       zig: 0.15.2
-      containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
       AWS_REGION: us-east-1
@@ -204,7 +203,6 @@ jobs:
     env:
       go: "1.26"
       cgo: "0"
-      containerName: "test-cnt-win"
 
     steps:
       - name: Checkout code
@@ -254,7 +252,7 @@ jobs:
       - name: Set CGO
         shell: bash
         env:
-          CGO: ${{ env.go }}
+          CGO: ${{ env.cgo }}
         run: |
           if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
 
@@ -265,7 +263,7 @@ jobs:
           sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
         with:
           version: latest
           args: --timeout=5m
