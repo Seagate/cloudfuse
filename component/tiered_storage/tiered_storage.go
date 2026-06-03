@@ -28,7 +28,7 @@ package tiered_storage
 import (
 	"context"
 	"fmt"
-	"sync"
+	"os"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -49,7 +49,11 @@ type TieredStorage struct {
 	internal.BaseComponent
 	fileMap  map[string]*FileNode
 	lruQueue *LRUQueue
-	mu       sync.Mutex
+
+	//use LockMap instead of mutex to allow parallel access to different files
+	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
+	tmpPath   string          // uses os.Separator (filepath.Join)
+
 }
 
 // define a file node structure to hold file related information
@@ -178,7 +182,55 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
+// First Function to work on!!
+// OpenFile: Makes the file available in the local cache for further file operations.
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	// Check if file exists in local cache, make sure to consider if file is not found
+	info, err := os.Stat(c.tmpPath + options.Name)
+
+	//File exists in local cache
+	if err == nil {
+		//Read from local disk, create file node and add to file map
+		node := &FileNode{
+			name:        options.Name,
+			size:        uint64(info.Size()),
+			cloudBacked: false,
+		}
+		c.fileMap[options.Name] = node
+	} else {
+		//Check if it exists in cloud, if yes create local copy, nope then we return error
+		info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
+		if err != nil {
+			// file does not exist in cloud, return error
+			return nil, fmt.Errorf("file not found")
+		}
+		// file exists in cloud, create local copy (name doesn't matter)and add to file map
+		localCopyNode := &FileNode{
+			name:        options.Name,
+			size:        uint64(info.Size),
+			cloudBacked: true,
+		}
+		c.fileMap[options.Name] = localCopyNode
+
+	}
+
+	// If not, check if file exists in cloud storage
+
+	// If exists in cloud storage, fetch the file to local cache and return handle
+	// If not exists in cloud storage, return error (file not found)
+
+	// create handle and record openFileOptions for later
+	handle := handlemap.NewHandle(options.Name)
+	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
+	if options.Flags&os.O_APPEND != 0 {
+		handle.Flags.Set(handlemap.HandleOpenedAppend)
+	}
+
 	return nil, nil
 }
 
