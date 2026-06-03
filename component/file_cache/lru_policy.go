@@ -252,11 +252,13 @@ func (p *lruPolicy) loadSnapshot(snapshot *lruPolicySnapshot) {
 		}
 		p.nodeMap.Store(fullPath, newNode)
 		// let markers stay in place
-		if nodeIndex == int(snapshot.CurrMarkerPosition) {
+		nodeIndexU64, ok := common.IntToUint64(nodeIndex)
+		if ok && nodeIndexU64 == snapshot.CurrMarkerPosition {
 			nextNode = nextNode.next
 			nodeIndex++
 		}
-		if nodeIndex == int(snapshot.LastMarkerPosition) {
+		nodeIndexU64, ok = common.IntToUint64(nodeIndex)
+		if ok && nodeIndexU64 == snapshot.LastMarkerPosition {
 			nextNode = nextNode.next
 			nodeIndex++
 		}

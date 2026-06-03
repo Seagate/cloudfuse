@@ -52,9 +52,9 @@ func (rw *ReadWriteFilenameCache) Configure(conf StreamOptions) error {
 	if conf.BufferSize <= 0 || conf.BlockSize <= 0 || conf.CachedObjLimit <= 0 {
 		rw.StreamOnly = true
 	}
-	rw.BlockSize = int64(conf.BlockSize) * mb
+	rw.BlockSize = conf.BlockSize * mb
 	rw.BufferSize = conf.BufferSize * mb
-	rw.CachedObjLimit = int32(conf.CachedObjLimit)
+	rw.CachedObjLimit = conf.CachedObjLimit
 	rw.fileCache = make(map[string]*handlemap.Cache)
 	rw.CachedObjects = 0
 	return nil
@@ -380,7 +380,7 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 		return nil
 	} else {
 		// if the file is not cached then try to create a buffer for it
-		handlemap.CreateCacheObject(int64(rw.BufferSize), handle)
+		handlemap.CreateCacheObject(rw.BufferSize, handle)
 		if atomic.LoadInt32(&rw.CachedObjects) >= rw.CachedObjLimit {
 			handle.CacheObj.StreamOnly = true
 			return nil
@@ -407,7 +407,8 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 					return nil
 				}
 
-				if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {
+				size, ok := common.Int64ToUint64(atomic.LoadInt64(&handle.Size))
+				if ok && size > v.Free {
 					handle.CacheObj.StreamOnly = true
 					return nil
 				}

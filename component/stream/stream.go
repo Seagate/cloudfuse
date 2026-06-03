@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -41,18 +42,18 @@ type Stream struct {
 	internal.BaseComponent
 	cache          StreamConnection
 	BlockSize      int64
-	BufferSize     uint64 // maximum number of blocks allowed to be stored for a file
+	BufferSize     int64 // maximum number of blocks allowed to be stored for a file
 	CachedObjLimit int32
 	CachedObjects  int32
 	StreamOnly     bool // parameter used to check if its pure streaming
 }
 
 type StreamOptions struct {
-	BlockSize      uint64 `config:"block-size-mb"  yaml:"block-size-mb,omitempty"`
-	BufferSize     uint64 `config:"buffer-size-mb" yaml:"buffer-size-mb,omitempty"`
-	CachedObjLimit uint64 `config:"max-buffers"    yaml:"max-buffers,omitempty"`
-	FileCaching    bool   `config:"file-caching"   yaml:"file-caching,omitempty"`
-	readOnly       bool   `config:"read-only"      yaml:"-"`
+	BlockSize      int64 `config:"block-size-mb"  yaml:"block-size-mb,omitempty"`
+	BufferSize     int64 `config:"buffer-size-mb" yaml:"buffer-size-mb,omitempty"`
+	CachedObjLimit int32 `config:"max-buffers"    yaml:"max-buffers,omitempty"`
+	FileCaching    bool  `config:"file-caching"   yaml:"file-caching,omitempty"`
+	readOnly       bool  `config:"read-only"      yaml:"-"`
 }
 
 const (
@@ -106,11 +107,23 @@ func (st *Stream) Configure(_ bool) error {
 			err,
 		)
 		st.StreamOnly = true
-	} else if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > v.Free {
-		log.Err(
-			"Stream::Configure : config error, not enough free memory for provided configuration",
-		)
-		return errors.New("not enough free memory for provided stream configuration")
+	} else {
+		bufferSize, ok := common.Int64ToUint64(conf.BufferSize)
+		if !ok {
+			return errors.New("invalid stream buffer-size-mb configuration")
+		}
+		cachedObjLimit, ok := common.IntToUint64(int(conf.CachedObjLimit))
+		if !ok {
+			return errors.New("invalid stream max-buffers configuration")
+		}
+
+		bufferBytes := bufferSize * cachedObjLimit * mb
+		if bufferBytes > v.Free {
+			log.Err(
+				"Stream::Configure : config error, not enough free memory for provided configuration",
+			)
+			return errors.New("not enough free memory for provided stream configuration")
+		}
 	}
 	st.cache = NewStreamConnection(conf, st)
 

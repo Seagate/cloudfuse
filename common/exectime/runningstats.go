@@ -30,6 +30,15 @@ import (
 	"time"
 )
 
+const maxDurationUint64 = uint64(1<<63 - 1)
+
+func durationFromUint64(v uint64) (time.Duration, bool) {
+	if v > maxDurationUint64 {
+		return 0, false
+	}
+	return time.Duration(v), true
+}
+
 type RunningStatistics struct {
 	N    uint64
 	oldM time.Duration
@@ -53,7 +62,11 @@ func (rs *RunningStatistics) Push(dur time.Duration) {
 		return
 	}
 
-	rs.newM = rs.oldM + ((dur - rs.oldM) / time.Duration(rs.N))
+	denom, ok := durationFromUint64(rs.N)
+	if !ok {
+		denom = time.Duration(maxDurationUint64)
+	}
+	rs.newM = rs.oldM + ((dur - rs.oldM) / denom)
 	rs.newS = rs.oldS + (dur-rs.oldM)*(dur-rs.newM)
 
 	rs.oldM = rs.newM
@@ -66,7 +79,11 @@ func (rs *RunningStatistics) Mean() time.Duration {
 
 func (rs *RunningStatistics) Variance() time.Duration {
 	if rs.N > 1 {
-		return rs.newS / time.Duration(rs.N-1)
+		denom, ok := durationFromUint64(rs.N - 1)
+		if !ok {
+			denom = time.Duration(maxDurationUint64)
+		}
+		return rs.newS / denom
 	}
 	return time.Duration(0)
 }

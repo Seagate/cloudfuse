@@ -49,9 +49,9 @@ func (rw *ReadWriteCache) Configure(conf StreamOptions) error {
 		rw.StreamOnly = true
 		log.Info("ReadWriteCache::Configure : Streamonly set to true")
 	}
-	rw.BlockSize = int64(conf.BlockSize) * mb
+	rw.BlockSize = conf.BlockSize * mb
 	rw.BufferSize = conf.BufferSize * mb
-	rw.CachedObjLimit = int32(conf.CachedObjLimit)
+	rw.CachedObjLimit = conf.CachedObjLimit
 	rw.CachedObjects = 0
 	return nil
 }
@@ -431,7 +431,7 @@ func (rw *ReadWriteCache) purge(handle *handlemap.Handle, size int64) error {
 }
 
 func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
-	handlemap.CreateCacheObject(int64(rw.BufferSize), handle)
+	handlemap.CreateCacheObject(rw.BufferSize, handle)
 	// if we hit handle limit then stream only on this new handle
 	if atomic.LoadInt32(&rw.CachedObjects) >= rw.CachedObjLimit {
 		handle.CacheObj.StreamOnly = true
@@ -465,7 +465,8 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 			return nil
 		}
 
-		if uint64(atomic.LoadInt64(&handle.Size)) > v.Free {
+		size, ok := common.Int64ToUint64(atomic.LoadInt64(&handle.Size))
+		if ok && size > v.Free {
 			handle.CacheObj.StreamOnly = true
 			return nil
 		}

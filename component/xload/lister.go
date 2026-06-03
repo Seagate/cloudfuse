@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -226,10 +227,15 @@ func (rl *remoteLister) Process(item *WorkItem) (int, error) {
 				}
 
 				// send file to the splitter's channel for chunking
+				dataLen, ok := common.Int64ToUint64(entry.Size)
+				if !ok {
+					return 0, fmt.Errorf("invalid entry size for %s: %d", entry.Path, entry.Size)
+				}
+
 				err := rl.GetNext().Schedule(&WorkItem{
 					CompName: rl.GetNext().GetName(),
 					Path:     entry.Path,
-					DataLen:  uint64(entry.Size),
+					DataLen:  dataLen,
 					Mode:     fileMode,
 					Atime:    entry.Atime,
 					Mtime:    entry.Mtime,

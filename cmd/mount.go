@@ -32,6 +32,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+
+	//nolint:gosec // G108: pprof for runtime profiling, exposed on demand via --profiler-port
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
@@ -825,7 +827,14 @@ func startDynamicProfiler() {
 	//      go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
 	//      go tool pprof http://localhost:6060/debug/pprof/block
 	//
-	err := http.ListenAndServe(connStr, nil)
+	server := &http.Server{
+		Addr:         connStr,
+		Handler:      nil,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Err("Mount::startDynamicProfiler : Failed to start dynamic profiler [%s]", err.Error())
 	}

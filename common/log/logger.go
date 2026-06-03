@@ -99,10 +99,18 @@ func SetConfig(config common.LogConfig) error {
 			logObj.SetLogLevel(config.Level)
 		}
 		if config.MaxFileSize != 0 {
-			logObj.SetMaxLogSize(int(config.MaxFileSize))
+			size, ok := common.Uint64ToInt(config.MaxFileSize)
+			if !ok {
+				return fmt.Errorf("max file size is out of range for int: %d", config.MaxFileSize)
+			}
+			logObj.SetMaxLogSize(size)
 		}
 		if config.FileCount != 0 {
-			logObj.SetLogFileCount(int(config.FileCount))
+			count, ok := common.Uint64ToInt(config.FileCount)
+			if !ok {
+				return fmt.Errorf("file count is out of range for int: %d", config.FileCount)
+			}
+			logObj.SetLogFileCount(count)
 		}
 	}
 

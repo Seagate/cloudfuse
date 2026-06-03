@@ -42,7 +42,7 @@ type UploadWindow struct {
 	name        string `yaml:"name"`
 	cronExpr    string `yaml:"cron"`
 	duration    time.Duration
-	cronEntryID int
+	cronEntryID cron.EntryID
 }
 
 type Config struct {
@@ -174,7 +174,7 @@ func (fc *FileCache) configureScheduler() error {
 			return err
 		}
 		// save window to fc.schedule
-		window.cronEntryID = int(entryId)
+		window.cronEntryID = entryId
 		fc.schedule = append(fc.schedule, window)
 		log.Info(
 			"FileCache::Configure : Added schedule %s ('%s', %s)",
@@ -190,7 +190,7 @@ func (fc *FileCache) configureScheduler() error {
 func (fc *FileCache) startScheduler() {
 	// check if any schedules should already be active
 	for _, window := range fc.schedule {
-		entry := fc.cronScheduler.Entry(cron.EntryID(window.cronEntryID))
+		entry := fc.cronScheduler.Entry(window.cronEntryID)
 		// check if this entry should already be active
 		// did this entry have a start time within the last duration?
 		now := time.Now()
