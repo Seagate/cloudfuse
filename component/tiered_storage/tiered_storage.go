@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -54,6 +55,9 @@ type TieredStorage struct {
 	//use LockMap instead of mutex to allow parallel access to different files
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
+
+	// Still need mutex to protect fileMap and lruQueue
+	mu sync.Mutex
 
 	maxCacheSize float64
 }
@@ -192,8 +196,20 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	flock.Lock()
 	defer flock.Unlock()
 
-	// Check if file exists in local cache, otherwise check cloud
-	info, err := os.Stat(c.tmpPath + options.Name)
+	//1. Initial Check Map
+	c.mu.Lock()
+	_, exists := c.fileMap[options.Name]
+	c.mu.Unlock()
+	if exists {
+		handle := handlemap.NewHandle(options.Name)
+		if options.Flags&os.O_APPEND != 0 {
+			handle.Flags.Set(handlemap.HandleOpenedAppend)
+		}
+		flock.Inc()
+		return handle, nil
+	}
+	//2. Check if File exists in Disk, if not check cloud
+	info, err := os.Stat(filepath.Join(c.tmpPath, options.Name))
 	if err == nil {
 		//Read from local disk, create file node and add to file map
 		node := &FileNode{
@@ -201,13 +217,15 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			size:        uint64(info.Size()),
 			cloudBacked: false,
 		}
+		c.mu.Lock()
 		c.fileMap[options.Name] = node
+		c.mu.Unlock()
 	} else {
-		//Check if it exists in cloud, if yes create local copy, nope then we return error
+		//3. Check if File exists in Cloud
 		info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
 		if err != nil {
 			// file does not exist in cloud, return error
-			return nil, fmt.Errorf("file not found")
+			return nil, fmt.Errorf("file not found in cloud")
 		}
 		// file exists in cloud, create local copy (name doesn't matter)and add to file map
 		localCopyNode := &FileNode{
@@ -217,16 +235,17 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 		}
 		// check if we are over the local cache limit
 		if c.isOverLocalLimit(uint64(info.Size), options.Name, "open") {
-			// we are over the local cache limit, return error for now, later we can add eviction logic here
-			//some sort of eviction logic here
+			// we are over the local cache limit, return error for now,
+			return nil, fmt.Errorf("cache limit exceeded, cannot open file")
 		}
 		//download it to the local cache and add to file map
 		err = c.openFileHelper(options)
 		if err != nil {
 			return nil, err
 		}
+		c.mu.Lock()
 		c.fileMap[options.Name] = localCopyNode
-
+		c.mu.Unlock()
 	}
 	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
@@ -270,6 +289,8 @@ func (c *TieredStorage) openFileHelper(options internal.OpenFileOptions) error {
 		os.Remove(localPath)
 		return err
 	}
+	//some sort of mode handling
+
 	localFileHandle.Close()
 	return nil
 }
@@ -282,11 +303,18 @@ func (c *TieredStorage) isOverLocalLimit(
 	requestType string,
 ) bool {
 
+	if c.maxCacheSize == 0 {
+		// if maxCacheSize is 0, it means there is no limit on local cache size, so we can return false
+		return false
+	}
+
 	//find ExistingSize of file if exists
 	existingSize := uint64(0)
+	c.mu.Lock()
 	if node, ok := c.fileMap[fileName]; ok {
 		existingSize = node.size
 	}
+	c.mu.Unlock()
 
 	addedFileSize := newFileSize - existingSize
 
@@ -298,11 +326,11 @@ func (c *TieredStorage) isOverLocalLimit(
 	//get current cache size
 	currSize, err := common.GetUsage(c.tmpPath)
 	if err != nil {
-		log.Err("FileCache::IsOverLocalLimit : failed to get current cache size [%v]", err)
+		log.Err("TieredStorage::IsOverLocalLimit : failed to get current cache size [%v]", err)
 		return false
 	}
 
-	if uint(currSize)+uint(addedFileSize) > uint(c.maxCacheSize) {
+	if float64(currSize)+float64(addedFileSize) > (c.maxCacheSize + 4096) {
 		//should include some error message
 		return true
 	}
@@ -376,7 +404,11 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 // Pipeline will call this method to create your object, initialize your variables here
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
 func NewTieredStorageComponent() internal.Component {
-	comp := &TieredStorage{}
+	comp := &TieredStorage{
+		fileMap:   make(map[string]*FileNode),
+		lruQueue:  &LRUQueue{},
+		fileLocks: common.NewLockMap(),
+	}
 	comp.SetName(compName)
 	return comp
 }
