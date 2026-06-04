@@ -178,17 +178,60 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 }
 
 // File operations
+// Second Funtion to work on!!
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
-	return nil, nil
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	if c.isOverLocalLimit(0, options.Name, "create") {
+		return nil, fmt.Errorf("cache limit exceeded, cannot create file")
+		//eventually put a eviction here
+	}
+
+	//Create the file in the local cache, we will ignore the create empty and cloud stuff for now
+	localPath := filepath.Join(c.tmpPath, options.Name)
+	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+
+	if err != nil {
+		return nil, err
+	}
+
+	//Open local file
+	localFile, err := common.OpenFile(
+		localPath,
+		os.O_CREATE|os.O_TRUNC|os.O_RDWR,
+		options.Mode,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	//Add file node to file map with cloudBacked as false
+	node := &FileNode{
+		name:        options.Name,
+		size:        uint64(0),
+		cloudBacked: false,
+	}
+	c.mu.Lock()
+	c.fileMap[options.Name] = node
+	c.mu.Unlock()
+
+	//create handle
+	handle := handlemap.NewHandle(options.Name)
+	handle.SetFileObject(localFile)
+
+	flock.Inc()
+
+	return handle, nil
 }
 
 func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
-// First Function to work on!!
 // OpenFile: Makes the file available in the local cache for further file operations.
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released

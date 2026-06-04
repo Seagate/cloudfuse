@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -166,4 +167,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 
 	// Verify it was now downloaded to the local tiered storage cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+}
+func TestTieredStorageTestSuite(t *testing.T) {
+	suite.Run(t, new(tieredStorageTestSuite))
 }
