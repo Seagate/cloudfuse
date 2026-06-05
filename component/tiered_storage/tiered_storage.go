@@ -145,6 +145,12 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if c.tmpPath == "" || c.tmpPath == "." {
 		return fmt.Errorf("TieredStorage: path not set in config")
 	}
+	err = os.MkdirAll(c.tmpPath, 0755)
+
+	if err != nil {
+		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
+		return fmt.Errorf("TieredStorage: failed to create tmp path: %w", err)
+	}
 
 	return nil
 }
@@ -326,7 +332,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 
 // openFileHelper : function to download copy from cloud and add to local cache
 func (c *TieredStorage) openFileHelper(options internal.OpenFileOptions) error {
-
 	//create folder if not exists, wait check what 0755 does
 	localPath := filepath.Join(c.tmpPath, options.Name)
 	err := os.MkdirAll(filepath.Dir(localPath), 0755)
@@ -342,6 +347,8 @@ func (c *TieredStorage) openFileHelper(options internal.OpenFileOptions) error {
 	if err != nil {
 		return err
 	}
+	defer localFileHandle.Close()
+
 	//Download
 	err = c.NextComponent().CopyToFile(internal.CopyToFileOptions{
 		Name:   options.Name,
@@ -351,11 +358,10 @@ func (c *TieredStorage) openFileHelper(options internal.OpenFileOptions) error {
 	})
 	if err != nil {
 		localFileHandle.Close()
-		os.Remove(localPath)
+		_ = os.Remove(localPath)
 		return err
 	}
 	//some sort of mode handling
-	localFileHandle.Close()
 	return nil
 }
 
