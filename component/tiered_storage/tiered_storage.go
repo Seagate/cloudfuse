@@ -83,6 +83,7 @@ type LRUQueue struct {
 // Structure defining your config parameters
 type TieredStorageOptions struct {
 	// e.g. var1 uint32 `config:"var1"`
+	TmpPath string `config:"path" yaml:"path,omitempty"`
 }
 
 const (
@@ -138,6 +139,11 @@ func (c *TieredStorage) Configure(_ bool) error {
 		return fmt.Errorf("TieredStorage: config error [invalid config attributes]")
 	}
 	// Extract values from 'conf' and store them as you wish here
+	// CLAUDE GENERATED HERE, CAUSE I HAD NO CLUE
+	c.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
+	if c.tmpPath == "" || c.tmpPath == "." {
+		return fmt.Errorf("TieredStorage: path not set in config")
+	}
 
 	return nil
 }
@@ -244,54 +250,66 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	_, exists := c.fileMap[options.Name]
 	c.mu.Unlock()
 	if exists {
-		handle := handlemap.NewHandle(options.Name)
-		if options.Flags&os.O_APPEND != 0 {
-			handle.Flags.Set(handlemap.HandleOpenedAppend)
-		}
-		flock.Inc()
-		return handle, nil
-	}
-	//2. Check if File exists in Disk, if not check cloud
-	info, err := os.Stat(filepath.Join(c.tmpPath, options.Name))
-	if err == nil {
-		//Read from local disk, create file node and add to file map
-		node := &FileNode{
-			name:        options.Name,
-			size:        uint64(info.Size()),
-			cloudBacked: false,
-		}
-		c.mu.Lock()
-		c.fileMap[options.Name] = node
-		c.mu.Unlock()
+		//skip to opening file since it should already be in local cache
 	} else {
-		//3. Check if File exists in Cloud
-		info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
-		if err != nil {
-			// file does not exist in cloud, return error
-			return nil, fmt.Errorf("file not found in cloud")
+		//2. Check if File exists in Disk, if not check cloud
+		info, err := os.Stat(filepath.Join(c.tmpPath, options.Name))
+		if err == nil {
+			//Read from local disk, create file node and add to file map
+			node := &FileNode{
+				name:        options.Name,
+				size:        uint64(info.Size()),
+				cloudBacked: false,
+			}
+			c.mu.Lock()
+			c.fileMap[options.Name] = node
+			c.mu.Unlock()
+		} else {
+			//3. Check if File exists in Cloud
+			info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
+			if err != nil {
+				// file does not exist in cloud, return error
+				return nil, fmt.Errorf("file not found in cloud")
+			}
+			// file exists in cloud, create local copy (name doesn't matter)and add to file map
+			localCopyNode := &FileNode{
+				name:        options.Name,
+				size:        uint64(info.Size),
+				cloudBacked: true,
+			}
+			// check if we are over the local cache limit
+			if c.isOverLocalLimit(uint64(info.Size), options.Name, "open") {
+				// we are over the local cache limit, return error for now,
+				return nil, fmt.Errorf("cache limit exceeded, cannot open file")
+			}
+			//download it to the local cache and add to file map
+			err = c.openFileHelper(options)
+			if err != nil {
+				return nil, err
+			}
+			c.mu.Lock()
+			c.fileMap[options.Name] = localCopyNode
+			c.mu.Unlock()
 		}
-		// file exists in cloud, create local copy (name doesn't matter)and add to file map
-		localCopyNode := &FileNode{
-			name:        options.Name,
-			size:        uint64(info.Size),
-			cloudBacked: true,
-		}
-		// check if we are over the local cache limit
-		if c.isOverLocalLimit(uint64(info.Size), options.Name, "open") {
-			// we are over the local cache limit, return error for now,
-			return nil, fmt.Errorf("cache limit exceeded, cannot open file")
-		}
-		//download it to the local cache and add to file map
-		err = c.openFileHelper(options)
-		if err != nil {
-			return nil, err
-		}
-		c.mu.Lock()
-		c.fileMap[options.Name] = localCopyNode
-		c.mu.Unlock()
+
 	}
-	// create handle and record openFileOptions for later
+
+	//At this point the file should be in the local cache, so we can proceed to open it
+
+	//Open the file in the local cache
+	localPath := filepath.Join(c.tmpPath, options.Name)
+	localFile, err := common.OpenFile(
+		localPath,
+		os.O_RDWR,
+		options.Mode,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create handle and attach file object to it
 	handle := handlemap.NewHandle(options.Name)
+	handle.SetFileObject(localFile)
 	if options.Flags&os.O_APPEND != 0 {
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
@@ -333,7 +351,6 @@ func (c *TieredStorage) openFileHelper(options internal.OpenFileOptions) error {
 		return err
 	}
 	//some sort of mode handling
-
 	localFileHandle.Close()
 	return nil
 }
@@ -385,6 +402,11 @@ func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int
 }
 
 func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
+	//1.Check if not opened
+
+	//2.Get the file opbject
+	//3. Calculate the new size
+
 	return 0, nil
 }
 
@@ -419,7 +441,7 @@ func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, erro
 
 // Filesystem level operations
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	return &internal.ObjAttr{}, nil
+	return c.NextComponent().GetAttr(options)
 }
 
 func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {

@@ -69,7 +69,7 @@ func (suite *tieredStorageTestSuite) SetupTest() {
 	suite.cache_path = filepath.Join(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = filepath.Join(home_dir, "fake_storage"+rand)
 	defaultConfig := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s",
+		"tiered_storage:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s",
 		suite.cache_path,
 		suite.fake_storage_path,
 	)
@@ -80,7 +80,7 @@ func (suite *tieredStorageTestSuite) SetupTest() {
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
 		fmt.Printf(
-			"fileCacheTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			"tieredStorageTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
 			suite.cache_path,
 			err,
 		)
@@ -88,7 +88,7 @@ func (suite *tieredStorageTestSuite) SetupTest() {
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
 		fmt.Printf(
-			"fileCacheTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			"tieredStorageTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
 			suite.fake_storage_path,
 			err,
 		)
