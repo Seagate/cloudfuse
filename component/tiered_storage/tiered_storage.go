@@ -402,12 +402,48 @@ func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int
 }
 
 func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
-	//1.Check if not opened
+	//1.Get the file opbject
+	f := options.Handle.GetFileObject()
+	if f == nil {
+		return 0, fmt.Errorf("invalid file handle")
+	}
 
-	//2.Get the file opbject
-	//3. Calculate the new size
+	//2. Check if exceeds limits
+	newSize := options.Offset + int64(len(options.Data))
+	if c.isOverLocalLimit(uint64(newSize), options.Handle.Path, "write") {
+		return 0, fmt.Errorf("cache limit exceeded, cannot write to file")
+		//eventually put eviction here
+	}
 
-	return 0, nil
+	//3. Decide where to write in file
+	var bytesWritten int
+	var err error
+	if options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend) {
+		//write to end of file, standard
+		bytesWritten, err = f.Write(options.Data)
+	} else {
+		//write to specific offset, need to use WriteAt
+		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
+	}
+
+	//4. Mark file as dirty for release later
+	if err == nil {
+		c.setHandleDirty(options.Handle)
+		//update file node size in file map
+		c.mu.Lock()
+		if node, ok := c.fileMap[options.Handle.Path]; ok {
+			node.size = uint64(newSize)
+		}
+		c.mu.Unlock()
+	} else {
+		log.Err(
+			"TieredStorage::WriteFile : failed to write %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
+	}
+
+	return bytesWritten, err
 }
 
 func (c *TieredStorage) SyncFile(options internal.SyncFileOptions) error {
@@ -437,6 +473,32 @@ func (c *TieredStorage) CreateLink(options internal.CreateLinkOptions) error {
 
 func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	return "", nil
+}
+
+// Dirty Handle Operations
+func (c *TieredStorage) setHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	alreadyDirty := handle.Dirty()
+	if !alreadyDirty {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if !alreadyDirty {
+		c.fileLocks.Get(handle.Path).IncDirty()
+	}
+}
+
+// setter
+func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
+	handle.Lock()
+	wasDirty := handle.Dirty()
+	if wasDirty {
+		handle.Flags.Clear(handlemap.HandleFlagDirty)
+	}
+	handle.Unlock()
+	if wasDirty {
+		c.fileLocks.Get(handle.Path).DecDirty()
+	}
 }
 
 // Filesystem level operations
