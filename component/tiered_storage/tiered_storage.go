@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -229,6 +230,9 @@ func (c *TieredStorage) CreateFile(
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(localFile)
 
+	//Mark as dirty because the cloud doesn't know about it
+	c.setHandleDirty(handle)
+
 	flock.Inc()
 
 	return handle, nil
@@ -405,13 +409,13 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	//1.Get the file opbject
 	f := options.Handle.GetFileObject()
 	if f == nil {
-		return 0, fmt.Errorf("invalid file handle")
+		return 0, syscall.EBADF
 	}
 
 	//2. Check if exceeds limits
 	newSize := options.Offset + int64(len(options.Data))
 	if c.isOverLocalLimit(uint64(newSize), options.Handle.Path, "write") {
-		return 0, fmt.Errorf("cache limit exceeded, cannot write to file")
+		return 0, syscall.ENOSPC
 		//eventually put eviction here
 	}
 

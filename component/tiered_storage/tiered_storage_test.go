@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -14,6 +15,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/component/loopback"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
@@ -139,6 +141,8 @@ func (suite *tieredStorageTestSuite) cleanupTest() {
 	suite.assert.NoError(err)
 }
 
+//Testing OpenFile
+
 func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 	defer suite.cleanupTest()
 	path := "file7"
@@ -168,6 +172,84 @@ func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 	// Verify it was now downloaded to the local tiered storage cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 }
+
+func (suite *tieredStorageTestSuite) TestOpenFileInCache() {
+	defer suite.cleanupTest()
+	path := "file8"
+	handle, _ := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	testData := "test data"
+	data := []byte(testData)
+	_, err := suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	err = suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Download is required
+	handle, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.Equal(path, handle.Path)
+	suite.assert.False(handle.Dirty())
+
+	// File should exist in cache
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+}
+
+//Testing WriteFile
+
+func (suite *tieredStorageTestSuite) TestWriteFile() {
+	defer suite.cleanupTest()
+	path := "file9"
+	handle, _ := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle.Flags.Clear(
+		handlemap.HandleFlagDirty,
+	) // Technically create file will mark it as dirty, we just want to check write file updates the dirty flag, so temporarily set this to false
+	testData := "test data"
+	data := []byte(testData)
+	length, err := suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), length)
+	// Check that the local cache updated with data
+	d, _ := os.ReadFile(filepath.Join(suite.cache_path, path))
+	suite.assert.Equal(data, d)
+	suite.assert.True(handle.Dirty())
+}
+
+func (suite *tieredStorageTestSuite) TestWriteFileErrorBadFd() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file20"
+	//bad handle
+	handle := handlemap.NewHandle(file)
+	bytesWrittength, err := suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle},
+	)
+	suite.assert.Error(err)
+	suite.assert.EqualValues(syscall.EBADF, err)
+	suite.assert.Equal(0, bytesWrittength)
+}
+
+// Testing Create File
+func (suite *tieredStorageTestSuite) TestCreateFile() {
+	defer suite.cleanupTest()
+	// Default is to not create empty files on create file to support immutable storage.
+	path := "file12"
+	options := internal.CreateFileOptions{Name: path}
+	f, err := suite.tieredStorage.CreateFile(options)
+
+	suite.assert.NoError(err)
+	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
+
+	// Path should be added to the file cache
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	// Path should not be in fake storage
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
+}
+
 func TestTieredStorageTestSuite(t *testing.T) {
 	suite.Run(t, new(tieredStorageTestSuite))
 }
