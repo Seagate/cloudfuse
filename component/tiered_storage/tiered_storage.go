@@ -191,7 +191,6 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 }
 
 // File operations
-// Second Funtion to work on!!
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
@@ -255,6 +254,17 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	flock.Lock()
 	defer flock.Unlock()
 
+	//Case 1: OpenFile with O_Create
+	if options.Flags&os.O_CREATE != 0 {
+		handle, err := c.CreateFile(
+			internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return handle, nil
+	}
+
 	//1. Initial Check Map
 	c.mu.Lock()
 	_, exists := c.fileMap[options.Name]
@@ -279,7 +289,8 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
 			if err != nil {
 				// file does not exist in cloud, return error
-				return nil, fmt.Errorf("file not found in cloud")
+				log.Err("TieredStorage::OpenFile : File Does not exist in cloud")
+				return nil, err
 			}
 			// file exists in cloud, create local copy (name doesn't matter)and add to file map
 			localCopyNode := &FileNode{
