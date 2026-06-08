@@ -191,7 +191,6 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 }
 
 // File operations
-
 func (c *TieredStorage) createFileUnlocked(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
@@ -494,7 +493,73 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 }
 
 func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
+	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released
+	flock := c.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
+
+	//Dec Handle First
+	flock.Dec()
+
+	//Check if this is the last file handle
+	handleCount := flock.Count()
+
+	//it is the last handle
+	if handleCount == 0 {
+		//is file cloudbacked
+		c.mu.Lock()
+		isCloudBacked := c.fileMap[options.Handle.Path].cloudBacked
+		c.mu.Unlock()
+		if isCloudBacked {
+			//File was modified
+			if options.Handle.Dirty() {
+				//Upload
+				err := c.uploadFile(options.Handle.Path)
+				//Delete local file copy
+				c.mu.Lock()
+				delete(c.fileMap, options.Handle.Path)
+				c.mu.Unlock()
+				//Clean Handle
+				options.Handle.Cleanup()
+			} else {
+				//File was not modified
+				c.mu.Lock()
+				delete(c.fileMap, options.Handle.Path)
+				c.mu.Unlock()
+				options.Handle.Cleanup()
+			}
+		} else {
+			//local only then just close the file, update LRU add to queue, we will get to this later
+			options.Handle.Cleanup()
+		}
+
+	}
 	return nil
+}
+
+func (c *TieredStorage) uploadFile(name string) error {
+	//get the local path
+	localPath := filepath.Join(c.tmpPath, name)
+	_, err := os.Stat(localPath)
+	if err != nil {
+		log.Err("TieredStorage::uploadFile : %s stat failed [%v]", name, err)
+		return err
+	}
+
+	//open read-only handle/file for uploading
+	f, openErr := common.Open(localPath)
+	if openErr != nil {
+		log.Err("TieredStorage::uploadFile : %s open failed [%v]", name, openErr)
+		return openErr
+	}
+	defer f.Close()
+
+	//upload
+	uploadErr := c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	if uploadErr != nil {
+		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, uploadErr)
+	}
+	return uploadErr
 }
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
