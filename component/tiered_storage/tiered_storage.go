@@ -191,13 +191,10 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 }
 
 // File operations
-func (c *TieredStorage) CreateFile(
+
+func (c *TieredStorage) createFileUnlocked(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
-	flock := c.fileLocks.Get(options.Name)
-	flock.Lock()
-	defer flock.Unlock()
-
 	if c.isOverLocalLimit(0, options.Name, "create") {
 		return nil, fmt.Errorf("cache limit exceeded, cannot create file")
 		//eventually put a eviction here
@@ -214,7 +211,7 @@ func (c *TieredStorage) CreateFile(
 	//Open local file
 	localFile, err := common.OpenFile(
 		localPath,
-		os.O_CREATE|os.O_TRUNC|os.O_RDWR,
+		os.O_CREATE|os.O_RDWR,
 		options.Mode,
 	)
 	if err != nil {
@@ -238,8 +235,21 @@ func (c *TieredStorage) CreateFile(
 	//Mark as dirty because the cloud doesn't know about it
 	c.setHandleDirty(handle)
 
-	flock.Inc()
+	return handle, nil
 
+}
+
+func (c *TieredStorage) CreateFile(
+	options internal.CreateFileOptions,
+) (*handlemap.Handle, error) {
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+	handle, err := c.createFileUnlocked(options)
+	if err != nil {
+		return nil, err
+	}
+	flock.Inc()
 	return handle, nil
 }
 
@@ -256,13 +266,21 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 
 	//Case 1: OpenFile with O_Create
 	if options.Flags&os.O_CREATE != 0 {
-		handle, err := c.CreateFile(
-			internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
-		)
-		if err != nil {
-			return nil, err
+		//Check if file first exists, then proceed
+		c.mu.Lock()
+		_, exists := c.fileMap[options.Name]
+		c.mu.Unlock()
+		if exists {
+		} else {
+			handle, err := c.createFileUnlocked(
+				internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
+			)
+			if err != nil {
+				return nil, err
+			}
+			flock.Inc()
+			return handle, nil
 		}
-		return handle, nil
 	}
 
 	//1. Initial Check Map
