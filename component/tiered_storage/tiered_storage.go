@@ -508,36 +508,50 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	if handleCount == 0 {
 		//is file cloudbacked
 		c.mu.Lock()
-		isCloudBacked := c.fileMap[options.Handle.Path].cloudBacked
+		node, _ := c.fileMap[options.Handle.Path]
 		c.mu.Unlock()
-		if isCloudBacked {
+
+		if node.cloudBacked {
 			//File was modified
 			if options.Handle.Dirty() {
 				//Upload
-				err := c.uploadFile(options.Handle.Path)
+				err := c.uploadCachedFile(options.Handle.Path)
+				if err != nil {
+					log.Err(
+						"TieredStorage::ReleaseFile : upload failed for %s [%v]",
+						options.Handle.Path,
+						err,
+					)
+					options.Handle.Cleanup()
+					return err
+				}
 				//Delete local file copy
+				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
 				c.mu.Lock()
 				delete(c.fileMap, options.Handle.Path)
 				c.mu.Unlock()
 				//Clean Handle
 				options.Handle.Cleanup()
+				os.Remove(localPath)
 			} else {
 				//File was not modified
+				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
 				c.mu.Lock()
 				delete(c.fileMap, options.Handle.Path)
 				c.mu.Unlock()
 				options.Handle.Cleanup()
+				os.Remove(localPath)
+
 			}
 		} else {
 			//local only then just close the file, update LRU add to queue, we will get to this later
 			options.Handle.Cleanup()
 		}
-
 	}
 	return nil
 }
 
-func (c *TieredStorage) uploadFile(name string) error {
+func (c *TieredStorage) uploadCachedFile(name string) error {
 	//get the local path
 	localPath := filepath.Join(c.tmpPath, name)
 	_, err := os.Stat(localPath)
