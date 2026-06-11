@@ -263,6 +263,8 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	flock.Lock()
 	defer flock.Unlock()
 
+	//Go through flag cases, might need to explore O_TRUNC
+
 	//Case 1: OpenFile with O_Create
 	if options.Flags&os.O_CREATE != 0 {
 		//Check if file first exists, then proceed
@@ -286,9 +288,9 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	c.mu.Lock()
 	_, exists := c.fileMap[options.Name]
 	c.mu.Unlock()
-	if exists {
-		//skip to opening file since it should already be in local cache
-	} else {
+
+	//if exists skip to opening file since it should already be in local cache
+	if !exists {
 		//2. Check if File exists in Disk, if not check cloud
 		info, err := os.Stat(filepath.Join(c.tmpPath, options.Name))
 		if err == nil {
@@ -414,7 +416,7 @@ func (c *TieredStorage) isOverLocalLimit(
 	}
 	c.mu.Unlock()
 
-	addedFileSize := newFileSize - existingSize
+	addedFileSize := int64(newFileSize) - int64(existingSize)
 
 	//if we didn't modify the size of the file then
 	if addedFileSize <= 0 {
@@ -508,8 +510,16 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	if handleCount == 0 {
 		//is file cloudbacked
 		c.mu.Lock()
-		node, _ := c.fileMap[options.Handle.Path]
+		node, exists := c.fileMap[options.Handle.Path]
 		c.mu.Unlock()
+
+		if !exists {
+			log.Err(
+				"TieredStorage::ReleaseFile : internal error: file %s not found in map",
+				options.Handle.Path,
+			)
+			return syscall.EBADF
+		}
 
 		if node.cloudBacked {
 			//File was modified
