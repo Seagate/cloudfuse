@@ -28,6 +28,7 @@ package tiered_storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -436,7 +437,21 @@ func (c *TieredStorage) isOverLocalLimit(
 }
 
 func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
-	return 0, nil
+	f := options.Handle.GetFileObject()
+	if f == nil {
+		log.Err(
+			"TieredStorage::ReadInBuffer : error [couldn't find fd in handle] %s",
+			options.Handle.Path,
+		)
+		return 0, syscall.EBADF
+	}
+
+	n, err := f.ReadAt(options.Data, options.Offset)
+	// ReadAt gives an error if it reads fewer bytes than the byte array. We discard that error.
+	if n < len(options.Data) && err == io.EOF {
+		return n, nil
+	}
+	return n, err
 }
 
 func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
