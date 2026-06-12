@@ -2141,17 +2141,18 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// Don't log these by default, as it noticeably affects performance
 	// log.Trace("FileCache::GetAttr : %s", options.Name)
 
-	// For get attr, there are three different path situations we have to potentially handle.
-	// 1. Path in cloud storage but not in local cache
-	// 2. Path not in cloud storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
-	// 3. Path in cloud storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
+	// For get attr, there are four different file state situations we have to potentially handle.
+	// 1. File exists in cloud storage but not in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
+	// 2. File exists in local cache but not in cloud storage (e.g., newly created and not uploaded yet; also supports immutable containers): serve local attributes.
+	// 3. File exists in both cloud storage and local cache: start from cloud attributes, but override size/mtime from local cache.
+	// 4. File is open in local cache and dirty (local cache is the source of truth)
 
 	// If the file is being downloaded or deleted, the size and mod time will be incorrect
 	// wait for download or deletion to complete before getting local file info
 	flock := fc.fileLocks.Get(options.Name)
 	flock.RLock()
 
-	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
+	// Case 4: File in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, localErr := os.Stat(localPath)
 	if localErr != nil && !isNotExist(localErr) {
@@ -2403,35 +2404,27 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			// Recover missing fd on valid handles by reopening the cached path.
-			// This avoids issues when truncate arrives before the handle has a live file object.
+			// File object is missing, try to recover by reopening the file
 			localPath := filepath.Join(fc.tmpPath, options.Name)
-			reopened, reopenErr := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
-			if reopenErr == nil {
-				options.Handle.UnixFD = uint64(reopened.Fd())
-				options.Handle.SetFileObject(reopened)
-				f = reopened
+			newFile, err := common.OpenFile(localPath, os.O_RDWR, 0666)
+			if err != nil {
+				log.Err(
+					"FileCache::TruncateFile : error recovering file object for %s [%v]",
+					options.Handle.Path,
+					err,
+				)
+				return err
 			}
+			options.Handle.SetFileObject(newFile)
+			options.Handle.UnixFD = uint64(newFile.Fd())
+			f = newFile
 		}
 
-		if f == nil {
-			log.Warn(
-				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
-				options.Name,
-			)
-			options.Handle = nil
-		}
-	}
-
-	if options.Handle != nil {
-		f := options.Handle.GetFileObject()
-		if f == nil {
-			return syscall.EBADF
-		}
-
+		// Get current file size before truncating
+		currentSize := int64(0)
 		info, err := f.Stat()
-		if err == nil && info.Size() == options.NewSize {
-			return nil
+		if err == nil {
+			currentSize = info.Size()
 		}
 
 		err = f.Truncate(options.NewSize)
@@ -2444,7 +2437,10 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			return err
 		}
 
-		fc.setHandleDirty(options.Handle)
+		// Only mark handle dirty if the size actually changed
+		if currentSize != options.NewSize {
+			fc.setHandleDirty(options.Handle)
+		}
 
 		return nil
 	}

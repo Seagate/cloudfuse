@@ -490,7 +490,15 @@ func (cl *Client) RenameFile(
 ) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.renameObject(
+	isDir, err := cl.directoryExistsForTarget(ctx, target)
+	if err != nil {
+		return err
+	}
+	if isDir {
+		return syscall.EISDIR
+	}
+
+	err = cl.renameObject(
 		ctx,
 		renameObjectOptions{source: source, target: target, isSymLink: isSymLink},
 	)
@@ -504,6 +512,22 @@ func (cl *Client) RenameFile(
 	}
 
 	return err
+}
+
+func (cl *Client) directoryExistsForTarget(ctx context.Context, name string) (bool, error) {
+	dirName := internal.ExtendDirName(name)
+	if !shouldProbeDirMarker(dirName, false, cl.Config.skipDirProbeOnFileExt) {
+		return false, nil
+	}
+
+	_, err := cl.getDirectoryAttr(ctx, dirName, false)
+	if err == nil {
+		return true, nil
+	}
+	if err == syscall.ENOENT {
+		return false, nil
+	}
+	return false, err
 }
 
 // RenameDirectory : Rename the directory
@@ -593,7 +617,7 @@ func (cl *Client) GetAttr(ctx context.Context, name string) (*internal.ObjAttr, 
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
-		} else if !shouldProbeDirMarker(dirName, explicitDirLookup) {
+		} else if !shouldProbeDirMarker(dirName, explicitDirLookup, cl.Config.skipDirProbeOnFileExt) {
 			// For obvious file-like names, skip expensive directory probing on miss-heavy paths.
 			return nil, syscall.ENOENT
 		}
@@ -624,9 +648,28 @@ func (cl *Client) getDirectoryAttr(
 ) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// When directory markers are enabled, check for the marker first via
-	// HeadObject (cheap, single-key lookup) before falling back to a List.
-	if cl.Config.enableDirMarker && shouldProbeDirMarker(dirName, explicitDirLookup) {
+	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
+
+	// Otherwise, the cloud does not support directory markers, or there is no
+	// marker, so look for an object in the directory.
+	if listErr != nil {
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
+		return nil, listErr
+	}
+	if len(objects) > 0 {
+		// create and return an objAttr for the directory
+		attr := internal.CreateObjAttrDir(dirName)
+		return attr, nil
+	}
+
+	// Only check for explicit empty directory markers when needed.
+	// For file-like names, this saves one extra HeadObject
+	// call on miss-heavy paths that are not directories.
+	if cl.Config.enableDirMarker && shouldProbeDirMarker(
+		dirName,
+		explicitDirLookup,
+		cl.Config.skipDirProbeOnFileExt,
+	) {
 		headAttr, headErr := cl.headObject(ctx, dirName, false, true)
 		if headErr == nil {
 			return headAttr, nil
@@ -644,7 +687,7 @@ func (cl *Client) getDirectoryAttr(
 	// Either directory markers are disabled, there is no marker, or the name
 	// was skipped by shouldProbeDirMarker. Fall back to listing objects under
 	// the prefix to detect a non-empty directory.
-	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
+	objects, _, listErr = cl.List(ctx, dirName, nil, 1)
 	if listErr != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
 		return nil, listErr
@@ -660,38 +703,30 @@ func (cl *Client) getDirectoryAttr(
 	return nil, syscall.ENOENT
 }
 
-var knownFileLikeExtensions = map[string]struct{}{
-	".tmp":  {},
-	".ini":  {},
-	".inf":  {},
-	".db":   {},
-	".guid": {},
-	".nxdb": {},
-	".mkv":  {},
-	".mp4":  {},
-	".avi":  {},
-	".mov":  {},
-	".txt":  {},
-	".doc":  {},
-	".docx": {},
-	".xls":  {},
-	".xlsx": {},
-	".ppt":  {},
-	".pptx": {},
-}
-
-func shouldProbeDirMarker(dirName string, explicitDirLookup bool) bool {
-	if explicitDirLookup {
+func shouldProbeDirMarker(
+	dirName string,
+	explicitDirLookup bool,
+	skipDirProbeOnFileExt bool,
+) bool {
+	if explicitDirLookup || !skipDirProbeOnFileExt {
 		return true
 	}
 	trimmed := internal.TruncateDirName(dirName)
-	base := strings.ToLower(path.Base(trimmed))
-	ext := strings.ToLower(path.Ext(base))
-	if ext == "" {
-		return true
+	base := path.Base(trimmed)
+	return !hasShortAlphaNumExt(base)
+}
+
+func hasShortAlphaNumExt(base string) bool {
+	ext := path.Ext(base)
+	if len(ext) < 2 || len(ext) > 5 {
+		return false
 	}
-	_, isFileLike := knownFileLikeExtensions[ext]
-	return !isFileLike
+	for _, r := range ext[1:] {
+		if (r < '0' || r > '9') && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') {
+			return false
+		}
+	}
+	return true
 }
 
 // Download object data to a file handle.
