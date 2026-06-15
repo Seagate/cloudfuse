@@ -29,15 +29,19 @@ jobs:
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
+            arch: AMD64
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
             os: ubuntu-latest
+            arch: AMD64
             fuselib: libfuse-dev
           - job_name: linux-fuse3-arm
             os: ubuntu-24.04-arm
+            arch: ARM64
             fuselib: libfuse3-dev
           - job_name: linux-fuse2-arm
             os: ubuntu-24.04-arm
+            arch: ARM64
             fuselib: libfuse-dev
 
     runs-on: ${{ matrix.os }}
@@ -45,7 +49,10 @@ jobs:
 
     services:
       localstack:
-        image: localstack/localstack:s3-community-archive
+        image: >-
+          ${{ matrix.arch == 'ARM64' &&
+          'localstack/localstack:s3-community-archive@sha256:0ac7983f6421e5598d57ea476a62339d03fefcd1c7d3523a0ddc89cc8ace3651' ||
+          'localstack/localstack:s3-community-archive@sha256:b14111811a1071ff8e05ea2d89fac68dc3aa115bcb0b053f5502a1dfffba4ff8' }}
         env:
           SERVICES: s3
           AWS_DEFAULT_REGION: us-east-1
