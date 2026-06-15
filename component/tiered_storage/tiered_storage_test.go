@@ -391,6 +391,14 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 	// Verify it was now downloaded to the local tiered storage cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	// Handle should be dirty since it was not created in cloud storage
+	suite.assert.True(handle.Dirty())
+
 	//As of now, the file would be cloudbacked and exist in map
 	suite.tieredStorage.mu.Lock()
 	node, exists := suite.tieredStorage.fileMap[path]
@@ -410,6 +418,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 	suite.assert.NoError(err)
 
 	//tmpFile to hold cloud data || WARNING AI SLOP BELOW, I did not write below this
+	//It just checks if the data is preserved
 	tmpFile, err := os.CreateTemp("", "cloud_verify")
 	suite.assert.NoError(err)
 	defer os.Remove(tmpFile.Name())
@@ -433,6 +442,49 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 		"The cloud version should match the modified local version",
 	)
 
+}
+
+func (suite *tieredStorageTestSuite) TestReadInBuffer() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file14"
+
+	//put file in cloud abd write to it
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	testData := "test data"
+	data := []byte(testData)
+	_, err := suite.loopback.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	//Must check that file by its data is actually in the cloud
+	_, err = suite.tieredStorage.NextComponent().GetAttr(
+		internal.GetAttrOptions{Name: file, RetrieveMetadata: true})
+	suite.assert.NoError(err)
+
+	handle, _ = suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+
+	output := make([]byte, 9)
+	length, err := suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, output)
+	suite.assert.Equal(len(data), length)
+}
+
+func (suite *tieredStorageTestSuite) TestReadInBufferErrorBadFd() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file15"
+	handle := handlemap.NewHandle(file)
+	length, err := suite.tieredStorage.ReadInBuffer(&internal.ReadInBufferOptions{Handle: handle})
+	suite.assert.Error(err)
+	suite.assert.EqualValues(syscall.EBADF, err)
+	suite.assert.Equal(0, length)
 }
 
 func TestTieredStorageTestSuite(t *testing.T) {
