@@ -254,6 +254,49 @@ func (c *TieredStorage) CreateFile(
 }
 
 func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
+	//Lock the file first
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	//Check file map
+	c.mu.Lock()
+	node, exists := c.fileMap[options.Name]
+	c.mu.Unlock()
+	if exists {
+		//local only
+		if !node.cloudBacked {
+			//delete locally
+			localPath := filepath.Join(c.tmpPath, options.Name)
+			c.mu.Lock()
+			delete(c.fileMap, options.Name)
+			c.mu.Unlock()
+			os.Remove(localPath)
+
+			//Both
+		} else {
+			//delete from cloud
+			err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
+			if err != nil {
+				return err
+			}
+			//delete locally
+			localPath := filepath.Join(c.tmpPath, options.Name)
+			c.mu.Lock()
+			delete(c.fileMap, options.Name)
+			c.mu.Unlock()
+			os.Remove(localPath)
+		}
+
+	} else {
+		//check cloud, else return an error
+		err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
+		if err != nil {
+			return syscall.ENOENT
+		}
+		return err
+	}
+
 	return nil
 }
 
