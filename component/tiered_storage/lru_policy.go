@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -29,33 +30,42 @@ type lruQueue struct {
 	uploadChan chan string
 	doneChan   chan struct{}
 
+	cachePath string
+	maxCacheSize float64
+
 	threshold   float64
 	targetRatio float64
 }
 
-func (q *lruQueue) Touch(name string) {}
+func (q *lruQueue) Touch(name string) {
+	q.Enqueue(name)
+}
 
 func (q *lruQueue) Enqueue(name string) {
-	//Maybe have a duplicate checker
+	//Maybe have a duplicate , that touches essentially
 
 	//create node
-	node := &lruNode{name: name}
-	//Add node to map
-	q.nodeMap.Store(name, node)
+	newNode := &lruNode{name: name}
+	val, found := q.nodeMap.LoadOrStore(name, newNode)
+	node := val.(*lruNode)
+
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.head == nil {
-		q.head = node
-		q.tail = node
+
+	if found {
+		// touch
+		q.extractNode(node)
 	} else {
-		q.setHead(node)
+		// brand new node — update tail if list was empty
+		if q.tail == nil {
+			q.tail = node
+		}
 	}
+	q.setHead(node)
 }
 
 func (q *lruQueue) Dequeue(name string) {
 	log.Trace("lruPolicy::removeNode : %s", name)
-
-	var node *lruNode = nil
 
 	val, found := q.nodeMap.LoadAndDelete(name)
 	if !found || val == nil {
@@ -65,7 +75,7 @@ func (q *lruQueue) Dequeue(name string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	node = val.(*lruNode)
+	node := val.(*lruNode)
 
 	q.extractNode(node)
 }
@@ -78,6 +88,28 @@ func (q *lruQueue) setHead(node *lruNode) {
 	q.head = node
 }
 
+func (q *lruQueue) extractNode(node *lruNode) {
+	// remove the node from its position in the list
+
+	// head case
+	if node == q.head {
+		q.head = node.next
+	}
+	//tail case
+	if node == q.tail {
+		q.tail = node.prev
+	}
+
+	if node.next != nil {
+		node.next.prev = node.prev
+	}
+	if node.prev != nil {
+		node.prev.next = node.next
+	}
+	node.prev = nil
+	node.next = nil
+}
+
 func worker() {}
 
 func (q *lruQueue) capacityChecker() {
@@ -88,9 +120,47 @@ func (q *lruQueue) capacityChecker() {
 		select {
 		case <-time.After(2 * time.Minute):
 			// eviction
+			//1. check if we need eviction
+			curSize, err := common.GetUsage(q.cachePath)
+			if err != nil{
+				log.Err("lruPolicy::capacityChecker : failed to get usage: %v", err)
+				continue
+			}
+			if curSize/q.maxCacheSize <= q.threshold{
+				break
+			}
+			for curSize/q.maxCacheSize > q.targetRatio{
+				if !q.eviction() {
+					break
+				}
+				curSize, err = common.GetUsage(q.cachePath)
+				if err != nil {
+					log.Err("lruPolicy::capacityChecker : failed to get usage after eviction: %v", err)
+					return
+				}
+			}
+		}
+
+			//seperate function for eviction
 
 		case <-q.doneChan:
 			return
 		}
+}
+
+func (q *lruQueue) eviction() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	nodeToEvict := q.tail
+	if nodeToEvict == nil {
+		return false
 	}
+
+	//remove node from queue and map
+	q.extractNode(nodeToEvict)
+	q.nodeMap.Delete(nodeToEvict)
+
+	//send node to channel
+	q.uploadChan <- nodeToEvict.name
+	return true
 }
