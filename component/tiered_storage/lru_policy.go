@@ -1,11 +1,14 @@
 package tiered_storage
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 )
 
 type lruNode struct {
@@ -30,11 +33,36 @@ type lruQueue struct {
 	uploadChan chan string
 	doneChan   chan struct{}
 
-	cachePath string
+	cachePath    string
 	maxCacheSize float64
 
 	threshold   float64
 	targetRatio float64
+}
+
+func (q *lruQueue) StartPolicy() error {
+	//initialize queue
+	//channels
+	//timer
+	//go routines
+	q.wg.Add(1)
+	go q.capacityChecker()
+
+	q.wg.Add(q.numWorkers)
+	for i := 0; i < q.numWorkers; i++ {
+		go worker()
+	}
+	return nil
+}
+
+func (q *lruQueue) StopPolicy() error {
+	//initialize queue
+	//channels
+	//timer
+	//go routines
+	close(q.doneChan)
+	q.wg.Wait()
+	return nil
 }
 
 func (q *lruQueue) Touch(name string) {
@@ -110,8 +138,6 @@ func (q *lruQueue) extractNode(node *lruNode) {
 	node.next = nil
 }
 
-func worker() {}
-
 func (q *lruQueue) capacityChecker() {
 	defer q.wg.Done()
 	defer close(q.uploadChan)
@@ -122,30 +148,31 @@ func (q *lruQueue) capacityChecker() {
 			// eviction
 			//1. check if we need eviction
 			curSize, err := common.GetUsage(q.cachePath)
-			if err != nil{
+			if err != nil {
 				log.Err("lruPolicy::capacityChecker : failed to get usage: %v", err)
 				continue
 			}
-			if curSize/q.maxCacheSize <= q.threshold{
+			if curSize/q.maxCacheSize <= q.threshold {
 				break
 			}
-			for curSize/q.maxCacheSize > q.targetRatio{
+			for curSize/q.maxCacheSize > q.targetRatio {
 				if !q.eviction() {
 					break
 				}
 				curSize, err = common.GetUsage(q.cachePath)
 				if err != nil {
-					log.Err("lruPolicy::capacityChecker : failed to get usage after eviction: %v", err)
-					return
+					log.Err(
+						"lruPolicy::capacityChecker : failed to get usage after eviction: %v",
+						err,
+					)
+					continue
 				}
 			}
-		}
-
-			//seperate function for eviction
 
 		case <-q.doneChan:
 			return
 		}
+	}
 }
 
 func (q *lruQueue) eviction() bool {
@@ -158,9 +185,37 @@ func (q *lruQueue) eviction() bool {
 
 	//remove node from queue and map
 	q.extractNode(nodeToEvict)
-	q.nodeMap.Delete(nodeToEvict)
+	q.nodeMap.Delete(nodeToEvict.name)
 
 	//send node to channel
 	q.uploadChan <- nodeToEvict.name
 	return true
 }
+
+func worker() {
+	//get the local path
+	localPath := filepath.Join(c.tmpPath, name)
+	_, err := os.Stat(localPath)
+	if err != nil {
+		log.Err("TieredStorage::uploadFile : %s stat failed [%v]", name, err)
+		return err
+	}
+
+	//open read-only handle/file for uploading
+	f, openErr := common.Open(localPath)
+	if openErr != nil {
+		log.Err("TieredStorage::uploadFile : %s open failed [%v]", name, openErr)
+		return openErr
+	}
+	defer f.Close()
+
+	//upload
+	uploadErr := c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	if uploadErr != nil {
+		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, uploadErr)
+	}
+	return uploadErr
+
+}
+
+//ok so the worker is going to have to take a file and upload to cloud
