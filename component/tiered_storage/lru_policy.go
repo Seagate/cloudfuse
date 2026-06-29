@@ -1,14 +1,12 @@
 package tiered_storage
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
-	"github.com/Seagate/cloudfuse/internal"
 )
 
 type lruNode struct {
@@ -38,11 +36,24 @@ type lruQueue struct {
 
 	threshold   float64
 	targetRatio float64
+
+	//upload function from tiered storage WIRE THIS LATER in tiered storage because we are using a function from there
+	upload func(name string) error
 }
 
 func (q *lruQueue) StartPolicy() error {
+	if q.upload == nil {
+		return fmt.Errorf("lruQueue: upload function not set")
+	}
+	if q.numWorkers <= 0 {
+		return fmt.Errorf("lruQueue: numWorkers must be > 0")
+	}
 	//initialize queue
+	q.head = nil
+	q.tail = nil
 	//channels
+	q.uploadChan = make(chan string, 1000)
+	q.doneChan = make(chan struct{})
 	//timer
 	//go routines
 	q.wg.Add(1)
@@ -50,16 +61,13 @@ func (q *lruQueue) StartPolicy() error {
 
 	q.wg.Add(q.numWorkers)
 	for i := 0; i < q.numWorkers; i++ {
-		go worker()
+		go q.worker()
 	}
 	return nil
 }
 
 func (q *lruQueue) StopPolicy() error {
-	//initialize queue
-	//channels
-	//timer
-	//go routines
+
 	close(q.doneChan)
 	q.wg.Wait()
 	return nil
@@ -177,7 +185,6 @@ func (q *lruQueue) capacityChecker() {
 
 func (q *lruQueue) eviction() bool {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	nodeToEvict := q.tail
 	if nodeToEvict == nil {
 		return false
@@ -186,36 +193,19 @@ func (q *lruQueue) eviction() bool {
 	//remove node from queue and map
 	q.extractNode(nodeToEvict)
 	q.nodeMap.Delete(nodeToEvict.name)
+	q.mu.Unlock()
 
 	//send node to channel
 	q.uploadChan <- nodeToEvict.name
 	return true
 }
 
-func worker() {
-	//get the local path
-	localPath := filepath.Join(c.tmpPath, name)
-	_, err := os.Stat(localPath)
-	if err != nil {
-		log.Err("TieredStorage::uploadFile : %s stat failed [%v]", name, err)
-		return err
+func (q *lruQueue) worker() {
+	defer q.wg.Done()
+	for fileName := range q.uploadChan {
+		err := q.upload(fileName)
+		if err != nil {
+			log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
+		}
 	}
-
-	//open read-only handle/file for uploading
-	f, openErr := common.Open(localPath)
-	if openErr != nil {
-		log.Err("TieredStorage::uploadFile : %s open failed [%v]", name, openErr)
-		return openErr
-	}
-	defer f.Close()
-
-	//upload
-	uploadErr := c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
-	if uploadErr != nil {
-		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, uploadErr)
-	}
-	return uploadErr
-
 }
-
-//ok so the worker is going to have to take a file and upload to cloud
