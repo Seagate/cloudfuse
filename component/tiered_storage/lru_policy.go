@@ -81,13 +81,14 @@ func (q *lruQueue) Touch(name string) {
 func (q *lruQueue) Enqueue(name string) {
 	//Maybe have a duplicate , that touches essentially
 
+	//lock earlier
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	//create node
 	newNode := &lruNode{name: name}
 	val, found := q.nodeMap.LoadOrStore(name, newNode)
 	node := val.(*lruNode)
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
 
 	if found {
 		// touch
@@ -104,13 +105,13 @@ func (q *lruQueue) Enqueue(name string) {
 func (q *lruQueue) Dequeue(name string) {
 	log.Trace("lruPolicy::removeNode : %s", name)
 
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	val, found := q.nodeMap.LoadAndDelete(name)
 	if !found || val == nil {
 		return
 	}
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
 
 	node := val.(*lruNode)
 
@@ -151,9 +152,12 @@ func (q *lruQueue) capacityChecker() {
 	defer q.wg.Done()
 	defer close(q.uploadChan)
 
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+
 	for {
 		select {
-		case <-time.After(2 * time.Minute):
+		case <-ticker.C:
 			// eviction
 
 			//check du , do stat file before, based on difference between DU and
@@ -174,20 +178,11 @@ func (q *lruQueue) capacityChecker() {
 			difference := curSize - q.maxCacheSize*q.targetRatio
 			curEvictedSpace := 0
 			for curEvictedSpace < int(difference) {
-
-				nodeName, evicted := q.eviction()
+				nodeSize, evicted := q.eviction()
 				if !evicted {
 					break
 				}
-
-				localPath := filepath.Join(q.cachePath, nodeName)
-
-				fileInfo, err := os.Stat(localPath)
-				if err != nil {
-					log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
-					break
-				}
-				curEvictedSpace += int(fileInfo.Size())
+				curEvictedSpace += int(nodeSize)
 			}
 
 		case <-q.doneChan:
@@ -196,14 +191,25 @@ func (q *lruQueue) capacityChecker() {
 	}
 }
 
-func (q *lruQueue) eviction() (string, bool) {
+func (q *lruQueue) eviction() (int64, bool) {
 	q.mu.Lock()
 	nodeToEvict := q.tail
 	if nodeToEvict == nil {
-		return "", false
+		return 0, false
 	}
 
-	//ok we have to add in handle checkers/logic
+	//ok we have to add in handle checkers/logic, only evict if no active handle, else touch to skip,
+	//Add in handle logic at the top to choose which node we want
+
+	//Get the node size that we evict
+	localPath := filepath.Join(q.cachePath, nodeToEvict.name)
+
+	fileInfo, err := os.Stat(localPath)
+	if err != nil {
+		log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
+		return 0, false
+	}
+	nodeSize := fileInfo.Size()
 
 	//remove node from queue and map
 	q.extractNode(nodeToEvict)
@@ -211,8 +217,13 @@ func (q *lruQueue) eviction() (string, bool) {
 	q.mu.Unlock()
 
 	//send node to channel
-	q.uploadChan <- nodeToEvict.name
-	return nodeToEvict.name, true
+	select {
+	case q.uploadChan <- nodeToEvict.name:
+	case <-q.doneChan:
+		return 0, false
+	}
+
+	return nodeSize, true
 }
 
 func (q *lruQueue) worker() {
