@@ -2,6 +2,8 @@ package tiered_storage
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -67,7 +69,6 @@ func (q *lruQueue) StartPolicy() error {
 }
 
 func (q *lruQueue) StopPolicy() error {
-
 	close(q.doneChan)
 	q.wg.Wait()
 	return nil
@@ -154,6 +155,9 @@ func (q *lruQueue) capacityChecker() {
 		select {
 		case <-time.After(2 * time.Minute):
 			// eviction
+
+			//check du , do stat file before, based on difference between DU and
+
 			//1. check if we need eviction
 			curSize, err := common.GetUsage(q.cachePath)
 			if err != nil {
@@ -163,18 +167,27 @@ func (q *lruQueue) capacityChecker() {
 			if curSize/q.maxCacheSize <= q.threshold {
 				break
 			}
-			for curSize/q.maxCacheSize > q.targetRatio {
-				if !q.eviction() {
+
+			//targetRatio should always be less than thresholdRatio
+
+			//find difference to evict down to 60%
+			difference := curSize - q.maxCacheSize*q.targetRatio
+			curEvictedSpace := 0
+			for curEvictedSpace < int(difference) {
+
+				nodeName, evicted := q.eviction()
+				if !evicted {
 					break
 				}
-				curSize, err = common.GetUsage(q.cachePath)
+
+				localPath := filepath.Join(q.cachePath, nodeName)
+
+				fileInfo, err := os.Stat(localPath)
 				if err != nil {
-					log.Err(
-						"lruPolicy::capacityChecker : failed to get usage after eviction: %v",
-						err,
-					)
-					continue
+					log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
+					break
 				}
+				curEvictedSpace += int(fileInfo.Size())
 			}
 
 		case <-q.doneChan:
@@ -183,12 +196,14 @@ func (q *lruQueue) capacityChecker() {
 	}
 }
 
-func (q *lruQueue) eviction() bool {
+func (q *lruQueue) eviction() (string, bool) {
 	q.mu.Lock()
 	nodeToEvict := q.tail
 	if nodeToEvict == nil {
-		return false
+		return "", false
 	}
+
+	//ok we have to add in handle checkers/logic
 
 	//remove node from queue and map
 	q.extractNode(nodeToEvict)
@@ -197,7 +212,7 @@ func (q *lruQueue) eviction() bool {
 
 	//send node to channel
 	q.uploadChan <- nodeToEvict.name
-	return true
+	return nodeToEvict.name, true
 }
 
 func (q *lruQueue) worker() {
