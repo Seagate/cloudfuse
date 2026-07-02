@@ -1502,13 +1502,14 @@ func (tui *appContext) createYAMLConfig() error {
 	}
 
 	if tui.config.cacheMode == "file_cache" {
-		timeout, ok := common.IntToUint32(tui.config.cacheRetentionDurationSec)
-		if !ok {
+		if tui.config.cacheRetentionDurationSec < 0 ||
+			tui.config.cacheRetentionDurationSec > math.MaxUint32 {
 			return fmt.Errorf(
 				"cache retention duration is out of range for uint32: %d",
 				tui.config.cacheRetentionDurationSec,
 			)
 		}
+		timeout := uint32(tui.config.cacheRetentionDurationSec)
 
 		config.FileCache = file_cache.FileCacheOptions{
 			TmpPath:       tui.config.cacheLocation,

@@ -29,7 +29,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 )
@@ -126,22 +125,15 @@ func (rdm *remoteDataManager) Process(item *WorkItem) (int, error) {
 func (rdm *remoteDataManager) ReadData(item *WorkItem) (int, error) {
 	// log.Debug("remoteDataManager::ReadData : Scheduling download for %s offset %v", item.Path, item.Block.Offset)
 
-	size, ok := common.Uint64ToInt64(item.DataLen)
-	if !ok {
-		return 0, fmt.Errorf("item data length out of range: %d", item.DataLen)
-	}
-
 	bytesTransferred, err := rdm.GetRemote().ReadInBuffer(&internal.ReadInBufferOptions{
 		Offset: item.Block.Offset,
 		Data:   item.Block.Data,
 		Path:   item.Path,
-		Size:   size,
+		Size:   (int64)(item.DataLen),
 	})
 
 	// send the block download status to stats manager
-	if transferred, ok := common.IntToUint64(bytesTransferred); ok {
-		rdm.sendStats(item.Path, true, transferred, err == nil)
-	}
+	rdm.sendStats(item.Path, true, uint64(bytesTransferred), err == nil)
 
 	return bytesTransferred, err
 }

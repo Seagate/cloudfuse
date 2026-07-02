@@ -1509,29 +1509,19 @@ func (cl *Client) GetCommittedBlockList(
 	for objectSize <= result.Size {
 		if objectSize+partSize >= result.Size {
 			// This is the last block to add
-			lastPartSize, ok := common.Int64ToUint64(result.Size - objectSize)
-			if !ok {
-				return nil, fmt.Errorf("invalid last part size: %d", result.Size-objectSize)
-			}
-
 			blk := internal.CommittedBlock{
 				Id:     base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
 				Offset: objectSize,
-				Size:   lastPartSize,
+				Size:   uint64(result.Size - objectSize),
 			}
 			blockList = append(blockList, blk)
 			break
 		}
 
-		partSizeU64, ok := common.Int64ToUint64(partSize)
-		if !ok {
-			return nil, fmt.Errorf("invalid part size: %d", partSize)
-		}
-
 		blk := internal.CommittedBlock{
 			Id:     base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
 			Offset: objectSize,
-			Size:   partSizeU64,
+			Size:   uint64(partSize),
 		}
 		blockList = append(blockList, blk)
 		objectSize += partSize

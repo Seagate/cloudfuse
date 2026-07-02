@@ -528,13 +528,7 @@ func getFileMode(permissions string) (os.FileMode, error) {
 	}
 
 	for i, c := range rwx {
-		char, ok := common.RuneToByte(c)
-		if !ok {
-			log.Debug("utils::getFileMode : unexpected rune in permission template: %v", c)
-			continue
-		}
-
-		if permissions[i] == char {
+		if permissions[i] == byte(c) {
 			mode |= 1 << uint(9-1-i)
 		} else if permissions[i] != byte('-') {
 			log.Debug(

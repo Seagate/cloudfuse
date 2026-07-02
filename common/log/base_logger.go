@@ -133,11 +133,7 @@ func (l *BaseLogger) SetLogFile(name string) error {
 			l.logFileHandle = f
 			fi, e := f.Stat()
 			if e == nil {
-				if size, ok := common.Int64ToUint64(fi.Size()); ok {
-					l.fileConfig.currentLogSize = size
-				} else {
-					l.fileConfig.currentLogSize = 0
-				}
+				l.fileConfig.currentLogSize = uint64(fi.Size())
 			}
 		}
 	}
@@ -145,11 +141,7 @@ func (l *BaseLogger) SetLogFile(name string) error {
 }
 
 func (l *BaseLogger) SetMaxLogSize(size int) {
-	if val, ok := common.IntToUint64(size); ok {
-		l.fileConfig.LogSize = val * 1024 * 1024
-	} else {
-		l.fileConfig.LogSize = 0
-	}
+	l.fileConfig.LogSize = uint64(size) * 1024 * 1024
 }
 
 func (l *BaseLogger) SetLogFileCount(count int) {
@@ -186,11 +178,7 @@ func (l *BaseLogger) init() error {
 	} else {
 		fi, e := os.Stat(l.fileConfig.LogFile)
 		if e == nil {
-			if size, ok := common.Int64ToUint64(fi.Size()); ok {
-				l.fileConfig.currentLogSize = size
-			} else {
-				l.fileConfig.currentLogSize = 0
-			}
+			l.fileConfig.currentLogSize = uint64(fi.Size())
 		}
 		var err error
 		l.logFileHandle, err = os.OpenFile(

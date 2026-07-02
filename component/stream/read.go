@@ -46,9 +46,9 @@ func (r *ReadCache) Configure(conf StreamOptions) error {
 		r.StreamOnly = true
 		log.Info("ReadCache::Configure : Streamonly set to true")
 	}
-	r.BlockSize = conf.BlockSize * mb
+	r.BlockSize = int64(conf.BlockSize) * mb
 	r.BufferSize = conf.BufferSize * mb
-	r.CachedObjLimit = conf.CachedObjLimit
+	r.CachedObjLimit = int32(conf.CachedObjLimit)
 	r.CachedObjects = 0
 	return nil
 }
@@ -93,7 +93,7 @@ func (r *ReadCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handl
 		handle = handlemap.NewHandle(options.Name)
 	}
 	if !r.StreamOnly {
-		handlemap.CreateCacheObject(r.BufferSize, handle)
+		handlemap.CreateCacheObject(int64(r.BufferSize), handle)
 		if r.CachedObjects >= r.CachedObjLimit {
 			log.Trace(
 				"Stream::OpenFile : file handle limit exceeded - switch handle to stream only mode %s [%v]",

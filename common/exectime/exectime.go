@@ -68,12 +68,7 @@ func (t *Timer) PrintStats() {
 			fmt.Printf("Timer::PrintStats: error writing [%s]\n", err)
 		}
 		for key, stat := range t.statsMap {
-			total := time.Duration(0)
-			if n, ok := durationFromUint64(stat.N); ok {
-				total = stat.Mean() * n
-			} else {
-				total = stat.Mean() * time.Duration(maxDurationUint64)
-			}
+			total := stat.Mean() * time.Duration(stat.N)
 			msg := fmt.Sprintf(
 				"%s: avg=%s, std=%s, total=%s, ops/sec=%f\n",
 				key,

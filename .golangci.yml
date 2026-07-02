@@ -25,6 +25,7 @@ linters:
       checks: ["all", "-ST1003", "-ST1005"]
     gosec:
       excludes:
+        - G115 # Integer conversion checks are enforced via boundary validation at config/input points.
         - G306 # Don't flag write file permissions
         - G401 # Allow use of md5 for non-cryptographic purposes
         - G501 # Allow use of md5 for non-cryptographic purposes

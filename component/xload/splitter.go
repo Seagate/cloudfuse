@@ -150,10 +150,7 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 		if isDir {
 			log.Err("downloadSplitter::Process : %s is a directory", item.Path)
 			return -1, fmt.Errorf("%s is a directory", item.Path)
-		}
-
-		sizeU64, ok := common.Int64ToUint64(size)
-		if ok && item.DataLen == sizeU64 {
+		} else if item.DataLen == uint64(size) {
 			log.Debug(
 				"downloadSplitter::Process : %s will be served from local path, priority %v",
 				item.Path,
@@ -191,12 +188,7 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 	}
 
 	// truncate the file to its size
-	truncateSize, ok := common.Uint64ToInt64(item.DataLen)
-	if !ok {
-		return -1, fmt.Errorf("data length out of range for truncate: %d", item.DataLen)
-	}
-
-	err = item.FileHandle.Truncate(truncateSize)
+	err = item.FileHandle.Truncate(int64(item.DataLen))
 	if err != nil {
 		log.Err(
 			"downloadSplitter::Process : Failed to truncate file %s, so deleting it from local path [%s]",
@@ -219,15 +211,6 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 
 	numBlocks := ((item.DataLen - 1) / ds.blockPool.GetBlockSize()) + 1
 	offset := int64(0)
-	numBlocksInt, ok := common.Uint64ToInt(numBlocks)
-	if !ok {
-		return -1, fmt.Errorf("too many blocks to process: %d", numBlocks)
-	}
-
-	blockSizeInt64, ok := common.Uint64ToInt64(ds.blockPool.GetBlockSize())
-	if !ok {
-		return -1, fmt.Errorf("block size out of range: %d", ds.blockPool.GetBlockSize())
-	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -240,7 +223,7 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 	go func() {
 		defer wg.Done()
 
-		for i := 0; i < numBlocksInt; i++ {
+		for i := 0; i < int(numBlocks); i++ {
 			select {
 			case <-ds.GetThreadPool().ctx.Done(): // check if the thread pool is closed
 				operationSuccess = false
@@ -288,14 +271,14 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 		}
 	}()
 
-	for i := 0; i < numBlocksInt; i++ {
+	for i := 0; i < int(numBlocks); i++ {
 		block := ds.blockPool.GetBlock(item.Priority)
 		if block == nil {
 			responseChannel <- &WorkItem{Err: fmt.Errorf("failed to get block from pool for file %s, offset %v", item.Path, offset)}
 		} else {
 			block.Index = i
 			block.Offset = offset
-			block.Length = blockSizeInt64
+			block.Length = int64(ds.blockPool.GetBlockSize())
 
 			splitItem := &WorkItem{
 				CompName:        ds.GetNext().GetName(),
@@ -320,7 +303,7 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 			}
 		}
 
-		offset += blockSizeInt64
+		offset += int64(ds.blockPool.GetBlockSize())
 	}
 
 	wg.Wait()

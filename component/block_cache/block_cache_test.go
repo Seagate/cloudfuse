@@ -377,12 +377,12 @@ func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 0\n"
 	_, err := setupPipeline(cfg)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "failed to init thread pool")
+	suite.assert.Contains(err.Error(), "invalid parallelism")
 
 	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 1024000\n  mem-size-mb: 20240000\n  prefetch: 12\n  parallelism: 1\n"
 	_, err = setupPipeline(cfg)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "failed to init block pool")
+	suite.assert.Contains(err.Error(), "invalid block size")
 
 	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: ./bctemp \n  disk-size-mb: 100\n  disk-timeout-sec: 0"
 	_, err = setupPipeline(cfg)

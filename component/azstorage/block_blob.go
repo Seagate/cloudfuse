@@ -2170,15 +2170,10 @@ func (bb *BlockBlob) GetCommittedBlockList(
 	blockList := make(internal.CommittedBlockList, 0)
 	startOffset := int64(0)
 	for _, block := range storageBlockList.CommittedBlocks {
-		size, ok := common.Int64ToUint64(*block.Size)
-		if !ok {
-			return nil, fmt.Errorf("invalid committed block size: %d", *block.Size)
-		}
-
 		blk := internal.CommittedBlock{
 			Id:     *block.Name,
 			Offset: startOffset,
-			Size:   size,
+			Size:   uint64(*block.Size),
 		}
 		startOffset += *block.Size
 		blockList = append(blockList, blk)

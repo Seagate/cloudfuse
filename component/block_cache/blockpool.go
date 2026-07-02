@@ -30,7 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -69,11 +68,7 @@ func NewBlockPool(blockSize uint64, memSize uint64) *BlockPool {
 	}
 
 	// Calculate how many blocks can be allocated
-	blockCount, ok := common.Uint64ToUint32(memSize / blockSize)
-	if !ok {
-		log.Err("blockpool::NewBlockPool : block count too large: %v", memSize/blockSize)
-		return nil
-	}
+	blockCount := uint32(memSize / blockSize)
 	highPriority := (blockCount * 10) / 100
 
 	pool := &BlockPool{
@@ -136,14 +131,7 @@ func releaseBlock(ch chan *Block) {
 
 // Usage provides % usage of this block pool
 func (pool *BlockPool) Usage() uint32 {
-	usedCount, ok := common.IntToUint32(
-		len(pool.blocksCh) + len(pool.priorityCh) + len(pool.resetBlockCh),
-	)
-	if !ok {
-		return 100
-	}
-
-	return ((pool.maxBlocks - usedCount) * 100) / pool.maxBlocks
+	return ((pool.maxBlocks - (uint32)(len(pool.blocksCh)+len(pool.priorityCh)+len(pool.resetBlockCh))) * 100) / pool.maxBlocks
 }
 
 // MustGet a Block from the pool, waits until defaultTimeout period before giving up the allocation of the buffer.

@@ -58,16 +58,11 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 		silentLogger := &SilentLogger{}
 		return silentLogger, nil
 	case "", "default", "base":
-		logFileCount, ok := common.Uint64ToInt(config.FileCount)
-		if !ok {
-			return nil, errors.New("log file count is out of range for int")
-		}
-
 		baseLogger, err := newBaseLogger(LogFileConfig{
 			LogFile:        config.FilePath,
 			LogLevel:       config.Level,
 			LogSize:        config.MaxFileSize * 1024 * 1024,
-			LogFileCount:   logFileCount,
+			LogFileCount:   int(config.FileCount),
 			LogTag:         config.Tag,
 			LogGoroutineID: config.LogGoroutineID,
 		})

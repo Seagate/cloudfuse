@@ -30,7 +30,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -115,26 +114,15 @@ func releaseBlocks(ch chan *Block) {
 
 // Usage provides % usage of this block pool
 func (pool *BlockPool) Usage() uint32 {
-	usedCount, ok := common.IntToUint32(len(pool.blocksCh) + len(pool.priorityCh))
-	if !ok {
-		return 100
-	}
-
-	return ((pool.maxBlocks - usedCount) * 100) / pool.maxBlocks
+	return ((pool.maxBlocks - (uint32)(len(pool.blocksCh)+len(pool.priorityCh))) * 100) / pool.maxBlocks
 }
 
 func (pool *BlockPool) GetUsageDetails() (uint32, uint32, uint32, int32) {
-	priority, ok := common.IntToUint32(len(pool.priorityCh))
-	if !ok {
-		priority = ^uint32(0)
-	}
-
-	blocks, ok := common.IntToUint32(len(pool.blocksCh))
-	if !ok {
-		blocks = ^uint32(0)
-	}
-
-	return pool.maxBlocks, priority, blocks, pool.waitLength.Load()
+	return pool.maxBlocks, uint32(
+			len(pool.priorityCh),
+		), uint32(
+			len(pool.blocksCh),
+		), pool.waitLength.Load()
 }
 
 func (pool *BlockPool) GetBlockSize() uint64 {

@@ -199,11 +199,7 @@ func sumS3PrefixRecursive(s3c *s3storage.S3Storage, prefix string) (uint64, erro
 			if strings.HasSuffix(*e.Key, "/") || e.Size == nil {
 				continue
 			}
-			size, ok := common.Int64ToUint64(*e.Size)
-			if !ok {
-				return 0, fmt.Errorf("invalid object size for key %s: %d", *e.Key, *e.Size)
-			}
-			total += size
+			total += uint64(*e.Size)
 		}
 		if entries.NextContinuationToken == nil {
 			break

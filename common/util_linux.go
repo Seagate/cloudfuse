@@ -124,21 +124,16 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 		currentUID = os.Getuid()
 	}
 
-	frSize, ok := Int64ToUint64(stat.Frsize)
-	if !ok {
-		return 0, 0, fmt.Errorf("invalid statfs fragment size: %d", stat.Frsize)
-	}
-
 	var availableSpace uint64
 	if currentUID == 0 {
 		// Sudo  has mounted
-		availableSpace = stat.Bfree * frSize
+		availableSpace = stat.Bfree * uint64(stat.Frsize)
 	} else {
 		// non Sudo has mounted
-		availableSpace = stat.Bavail * frSize
+		availableSpace = stat.Bavail * uint64(stat.Frsize)
 	}
 
-	totalSpace := stat.Blocks * frSize
+	totalSpace := stat.Blocks * uint64(stat.Frsize)
 	usedSpace := float64(totalSpace - availableSpace)
 	return usedSpace, float64(usedSpace) / float64(totalSpace) * 100, nil
 }
