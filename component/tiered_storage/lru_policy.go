@@ -39,6 +39,7 @@ type lruQueue struct {
 	threshold   float64
 	targetRatio float64
 
+	tickerUnit time.Duration
 
 	//Functions to wire later into tiered_storage package
 	//upload function from tiered storage WIRE THIS LATER in tiered storage because we are using a function from there
@@ -47,8 +48,10 @@ type lruQueue struct {
 	FileHasOpenFileHandle func(name string) bool
 
 	//policy.isFileInUse = func(name string) bool {
-    //	return c.fileLocks.Get(name).Count() > 0
+	//	return c.fileLocks.Get(name).Count() > 0
 	//}
+
+	//we also need the filLock map to use
 
 }
 
@@ -90,7 +93,7 @@ func (q *lruQueue) Touch(name string) {
 func (q *lruQueue) Enqueue(name string) {
 	//Maybe have a duplicate , that touches essentially
 
-	//lock earlier 
+	//lock earlier
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -131,7 +134,9 @@ func (q *lruQueue) setHead(node *lruNode) {
 	// insert node at the head
 	node.prev = nil
 	node.next = q.head
-	q.head.prev = node
+	if q.head != nil {
+		q.head.prev = node
+	}
 	q.head = node
 }
 
@@ -161,8 +166,7 @@ func (q *lruQueue) capacityChecker() {
 	defer q.wg.Done()
 	defer close(q.uploadChan)
 
-
-	ticker := time.NewTicker(2 * time.Minute)
+	ticker := time.NewTicker(q.tickerUnit)
 	defer ticker.Stop()
 
 	for {
@@ -205,27 +209,24 @@ func (q *lruQueue) eviction() (int64, bool) {
 	q.mu.Lock()
 	nodeToEvict := q.tail
 	if nodeToEvict == nil {
+		q.mu.Unlock()
 		return 0, false
 	}
 
-	//find the first applicable node 
-	for nodeToEvict!= nil && q.FileHasOpenFileHandle(nodeToEvict.name){
-		prevNode := nodeToEvict.prev 
- 		if q.tail == nil {
-        	q.tail = nodeToEvict
-    	}
-    	q.setHead(nodeToEvict)
+	//find the first applicable node
+	for nodeToEvict != nil && q.FileHasOpenFileHandle(nodeToEvict.name) {
+		prevNode := nodeToEvict.prev
+		q.extractNode(nodeToEvict)
+		q.setHead(nodeToEvict)
 		nodeToEvict = prevNode
 	}
+	//means all files are in use, what if all files are in use so what do we evict then?????time??????
 	if nodeToEvict == nil {
 		q.mu.Unlock()
 		return 0, false
 	}
 
-
-	//ok we have to add in handle checkers/logic, only evict if no active handle, else touch to skip, 
-	//Add in handle logic at the top to choose which node we want
-
+	//right here is where we lock the file, where do we unlock it
 
 	//Get the node size that we evict
 	localPath := filepath.Join(q.cachePath, nodeToEvict.name)
@@ -233,6 +234,7 @@ func (q *lruQueue) eviction() (int64, bool) {
 	fileInfo, err := os.Stat(localPath)
 	if err != nil {
 		log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
+		q.mu.Unlock()
 		return 0, false
 	}
 	nodeSize := fileInfo.Size()
@@ -243,12 +245,12 @@ func (q *lruQueue) eviction() (int64, bool) {
 	q.mu.Unlock()
 
 	//send node to channel
-	select{
+	select {
 	case q.uploadChan <- nodeToEvict.name:
 	case <-q.doneChan:
-		return 0, false 
+		return 0, false
 	}
-	
+
 	return nodeSize, true
 }
 
