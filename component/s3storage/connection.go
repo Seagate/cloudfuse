@@ -57,7 +57,7 @@ type Config struct {
 	disableSymlink            bool
 	disableUsage              bool
 	enableDirMarker           bool
-	skipDirProbeOnFileExt     bool
+	requireDirMarkers         bool
 	healthCheckInterval       time.Duration
 }
 

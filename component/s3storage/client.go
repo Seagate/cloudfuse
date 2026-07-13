@@ -36,7 +36,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -516,11 +515,11 @@ func (cl *Client) RenameFile(
 
 func (cl *Client) directoryExistsForTarget(ctx context.Context, name string) (bool, error) {
 	dirName := internal.ExtendDirName(name)
-	if !shouldProbeDirMarker(dirName, false, cl.Config.skipDirProbeOnFileExt) {
-		return false, nil
+	if dirName == "/" {
+		return true, nil
 	}
 
-	_, err := cl.getDirectoryAttr(ctx, dirName, false)
+	_, err := cl.getDirectoryAttr(ctx, dirName)
 	if err == nil {
 		return true, nil
 	}
@@ -607,6 +606,9 @@ func (cl *Client) GetAttr(ctx context.Context, name string) (*internal.ObjAttr, 
 	log.Trace("Client::GetAttr : name %s", name)
 	explicitDirLookup := strings.HasSuffix(name, "/")
 	dirName := internal.ExtendDirName(name)
+	if dirName == "/" {
+		return internal.CreateObjAttrDir(dirName), nil
+	}
 
 	// first let's suppose the caller is looking for a file
 	// so if this was called with a trailing slash, don't look for an object
@@ -617,14 +619,11 @@ func (cl *Client) GetAttr(ctx context.Context, name string) (*internal.ObjAttr, 
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
-		} else if !shouldProbeDirMarker(dirName, explicitDirLookup, cl.Config.skipDirProbeOnFileExt) {
-			// For obvious file-like names, skip expensive directory probing on miss-heavy paths.
-			return nil, syscall.ENOENT
 		}
 	}
 
 	// now search for that as a directory
-	return cl.getDirectoryAttr(ctx, dirName, explicitDirLookup)
+	return cl.getDirectoryAttr(ctx, dirName)
 }
 
 // Get attributes for the given file path.
@@ -641,92 +640,46 @@ func (cl *Client) getFileAttr(ctx context.Context, name string) (*internal.ObjAt
 	return object, err
 }
 
-func (cl *Client) getDirectoryAttr(
-	ctx context.Context,
-	dirName string,
-	explicitDirLookup bool,
-) (*internal.ObjAttr, error) {
+func (cl *Client) getDirectoryAttr(ctx context.Context, dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
+	if cl.Config.requireDirMarkers {
+		return cl.getDirMarkerAttr(ctx, dirName)
+	}
 
 	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
-
-	// Otherwise, the cloud does not support directory markers, or there is no
-	// marker, so look for an object in the directory.
 	if listErr != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
 		return nil, listErr
 	}
 	if len(objects) > 0 {
-		// create and return an objAttr for the directory
-		attr := internal.CreateObjAttrDir(dirName)
-		return attr, nil
+		return internal.CreateObjAttrDir(dirName), nil
 	}
 
-	// Only check for explicit empty directory markers when needed.
-	// For file-like names, this saves one extra HeadObject
-	// call on miss-heavy paths that are not directories.
-	if cl.Config.enableDirMarker && shouldProbeDirMarker(
-		dirName,
-		explicitDirLookup,
-		cl.Config.skipDirProbeOnFileExt,
-	) {
-		headAttr, headErr := cl.headObject(ctx, dirName, false, true)
-		if headErr == nil {
-			return headAttr, nil
-		}
-		if headErr != syscall.ENOENT {
-			log.Err(
-				"Client::getDirectoryAttr : HeadObject(%s) failed. Here's why: %v",
-				dirName,
-				headErr,
-			)
-			return nil, headErr
-		}
+	// List does not return an empty marker as a child of itself. Probe it
+	// separately when marker support is enabled.
+	if cl.Config.enableDirMarker {
+		return cl.getDirMarkerAttr(ctx, dirName)
 	}
 
-	// Either directory markers are disabled, there is no marker, or the name
-	// was skipped by shouldProbeDirMarker. Fall back to listing objects under
-	// the prefix to detect a non-empty directory.
-	objects, _, listErr = cl.List(ctx, dirName, nil, 1)
-	if listErr != nil {
-		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
-		return nil, listErr
-	}
-	if len(objects) > 0 {
-		// create and return an objAttr for the directory
-		attr := internal.CreateObjAttrDir(dirName)
-		return attr, nil
-	}
-
-	// directory not found in bucket
 	log.Err("Client::getDirectoryAttr : not found: %s", dirName)
 	return nil, syscall.ENOENT
 }
 
-func shouldProbeDirMarker(
-	dirName string,
-	explicitDirLookup bool,
-	skipDirProbeOnFileExt bool,
-) bool {
-	if explicitDirLookup || !skipDirProbeOnFileExt {
-		return true
+func (cl *Client) getDirMarkerAttr(ctx context.Context, dirName string) (*internal.ObjAttr, error) {
+	headAttr, headErr := cl.headObject(ctx, dirName, false, true)
+	if headErr == nil {
+		return headAttr, nil
 	}
-	trimmed := internal.TruncateDirName(dirName)
-	base := path.Base(trimmed)
-	return !hasShortAlphaNumExt(base)
-}
-
-func hasShortAlphaNumExt(base string) bool {
-	ext := path.Ext(base)
-	if len(ext) < 2 || len(ext) > 5 {
-		return false
+	if headErr != syscall.ENOENT {
+		log.Err(
+			"Client::getDirMarkerAttr : HeadObject(%s) failed. Here's why: %v",
+			dirName,
+			headErr,
+		)
+		return nil, headErr
 	}
-	for _, r := range ext[1:] {
-		if (r < '0' || r > '9') && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') {
-			return false
-		}
-	}
-	return true
+	log.Err("Client::getDirMarkerAttr : not found: %s", dirName)
+	return nil, syscall.ENOENT
 }
 
 // Download object data to a file handle.
