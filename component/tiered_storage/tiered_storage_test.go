@@ -487,6 +487,110 @@ func (suite *tieredStorageTestSuite) TestReadInBufferErrorBadFd() {
 	suite.assert.Equal(0, length)
 }
 
+func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
+	defer suite.cleanupTest()
+	path := "file16"
+
+	//put file in cloud
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	err := suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	//open file through tiered storage, should succeed and return a handle with correct path
+	handle, openErr := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{
+			Name:  path,
+			Flags: os.O_RDWR,
+			Mode:  0666, //random mode, since we didn't do the other stuff yet
+		},
+	)
+	suite.assert.NoError(openErr)
+
+	// Verify it was now downloaded to the local tiered storage cache + in map
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.tieredStorage.mu.Lock()
+	node, exists := suite.tieredStorage.fileMap[path]
+	suite.tieredStorage.mu.Unlock()
+	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
+	suite.assert.True(exists, "File should be tracked in the fileMap")
+
+	//1. Write to handle
+	testData := "test data"
+	data := []byte(testData)
+	length, err := suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), length)
+
+	//check the handle is dirty
+	suite.assert.True(handle.Dirty())
+
+	//2. New Read Handle to same file
+	handle2, openErr := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{
+			Name:  path,
+			Flags: os.O_RDWR,
+			Mode:  0666, //random mode, since we didn't do the other stuff yet
+		},
+	)
+	suite.assert.NoError(openErr)
+	output := make([]byte, 9)
+	length, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: handle2, Offset: 0, Data: output},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, output)
+	suite.assert.Equal(len(data), length)
+
+	//3. Release The write handle, should still be in local with a dirty handle
+	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.False(os.IsNotExist(err), "File should not be uploaded")
+
+	//check still dirty
+	suite.assert.False(handle2.Dirty())
+	suite.assert.False(handle.Dirty())
+
+	suite.tieredStorage.mu.Lock()
+	node, _ = suite.tieredStorage.fileMap[path]
+	suite.tieredStorage.mu.Unlock()
+
+	suite.assert.True(node.isDirty, "File should be marked as dirty")
+
+	//4. Release the read should upload to cloud
+	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle2})
+	suite.assert.NoError(err)
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.True(os.IsNotExist(err), "File should be deleted from cache after release")
+
+	//5. Check data
+	//It just checks if the data is preserved
+	tmpFile, err := os.CreateTemp("", "cloud_verify")
+	suite.assert.NoError(err)
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	// 2. Copy from the cloud (loopback) to the temporary file
+	err = suite.loopback.CopyToFile(internal.CopyToFileOptions{
+		Name:   path,
+		Offset: 0,
+		Count:  0, // 0 usually means the whole file
+		File:   tmpFile,
+	})
+	suite.assert.NoError(err)
+
+	// 3. Read the data back from the temp file and verify
+	dataFromCloud, err := os.ReadFile(tmpFile.Name())
+	suite.assert.NoError(err)
+	suite.assert.Equal(
+		data,
+		dataFromCloud,
+		"The cloud version should match the modified local version",
+	)
+}
+
 func TestTieredStorageTestSuite(t *testing.T) {
 	suite.Run(t, new(tieredStorageTestSuite))
 }

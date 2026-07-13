@@ -71,6 +71,7 @@ type FileNode struct {
 	prev        *FileNode
 	next        *FileNode
 	cloudBacked bool
+	isDirty     bool
 	// Add more attributes as needed, e.g., last accessed time, etc.
 }
 
@@ -223,6 +224,7 @@ func (c *TieredStorage) createFileUnlocked(
 		name:        options.Name,
 		size:        uint64(0),
 		cloudBacked: false,
+		isDirty:     true,
 	}
 	c.mu.Lock()
 	c.fileMap[options.Name] = node
@@ -535,6 +537,7 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		c.mu.Lock()
 		if node, ok := c.fileMap[options.Handle.Path]; ok {
 			node.size = uint64(newSize)
+			node.isDirty = true
 		}
 		c.mu.Unlock()
 	} else {
@@ -562,8 +565,20 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	//Dec Handle First
+	//Dec Handle Count First
 	flock.Dec()
+
+	//close file associated with handle
+	if f := options.Handle.GetFileObject(); f != nil {
+		f.Close()
+	}
+
+	//clean handle state
+	c.clearHandleDirty(options.Handle)
+	options.Handle.Cleanup()
+
+	//remove from global handle map
+	handlemap.Delete(options.Handle.ID)
 
 	//Check if this is the last file handle
 	handleCount := flock.Count()
@@ -585,7 +600,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 		if node.cloudBacked {
 			//File was modified
-			if options.Handle.Dirty() {
+			if node.isDirty {
 				//Upload
 				err := c.uploadCachedFile(options.Handle.Path)
 				if err != nil {
@@ -594,30 +609,17 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 						options.Handle.Path,
 						err,
 					)
-					options.Handle.Cleanup()
 					return err
 				}
-				//Delete local file copy
-				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-				c.mu.Lock()
-				delete(c.fileMap, options.Handle.Path)
-				c.mu.Unlock()
-				//Clean Handle
-				options.Handle.Cleanup()
-				os.Remove(localPath)
-			} else {
-				//File was not modified
-				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-				c.mu.Lock()
-				delete(c.fileMap, options.Handle.Path)
-				c.mu.Unlock()
-				options.Handle.Cleanup()
-				os.Remove(localPath)
-
 			}
+			// Whether File was not modified or not, delete local file copy
+			localPath := filepath.Join(c.tmpPath, options.Handle.Path)
+			c.mu.Lock()
+			delete(c.fileMap, options.Handle.Path)
+			c.mu.Unlock()
+			os.Remove(localPath)
 		} else {
 			//local only then just close the file, update LRU add to queue, we will get to this later
-			options.Handle.Cleanup()
 		}
 	}
 	return nil
