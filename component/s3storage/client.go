@@ -655,8 +655,6 @@ func (cl *Client) getDirectoryAttr(ctx context.Context, dirName string) (*intern
 		return internal.CreateObjAttrDir(dirName), nil
 	}
 
-	// List does not return an empty marker as a child of itself. Probe it
-	// separately when marker support is enabled.
 	if cl.Config.enableDirMarker {
 		return cl.getDirMarkerAttr(ctx, dirName)
 	}

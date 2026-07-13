@@ -2413,7 +2413,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 					options.Handle.Path,
 					err,
 				)
-				return err
+				return syscall.EBADF
 			}
 			options.Handle.SetFileObject(newFile)
 			options.Handle.UnixFD = uint64(newFile.Fd())
