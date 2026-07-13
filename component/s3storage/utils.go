@@ -27,7 +27,7 @@ package s3storage
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"

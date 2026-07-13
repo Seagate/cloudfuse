@@ -27,7 +27,7 @@ package stats_manager
 
 import (
 	"bytes"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"strings"
 	"time"

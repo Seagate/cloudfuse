@@ -33,7 +33,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"io/fs"

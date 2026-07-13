@@ -27,7 +27,7 @@ package stats_manager
 
 import (
 	"bufio"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"os"
 	"strings"

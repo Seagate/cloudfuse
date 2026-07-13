@@ -26,7 +26,8 @@
 package internal
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -95,7 +96,7 @@ func (se *StatsExporter) Destroy() {
 
 	// write remaining data to the output file
 	for i, op := range se.outputList {
-		jsonData, err := json.MarshalIndent(op, "", "\t")
+		jsonData, err := json.Marshal(op, jsontext.WithIndent("\t"), jsontext.WithIndentPrefix(""))
 		if err != nil {
 			log.Err("stats_exporter::Destroy : unable to marshal [%v]", err)
 		}
@@ -198,7 +199,7 @@ func (se *StatsExporter) checkInList(t string) int {
 
 func (se *StatsExporter) addToOutputFile(op *Output) error {
 	log.Debug("stats_exporter::addToOutputFile : Writing to output file")
-	jsonData, err := json.MarshalIndent(op, "", "\t")
+	jsonData, err := json.Marshal(op, jsontext.WithIndent("\t"), jsontext.WithIndentPrefix(""))
 	if err != nil {
 		log.Err("stats_exporter::addToOutputFile : unable to marshal [%v]", err)
 		return err

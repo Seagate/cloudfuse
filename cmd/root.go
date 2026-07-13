@@ -27,7 +27,7 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -124,7 +124,7 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	}
 
 	var rel GithubApiReleaseData
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &rel); err != nil {
 		return nil, err
 	}
 

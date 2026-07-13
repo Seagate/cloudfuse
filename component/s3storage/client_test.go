@@ -30,7 +30,7 @@ package s3storage
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"math/rand/v2"
