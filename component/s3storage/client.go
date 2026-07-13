@@ -167,8 +167,7 @@ func (cl *Client) Configure(cfg Config) error {
 	)
 
 	if err != nil {
-		var e config.SharedConfigProfileNotExistError
-		if errors.As(err, &e) {
+		if _, ok := errors.AsType[config.SharedConfigProfileNotExistError](err); ok {
 			// If a config profile is provided the sdk checks that it exists, otherwise it fails and
 			// does not try other credentials. So try the other ones here if the profile does not exist
 			defaultConfig, err = config.LoadDefaultConfig(
@@ -203,10 +202,8 @@ func (cl *Client) Configure(cfg Config) error {
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
 
-		var oe *smithy.OperationError
-		if errors.As(err, &oe) {
-			var re *awsHttp.ResponseError
-			if errors.As(err, &re) {
+		if _, ok := errors.AsType[*smithy.OperationError](err); ok {
+			if re, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 				// Endpoint is invalid or could not connect to endpoint
 				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
 					log.Err(
@@ -218,8 +215,7 @@ func (cl *Client) Configure(cfg Config) error {
 			}
 		}
 
-		var ae smithy.APIError
-		if errors.As(err, &ae) {
+		if ae, ok := errors.AsType[smithy.APIError](err); ok {
 			// If error is forbidden, then credentials were incorrect
 			if ae.ErrorCode() == "Forbidden" || ae.ErrorCode() == "AccessDenied" {
 				return errInvalidCredential

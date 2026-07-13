@@ -29,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Seagate/cloudfuse/common/log"
 )
@@ -122,8 +123,8 @@ func (p *Pipeline) Start(ctx context.Context) (err error) {
 
 	var errs []error
 
-	for i := len(p.components) - 1; i >= 0; i-- {
-		if err = p.components[i].Start(ctx); err != nil {
+	for i, v := range slices.Backward(p.components) {
+		if err = v.Start(ctx); err != nil {
 			errs = append(errs, err)
 			// stop all the upstream components before returning, f.e., this would prevent the upstream components
 			// to use the logger after it is destroyed.

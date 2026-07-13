@@ -2909,7 +2909,7 @@ func (suite *fileCacheTestSuite) TestServicePendingOpsProcessesPendingOnline() {
 
 	suite.fileCache.addPendingOp(name, pendingFlags{})
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		_, pending := suite.fileCache.pendingOps.Load(name)
 		if !pending {
 			break
@@ -3169,7 +3169,7 @@ loopbackfs:
 	// Verify updated data was uploaded - poll for the update
 	expectedData := append(data1, updatedData...)
 	var cloudData []byte
-	for i := 0; i < 300; i++ {
+	for range 300 {
 		cloudData, err = os.ReadFile(filepath.Join(suite.fake_storage_path, file1))
 		if err == nil && len(cloudData) == len(expectedData) {
 			break

@@ -51,19 +51,22 @@ type StreamConnection interface {
 // NewAzStorageConnection : Based on account type create respective AzConnection Object
 func NewStreamConnection(cfg StreamOptions, stream *Stream) StreamConnection {
 	if cfg.readOnly {
-		r := ReadCache{}
-		r.Stream = stream
+		r := ReadCache{
+			Stream: stream,
+		}
 		_ = r.Configure(cfg)
 		return &r
 	}
 	if cfg.FileCaching {
-		rw := ReadWriteFilenameCache{}
-		rw.Stream = stream
+		rw := ReadWriteFilenameCache{
+			Stream: stream,
+		}
 		_ = rw.Configure(cfg)
 		return &rw
 	}
-	rw := ReadWriteCache{}
-	rw.Stream = stream
+	rw := ReadWriteCache{
+		Stream: stream,
+	}
 	_ = rw.Configure(cfg)
 	return &rw
 }

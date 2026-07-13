@@ -111,20 +111,21 @@ func (suite *hmonTestSuite) TestValidateHmonOptions() {
 func (suite *hmonTestSuite) TestBuildHmonCliParams() {
 	defer suite.cleanupTest()
 
-	options = mountOptions{}
-	options.MonitorOpt = monitorOptions{
-		EnableMon: true,
-		DisableList: []string{
-			hmcommon.CloudfuseStats,
-			hmcommon.CpuProfiler,
-			hmcommon.MemoryProfiler,
-			hmcommon.NetworkProfiler,
-			hmcommon.FileCacheMon,
-			"invalid_monitor",
+	options = mountOptions{
+		MonitorOpt: monitorOptions{
+			EnableMon: true,
+			DisableList: []string{
+				hmcommon.CloudfuseStats,
+				hmcommon.CpuProfiler,
+				hmcommon.MemoryProfiler,
+				hmcommon.NetworkProfiler,
+				hmcommon.FileCacheMon,
+				"invalid_monitor",
+			},
+			CfsPollInterval: 10,
+			ProcMonInterval: 10,
+			OutputPath:      "/tmp/health_monitor",
 		},
-		CfsPollInterval: 10,
-		ProcMonInterval: 10,
-		OutputPath:      "/tmp/health_monitor",
 	}
 	cacheMonitorOptions = file_cache.FileCacheOptions{
 		TmpPath:   "/tmp/file_cache",

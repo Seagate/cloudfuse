@@ -84,12 +84,10 @@ func newDownloadSplitter(opts *downloadSplitterOptions) (*downloadSplitter, erro
 	)
 
 	ds := &downloadSplitter{
-		splitter: splitter{
-			blockPool:   opts.blockPool,
-			path:        opts.path,
-			fileLocks:   opts.fileLocks,
-			validateMD5: opts.validateMD5,
-		},
+		blockPool:   opts.blockPool,
+		path:        opts.path,
+		fileLocks:   opts.fileLocks,
+		validateMD5: opts.validateMD5,
 	}
 
 	ds.SetName(SPLITTER)

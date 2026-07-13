@@ -1,6 +1,6 @@
 module github.com/Seagate/cloudfuse
 
-go 1.26.4
+go 1.27rc2
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0
@@ -19,6 +19,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/montanaflynn/stats v0.9.0
 	github.com/netresearch/go-cron v0.14.0
+	github.com/petermattis/goid v0.0.0-20260113132338-7c7de50cc741
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
 	github.com/sevlyar/go-daemon v0.1.7-0.20251110065050-63665fab0d07
@@ -68,7 +69,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-	github.com/petermattis/goid v0.0.0-20260113132338-7c7de50cc741
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect

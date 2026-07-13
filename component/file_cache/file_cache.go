@@ -1038,9 +1038,9 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	})
 
 	// clean up leftover source directories in reverse order
-	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
-		log.Debug("FileCache::RenameDir : Removing local directory %s", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i])
+	for _, d := range slices.Backward(directoriesToPurge) {
+		log.Debug("FileCache::RenameDir : Removing local directory %s", d)
+		fc.policy.CachePurge(d)
 	}
 
 	// update any lazy open handles (which are not in the local listing)
@@ -1070,8 +1070,8 @@ func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err 
 			return
 		}
 		// collect the object names
-		for i := len(attrSlice) - 1; i >= 0; i-- {
-			attr := attrSlice[i]
+		for _, attr := range slices.Backward(attrSlice) {
+
 			if !attr.IsDir() {
 				objectNames = append(objectNames, attr.Path)
 			} else {

@@ -96,7 +96,7 @@ func GetUsage(path string) (float64, error) {
 		return 0, err
 	}
 
-	size := strings.Split(out.String(), "\t")[0]
+	size, _, _ := strings.Cut(out.String(), "\t")
 	if size == "0" {
 		return 0, nil
 	}

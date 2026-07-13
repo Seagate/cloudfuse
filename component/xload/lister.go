@@ -84,11 +84,9 @@ func newRemoteLister(opts *remoteListerOptions) (*remoteLister, error) {
 	)
 
 	rl := &remoteLister{
-		lister: lister{
-			path:              opts.path,
-			defaultPermission: opts.defaultPermission,
-		},
-		listBlocked: false,
+		path:              opts.path,
+		defaultPermission: opts.defaultPermission,
+		listBlocked:       false,
 	}
 
 	rl.SetName(LISTER)

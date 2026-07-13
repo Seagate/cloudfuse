@@ -58,7 +58,7 @@ type pendingFlags struct {
 
 func (fc *FileCache) configureScheduler() error {
 	// load from config
-	var rawSchedule []map[string]interface{}
+	var rawSchedule []map[string]any
 	err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
 	if err != nil {
 		return err
@@ -237,7 +237,7 @@ func (fc *FileCache) servicePendingOps() {
 			}
 			numFilesProcessed := 0
 			// Iterate over pending ops
-			fc.pendingOps.Range(func(key, value interface{}) bool {
+			fc.pendingOps.Range(func(key, value any) bool {
 				numFilesProcessed++
 				select {
 				case <-fc.componentStopping:

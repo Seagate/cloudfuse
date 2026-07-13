@@ -29,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"slices"
@@ -284,9 +285,7 @@ func cloneMovedAttr(srcAttr *internal.ObjAttr, dstPath string) *internal.ObjAttr
 
 	if srcAttr.Metadata != nil {
 		dstAttr.Metadata = make(map[string]*string, len(srcAttr.Metadata))
-		for key, value := range srcAttr.Metadata {
-			dstAttr.Metadata[key] = value
-		}
+		maps.Copy(dstAttr.Metadata, srcAttr.Metadata)
 	}
 
 	return &dstAttr

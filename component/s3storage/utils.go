@@ -104,8 +104,7 @@ func parseS3Err(err error, attemptedAction string) error {
 
 	// Any error that comes in should have an APIError somewhere in its tree
 	// Find the API error in the error's tree
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 		// There is an error modeling system, which allows us to match errors by type:
 		//   e.g. *types.NoSuchKey, where types is "github.com/aws/aws-sdk-go-v2/service/s3/types"
 		// but sometimes the same errorCode (e.g. "NoSuchKey") will come up but be wrapped in a smithy.GenericAPIError,
