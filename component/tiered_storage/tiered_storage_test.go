@@ -349,11 +349,15 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudNoDirtyFile() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 
 	//As of now, the file would be cloudbacked and exist in map
-	suite.tieredStorage.mu.Lock()
-	node, exists := suite.tieredStorage.fileMap[path]
-	suite.tieredStorage.mu.Unlock()
+	// suite.tieredStorage.mu.Lock()
+	// node, exists := suite.tieredStorage.fileMap[path]
+	// suite.tieredStorage.mu.Unlock()
+
+	val, ok := suite.tieredStorage.fileMap.Load(path)
+	node := val.(*FileNode)
+
 	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
-	suite.assert.True(exists, "File should be tracked in the fileMap")
+	suite.assert.True(ok, "File should be tracked in the fileMap")
 
 	//File should be "cloudBacked" and not dirty so on release the file should be deleted from local and the handle clean
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
@@ -400,9 +404,13 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 	suite.assert.True(handle.Dirty())
 
 	//As of now, the file would be cloudbacked and exist in map
-	suite.tieredStorage.mu.Lock()
-	node, exists := suite.tieredStorage.fileMap[path]
-	suite.tieredStorage.mu.Unlock()
+	// suite.tieredStorage.mu.Lock()
+	// node, exists := suite.tieredStorage.fileMap[path]
+	// suite.tieredStorage.mu.Unlock()
+
+	val, exists := suite.tieredStorage.fileMap.Load(path)
+	node := val.(*FileNode)
+
 	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
 	suite.assert.True(exists, "File should be tracked in the fileMap")
 
@@ -508,9 +516,13 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 
 	// Verify it was now downloaded to the local tiered storage cache + in map
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
-	suite.tieredStorage.mu.Lock()
-	node, exists := suite.tieredStorage.fileMap[path]
-	suite.tieredStorage.mu.Unlock()
+	// suite.tieredStorage.mu.Lock()
+	// node, exists := suite.tieredStorage.fileMap[path]
+	// suite.tieredStorage.mu.Unlock()
+
+	val, exists := suite.tieredStorage.fileMap.Load(path)
+	node := val.(*FileNode)
+
 	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
 	suite.assert.True(exists, "File should be tracked in the fileMap")
 
@@ -553,9 +565,12 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	suite.assert.False(handle2.Dirty())
 	suite.assert.False(handle.Dirty())
 
-	suite.tieredStorage.mu.Lock()
-	node, _ = suite.tieredStorage.fileMap[path]
-	suite.tieredStorage.mu.Unlock()
+	// suite.tieredStorage.mu.Lock()
+	// node, _ = suite.tieredStorage.fileMap[path]
+	// suite.tieredStorage.mu.Unlock()
+
+	val, _ = suite.tieredStorage.fileMap.Load(path)
+	node = val.(*FileNode)
 
 	suite.assert.True(node.isDirty, "File should be marked as dirty")
 
