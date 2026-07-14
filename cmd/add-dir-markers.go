@@ -29,7 +29,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -48,7 +47,6 @@ type addDirMarkersOptions struct {
 type markerScanResult struct {
 	objectsScanned int
 	markersAdded   int
-	missingMarkers []string
 }
 
 var addDirMarkersOpts addDirMarkersOptions
@@ -108,12 +106,20 @@ func runAddDirMarkers(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("unexpected S3 client type")
 	}
 
+	var onMissingMarker func(string)
+	if addDirMarkersOpts.dryRun {
+		onMissingMarker = func(marker string) {
+			fmt.Fprintln(os.Stdout, marker)
+		}
+	}
+
 	result, err := backfillDirectoryMarkers(
 		context.Background(),
 		client.AwsS3Client,
 		s3Options.BucketName,
 		s3Options.PrefixPath,
 		addDirMarkersOpts.dryRun,
+		onMissingMarker,
 	)
 	if err != nil {
 		return err
@@ -122,11 +128,8 @@ func runAddDirMarkers(_ *cobra.Command, _ []string) error {
 	action := "added"
 	if addDirMarkersOpts.dryRun {
 		action = "would add"
-		for _, marker := range result.missingMarkers {
-			fmt.Fprintf(os.Stdout, "%s\n", marker)
-		}
 	}
-	location := strings.Trim(strings.TrimSpace(s3Options.PrefixPath), "/")
+	location := strings.Trim(s3Options.PrefixPath, "/")
 	if location == "" {
 		location = "<bucket root>"
 	}
@@ -161,15 +164,19 @@ func backfillDirectoryMarkers(
 	bucket string,
 	prefix string,
 	dryRun bool,
+	onMissingMarker func(string),
 ) (markerScanResult, error) {
 	result := markerScanResult{}
-	scanPrefix := strings.Trim(strings.TrimSpace(prefix), "/")
+	scanPrefix := strings.Trim(prefix, "/")
 	if scanPrefix != "" {
 		scanPrefix += "/"
 	}
 
-	desired := make(map[string]struct{})
-	existing := make(map[string]struct{})
+	// S3 returns keys in lexicographical order. A directory marker sorts before
+	// all of its descendants, and those descendants are contiguous. Keeping
+	// only markers that are ancestors of the current key bounds memory usage by
+	// directory depth instead of the total number of objects in the bucket.
+	activeMarkers := make(map[string]struct{})
 	var continuationToken *string
 	for {
 		output, err := api.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
@@ -185,82 +192,66 @@ func backfillDirectoryMarkers(
 				continue
 			}
 			result.objectsScanned++
-			recordDirectoryMarkers(*object.Key, scanPrefix, desired, existing)
+			key := aws.ToString(object.Key)
+			if scanPrefix != "" && !strings.HasPrefix(key, scanPrefix) {
+				continue
+			}
+
+			for marker := range activeMarkers {
+				if !strings.HasPrefix(key, marker) {
+					delete(activeMarkers, marker)
+				}
+			}
+			if strings.HasSuffix(key, "/") {
+				activeMarkers[key] = struct{}{}
+			}
+
+			for i := 0; i < len(key); i++ {
+				if key[i] != '/' {
+					continue
+				}
+				marker := key[:i+1]
+				if len(marker) < len(scanPrefix) {
+					continue
+				}
+				if _, found := activeMarkers[marker]; found {
+					continue
+				}
+
+				activeMarkers[marker] = struct{}{}
+				if onMissingMarker != nil {
+					onMissingMarker(marker)
+				}
+				if !dryRun {
+					_, err := api.PutObject(ctx, &s3.PutObjectInput{
+						Bucket:        aws.String(bucket),
+						Key:           aws.String(marker),
+						Body:          bytes.NewReader(nil),
+						ContentLength: aws.Int64(0),
+					})
+					if err != nil {
+						return result, fmt.Errorf(
+							"failed to create directory marker %q: %w",
+							marker,
+							err,
+						)
+					}
+				}
+				result.markersAdded++
+			}
 		}
 		if !aws.ToBool(output.IsTruncated) {
 			break
 		}
 		if output.NextContinuationToken == nil || *output.NextContinuationToken == "" {
-			return result, fmt.Errorf("S3 returned a truncated listing without a continuation token")
+			return result, fmt.Errorf(
+				"S3 returned a truncated listing without a continuation token",
+			)
 		}
 		continuationToken = output.NextContinuationToken
 	}
 
-	result.missingMarkers = missingMarkers(desired, existing)
-	if dryRun {
-		result.markersAdded = len(result.missingMarkers)
-		return result, nil
-	}
-
-	for _, marker := range result.missingMarkers {
-		_, err := api.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:        aws.String(bucket),
-			Key:           aws.String(marker),
-			Body:          bytes.NewReader(nil),
-			ContentLength: aws.Int64(0),
-		})
-		if err != nil {
-			return result, fmt.Errorf("failed to create directory marker %q: %w", marker, err)
-		}
-		result.markersAdded++
-	}
 	return result, nil
-}
-
-func missingDirectoryMarkers(keys []string, scanPrefix string) []string {
-	desired := make(map[string]struct{})
-	existing := make(map[string]struct{})
-	for _, key := range keys {
-		recordDirectoryMarkers(key, scanPrefix, desired, existing)
-	}
-	return missingMarkers(desired, existing)
-}
-
-func recordDirectoryMarkers(
-	key string,
-	scanPrefix string,
-	desired map[string]struct{},
-	existing map[string]struct{},
-) {
-	if scanPrefix != "" && !strings.HasPrefix(key, scanPrefix) {
-		return
-	}
-	if strings.HasSuffix(key, "/") {
-		existing[key] = struct{}{}
-	}
-	for i := 0; i < len(key); i++ {
-		if key[i] != '/' {
-			continue
-		}
-		marker := key[:i+1]
-		if scanPrefix == "" || len(marker) >= len(scanPrefix) {
-			desired[marker] = struct{}{}
-		}
-	}
-}
-
-func missingMarkers(
-	desired map[string]struct{},
-	existing map[string]struct{},
-) []string {
-	missing := make([]string, 0, len(desired))
-	for marker := range desired {
-		if _, found := existing[marker]; !found {
-			missing = append(missing, marker)
-		}
-	}
-	sort.Strings(missing)
-	return missing
 }
 
 func init() {

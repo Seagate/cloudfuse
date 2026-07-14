@@ -37,16 +37,18 @@ import (
 )
 
 type fakeDirectoryMarkerS3 struct {
-	pages   []*s3.ListObjectsV2Output
-	listPos int
-	putKeys []string
+	pages        []*s3.ListObjectsV2Output
+	listPos      int
+	listPrefixes []string
+	putKeys      []string
 }
 
 func (f *fakeDirectoryMarkerS3) ListObjectsV2(
 	_ context.Context,
-	_ *s3.ListObjectsV2Input,
+	input *s3.ListObjectsV2Input,
 	_ ...func(*s3.Options),
 ) (*s3.ListObjectsV2Output, error) {
+	f.listPrefixes = append(f.listPrefixes, aws.ToString(input.Prefix))
 	page := f.pages[f.listPos]
 	f.listPos++
 	return page, nil
@@ -62,39 +64,58 @@ func (f *fakeDirectoryMarkerS3) PutObject(
 	return &s3.PutObjectOutput{}, nil
 }
 
-func TestMissingDirectoryMarkers(t *testing.T) {
-	keys := []string{
-		"photos/2025/",
-		"photos/2025/a.jpg",
-		"photos/2025/events/b.jpg",
-		"photos/empty/",
-		"unrelated/path/file.txt",
-	}
+func TestBackfillDirectoryMarkersRecognizesExistingMarkers(t *testing.T) {
+	api := &fakeDirectoryMarkerS3{pages: []*s3.ListObjectsV2Output{{
+		Contents: []types.Object{
+			{Key: aws.String("photos/2025/")},
+			{Key: aws.String("photos/2025/a.jpg")},
+			{Key: aws.String("photos/2025/events/b.jpg")},
+			{Key: aws.String("photos/empty/")},
+		},
+	}}}
+	var missingMarkers []string
 
-	markers := missingDirectoryMarkers(keys, "photos/")
+	result, err := backfillDirectoryMarkers(
+		context.Background(),
+		api,
+		"bucket",
+		"photos",
+		true,
+		func(marker string) { missingMarkers = append(missingMarkers, marker) },
+	)
 
-	assert.Equal(t, []string{"photos/", "photos/2025/events/"}, markers)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.markersAdded)
+	assert.Equal(t, []string{"photos/", "photos/2025/events/"}, missingMarkers)
 }
 
 func TestBackfillDirectoryMarkersDryRunHandlesPagination(t *testing.T) {
 	api := &fakeDirectoryMarkerS3{pages: []*s3.ListObjectsV2Output{
 		{
-			Contents:              []types.Object{{Key: aws.String("a/b/file.txt")}},
+			Contents:              []types.Object{{Key: aws.String("a/")}},
 			IsTruncated:           aws.Bool(true),
 			NextContinuationToken: aws.String("page-2"),
 		},
 		{
-			Contents:    []types.Object{{Key: aws.String("a/")}},
+			Contents:    []types.Object{{Key: aws.String("a/b/file.txt")}},
 			IsTruncated: aws.Bool(false),
 		},
 	}}
 
-	result, err := backfillDirectoryMarkers(context.Background(), api, "bucket", "", true)
+	var missingMarkers []string
+	result, err := backfillDirectoryMarkers(
+		context.Background(),
+		api,
+		"bucket",
+		"",
+		true,
+		func(marker string) { missingMarkers = append(missingMarkers, marker) },
+	)
 
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.objectsScanned)
 	assert.Equal(t, 1, result.markersAdded)
-	assert.Equal(t, []string{"a/b/"}, result.missingMarkers)
+	assert.Equal(t, []string{"a/b/"}, missingMarkers)
 	assert.Empty(t, api.putKeys)
 }
 
@@ -103,9 +124,36 @@ func TestBackfillDirectoryMarkersCreatesMissingMarkers(t *testing.T) {
 		Contents: []types.Object{{Key: aws.String("one/two/file.txt")}},
 	}}}
 
-	result, err := backfillDirectoryMarkers(context.Background(), api, "bucket", "", false)
+	result, err := backfillDirectoryMarkers(
+		context.Background(),
+		api,
+		"bucket",
+		"",
+		false,
+		nil,
+	)
 
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.markersAdded)
 	assert.Equal(t, []string{"one/", "one/two/"}, api.putKeys)
+}
+
+func TestBackfillDirectoryMarkersPreservesPrefixWhitespace(t *testing.T) {
+	api := &fakeDirectoryMarkerS3{pages: []*s3.ListObjectsV2Output{{
+		Contents: []types.Object{{Key: aws.String(" tenant /child/file.txt")}},
+	}}}
+
+	result, err := backfillDirectoryMarkers(
+		context.Background(),
+		api,
+		"bucket",
+		" tenant ",
+		false,
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.markersAdded)
+	assert.Equal(t, []string{" tenant /"}, api.listPrefixes)
+	assert.Equal(t, []string{" tenant /", " tenant /child/"}, api.putKeys)
 }
