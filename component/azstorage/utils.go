@@ -240,10 +240,9 @@ const (
 // https://github.com/Azure/azure-sdk-for-go/blob/main/sdk/storage/azblob/bloberror/error_codes.go
 // Convert blob storage error to common errors
 func storeBlobErrToErr(err error) uint16 {
-	var respErr *azcore.ResponseError
-	errors.As(err, &respErr)
+	respErr, ok := errors.AsType[*azcore.ResponseError](err)
 
-	if respErr != nil {
+	if ok {
 		switch (bloberror.Code)(respErr.ErrorCode) {
 		case bloberror.BlobAlreadyExists:
 			return ErrFileAlreadyExists
@@ -264,10 +263,9 @@ func storeBlobErrToErr(err error) uint16 {
 
 // Convert datalake storage error to common errors
 func storeDatalakeErrToErr(err error) uint16 {
-	var respErr *azcore.ResponseError
-	errors.As(err, &respErr)
+	respErr, ok := errors.AsType[*azcore.ResponseError](err)
 
-	if respErr != nil {
+	if ok {
 		switch (datalakeerror.StorageErrorCode)(respErr.ErrorCode) {
 		case datalakeerror.PathAlreadyExists:
 			return ErrFileAlreadyExists

@@ -309,13 +309,11 @@ func (cl *Client) filterAuthorizedBuckets(
 	var wg sync.WaitGroup
 	authorizedBuckets := make(chan string, len(bucketList))
 	for _, bucketName := range bucketList {
-		wg.Add(1)
-		go func(bucketName string) {
-			defer wg.Done()
+		wg.Go(func() {
 			if _, err := cl.headBucket(ctx, bucketName); err == nil {
 				authorizedBuckets <- bucketName
 			}
-		}(bucketName)
+		})
 	}
 	// use a go routine to close the channel after all workers finish
 	go func() {

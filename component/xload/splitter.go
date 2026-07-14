@@ -211,16 +211,13 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 	offset := int64(0)
 
 	wg := sync.WaitGroup{}
-	wg.Add(1)
 
 	responseChannel := make(chan *WorkItem, numBlocks)
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
 	operationSuccess := true
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		for i := 0; i < int(numBlocks); i++ {
 			select {
 			case <-ds.GetThreadPool().ctx.Done(): // check if the thread pool is closed
@@ -267,7 +264,7 @@ func (ds *downloadSplitter) Process(item *WorkItem) (int, error) {
 				}
 			}
 		}
-	}()
+	})
 
 	for i := 0; i < int(numBlocks); i++ {
 		block := ds.blockPool.GetBlock(item.Priority)

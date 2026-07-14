@@ -98,13 +98,16 @@ func getPid(cloudfusePid string) (string, error) {
 		if strings.Contains(strOutput, "No Instance") {
 			return "", fmt.Errorf("failed to process PID from %s", cloudfusePid)
 		}
-		lines := strings.Split(strings.TrimSpace(strOutput), "\n")[1:]
-
-		if len(lines) == 0 {
-			return "", fmt.Errorf("failed to process PID from %s", cloudfusePid)
+		lineIndex := 0
+		for line := range strings.SplitSeq(strings.TrimSpace(strOutput), "\n") {
+			if lineIndex == 1 {
+				pid := strings.TrimSpace(line)
+				return pid, nil
+			}
+			lineIndex++
 		}
-		pid := strings.TrimSpace(lines[0])
-		return pid, nil
+
+		return "", fmt.Errorf("failed to process PID from %s", cloudfusePid)
 	}
 
 	psAux := exec.Command("ps", "aux")

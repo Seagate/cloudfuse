@@ -203,9 +203,8 @@ func (dl *Datalake) TestPipeline() error {
 			"Datalake::TestPipeline : Failed to validate account with given auth %s",
 			err.Error(),
 		)
-		var respErr *azcore.ResponseError
-		errors.As(err, &respErr)
-		if respErr != nil {
+		respErr, ok := errors.AsType[*azcore.ResponseError](err)
+		if ok {
 			return fmt.Errorf("Datalake::TestPipeline : [%s]", respErr.ErrorCode)
 		}
 		return err

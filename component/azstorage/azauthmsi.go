@@ -79,8 +79,8 @@ func (azmsi *azAuthMSI) getTokenCredentialUsingCLI() (azcore.TokenCredential, er
 	output, err := cliCmd.Output()
 	if err != nil {
 		msg := stderr.String()
-		var exErr *exec.ExitError
-		if errors.As(err, &exErr) && exErr.ExitCode() == 127 ||
+		exErr, ok := errors.AsType[*exec.ExitError](err)
+		if ok && exErr.ExitCode() == 127 ||
 			strings.HasPrefix(msg, "'az' is not recognized") {
 			msg = "Azure CLI not found on path"
 		}

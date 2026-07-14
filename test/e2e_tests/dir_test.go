@@ -472,10 +472,9 @@ func (suite *dirTestSuite) TestDirListShowsDots() {
 	cmd := exec.Command("ls", "-al", suite.testPath)
 	cliOut, err := cmd.Output()
 	suite.NoError(err)
-	lines := strings.Split(string(cliOut), "\n")
 	foundDot := false
 	foundDotDot := false
-	for _, line := range lines {
+	for line := range strings.SplitSeq(string(cliOut), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
