@@ -105,8 +105,8 @@ github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 h1:6E+4a0GO5zZEnZ
 github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0/go.mod h1:zJYVVT2jmtg6P3p1VtQj7WsuWi/y4VnjVBn7F8KPB3I=
 github.com/montanaflynn/stats v0.9.0 h1:tsBJ0RXwph9BmAuFoCmqGv6e8xa0MENQ8m0ptKq29mQ=
 github.com/montanaflynn/stats v0.9.0/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
-github.com/netresearch/go-cron v0.14.0 h1:CnUt6kGjet0dQL6rc4xmS+q2EbP9BKR9kh4AX5bnc5U=
-github.com/netresearch/go-cron v0.14.0/go.mod h1:79iktHfV90py3jcaFUtWcGSKbZXRev+WwoLMyV5eMvo=
+github.com/netresearch/go-cron v0.15.0 h1:pu+dhMZjBao9m5IpYe0o+zcNFlP94Z7TDHrORQk+/t0=
+github.com/netresearch/go-cron v0.15.0/go.mod h1:79iktHfV90py3jcaFUtWcGSKbZXRev+WwoLMyV5eMvo=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/petermattis/goid v0.0.0-20260113132338-7c7de50cc741 h1:KPpdlQLZcHfTMQRi6bFQ7ogNO0ltFT4PmtwTLW4W+14=
