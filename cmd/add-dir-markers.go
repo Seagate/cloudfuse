@@ -172,10 +172,6 @@ func backfillDirectoryMarkers(
 		scanPrefix += "/"
 	}
 
-	// S3 returns keys in lexicographical order. A directory marker sorts before
-	// all of its descendants, and those descendants are contiguous. Keeping
-	// only markers that are ancestors of the current key bounds memory usage by
-	// directory depth instead of the total number of objects in the bucket.
 	activeMarkers := make(map[string]struct{})
 	var continuationToken *string
 	for {
