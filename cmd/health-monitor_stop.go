@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -60,6 +61,12 @@ or 'stop all' to stop all running monitors.`,
 			)
 		}
 
+		pidNum, err := strconv.Atoi(cloudfusePid)
+		if err != nil || pidNum <= 0 {
+			return fmt.Errorf("invalid cloudfuse pid %q", cloudfusePid)
+		}
+		cloudfusePid = strconv.Itoa(pidNum)
+
 		pid, err := getPid(cloudfusePid)
 		if err != nil {
 			return fmt.Errorf(
@@ -81,6 +88,7 @@ or 'stop all' to stop all running monitors.`,
 // Attempts to get pid of the health monitor
 func getPid(cloudfusePid string) (string, error) {
 	if runtime.GOOS == "windows" {
+		//nolint:gosec // G204: cloudfusePid is validated as positive integer before command construction.
 		cliOut := exec.Command(
 			"wmic",
 			"process",

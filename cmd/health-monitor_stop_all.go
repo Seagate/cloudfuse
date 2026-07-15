@@ -63,6 +63,7 @@ func stopAll() error {
 		}
 		return nil
 	}
+	//nolint:gosec // G204: command and arguments are fixed literals with no external input.
 	cliOut := exec.Command("killall", hmcommon.CfuseMon)
 	_, err := cliOut.Output()
 	if err != nil {
