@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -24,39 +25,54 @@ type lruQueue struct {
 
 	nodeMap sync.Map
 
-	wg         sync.WaitGroup
-	numWorkers int
+	wg            sync.WaitGroup // tracks capacityChecker only
+	workerWg      sync.WaitGroup // tracks worker goroutines
+	numWorkers    int
+	activeWorkers int32
 
 	head *lruNode
 	tail *lruNode
 
-	uploadChan chan string
-	doneChan   chan struct{}
+	uploadChan   chan string
+	doneChan     chan struct{}
+	hallPassChan chan bool
 
-	cachePath    string
-	maxCacheSize float64
+	cachePath         string
+	maxCacheSize      float64
+	totalUploadedSize int64
 
 	threshold   float64
 	targetRatio float64
 
 	tickerUnit time.Duration
 
+	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
+
 	//Functions to wire later into tiered_storage package
 	//upload function from tiered storage WIRE THIS LATER in tiered storage because we are using a function from there
-	upload func(name string) error
+	uploadFn func(name string) error
 
+	//this function is just used for testing
 	FileHasOpenFileHandle func(name string) bool
 
 	//policy.isFileInUse = func(name string) bool {
 	//	return c.fileLocks.Get(name).Count() > 0
 	//}
 
-	//we also need the filLock map to use
+	//we also wire a cleanup function to delete from FileMap and Local
+	cleanupFn func(name string) error
+
+	// //delete locally
+	// 		localPath := filepath.Join(c.tmpPath, options.Name)
+	// 		c.mu.Lock()
+	// 		delete(c.fileMap, options.Name)
+	// 		c.mu.Unlock()
+	// 		os.Remove(localPath)
 
 }
 
 func (q *lruQueue) StartPolicy() error {
-	if q.upload == nil {
+	if q.uploadFn == nil {
 		return fmt.Errorf("lruQueue: upload function not set")
 	}
 	if q.numWorkers <= 0 {
@@ -66,23 +82,25 @@ func (q *lruQueue) StartPolicy() error {
 	q.head = nil
 	q.tail = nil
 	//channels
-	q.uploadChan = make(chan string, 1000)
 	q.doneChan = make(chan struct{})
+	q.hallPassChan = make(chan bool, 1)
+	q.hallPassChan <- true
+
 	//timer
 	//go routines
 	q.wg.Add(1)
 	go q.capacityChecker()
 
-	q.wg.Add(q.numWorkers)
-	for i := 0; i < q.numWorkers; i++ {
-		go q.worker()
-	}
 	return nil
 }
 
 func (q *lruQueue) StopPolicy() error {
 	close(q.doneChan)
+	// Wait for capacityChecker to exit — its deferred close(uploadChan) fires here,
+	// signalling workers that no more jobs are coming.
 	q.wg.Wait()
+	// Now wait for workers to drain whatever remains in uploadChan.
+	q.workerWg.Wait()
 	return nil
 }
 
@@ -173,32 +191,63 @@ func (q *lruQueue) capacityChecker() {
 		select {
 		case <-ticker.C:
 			// eviction
+			select {
+			case <-q.hallPassChan:
 
-			//check du , do stat file before, based on difference between DU and
-
-			//1. check if we need eviction
-			curSize, err := common.GetUsage(q.cachePath)
-			if err != nil {
-				log.Err("lruPolicy::capacityChecker : failed to get usage: %v", err)
-				continue
-			}
-			if curSize/q.maxCacheSize <= q.threshold {
-				break
-			}
-
-			//targetRatio should always be less than thresholdRatio
-
-			//find difference to evict down to 60%
-			difference := curSize - q.maxCacheSize*q.targetRatio
-			curEvictedSpace := 0
-			for curEvictedSpace < int(difference) {
-				nodeSize, evicted := q.eviction()
-				if !evicted {
+				//1. Check if we need eviction
+				curSize, err := common.GetUsage(q.cachePath)
+				if err != nil {
+					log.Err("lruPolicy::capacityChecker : failed to get usage: %v", err)
+					q.hallPassChan <- true
+					continue
+				}
+				if curSize/q.maxCacheSize <= q.threshold {
+					q.hallPassChan <- true
 					break
 				}
-				curEvictedSpace += int(nodeSize)
-			}
+				//targetRatio should always be less than thresholdRatio
 
+				//2. Find difference to evict down to target ratio
+				difference := curSize - q.maxCacheSize*q.targetRatio
+				curEvictedSpace := 0
+				actualEvictedSpace := 0
+				atomic.StoreInt64(&q.totalUploadedSize, 0)
+
+				//3. LRU Eviction to match difference
+				for actualEvictedSpace < int(difference) {
+
+					//initialize channel
+					q.uploadChan = make(chan string, 1000)
+
+					//start workers here
+					q.workerWg.Add(q.numWorkers)
+					for i := 0; i < q.numWorkers; i++ {
+						go q.worker()
+					}
+
+					//populate upload channel for workers
+					for curEvictedSpace < int(difference) {
+						nodeSize, evicted := q.eviction()
+						if !evicted {
+							break
+						}
+						curEvictedSpace += int(nodeSize)
+					}
+
+					//close upload chan and wait for workers to process all remaining jobs
+					close(q.uploadChan)
+					q.workerWg.Wait()
+
+					//update the actual evicted space here
+					actualEvictedSpace = int(q.totalUploadedSize)
+				}
+				//give hall pass back when actual evicted space is satisfied
+				q.hallPassChan <- true
+
+			case <-q.doneChan:
+				return
+
+			}
 		case <-q.doneChan:
 			return
 		}
@@ -213,40 +262,51 @@ func (q *lruQueue) eviction() (int64, bool) {
 		return 0, false
 	}
 
-	//find the first applicable node
-	for nodeToEvict != nil && q.FileHasOpenFileHandle(nodeToEvict.name) {
+	//1. loop through and find the first applicable node
+	for nodeToEvict != nil {
 		prevNode := nodeToEvict.prev
+
+		flock := q.fileLocks.Get(nodeToEvict.name)
+		flock.RLock()
+		handleCount := flock.Count()
+		flock.RUnlock()
+
+		if handleCount == 0 {
+			break
+		}
+
+		//node has open handles touch node
 		q.extractNode(nodeToEvict)
 		q.setHead(nodeToEvict)
 		nodeToEvict = prevNode
 	}
-	//means all files are in use, what if all files are in use so what do we evict then?????time??????
+
+	//all files are in use
 	if nodeToEvict == nil {
 		q.mu.Unlock()
 		return 0, false
 	}
+	name := nodeToEvict.name
 
-	//right here is where we lock the file, where do we unlock it
+	//2. Remove file from queue so not accidentally chosen again
+	q.extractNode(nodeToEvict)
+	q.nodeMap.Delete(name)
 
-	//Get the node size that we evict
-	localPath := filepath.Join(q.cachePath, nodeToEvict.name)
+	q.mu.Unlock()
+
+	//3. Get the node size that we evict
+	localPath := filepath.Join(q.cachePath, name)
 
 	fileInfo, err := os.Stat(localPath)
 	if err != nil {
 		log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
-		q.mu.Unlock()
 		return 0, false
 	}
 	nodeSize := fileInfo.Size()
 
-	//remove node from queue and map
-	q.extractNode(nodeToEvict)
-	q.nodeMap.Delete(nodeToEvict.name)
-	q.mu.Unlock()
-
-	//send node to channel
+	//4. Send node to channel to be uploaded by workers
 	select {
-	case q.uploadChan <- nodeToEvict.name:
+	case q.uploadChan <- name:
 	case <-q.doneChan:
 		return 0, false
 	}
@@ -255,11 +315,38 @@ func (q *lruQueue) eviction() (int64, bool) {
 }
 
 func (q *lruQueue) worker() {
-	defer q.wg.Done()
+	defer q.workerWg.Done()
 	for fileName := range q.uploadChan {
-		err := q.upload(fileName)
+
+		//1. Get handle count and file size
+		flock := q.fileLocks.Get(fileName)
+		flock.Lock()
+		handleCount := flock.Count()
+
+		localPath := filepath.Join(q.cachePath, fileName)
+		fileInfo, err := os.Stat(localPath)
 		if err != nil {
-			log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
+			log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
+		}
+
+		fileSize := fileInfo.Size()
+
+		//2. Check if file eligible to upload
+		if handleCount == 0 {
+			err := q.uploadandCleanFn(fileName)
+			flock.Unlock()
+			if err != nil {
+				log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
+				//if upload fails we have to put the file back to the queue to retry later
+				q.Touch(fileName)
+
+			} else {
+				atomic.AddInt64(&q.totalUploadedSize, fileSize)
+			}
+			//file is in use skip upload touch file back to top of queue
+		} else {
+			flock.Unlock()
+			q.Touch(fileName)
 		}
 	}
 }
