@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -54,7 +55,7 @@ type TieredStorage struct {
 	//fileMap  map[string]*FileNode
 	fileMap sync.Map
 
-	lruQueue *LRUQueue
+	policy *lruQueue
 
 	//use LockMap instead of mutex to allow parallel access to different files
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
@@ -120,12 +121,24 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 
 	// TieredStorage : start code goes here
 
+	//Start the policy
+	if c.policy != nil {
+		if err := c.policy.StartPolicy(); err != nil {
+			log.Err("TieredStorage::Start : failed to start LRU policy [%v]", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Stop : Stop the component functionality and kill all threads started
 func (c *TieredStorage) Stop() error {
 	log.Trace("TieredStorage::Stop : Stopping component %s", c.Name())
+
+	if c.policy != nil {
+		return c.policy.StopPolicy()
+	}
 
 	return nil
 }
@@ -154,6 +167,20 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if err != nil {
 		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
 		return fmt.Errorf("TieredStorage: failed to create tmp path: %w", err)
+	}
+
+	//figure out the maxCache size stuff here, there is just a bunch of configure stuff that we need to figure out
+
+	//Wire in the LRU Policy
+	c.policy = &lruQueue{
+		cachePath:        c.tmpPath,
+		maxCacheSize:     c.maxCacheSize,
+		fileLocks:        c.fileLocks,
+		threshold:        0.8,
+		targetRatio:      0.6,
+		numWorkers:       8,
+		tickerUnit:       time.Millisecond,
+		uploadandCleanFn: c.uploadandCleanFile,
 	}
 
 	return nil
@@ -653,7 +680,10 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 			os.Remove(localPath)
 		} else {
-			//local only then just close the file, update LRU add to queue, we will get to this later
+			// update LRU add to queue because cleaning up the file should be handled once the file is uploaded in LRU policy logic
+			if c.policy != nil {
+				c.policy.Enqueue(options.Handle.Path)
+			}
 		}
 	}
 	return nil
@@ -682,6 +712,21 @@ func (c *TieredStorage) uploadCachedFile(name string) error {
 		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, uploadErr)
 	}
 	return uploadErr
+}
+
+func (c *TieredStorage) uploadandCleanFile(name string) error {
+	err := c.uploadCachedFile(name)
+	if err != nil {
+		return err
+	}
+	localPath := filepath.Join(c.tmpPath, name)
+	c.fileMap.Delete(name)
+	err = os.Remove(localPath)
+	if err != nil {
+		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
+		return err
+	}
+	return nil
 }
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
@@ -758,8 +803,6 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
 func NewTieredStorageComponent() internal.Component {
 	comp := &TieredStorage{
-		//fileMap:   make(map[string]*FileNode),
-		lruQueue:  &LRUQueue{},
 		fileLocks: common.NewLockMap(),
 	}
 	comp.SetName(compName)
