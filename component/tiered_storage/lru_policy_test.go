@@ -72,12 +72,10 @@ func (suite *lruPolicyTestSuite) setupTestHelper(
 		targetRatio:  targetRatio,
 		numWorkers:   numWorkers,
 		tickerUnit:   time.Millisecond,
+		fileLocks:    common.NewLockMap(), // required by eviction() and worker()
 
-		upload: func(name string) error {
+		uploadandCleanFn: func(name string) error {
 			return nil
-		},
-		FileHasOpenFileHandle: func(name string) bool {
-			return false
 		},
 	}
 
@@ -173,7 +171,7 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 
 	//1. Define an arbitrary upload function to test the functionality of the channel
 	var uploaded []string
-	suite.policy.upload = func(name string) error {
+	suite.policy.uploadandCleanFn = func(name string) error {
 		mu.Lock()
 		uploaded = append(uploaded, name)
 		os.Remove(filepath.Join(cache_path, name))
@@ -225,7 +223,7 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 
 	//1. Define an arbitrary upload function to test the functionality of the channel
 	var uploaded []string
-	suite.policy.upload = func(name string) error {
+	suite.policy.uploadandCleanFn = func(name string) error {
 		mu.Lock()
 		uploaded = append(uploaded, name)
 		os.Remove(filepath.Join(cache_path, name))
@@ -233,19 +231,17 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 		return nil
 	}
 
-	//give file1 an openFileHandle, should be touched to the top and skipped, so we expect file2 and 3 to be uploaded
-	suite.policy.FileHasOpenFileHandle = func(name string) bool {
-		if name == "file1" {
-			return true
-		}
-		return false
-	}
-
 	//2. Create files that exceed the 80% threshold, max set at 1MB
 	data := make([]byte, 250*1024)
 	err := os.WriteFile(filepath.Join(cache_path, "file1"), data, 0644)
 	suite.assert.NoError(err)
 	suite.policy.Enqueue("file1")
+
+	//open a file handle for file1 so it should get skipped and touched to the top, file1, file4, file3, file2
+	flock := suite.policy.fileLocks.Get("file1")
+	flock.Lock()
+	flock.Inc()
+	flock.Unlock()
 
 	data = make([]byte, 250*1024)
 	err = os.WriteFile(filepath.Join(cache_path, "file2"), data, 0644)
@@ -262,7 +258,6 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 	suite.assert.NoError(err)
 	suite.policy.Enqueue("file4")
 
-	//file4 should be in upload channel
 	time.Sleep(10 * time.Millisecond)
 
 	mu.Lock()
@@ -288,7 +283,7 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 }
 
 // 7. Test done channel function
-func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionDoneChanDrain() {
+func (suite *lruPolicyTestSuite) TestStopPolicyMidUpload() {
 	//fill up upload chan
 	//call stop policy
 	//make sure all files in upload were indeed uploaded
@@ -297,33 +292,53 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionDoneChanDrain() {
 
 	//1. Define an arbitrary upload function to test the functionality of the channel
 	var uploaded []string
-	suite.policy.upload = func(name string) error {
+	suite.policy.uploadandCleanFn = func(name string) error {
 		mu.Lock()
+		//make upload super slow
+		time.Sleep(200 * time.Millisecond)
 		uploaded = append(uploaded, name)
 		os.Remove(filepath.Join(cache_path, name))
 		mu.Unlock()
 		return nil
 	}
 
-	suite.policy.uploadChan <- "file1"
-	suite.policy.uploadChan <- "file2"
-	suite.policy.uploadChan <- "file3"
-	suite.policy.uploadChan <- "file4"
+	data := make([]byte, 250*1024)
+	err := os.WriteFile(filepath.Join(cache_path, "file1"), data, 0644)
+	suite.assert.NoError(err)
+	suite.policy.Enqueue("file1")
+
+	data = make([]byte, 250*1024)
+	err = os.WriteFile(filepath.Join(cache_path, "file2"), data, 0644)
+	suite.assert.NoError(err)
+	suite.policy.Enqueue("file2")
+
+	data = make([]byte, 250*1024)
+	err = os.WriteFile(filepath.Join(cache_path, "file3"), data, 0644)
+	suite.assert.NoError(err)
+	suite.policy.Enqueue("file3")
+
+	data = make([]byte, 250*1024)
+	err = os.WriteFile(filepath.Join(cache_path, "file4"), data, 0644)
+	suite.assert.NoError(err)
+	suite.policy.Enqueue("file4")
+
+	time.Sleep(5 * time.Millisecond)
 
 	//Stop policy
-	err := suite.policy.StopPolicy()
+	err = suite.policy.StopPolicy()
 	suite.assert.NoError(err)
 
-	time.Sleep(10 * time.Millisecond)
 	mu.Lock()
 	snapshot := make([]string, len(uploaded))
 	copy(snapshot, uploaded)
 	mu.Unlock()
 
+	fmt.Print(snapshot)
+
 	suite.assert.Contains(snapshot, "file1")
 	suite.assert.Contains(snapshot, "file2")
-	suite.assert.Contains(snapshot, "file3")
-	suite.assert.Contains(snapshot, "file4")
+	suite.assert.NotContains(snapshot, "file3")
+	suite.assert.NotContains(snapshot, "file4")
 
 	err = os.RemoveAll(cache_path)
 	suite.assert.NoError(err)

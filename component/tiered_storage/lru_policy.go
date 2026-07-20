@@ -50,17 +50,7 @@ type lruQueue struct {
 
 	//Functions to wire later into tiered_storage package
 	//upload function from tiered storage WIRE THIS LATER in tiered storage because we are using a function from there
-	uploadFn func(name string) error
-
-	//this function is just used for testing
-	FileHasOpenFileHandle func(name string) bool
-
-	//policy.isFileInUse = func(name string) bool {
-	//	return c.fileLocks.Get(name).Count() > 0
-	//}
-
-	//we also wire a cleanup function to delete from FileMap and Local
-	cleanupFn func(name string) error
+	uploadandCleanFn func(name string) error
 
 	// //delete locally
 	// 		localPath := filepath.Join(c.tmpPath, options.Name)
@@ -72,7 +62,7 @@ type lruQueue struct {
 }
 
 func (q *lruQueue) StartPolicy() error {
-	if q.uploadFn == nil {
+	if q.uploadandCleanFn == nil {
 		return fmt.Errorf("lruQueue: upload function not set")
 	}
 	if q.numWorkers <= 0 {
@@ -86,7 +76,6 @@ func (q *lruQueue) StartPolicy() error {
 	q.hallPassChan = make(chan bool, 1)
 	q.hallPassChan <- true
 
-	//timer
 	//go routines
 	q.wg.Add(1)
 	go q.capacityChecker()
@@ -115,21 +104,23 @@ func (q *lruQueue) Enqueue(name string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	//create node
-	newNode := &lruNode{name: name}
-	val, found := q.nodeMap.LoadOrStore(name, newNode)
-	node := val.(*lruNode)
-
+	//search for new node first
+	val, found := q.nodeMap.Load(name)
 	if found {
-		// touch
+		// Node already exists, no need to create a new one, just touch
+		node := val.(*lruNode)
 		q.extractNode(node)
+		q.setHead(node)
 	} else {
-		// brand new node — update tail if list was empty
+		// Node does not exist need to create a new one and put to top
+		newNode := &lruNode{name: name}
+		// if list is empty, set tail pointer to newNode
 		if q.tail == nil {
-			q.tail = node
+			q.tail = newNode
 		}
+		q.nodeMap.Store(name, newNode)
+		q.setHead(newNode)
 	}
-	q.setHead(node)
 }
 
 func (q *lruQueue) Dequeue(name string) {
@@ -182,7 +173,7 @@ func (q *lruQueue) extractNode(node *lruNode) {
 
 func (q *lruQueue) capacityChecker() {
 	defer q.wg.Done()
-	defer close(q.uploadChan)
+	//defer close(q.uploadChan)
 
 	ticker := time.NewTicker(q.tickerUnit)
 	defer ticker.Stop()
@@ -215,6 +206,9 @@ func (q *lruQueue) capacityChecker() {
 
 				//3. LRU Eviction to match difference
 				for actualEvictedSpace < int(difference) {
+					// Start nomination from what's already been confirmed uploaded,
+					// so we only nominate enough new files to cover the remaining gap.
+					curEvictedSpace = actualEvictedSpace
 
 					//initialize channel
 					q.uploadChan = make(chan string, 1000)
@@ -240,6 +234,16 @@ func (q *lruQueue) capacityChecker() {
 
 					//update the actual evicted space here
 					actualEvictedSpace = int(q.totalUploadedSize)
+
+					//if done is closed we need to check shutdown to prevent infinite loop
+					select {
+					case <-q.doneChan:
+						return
+					default:
+					}
+
+					//we can also have a case here if no files were evicted then we can break on this tick if we so choose
+
 				}
 				//give hall pass back when actual evicted space is satisfied
 				q.hallPassChan <- true
@@ -247,6 +251,8 @@ func (q *lruQueue) capacityChecker() {
 			case <-q.doneChan:
 				return
 
+			//default return?
+			default:
 			}
 		case <-q.doneChan:
 			return
