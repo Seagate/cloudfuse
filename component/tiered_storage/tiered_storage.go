@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -51,8 +52,10 @@ import (
 // Common structure for Component
 type TieredStorage struct {
 	internal.BaseComponent
-	fileMap  map[string]*FileNode
-	lruQueue *LRUQueue
+	//fileMap  map[string]*FileNode
+	fileMap sync.Map
+
+	policy *lruQueue
 
 	//use LockMap instead of mutex to allow parallel access to different files
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
@@ -71,6 +74,7 @@ type FileNode struct {
 	prev        *FileNode
 	next        *FileNode
 	cloudBacked bool
+	isDirty     bool
 	// Add more attributes as needed, e.g., last accessed time, etc.
 }
 
@@ -117,12 +121,24 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 
 	// TieredStorage : start code goes here
 
+	//Start the policy
+	if c.policy != nil {
+		if err := c.policy.StartPolicy(); err != nil {
+			log.Err("TieredStorage::Start : failed to start LRU policy [%v]", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Stop : Stop the component functionality and kill all threads started
 func (c *TieredStorage) Stop() error {
 	log.Trace("TieredStorage::Stop : Stopping component %s", c.Name())
+
+	if c.policy != nil {
+		return c.policy.StopPolicy()
+	}
 
 	return nil
 }
@@ -151,6 +167,20 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if err != nil {
 		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
 		return fmt.Errorf("TieredStorage: failed to create tmp path: %w", err)
+	}
+
+	//figure out the maxCache size stuff here, there is just a bunch of configure stuff that we need to figure out
+
+	//Wire in the LRU Policy
+	c.policy = &lruQueue{
+		cachePath:        c.tmpPath,
+		maxCacheSize:     c.maxCacheSize,
+		fileLocks:        c.fileLocks,
+		threshold:        0.8,
+		targetRatio:      0.6,
+		numWorkers:       8,
+		tickerUnit:       time.Millisecond,
+		uploadandCleanFn: c.uploadandCleanFile,
 	}
 
 	return nil
@@ -223,10 +253,13 @@ func (c *TieredStorage) createFileUnlocked(
 		name:        options.Name,
 		size:        uint64(0),
 		cloudBacked: false,
+		isDirty:     true,
 	}
-	c.mu.Lock()
-	c.fileMap[options.Name] = node
-	c.mu.Unlock()
+	// c.mu.Lock()
+	// c.fileMap[options.Name] = node
+	// c.mu.Unlock()
+
+	c.fileMap.Store(options.Name, node)
 
 	//create handle
 	handle := handlemap.NewHandle(options.Name)
@@ -254,6 +287,56 @@ func (c *TieredStorage) CreateFile(
 }
 
 func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
+	//Lock the file first
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	//Check file map
+	// c.mu.Lock()
+	// node, exists := c.fileMap[options.Name]
+	// c.mu.Unlock()
+
+	val, exists := c.fileMap.Load(options.Name)
+
+	if exists {
+		//local only
+		node := val.(*FileNode)
+		if !node.cloudBacked {
+			//delete locally
+			localPath := filepath.Join(c.tmpPath, options.Name)
+			// c.mu.Lock()
+			// delete(c.fileMap, options.Name)
+			// c.mu.Unlock()
+			c.fileMap.Delete(options.Name)
+			os.Remove(localPath)
+
+			//Both
+		} else {
+			//delete from cloud
+			err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
+			if err != nil {
+				return err
+			}
+			//delete locally
+			localPath := filepath.Join(c.tmpPath, options.Name)
+			// c.mu.Lock()
+			// delete(c.fileMap, options.Name)
+			// c.mu.Unlock()
+			c.fileMap.Delete(options.Name)
+
+			os.Remove(localPath)
+		}
+
+	} else {
+		//check cloud, else return an error
+		err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
+		if err != nil {
+			return syscall.ENOENT
+		}
+		return err
+	}
+
 	return nil
 }
 
@@ -269,9 +352,11 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	//Case 1: OpenFile with O_Create
 	if options.Flags&os.O_CREATE != 0 {
 		//Check if file first exists, then proceed
-		c.mu.Lock()
-		_, exists := c.fileMap[options.Name]
-		c.mu.Unlock()
+		// c.mu.Lock()
+		// _, exists := c.fileMap[options.Name]
+		// c.mu.Unlock()
+
+		_, exists := c.fileMap.Load(options.Name)
 		if !exists {
 			handle, err := c.createFileUnlocked(
 				internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
@@ -285,9 +370,10 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	}
 
 	//1. Initial Check Map
-	c.mu.Lock()
-	_, exists := c.fileMap[options.Name]
-	c.mu.Unlock()
+	// c.mu.Lock()
+	// _, exists := c.fileMap[options.Name]
+	// c.mu.Unlock()
+	_, exists := c.fileMap.Load(options.Name)
 
 	//if exists skip to opening file since it should already be in local cache
 	if !exists {
@@ -304,9 +390,12 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 				size:        uint64(info.Size()),
 				cloudBacked: false,
 			}
-			c.mu.Lock()
-			c.fileMap[options.Name] = node
-			c.mu.Unlock()
+			// c.mu.Lock()
+			// c.fileMap[options.Name] = node
+			// c.mu.Unlock()
+
+			c.fileMap.Store(options.Name, node)
+
 		} else {
 			//3. Check if File exists in Cloud
 			info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
@@ -333,9 +422,12 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			if err != nil {
 				return nil, err
 			}
-			c.mu.Lock()
-			c.fileMap[options.Name] = localCopyNode
-			c.mu.Unlock()
+			// c.mu.Lock()
+			// c.fileMap[options.Name] = localCopyNode
+			// c.mu.Unlock()
+
+			c.fileMap.Store(options.Name, localCopyNode)
+
 		}
 
 	}
@@ -415,11 +507,15 @@ func (c *TieredStorage) isOverLocalLimit(
 
 	//find ExistingSize of file if exists
 	existingSize := uint64(0)
-	c.mu.Lock()
-	if node, ok := c.fileMap[fileName]; ok {
-		existingSize = node.size
+	// c.mu.Lock()
+	// if node, ok := c.fileMap[fileName]; ok {
+	// 	existingSize = node.size
+	// }
+	// c.mu.Unlock()
+
+	if val, ok := c.fileMap.Load(fileName); ok {
+		existingSize = val.(*FileNode).size
 	}
-	c.mu.Unlock()
 
 	addedFileSize := int64(newFileSize) - int64(existingSize)
 
@@ -489,11 +585,18 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	if err == nil {
 		c.setHandleDirty(options.Handle)
 		//update file node size in file map
-		c.mu.Lock()
-		if node, ok := c.fileMap[options.Handle.Path]; ok {
+		// c.mu.Lock()
+		// if node, ok := c.fileMap[options.Handle.Path]; ok {
+		// 	node.size = uint64(newSize)
+		// 	node.isDirty = true
+		// }
+		// c.mu.Unlock()
+		if val, ok := c.fileMap.Load(options.Handle.Path); ok {
+			node := val.(*FileNode)
 			node.size = uint64(newSize)
+			node.isDirty = true
 		}
-		c.mu.Unlock()
+
 	} else {
 		log.Err(
 			"TieredStorage::WriteFile : failed to write %s [%s]",
@@ -519,8 +622,20 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	//Dec Handle First
+	//Dec Handle Count First
 	flock.Dec()
+
+	//close file associated with handle
+	if f := options.Handle.GetFileObject(); f != nil {
+		f.Close()
+	}
+
+	//clean handle state
+	c.clearHandleDirty(options.Handle)
+	options.Handle.Cleanup()
+
+	//remove from global handle map
+	handlemap.Delete(options.Handle.ID)
 
 	//Check if this is the last file handle
 	handleCount := flock.Count()
@@ -528,11 +643,13 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	//it is the last handle
 	if handleCount == 0 {
 		//is file cloudbacked
-		c.mu.Lock()
-		node, exists := c.fileMap[options.Handle.Path]
-		c.mu.Unlock()
+		// c.mu.Lock()
+		// node, exists := c.fileMap[options.Handle.Path]
+		// c.mu.Unlock()
 
-		if !exists {
+		val, ok := c.fileMap.Load(options.Handle.Path)
+		node := val.(*FileNode)
+		if !ok {
 			log.Err(
 				"TieredStorage::ReleaseFile : internal error: file %s not found in map",
 				options.Handle.Path,
@@ -542,7 +659,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 		if node.cloudBacked {
 			//File was modified
-			if options.Handle.Dirty() {
+			if node.isDirty {
 				//Upload
 				err := c.uploadCachedFile(options.Handle.Path)
 				if err != nil {
@@ -551,30 +668,22 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 						options.Handle.Path,
 						err,
 					)
-					options.Handle.Cleanup()
 					return err
 				}
-				//Delete local file copy
-				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-				c.mu.Lock()
-				delete(c.fileMap, options.Handle.Path)
-				c.mu.Unlock()
-				//Clean Handle
-				options.Handle.Cleanup()
-				os.Remove(localPath)
-			} else {
-				//File was not modified
-				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-				c.mu.Lock()
-				delete(c.fileMap, options.Handle.Path)
-				c.mu.Unlock()
-				options.Handle.Cleanup()
-				os.Remove(localPath)
-
 			}
+			//Whether File was modified or not, delete local file copy
+			localPath := filepath.Join(c.tmpPath, options.Handle.Path)
+			// c.mu.Lock()
+			// delete(c.fileMap, options.Handle.Path)
+			// c.mu.Unlock()
+			c.fileMap.Delete(options.Handle.Path)
+
+			os.Remove(localPath)
 		} else {
-			//local only then just close the file, update LRU add to queue, we will get to this later
-			options.Handle.Cleanup()
+			// update LRU add to queue because cleaning up the file should be handled once the file is uploaded in LRU policy logic
+			if c.policy != nil {
+				c.policy.Enqueue(options.Handle.Path)
+			}
 		}
 	}
 	return nil
@@ -603,6 +712,21 @@ func (c *TieredStorage) uploadCachedFile(name string) error {
 		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, uploadErr)
 	}
 	return uploadErr
+}
+
+func (c *TieredStorage) uploadandCleanFile(name string) error {
+	err := c.uploadCachedFile(name)
+	if err != nil {
+		return err
+	}
+	localPath := filepath.Join(c.tmpPath, name)
+	c.fileMap.Delete(name)
+	err = os.Remove(localPath)
+	if err != nil {
+		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
+		return err
+	}
+	return nil
 }
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
@@ -679,8 +803,6 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
 func NewTieredStorageComponent() internal.Component {
 	comp := &TieredStorage{
-		fileMap:   make(map[string]*FileNode),
-		lruQueue:  &LRUQueue{},
 		fileLocks: common.NewLockMap(),
 	}
 	comp.SetName(compName)
