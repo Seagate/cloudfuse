@@ -88,8 +88,6 @@ func (q *lruQueue) StopPolicy() error {
 	// Wait for capacityChecker to exit — its deferred close(uploadChan) fires here,
 	// signalling workers that no more jobs are coming.
 	q.wg.Wait()
-	// Now wait for workers to drain whatever remains in uploadChan.
-	q.workerWg.Wait()
 	return nil
 }
 
@@ -203,9 +201,10 @@ func (q *lruQueue) capacityChecker() {
 				curEvictedSpace := 0
 				actualEvictedSpace := 0
 				atomic.StoreInt64(&q.totalUploadedSize, 0)
+				evicFail := false
 
 				//3. LRU Eviction to match difference
-				for actualEvictedSpace < int(difference) {
+				for actualEvictedSpace < int(difference) && !evicFail {
 					// Start nomination from what's already been confirmed uploaded,
 					// so we only nominate enough new files to cover the remaining gap.
 					curEvictedSpace = actualEvictedSpace
@@ -223,6 +222,7 @@ func (q *lruQueue) capacityChecker() {
 					for curEvictedSpace < int(difference) {
 						nodeSize, evicted := q.eviction()
 						if !evicted {
+							evicFail = true
 							break
 						}
 						curEvictedSpace += int(nodeSize)
@@ -343,9 +343,8 @@ func (q *lruQueue) worker() {
 			flock.Unlock()
 			if err != nil {
 				log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
-				//if upload fails we have to put the file back to the queue to retry later
+				//if upload fails we have to put the file back to the queue and map to retry later
 				q.Touch(fileName)
-
 			} else {
 				atomic.AddInt64(&q.totalUploadedSize, fileSize)
 			}

@@ -89,7 +89,8 @@ type LRUQueue struct {
 // Structure defining your config parameters
 type TieredStorageOptions struct {
 	// e.g. var1 uint32 `config:"var1"`
-	TmpPath string `config:"path" yaml:"path,omitempty"`
+	TmpPath   string  `config:"path"        yaml:"path,omitempty"`
+	MaxSizeMB float64 `config:"max-size-mb" yaml:"max-size-mb,omitempty"`
 }
 
 const (
@@ -170,7 +171,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 	}
 
 	//figure out the maxCache size stuff here, there is just a bunch of configure stuff that we need to figure out
-
+	c.maxCacheSize = conf.MaxSizeMB * 1024 * 1024
 	//Wire in the LRU Policy
 	c.policy = &lruQueue{
 		cachePath:        c.tmpPath,

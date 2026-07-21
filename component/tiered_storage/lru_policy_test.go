@@ -200,6 +200,16 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	suite.assert.NoError(err)
 	suite.policy.Enqueue("file4")
 
+	_, ex1 := suite.policy.nodeMap.Load("file1")
+	_, ex2 := suite.policy.nodeMap.Load("file2")
+	_, ex3 := suite.policy.nodeMap.Load("file3")
+	_, ex4 := suite.policy.nodeMap.Load("file4")
+
+	suite.assert.True(ex1)
+	suite.assert.True(ex2)
+	suite.assert.True(ex3)
+	suite.assert.True(ex4)
+
 	//file4 should be in upload channel
 	time.Sleep(10 * time.Millisecond)
 
@@ -214,6 +224,30 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	// file3 and file4 are the most recently used, so they should NOT be evicted
 	suite.assert.NotContains(snapshot, "file3")
 	suite.assert.NotContains(snapshot, "file4")
+
+	fmt.Println("=== nodeMap contents ===")
+	suite.policy.nodeMap.Range(func(key, value interface{}) bool {
+		lruNode := value.(*lruNode)
+		fmt.Printf("  key=%q, name=%q, next=%v, prev=%v\n",
+			key,
+			lruNode.name,
+			lruNode.next,
+			lruNode.prev,
+		)
+		return true // continue iteration
+	})
+	fmt.Println("=== end nodeMap ===")
+
+	_, ex1 = suite.policy.nodeMap.Load("file1")
+	_, ex2 = suite.policy.nodeMap.Load("file2")
+	_, ex3 = suite.policy.nodeMap.Load("file3")
+	_, ex4 = suite.policy.nodeMap.Load("file4")
+
+	suite.assert.False(ex1)
+	suite.assert.False(ex2)
+	suite.assert.True(ex3)
+	suite.assert.True(ex4)
+
 }
 
 // 6. Eviction, file with open handle, file with no open handle,
