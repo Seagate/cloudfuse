@@ -56,6 +56,7 @@ type Options struct {
 	UsePathStyle              bool                    `config:"use-path-style"                yaml:"use-path-style,omitempty"`
 	DisableUsage              bool                    `config:"disable-usage"                 yaml:"disable-usage,omitempty"`
 	EnableDirMarker           bool                    `config:"enable-dir-marker"             yaml:"enable-dir-marker,omitempty"`
+	RequireDirMarkers         bool                    `config:"require-dir-markers"           yaml:"require-dir-markers,omitempty"`
 	HealthCheckIntervalSec    int                     `config:"health-check-interval-sec"     yaml:"health-check-interval-sec,omitempty"`
 }
 
@@ -92,6 +93,13 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	s3.stConfig.usePathStyle = opt.UsePathStyle
 	s3.stConfig.disableUsage = opt.DisableUsage
 	s3.stConfig.enableDirMarker = opt.EnableDirMarker
+	s3.stConfig.requireDirMarkers = opt.RequireDirMarkers
+	if opt.RequireDirMarkers && !opt.EnableDirMarker {
+		return fmt.Errorf(
+			"%w: require-dir-markers requires enable-dir-marker to be true",
+			errInvalidConfigField,
+		)
+	}
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {

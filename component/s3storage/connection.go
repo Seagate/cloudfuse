@@ -57,6 +57,7 @@ type Config struct {
 	disableSymlink            bool
 	disableUsage              bool
 	enableDirMarker           bool
+	requireDirMarkers         bool
 	healthCheckInterval       time.Duration
 }
 

@@ -199,6 +199,7 @@ s3storage:
   use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
+  require-dir-markers: true|false <require every directory to have a marker and never use prefix listings to discover directories. Requires enable-dir-marker.>
   health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>
 
 # Mount all configuration
