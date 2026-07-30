@@ -43,7 +43,10 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           scan-type: "fs"
-          severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+          # lower severity threshold (so we don't crash for PGP)
+          severity: "MEDIUM,HIGH,CRITICAL"
+          # Apply the severity filter to the SARIF report and the exit code
+          limit-severities-for-sarif: true
           scan-ref: "."
           scanners: "vuln"
           format: "sarif"

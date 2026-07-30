@@ -1596,23 +1596,24 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 
-	// Increment the handle count
-	flock.Inc()
-
 	// will opening the file require downloading it?
-	var openErr error
 	openOverwrites := options.Flags&os.O_TRUNC != 0
 	if !downloadRequired || openOverwrites || !cloudConnected {
 		// use the local file to complete the open operation now
 		// flock is already locked, as required by openFileInternal
-		openErr = fc.openFileInternal(handle, flock)
+		if openErr := fc.openFileInternal(handle, flock); openErr != nil {
+			return nil, openErr
+		}
 	} else {
 		// use a lazy open algorithm to avoid downloading unnecessarily (do nothing for now)
 		// update file state
 		flock.LazyOpen = true
 	}
 
-	return handle, openErr
+	// increment the handle count
+	flock.Inc()
+
+	return handle, nil
 }
 
 func (fc *FileCache) exceedsHardLimit(newSize int64, name string, requestType string) bool {
