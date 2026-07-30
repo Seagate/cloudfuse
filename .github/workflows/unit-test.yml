@@ -123,15 +123,20 @@ jobs:
           echo "fusermount3 version:"; fusermount3 --version || true
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           # Newer Ubuntu 24.04 runner images mediate mount/umount through
-          # AppArmor, which makes `fusermount3 -u` fail with
-          # "Operation not permitted" (even for lazy unmount). Unload AppArmor
-          # so FUSE unmount works in CI.
-          echo "AppArmor profiles loaded before teardown:"
-          sudo aa-status --profiled 2>/dev/null || sudo aa-status 2>&1 | head -3 || true
+          # AppArmor, making `fusermount3 -u` fail with "Operation not
+          # permitted" (even lazy unmount). aa-teardown alone leaves many
+          # profiles loaded, so also force-remove any that remain to fully
+          # disable AppArmor mediation for CI.
           sudo aa-teardown || true
           sudo systemctl stop apparmor.service 2>/dev/null || true
-          echo "AppArmor profiles loaded after teardown:"
-          sudo aa-status --profiled 2>/dev/null || echo "(apparmor disabled or unavailable)"
+          if [ -f /sys/kernel/security/apparmor/profiles ]; then
+            sudo bash -c 'while read -r line; do
+              name="${line% (*}"
+              printf "%s" "$name" > /sys/kernel/security/apparmor/.remove 2>/dev/null || true
+            done < /sys/kernel/security/apparmor/profiles'
+          fi
+          echo "AppArmor profiles still loaded:"
+          sudo aa-status --profiled 2>/dev/null || echo "0 (apparmor disabled or unavailable)"
 
       - name: Build
         env:
