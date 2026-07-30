@@ -8,6 +8,7 @@ This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storag
 ### Bug Fixes ###
 
 - [#991](https://github.com/Seagate/cloudfuse/pull/991) Fix issue causing file cache to fill all available capacity
+- [#974](https://github.com/Seagate/cloudfuse/pull/974) Enable go security scanning & fix security issues
 
 ## **2.3.0** ##
 
