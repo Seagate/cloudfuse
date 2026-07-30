@@ -68,6 +68,19 @@ jobs:
         run: |-
           sudo apt-get install fuse3 ${FUSELIB} -y
 
+      # Newer Ubuntu 24.04 runner images restrict unprivileged user namespaces
+      # via AppArmor, which makes `fusermount3 -u` fail with
+      # "Operation not permitted". Relax it so FUSE unmount works in CI.
+      - name: Allow unprivileged FUSE unmount
+        if: runner.os == 'Linux'
+        run: |-
+          echo "fusermount3 version:"; fusermount3 --version || true
+          echo "apparmor_restrict_unprivileged_userns before:"
+          sysctl kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo "(sysctl not present)"
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          echo "apparmor_restrict_unprivileged_userns after:"
+          sysctl kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo "(sysctl not present)"
+
       - name: Install Zig
         if: runner.os == 'Linux'
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
