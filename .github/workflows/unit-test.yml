@@ -115,29 +115,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config fuse3 "$FUSELIB"
 
-      # Newer Ubuntu 24.04 runner images restrict unprivileged user namespaces
-      # Relax the restriction
-      - name: Allow unprivileged FUSE unmount on Linux
-        shell: bash
-        run: |
-          echo "fusermount3 version:"; fusermount3 --version || true
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
-          # Newer Ubuntu 24.04 runner images mediate mount/umount through
-          # AppArmor, making `fusermount3 -u` fail with "Operation not
-          # permitted" (even lazy unmount). aa-teardown alone leaves many
-          # profiles loaded, so also force-remove any that remain to fully
-          # disable AppArmor mediation for CI.
-          sudo aa-teardown || true
-          sudo systemctl stop apparmor.service 2>/dev/null || true
-          if [ -f /sys/kernel/security/apparmor/profiles ]; then
-            sudo bash -c 'while read -r line; do
-              name="${line% (*}"
-              printf "%s" "$name" > /sys/kernel/security/apparmor/.remove 2>/dev/null || true
-            done < /sys/kernel/security/apparmor/profiles'
-          fi
-          echo "AppArmor profiles still loaded:"
-          sudo aa-status --profiled 2>/dev/null || echo "0 (apparmor disabled or unavailable)"
-
       - name: Build
         env:
           JOB_NAME: ${{ matrix.job_name }}
