@@ -44,6 +44,10 @@ jobs:
         with:
           scan-type: "fs"
           severity: "MEDIUM,HIGH,CRITICAL"
+          # Apply the severity filter to the SARIF report and the exit code.
+          # Without this, the action builds the SARIF report with all
+          # severities and fails on any finding regardless of `severity`.
+          limit-severities-for-sarif: true
           scan-ref: "."
           scanners: "vuln"
           format: "sarif"
