@@ -332,7 +332,13 @@ func (q *lruQueue) worker() {
 		localPath := filepath.Join(q.cachePath, fileName)
 		fileInfo, err := os.Stat(localPath)
 		if err != nil {
-			log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
+			log.Warn(
+				"lruPolicy::worker : file %s no longer exists or stat failed, skipping: %v",
+				fileName,
+				err,
+			)
+			flock.Unlock()
+			continue
 		}
 
 		fileSize := fileInfo.Size()
@@ -341,10 +347,18 @@ func (q *lruQueue) worker() {
 		if handleCount == 0 {
 			err := q.uploadandCleanFn(fileName)
 			flock.Unlock()
+			//handle when file doesn't exist during upload we do not requeue otherwise we do enqueue
 			if err != nil {
-				log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
-				//if upload fails we have to put the file back to the queue and map to retry later
-				q.Touch(fileName)
+				if os.IsNotExist(err) {
+					log.Warn(
+						"lruPolicy::worker : file %s was deleted during upload, skipping",
+						fileName,
+					)
+				} else {
+					log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
+					//if upload fails we have to put the file back to the queue and map to retry later
+					q.Touch(fileName)
+				}
 			} else {
 				atomic.AddInt64(&q.totalUploadedSize, fileSize)
 			}
