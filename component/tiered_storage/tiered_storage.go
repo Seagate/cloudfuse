@@ -292,7 +292,9 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	//Lock the file first
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
-	defer flock.Unlock()
+
+	//Unlock manually so we only hold one lock at a time
+	//defer flock.Unlock()
 
 	val, exists := c.fileMap.Load(options.Name)
 	//Potential local or local + cloud state
@@ -306,18 +308,21 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 			//delete from cloud first
 			err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
 			if err != nil {
+				flock.Unlock()
 				return err
 			}
 		}
 		//Local only State
 		//remove from LRU if it is in there already and delete local file
 		c.fileMap.Delete(options.Name)
+		flock.Unlock()
 		c.policy.Dequeue(options.Name)
 		os.Remove(localPath)
 
 		//Cloud only state
 	} else {
 		//delete from cloud
+		flock.Unlock()
 		err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
 		if err != nil {
 			return err
@@ -338,10 +343,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	//Case 1: OpenFile with O_Create
 	if options.Flags&os.O_CREATE != 0 {
 		//Check if file first exists, then proceed
-		// c.mu.Lock()
-		// _, exists := c.fileMap[options.Name]
-		// c.mu.Unlock()
-
 		_, exists := c.fileMap.Load(options.Name)
 		if !exists {
 			handle, err := c.createFileUnlocked(
@@ -356,9 +357,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	}
 
 	//1. Initial Check Map
-	// c.mu.Lock()
-	// _, exists := c.fileMap[options.Name]
-	// c.mu.Unlock()
 	_, exists := c.fileMap.Load(options.Name)
 
 	//if exists skip to opening file since it should already be in local cache
@@ -376,10 +374,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 				size:        uint64(info.Size()),
 				cloudBacked: false,
 			}
-			// c.mu.Lock()
-			// c.fileMap[options.Name] = node
-			// c.mu.Unlock()
-
 			c.fileMap.Store(options.Name, node)
 
 		} else {
@@ -408,10 +402,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			if err != nil {
 				return nil, err
 			}
-			// c.mu.Lock()
-			// c.fileMap[options.Name] = localCopyNode
-			// c.mu.Unlock()
-
 			c.fileMap.Store(options.Name, localCopyNode)
 
 		}
@@ -493,12 +483,6 @@ func (c *TieredStorage) isOverLocalLimit(
 
 	//find ExistingSize of file if exists
 	existingSize := uint64(0)
-	// c.mu.Lock()
-	// if node, ok := c.fileMap[fileName]; ok {
-	// 	existingSize = node.size
-	// }
-	// c.mu.Unlock()
-
 	if val, ok := c.fileMap.Load(fileName); ok {
 		existingSize = val.(*FileNode).size
 	}
@@ -571,12 +555,6 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	if err == nil {
 		c.setHandleDirty(options.Handle)
 		//update file node size in file map
-		// c.mu.Lock()
-		// if node, ok := c.fileMap[options.Handle.Path]; ok {
-		// 	node.size = uint64(newSize)
-		// 	node.isDirty = true
-		// }
-		// c.mu.Unlock()
 		if val, ok := c.fileMap.Load(options.Handle.Path); ok {
 			node := val.(*FileNode)
 			node.size = uint64(newSize)
