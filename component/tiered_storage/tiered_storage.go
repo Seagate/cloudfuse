@@ -573,10 +573,39 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 }
 
 func (c *TieredStorage) SyncFile(options internal.SyncFileOptions) error {
-	return nil
+	log.Trace(
+		"TieredStorage::SyncFile : handle=%d, path=%s",
+		options.Handle.ID,
+		options.Handle.Path,
+	)
+	return c.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 }
 
 func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
+	//Ok so we just need to flush locally, which means just write it to the disc
+	log.Trace(
+		"TieredStorage::FlushFile : handle=%d, path=%s",
+		options.Handle.ID,
+		options.Handle.Path,
+	)
+
+	//1. Only need to flush dirty files
+	if !options.Handle.Dirty() {
+		return nil
+	}
+	//2. Check if there is local file object form handle
+	f := options.Handle.GetFileObject()
+	if f == nil {
+		log.Err("TieredStorage::FlushFile : %s no file object in handle", options.Handle.Path)
+		return syscall.EBADF
+	}
+	//3. Sync to Disk
+	err := f.Sync()
+	if err != nil {
+		log.Err("TieredStorage::FlushFile : %s sync failed [%v]", options.Handle.Path, err)
+		return syscall.EIO
+	}
+
 	return nil
 }
 
