@@ -288,56 +288,41 @@ func (c *TieredStorage) CreateFile(
 }
 
 func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
+	log.Trace("TieredStorage::DeleteFile : name=%s", options.Name)
 	//Lock the file first
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
 
-	//Check file map
-	// c.mu.Lock()
-	// node, exists := c.fileMap[options.Name]
-	// c.mu.Unlock()
-
 	val, exists := c.fileMap.Load(options.Name)
-
+	//Potential local or local + cloud state
 	if exists {
-		//local only
 		node := val.(*FileNode)
-		if !node.cloudBacked {
-			//delete locally
-			localPath := filepath.Join(c.tmpPath, options.Name)
-			// c.mu.Lock()
-			// delete(c.fileMap, options.Name)
-			// c.mu.Unlock()
-			c.fileMap.Delete(options.Name)
-			os.Remove(localPath)
+		localPath := filepath.Join(c.tmpPath, options.Name)
 
-			//Both
-		} else {
-			//delete from cloud
+		//Local and Cloud State
+		if node.cloudBacked {
+			//Both local and cloud state
+			//delete from cloud first
 			err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
 			if err != nil {
 				return err
 			}
-			//delete locally
-			localPath := filepath.Join(c.tmpPath, options.Name)
-			// c.mu.Lock()
-			// delete(c.fileMap, options.Name)
-			// c.mu.Unlock()
-			c.fileMap.Delete(options.Name)
-
-			os.Remove(localPath)
 		}
+		//Local only State
+		//remove from LRU if it is in there already and delete local file
+		c.fileMap.Delete(options.Name)
+		c.policy.Dequeue(options.Name)
+		os.Remove(localPath)
 
+		//Cloud only state
 	} else {
-		//check cloud, else return an error
+		//delete from cloud
 		err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
 		if err != nil {
-			return syscall.ENOENT
+			return err
 		}
-		return err
 	}
-
 	return nil
 }
 
@@ -621,7 +606,9 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released
 	flock := c.fileLocks.Get(options.Handle.Path)
 	flock.Lock()
-	defer flock.Unlock()
+
+	//Ok we have to manually unlock the file now instead
+	//defer flock.Unlock()
 
 	//Dec Handle Count First
 	flock.Dec()
@@ -644,20 +631,16 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	//it is the last handle
 	if handleCount == 0 {
 		//is file cloudbacked
-		// c.mu.Lock()
-		// node, exists := c.fileMap[options.Handle.Path]
-		// c.mu.Unlock()
-
 		val, ok := c.fileMap.Load(options.Handle.Path)
-		node := val.(*FileNode)
 		if !ok {
 			log.Err(
 				"TieredStorage::ReleaseFile : internal error: file %s not found in map",
 				options.Handle.Path,
 			)
+			flock.Unlock()
 			return syscall.EBADF
 		}
-
+		node := val.(*FileNode)
 		if node.cloudBacked {
 			//File was modified
 			if node.isDirty {
@@ -669,23 +652,26 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 						options.Handle.Path,
 						err,
 					)
+					flock.Unlock()
 					return err
 				}
 			}
 			//Whether File was modified or not, delete local file copy
 			localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-			// c.mu.Lock()
-			// delete(c.fileMap, options.Handle.Path)
-			// c.mu.Unlock()
 			c.fileMap.Delete(options.Handle.Path)
-
 			os.Remove(localPath)
+			flock.Unlock()
 		} else {
 			// update LRU add to queue because cleaning up the file should be handled once the file is uploaded in LRU policy logic
+			//Unlock the file first so we don't hold two locks at the same time
+			flock.Unlock()
 			if c.policy != nil {
 				c.policy.Enqueue(options.Handle.Path)
 			}
 		}
+	} else {
+		//if not the last handle
+		flock.Unlock()
 	}
 	return nil
 }
