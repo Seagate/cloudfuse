@@ -724,7 +724,98 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 }
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
+	//Ok we are going to follow DeleteFile, we have to rename this File in the various states that its in
+	//So First we lock in alphabetical order
+	log.Trace("TieredStorage::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
+
+	sflock := c.fileLocks.Get(options.Src)
+	dflock := c.fileLocks.Get(options.Dst)
+
+	if options.Src < options.Dst {
+		sflock.Lock()
+		dflock.Lock()
+	} else {
+		dflock.Lock()
+		sflock.Lock()
+	}
+	defer sflock.Unlock()
+	defer dflock.Unlock()
+
+	//Ok now we have to consider all the states
+	//Rename File that is Local Only
+	//sync map in both local and in the LRU, also need to rename the node in the queue
+	//Check that it exists
+	val, exists := c.fileMap.Load(options.Src)
+	//Potential local or local + cloud state
+	if exists {
+		node := val.(*FileNode)
+		// //Local and Cloud State
+		if node.cloudBacked {
+			//just rename from the cloud
+			err := c.NextComponent().RenameFile(options)
+			if err != nil {
+				return err
+			}
+		}
+		//Local only State, this will happen anyways if it exists local
+		//Rename
+		err := os.Rename(
+			filepath.Join(c.tmpPath, options.Src),
+			filepath.Join(c.tmpPath, options.Dst),
+		)
+		if err != nil {
+			return err
+		}
+		c.fileMap.Delete(options.Src)
+		node.name = options.Dst
+		c.fileMap.Store(options.Dst, node)
+
+		//Check if it is in the LRU first
+		_, inLRU := c.policy.nodeMap.Load(options.Src)
+		if inLRU {
+			c.policy.Dequeue(options.Src)
+			c.policy.Enqueue(options.Dst)
+		}
+		//Change the handle and the lock counts
+		c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
+
+		//Cloud only state
+	} else {
+		err := c.NextComponent().RenameFile(options)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// flock must be locked for both files
+func (c *TieredStorage) renameOpenHandles(
+	srcName, dstName string,
+	sflock, dflock *common.LockMapItem,
+) {
+	// update open handles
+	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			handle.Lock()
+			if handle.Path == srcName {
+				handle.Path = dstName
+			}
+			handle.Unlock()
+			return true
+		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
+		for sflock.DirtyCount() > 0 {
+			sflock.DecDirty()
+			dflock.IncDirty()
+		}
+	}
 }
 
 func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {

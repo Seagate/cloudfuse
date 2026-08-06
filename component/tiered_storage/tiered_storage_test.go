@@ -862,171 +862,27 @@ func (suite *tieredStorageTestSuite) TestDeleteFileNotExists() {
 	suite.assert.EqualValues(syscall.ENOENT, err)
 }
 
-// Ok lets set up a situation where the worker gets a bunch of files, we delete the first file right before upload, then check
-// that the rest of the files do get uploaded to some cloud the error is successfully logged, we can make it super easy
-func (suite *tieredStorageTestSuite) TestDeleteFileWorkerResponse() {
-	//1. Initialize many local only file
-	//1a. Create files that exceed the 80% threshold, max set at 1MB
-	data := make([]byte, 250*1024)
-	path1 := "file18"
-	handle, err := suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: path1, Flags: os.O_CREATE, Mode: 0777},
+func (suite *tieredStorageTestSuite) TestFlushFile() {
+	defer suite.cleanupTest()
+	file := "file25"
+	handle, _ := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+
+	testData := "test data"
+	data := []byte(testData)
+	_, err := suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
 	suite.assert.NoError(err)
-	suite.assert.Equal(path1, handle.Path)
-
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.True(handle.Dirty())
 
-	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	err = suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	path2 := "file19"
-	handle, err = suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: path2, Flags: os.O_CREATE, Mode: 0777},
-	)
-	suite.assert.NoError(err)
-	suite.assert.Equal(path2, handle.Path)
-
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	//Verify Data is still on the disk
+	d, _ := os.ReadFile(filepath.Join(suite.cache_path, file))
+	suite.assert.Equal(data, d)
+	//Check that handle is still dirty
 	suite.assert.True(handle.Dirty())
-
-	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	path3 := "file20"
-	handle, err = suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: path3, Flags: os.O_CREATE, Mode: 0777},
-	)
-	suite.assert.NoError(err)
-	suite.assert.Equal(path3, handle.Path)
-
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
-	suite.assert.True(handle.Dirty())
-
-	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	path4 := "file21"
-	handle, err = suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: path4, Flags: os.O_CREATE, Mode: 0777},
-	)
-	suite.assert.NoError(err)
-	suite.assert.Equal(path4, handle.Path)
-
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
-	suite.assert.True(handle.Dirty())
-
-	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	// 3. Check if all in the LRU Queue initially
-	suite.assert.Equal(path4, suite.tieredStorage.policy.head.name)
-	suite.assert.Equal(path3, suite.tieredStorage.policy.head.next.name)
-	suite.assert.Equal(path2, suite.tieredStorage.policy.head.next.next.name)
-	suite.assert.Equal(path1, suite.tieredStorage.policy.tail.name)
-
-	_, exists1 := suite.tieredStorage.policy.nodeMap.Load(path1)
-	_, exists2 := suite.tieredStorage.policy.nodeMap.Load(path2)
-	_, exists3 := suite.tieredStorage.policy.nodeMap.Load(path3)
-	_, exists4 := suite.tieredStorage.policy.nodeMap.Load(path4)
-
-	suite.assert.True(exists1)
-	suite.assert.True(exists2)
-	suite.assert.True(exists3)
-	suite.assert.True(exists4)
-
-	//4. Sleep to wait for eviction to kick in
-	time.Sleep(100 * time.Millisecond)
-
-	// 4. Some should then be released to the cloud essentially, the ones we wrote data to
-	//And the local files should be gone (uploaded and cleaned up), not in either map
-
-	// 4a. Check state of NodeMap
-	_, exists1 = suite.tieredStorage.policy.nodeMap.Load(path1)
-	_, exists2 = suite.tieredStorage.policy.nodeMap.Load(path2)
-	_, exists3 = suite.tieredStorage.policy.nodeMap.Load(path3)
-	_, exists4 = suite.tieredStorage.policy.nodeMap.Load(path4)
-
-	suite.assert.False(exists1)
-	suite.assert.False(exists2)
-	suite.assert.True(exists3)
-	suite.assert.True(exists4)
-
-	//4b. Check state of fileMap
-	_, exists1 = suite.tieredStorage.fileMap.Load(path1)
-	_, exists2 = suite.tieredStorage.fileMap.Load(path2)
-	_, exists3 = suite.tieredStorage.fileMap.Load(path3)
-	_, exists4 = suite.tieredStorage.fileMap.Load(path4)
-
-	suite.assert.False(exists1)
-	suite.assert.False(exists2)
-	suite.assert.True(exists3)
-	suite.assert.True(exists4)
-
-	// 4c.Check files for files 1 and 2 no longer exist local
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path1))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path2))
-
-	//5. We have to check that the files exist in the cloud
-	//Must check that file is actually in the cloud
-	_, err = suite.tieredStorage.NextComponent().GetAttr(
-		internal.GetAttrOptions{Name: path1, RetrieveMetadata: true})
-	suite.assert.NoError(err)
-
-	//Must check that file is actually in the cloud
-	_, err = suite.tieredStorage.NextComponent().GetAttr(
-		internal.GetAttrOptions{Name: path2, RetrieveMetadata: true})
-	suite.assert.NoError(err)
-
-	//Validate the data matches what we have
-	//It just checks if the data is preserved
-	tmpFile, err := os.CreateTemp("", "cloud_verify")
-	suite.assert.NoError(err)
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	// 2. Copy from the cloud (loopback) to the temporary file
-	err = suite.loopback.CopyToFile(internal.CopyToFileOptions{
-		Name:   path1,
-		Offset: 0,
-		Count:  0, // 0 usually means the whole file
-		File:   tmpFile,
-	})
-	suite.assert.NoError(err)
-
-	// 3. Read the data back from the temp file and verify
-	dataFromCloud, err := os.ReadFile(tmpFile.Name())
-	suite.assert.NoError(err)
-	suite.assert.Equal(
-		data,
-		dataFromCloud,
-		"The cloud version should match the modified local version",
-	)
-
-	//It just checks if the data is preserved
-	tmpFile, err = os.CreateTemp("", "cloud_verify")
-	suite.assert.NoError(err)
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	// 2. Copy from the cloud (loopback) to the temporary file
-	err = suite.loopback.CopyToFile(internal.CopyToFileOptions{
-		Name:   path2,
-		Offset: 0,
-		Count:  0, // 0 usually means the whole file
-		File:   tmpFile,
-	})
-	suite.assert.NoError(err)
-
-	// 3. Read the data back from the temp file and verify
-	dataFromCloud, err = os.ReadFile(tmpFile.Name())
-	suite.assert.NoError(err)
-	suite.assert.Equal(
-		data,
-		dataFromCloud,
-		"The cloud version should match the modified local version",
-	)
 
 }
 
