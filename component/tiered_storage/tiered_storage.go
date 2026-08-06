@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -51,8 +52,10 @@ import (
 // Common structure for Component
 type TieredStorage struct {
 	internal.BaseComponent
-	fileMap  map[string]*FileNode
-	lruQueue *LRUQueue
+	//fileMap  map[string]*FileNode
+	fileMap sync.Map
+
+	policy *lruQueue
 
 	//use LockMap instead of mutex to allow parallel access to different files
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
@@ -71,6 +74,7 @@ type FileNode struct {
 	prev        *FileNode
 	next        *FileNode
 	cloudBacked bool
+	isDirty     bool
 	// Add more attributes as needed, e.g., last accessed time, etc.
 }
 
@@ -85,7 +89,8 @@ type LRUQueue struct {
 // Structure defining your config parameters
 type TieredStorageOptions struct {
 	// e.g. var1 uint32 `config:"var1"`
-	TmpPath string `config:"path" yaml:"path,omitempty"`
+	TmpPath   string  `config:"path"        yaml:"path,omitempty"`
+	MaxSizeMB float64 `config:"max-size-mb" yaml:"max-size-mb,omitempty"`
 }
 
 const (
@@ -117,12 +122,24 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 
 	// TieredStorage : start code goes here
 
+	//Start the policy
+	if c.policy != nil {
+		if err := c.policy.StartPolicy(); err != nil {
+			log.Err("TieredStorage::Start : failed to start LRU policy [%v]", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Stop : Stop the component functionality and kill all threads started
 func (c *TieredStorage) Stop() error {
 	log.Trace("TieredStorage::Stop : Stopping component %s", c.Name())
+
+	if c.policy != nil {
+		return c.policy.StopPolicy()
+	}
 
 	return nil
 }
@@ -151,6 +168,20 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if err != nil {
 		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
 		return fmt.Errorf("TieredStorage: failed to create tmp path: %w", err)
+	}
+
+	//figure out the maxCache size stuff here, there is just a bunch of configure stuff that we need to figure out
+	c.maxCacheSize = conf.MaxSizeMB * 1024 * 1024
+	//Wire in the LRU Policy
+	c.policy = &lruQueue{
+		cachePath:        c.tmpPath,
+		maxCacheSize:     c.maxCacheSize,
+		fileLocks:        c.fileLocks,
+		threshold:        0.8,
+		targetRatio:      0.6,
+		numWorkers:       8,
+		tickerUnit:       time.Millisecond,
+		uploadandCleanFn: c.uploadandCleanFile,
 	}
 
 	return nil
@@ -223,10 +254,13 @@ func (c *TieredStorage) createFileUnlocked(
 		name:        options.Name,
 		size:        uint64(0),
 		cloudBacked: false,
+		isDirty:     true,
 	}
-	c.mu.Lock()
-	c.fileMap[options.Name] = node
-	c.mu.Unlock()
+	// c.mu.Lock()
+	// c.fileMap[options.Name] = node
+	// c.mu.Unlock()
+
+	c.fileMap.Store(options.Name, node)
 
 	//create handle
 	handle := handlemap.NewHandle(options.Name)
@@ -254,6 +288,46 @@ func (c *TieredStorage) CreateFile(
 }
 
 func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
+	log.Trace("TieredStorage::DeleteFile : name=%s", options.Name)
+	//Lock the file first
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+
+	//Unlock manually so we only hold one lock at a time
+	//defer flock.Unlock()
+
+	val, exists := c.fileMap.Load(options.Name)
+	//Potential local or local + cloud state
+	if exists {
+		node := val.(*FileNode)
+		localPath := filepath.Join(c.tmpPath, options.Name)
+
+		//Local and Cloud State
+		if node.cloudBacked {
+			//Both local and cloud state
+			//delete from cloud first
+			err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
+			if err != nil {
+				flock.Unlock()
+				return err
+			}
+		}
+		//Local only State
+		//remove from LRU if it is in there already and delete local file
+		c.fileMap.Delete(options.Name)
+		flock.Unlock()
+		c.policy.Dequeue(options.Name)
+		os.Remove(localPath)
+
+		//Cloud only state
+	} else {
+		//delete from cloud
+		flock.Unlock()
+		err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Name})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -269,9 +343,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	//Case 1: OpenFile with O_Create
 	if options.Flags&os.O_CREATE != 0 {
 		//Check if file first exists, then proceed
-		c.mu.Lock()
-		_, exists := c.fileMap[options.Name]
-		c.mu.Unlock()
+		_, exists := c.fileMap.Load(options.Name)
 		if !exists {
 			handle, err := c.createFileUnlocked(
 				internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
@@ -285,9 +357,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	}
 
 	//1. Initial Check Map
-	c.mu.Lock()
-	_, exists := c.fileMap[options.Name]
-	c.mu.Unlock()
+	_, exists := c.fileMap.Load(options.Name)
 
 	//if exists skip to opening file since it should already be in local cache
 	if !exists {
@@ -304,9 +374,8 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 				size:        uint64(info.Size()),
 				cloudBacked: false,
 			}
-			c.mu.Lock()
-			c.fileMap[options.Name] = node
-			c.mu.Unlock()
+			c.fileMap.Store(options.Name, node)
+
 		} else {
 			//3. Check if File exists in Cloud
 			info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
@@ -333,9 +402,8 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			if err != nil {
 				return nil, err
 			}
-			c.mu.Lock()
-			c.fileMap[options.Name] = localCopyNode
-			c.mu.Unlock()
+			c.fileMap.Store(options.Name, localCopyNode)
+
 		}
 
 	}
@@ -415,11 +483,9 @@ func (c *TieredStorage) isOverLocalLimit(
 
 	//find ExistingSize of file if exists
 	existingSize := uint64(0)
-	c.mu.Lock()
-	if node, ok := c.fileMap[fileName]; ok {
-		existingSize = node.size
+	if val, ok := c.fileMap.Load(fileName); ok {
+		existingSize = val.(*FileNode).size
 	}
-	c.mu.Unlock()
 
 	addedFileSize := int64(newFileSize) - int64(existingSize)
 
@@ -489,11 +555,12 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	if err == nil {
 		c.setHandleDirty(options.Handle)
 		//update file node size in file map
-		c.mu.Lock()
-		if node, ok := c.fileMap[options.Handle.Path]; ok {
+		if val, ok := c.fileMap.Load(options.Handle.Path); ok {
+			node := val.(*FileNode)
 			node.size = uint64(newSize)
+			node.isDirty = true
 		}
-		c.mu.Unlock()
+
 	} else {
 		log.Err(
 			"TieredStorage::WriteFile : failed to write %s [%s]",
@@ -506,10 +573,39 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 }
 
 func (c *TieredStorage) SyncFile(options internal.SyncFileOptions) error {
-	return nil
+	log.Trace(
+		"TieredStorage::SyncFile : handle=%d, path=%s",
+		options.Handle.ID,
+		options.Handle.Path,
+	)
+	return c.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 }
 
 func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
+	//Ok so we just need to flush locally, which means just write it to the disc
+	log.Trace(
+		"TieredStorage::FlushFile : handle=%d, path=%s",
+		options.Handle.ID,
+		options.Handle.Path,
+	)
+
+	//1. Only need to flush dirty files
+	if !options.Handle.Dirty() {
+		return nil
+	}
+	//2. Check if there is local file object form handle
+	f := options.Handle.GetFileObject()
+	if f == nil {
+		log.Err("TieredStorage::FlushFile : %s no file object in handle", options.Handle.Path)
+		return syscall.EBADF
+	}
+	//3. Sync to Disk
+	err := f.Sync()
+	if err != nil {
+		log.Err("TieredStorage::FlushFile : %s sync failed [%v]", options.Handle.Path, err)
+		return syscall.EIO
+	}
+
 	return nil
 }
 
@@ -517,10 +613,24 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released
 	flock := c.fileLocks.Get(options.Handle.Path)
 	flock.Lock()
-	defer flock.Unlock()
 
-	//Dec Handle First
+	//Ok we have to manually unlock the file now instead
+	//defer flock.Unlock()
+
+	//Dec Handle Count First
 	flock.Dec()
+
+	//close file associated with handle
+	if f := options.Handle.GetFileObject(); f != nil {
+		f.Close()
+	}
+
+	//clean handle state
+	c.clearHandleDirty(options.Handle)
+	options.Handle.Cleanup()
+
+	//remove from global handle map
+	handlemap.Delete(options.Handle.ID)
 
 	//Check if this is the last file handle
 	handleCount := flock.Count()
@@ -528,21 +638,19 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	//it is the last handle
 	if handleCount == 0 {
 		//is file cloudbacked
-		c.mu.Lock()
-		node, exists := c.fileMap[options.Handle.Path]
-		c.mu.Unlock()
-
-		if !exists {
+		val, ok := c.fileMap.Load(options.Handle.Path)
+		if !ok {
 			log.Err(
 				"TieredStorage::ReleaseFile : internal error: file %s not found in map",
 				options.Handle.Path,
 			)
+			flock.Unlock()
 			return syscall.EBADF
 		}
-
+		node := val.(*FileNode)
 		if node.cloudBacked {
 			//File was modified
-			if options.Handle.Dirty() {
+			if node.isDirty {
 				//Upload
 				err := c.uploadCachedFile(options.Handle.Path)
 				if err != nil {
@@ -551,31 +659,26 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 						options.Handle.Path,
 						err,
 					)
-					options.Handle.Cleanup()
+					flock.Unlock()
 					return err
 				}
-				//Delete local file copy
-				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-				c.mu.Lock()
-				delete(c.fileMap, options.Handle.Path)
-				c.mu.Unlock()
-				//Clean Handle
-				options.Handle.Cleanup()
-				os.Remove(localPath)
-			} else {
-				//File was not modified
-				localPath := filepath.Join(c.tmpPath, options.Handle.Path)
-				c.mu.Lock()
-				delete(c.fileMap, options.Handle.Path)
-				c.mu.Unlock()
-				options.Handle.Cleanup()
-				os.Remove(localPath)
-
 			}
+			//Whether File was modified or not, delete local file copy
+			localPath := filepath.Join(c.tmpPath, options.Handle.Path)
+			c.fileMap.Delete(options.Handle.Path)
+			os.Remove(localPath)
+			flock.Unlock()
 		} else {
-			//local only then just close the file, update LRU add to queue, we will get to this later
-			options.Handle.Cleanup()
+			// update LRU add to queue because cleaning up the file should be handled once the file is uploaded in LRU policy logic
+			//Unlock the file first so we don't hold two locks at the same time
+			flock.Unlock()
+			if c.policy != nil {
+				c.policy.Enqueue(options.Handle.Path)
+			}
 		}
+	} else {
+		//if not the last handle
+		flock.Unlock()
 	}
 	return nil
 }
@@ -605,8 +708,114 @@ func (c *TieredStorage) uploadCachedFile(name string) error {
 	return uploadErr
 }
 
-func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
+func (c *TieredStorage) uploadandCleanFile(name string) error {
+	err := c.uploadCachedFile(name)
+	if err != nil {
+		return err
+	}
+	localPath := filepath.Join(c.tmpPath, name)
+	c.fileMap.Delete(name)
+	err = os.Remove(localPath)
+	if err != nil {
+		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
+		return err
+	}
 	return nil
+}
+
+func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
+	//Ok we are going to follow DeleteFile, we have to rename this File in the various states that its in
+	//So First we lock in alphabetical order
+	log.Trace("TieredStorage::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
+
+	sflock := c.fileLocks.Get(options.Src)
+	dflock := c.fileLocks.Get(options.Dst)
+
+	if options.Src < options.Dst {
+		sflock.Lock()
+		dflock.Lock()
+	} else {
+		dflock.Lock()
+		sflock.Lock()
+	}
+	defer sflock.Unlock()
+	defer dflock.Unlock()
+
+	//Ok now we have to consider all the states
+	//Rename File that is Local Only
+	//sync map in both local and in the LRU, also need to rename the node in the queue
+	//Check that it exists
+	val, exists := c.fileMap.Load(options.Src)
+	//Potential local or local + cloud state
+	if exists {
+		node := val.(*FileNode)
+		// //Local and Cloud State
+		if node.cloudBacked {
+			//just rename from the cloud
+			err := c.NextComponent().RenameFile(options)
+			if err != nil {
+				return err
+			}
+		}
+		//Local only State, this will happen anyways if it exists local
+		//Rename
+		err := os.Rename(
+			filepath.Join(c.tmpPath, options.Src),
+			filepath.Join(c.tmpPath, options.Dst),
+		)
+		if err != nil {
+			return err
+		}
+		c.fileMap.Delete(options.Src)
+		node.name = options.Dst
+		c.fileMap.Store(options.Dst, node)
+
+		//Check if it is in the LRU first
+		_, inLRU := c.policy.nodeMap.Load(options.Src)
+		if inLRU {
+			c.policy.Dequeue(options.Src)
+			c.policy.Enqueue(options.Dst)
+		}
+		//Change the handle and the lock counts
+		c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
+
+		//Cloud only state
+	} else {
+		err := c.NextComponent().RenameFile(options)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// flock must be locked for both files
+func (c *TieredStorage) renameOpenHandles(
+	srcName, dstName string,
+	sflock, dflock *common.LockMapItem,
+) {
+	// update open handles
+	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			handle.Lock()
+			if handle.Path == srcName {
+				handle.Path = dstName
+			}
+			handle.Unlock()
+			return true
+		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
+		for sflock.DirtyCount() > 0 {
+			sflock.DecDirty()
+			dflock.IncDirty()
+		}
+	}
 }
 
 func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {
@@ -679,8 +888,6 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
 func NewTieredStorageComponent() internal.Component {
 	comp := &TieredStorage{
-		fileMap:   make(map[string]*FileNode),
-		lruQueue:  &LRUQueue{},
 		fileLocks: common.NewLockMap(),
 	}
 	comp.SetName(compName)
