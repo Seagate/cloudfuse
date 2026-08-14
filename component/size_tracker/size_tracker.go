@@ -408,7 +408,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 		Namemax: 255,
 	}
 
-	log.Debug(
+	log.Info(
 		"SizeTracker::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)",
 		stat.Bfree,
 		stat.Bavail,
