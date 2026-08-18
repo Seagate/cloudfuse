@@ -290,6 +290,11 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	stbuf.Ctim = fuse.NewTimespec(attr.Ctime)
 	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
 	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
+
+	// st_blksize is the preferred I/O block size
+	stbuf.Blksize = blockSize
+	// st_blocks is always in 512-byte units (POSIX), which is what du reads
+	stbuf.Blocks = (stbuf.Size + 511) / 512
 }
 
 func fileTypeBits(attr *internal.ObjAttr) uint32 {
