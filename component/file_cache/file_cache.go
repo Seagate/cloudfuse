@@ -1007,6 +1007,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
+				//nolint:gosec // G122: newPath is from filepath.WalkDir callback, safe for operations within WalkDir
 				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
 				if mkdirErr != nil {
 					// log any error but do nothing about it
@@ -1595,23 +1596,24 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 
-	// Increment the handle count
-	flock.Inc()
-
 	// will opening the file require downloading it?
-	var openErr error
 	openOverwrites := options.Flags&os.O_TRUNC != 0
 	if !downloadRequired || openOverwrites || !cloudConnected {
 		// use the local file to complete the open operation now
 		// flock is already locked, as required by openFileInternal
-		openErr = fc.openFileInternal(handle, flock)
+		if openErr := fc.openFileInternal(handle, flock); openErr != nil {
+			return nil, openErr
+		}
 	} else {
 		// use a lazy open algorithm to avoid downloading unnecessarily (do nothing for now)
 		// update file state
 		flock.LazyOpen = true
 	}
 
-	return handle, openErr
+	// increment the handle count
+	flock.Inc()
+
+	return handle, nil
 }
 
 func (fc *FileCache) exceedsHardLimit(newSize int64, name string, requestType string) bool {

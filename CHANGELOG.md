@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## **2.3.1** ##
+
+July 30th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#991](https://github.com/Seagate/cloudfuse/pull/991) Fix issue causing file cache to fill all available capacity
+- [#974](https://github.com/Seagate/cloudfuse/pull/974) Enable go security scanning & fix security issues
+
 ## **2.3.0** ##
 
 May 28th 2026

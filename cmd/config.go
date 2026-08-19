@@ -505,9 +505,11 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 	secretLabel := ""
 	if tui.config.storageProtocol == "azstorage" {
 		accessLabel = "🔑 Account Name: "
+		//nolint:gosec // G101: UI label text; no credential value is embedded.
 		secretLabel = "🔑 Account Key: "
 	} else {
 		accessLabel = "🔑 Access Key: "
+		//nolint:gosec // G101: UI label text; no credential value is embedded.
 		secretLabel = "🔑 Secret Key: "
 	}
 

@@ -1873,8 +1873,13 @@ func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingData() {
 		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY, Mode: 0777},
 	)
 	suite.assert.Error(err)
-	suite.assert.NotNil(handle)
+	suite.assert.Nil(handle)
 	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+
+	// A failed open must not leak a handle reference, otherwise the LRU policy
+	// would never be able to evict this file.
+	flock := suite.fileCache.fileLocks.Get(path)
+	suite.assert.Zero(flock.Count())
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingAttrsWithOverwrite() {
@@ -2233,6 +2238,26 @@ func (suite *fileCacheTestSuite) TestOpenCloseHandleCount() {
 	suite.assert.NoError(err)
 
 	// check that flock handle count is correct
+	flock := suite.fileCache.fileLocks.Get(file)
+	suite.assert.Zero(flock.Count())
+}
+
+func (suite *fileCacheTestSuite) TestOpenFileErrorDoesNotLeakHandleCount() {
+	defer suite.cleanupTest()
+
+	file := "file_open_fail"
+	localPath := filepath.Join(suite.cache_path, file)
+	err := os.MkdirAll(localPath, 0777)
+	suite.assert.NoError(err)
+
+	// Use an invalid flag combination to force an error
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: file, Flags: os.O_RDWR | os.O_TRUNC, Mode: 0777},
+	)
+	suite.assert.Error(err)
+	suite.assert.Nil(handle)
+
+	// a failed open must not increment the handle count
 	flock := suite.fileCache.fileLocks.Get(file)
 	suite.assert.Zero(flock.Count())
 }
