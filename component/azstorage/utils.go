@@ -193,12 +193,11 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: ProxyURL,
-			// We use Dial instead of DialContext as DialContext has been reported to cause slower performance.
-			Dial /*Context*/ : (&net.Dialer{
-				Timeout:   Timeout,
-				KeepAlive: KeepAlive,
-				DualStack: DualStack,
-			}).Dial, /*Context*/
+			DialContext: (&net.Dialer{
+				Timeout:       Timeout,
+				KeepAlive:     KeepAlive,
+				FallbackDelay: fallbackDelay(),
+			}).DialContext,
 			MaxIdleConns:          MaxIdleConns, // No limit
 			MaxIdleConnsPerHost:   MaxIdleConnsPerHost,
 			MaxConnsPerHost:       MaxConnsPerHost,
@@ -212,6 +211,13 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 			MaxResponseHeaderBytes: MaxResponseHeaderBytes,
 		},
 	}, nil
+}
+
+func fallbackDelay() time.Duration {
+	if DualStack {
+		return 0
+	}
+	return -1
 }
 
 // getCloudConfiguration : returns cloud configuration type on the basis of endpoint
