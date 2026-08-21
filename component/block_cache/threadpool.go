@@ -95,8 +95,10 @@ func (t *ThreadPool) Start() {
 	highPriority := (t.worker * 10) / 100
 
 	for i := uint32(0); i < t.worker; i++ {
-		t.wg.Add(1)
-		go t.Do(i < highPriority)
+		priority := i < highPriority
+		t.wg.Go(func() {
+			t.Do(priority)
+		})
 	}
 }
 
@@ -126,8 +128,6 @@ func (t *ThreadPool) Schedule(urgent bool, item *workItem) {
 
 // Do is the core task to be executed by each worker thread
 func (t *ThreadPool) Do(priority bool) {
-	defer t.wg.Done()
-
 	if priority {
 		// This thread will work only on high priority channel
 		for {

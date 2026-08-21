@@ -65,8 +65,9 @@ func (s *configTestSuite) TestEmptyAccountType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
@@ -76,9 +77,10 @@ func (s *configTestSuite) TestInvalidAccountType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.AccountType = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		AccountType: "abcd",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
@@ -94,9 +96,10 @@ func (s *configTestSuite) TestBlockSize() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.BlockSize = 10
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		BlockSize:   10,
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
@@ -112,9 +115,10 @@ func (s *configTestSuite) TestProtoType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
@@ -131,12 +135,13 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert := assert.New(s.T())
 
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
 
-	opt.HttpsProxyAddress = "127.0.0.1"
-	opt.UseHTTP = true
+		HttpsProxyAddress: "127.0.0.1",
+		UseHTTP:           true,
+	}
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
 	assert.Equal(
@@ -213,9 +218,10 @@ func (s *configTestSuite) TestMaxResultsForList() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
@@ -232,9 +238,10 @@ func (s *configTestSuite) TestAuthModeNotSet() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
@@ -245,10 +252,10 @@ func (s *configTestSuite) TestAuthModeKey() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
-	opt.AuthMode = "key"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+		AuthMode:    "key"}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
@@ -267,10 +274,11 @@ func (s *configTestSuite) TestAuthModeSAS() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
-	opt.AuthMode = "sas"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+		AuthMode:    "sas",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
@@ -286,10 +294,11 @@ func (s *configTestSuite) TestAuthModeMSI() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
-	opt.AuthMode = "msi"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+		AuthMode:    "msi",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
@@ -324,10 +333,11 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
-	opt.AuthMode = "spn"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+		AuthMode:    "spn",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
@@ -360,19 +370,20 @@ func (s *configTestSuite) TestOtherFlags() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
-	opt.AuthMode = "sas"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+		AuthMode:    "sas",
 
-	// opt.SaSKey = "xyz"
-	opt.MaxRetries = 10
-	opt.MaxTimeout = 10
-	opt.BackoffTime = 10
-	opt.MaxRetryDelay = 10
-	opt.BlockSize = 5
-	opt.MaxConcurrency = 20
-	opt.DefaultTier = "hot"
+		// opt.SaSKey = "xyz"
+		MaxRetries:     10,
+		MaxTimeout:     10,
+		BackoffTime:    10,
+		MaxRetryDelay:  10,
+		BlockSize:      5,
+		MaxConcurrency: 20,
+		DefaultTier:    "hot",
+	}
 
 	config.SetBool(compName+".set-content-type", true)
 	config.SetBool(compName+".ca-cert-file", true)
@@ -387,9 +398,10 @@ func (s *configTestSuite) TestCompressionType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+	}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
@@ -413,19 +425,20 @@ func (s *configTestSuite) TestSASRefresh() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.Container = "abcd"
-	opt.AuthMode = "sas"
+	opt := AzStorageOptions{
+		AccountName: "abcd",
+		Container:   "abcd",
+		AuthMode:    "sas",
 
-	opt.SaSKey = "xyz"
-	opt.MaxRetries = 10
-	opt.MaxTimeout = 10
-	opt.BackoffTime = 10
-	opt.MaxRetryDelay = 10
-	opt.BlockSize = 5
-	opt.MaxConcurrency = 20
-	opt.DefaultTier = "hot"
+		SaSKey:         "xyz",
+		MaxRetries:     10,
+		MaxTimeout:     10,
+		BackoffTime:    10,
+		MaxRetryDelay:  10,
+		BlockSize:      5,
+		MaxConcurrency: 20,
+		DefaultTier:    "hot",
+	}
 
 	config.SetBool(compName+".set-content-type", true)
 	config.SetBool(compName+".ca-cert-file", true)
@@ -433,11 +446,7 @@ func (s *configTestSuite) TestSASRefresh() {
 
 	az.storage = &BlockBlob{
 		Auth: &azAuthBlobSAS{
-			azAuthSAS: azAuthSAS{
-				azAuthBase: azAuthBase{
-					config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"},
-				},
-			},
+			config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"},
 		},
 	}
 	err := ParseAndReadDynamicConfig(az, opt, true)

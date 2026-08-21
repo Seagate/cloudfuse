@@ -26,7 +26,8 @@
 package xload
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"os"
@@ -277,7 +278,7 @@ func (sm *StatsManager) marshalStatsData(data *statsJSONData, seek bool) error {
 		return nil
 	}
 
-	jsonData, err := json.MarshalIndent(data, "", "\t")
+	jsonData, err := json.Marshal(data, jsontext.WithIndent("\t"), jsontext.WithIndentPrefix(""))
 	if err != nil {
 		log.Err("statsManager::convertToBytes : unable to marshal [%v]", err.Error())
 		return err

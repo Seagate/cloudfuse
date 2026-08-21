@@ -35,6 +35,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort" // to sort List() results
 	"strings"
 	"time"
@@ -488,13 +489,13 @@ func (cl *Client) List(
 			// walk up the tree and add each one until we find an already existing parent
 			// we have to iterate in descending order
 			suffixToTrim := ""
-			for i := len(intermediateDirectories) - 1; i >= 0; i-- {
+			for _, intermediateDirectorie := range slices.Backward(intermediateDirectories) {
 				// ignore empty strings (split does not omit them)
-				if intermediateDirectories[i] == "" {
+				if intermediateDirectorie == "" {
 					continue
 				}
 				// add to the suffix we're trimming off
-				suffixToTrim = intermediateDirectories[i] + "/" + suffixToTrim
+				suffixToTrim = intermediateDirectorie + "/" + suffixToTrim
 				// get the trimmed (parent) directory
 				parentDir := strings.TrimSuffix(dir, suffixToTrim)
 				// have we seen this one already?
