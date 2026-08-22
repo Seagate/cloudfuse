@@ -38,6 +38,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// posixFileModes reports whether the platform has meaningful POSIX file modes.
+const posixFileModes = true
+
 // Creates a new object attribute
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 	stat := info.Sys().(*syscall.Stat_t)
