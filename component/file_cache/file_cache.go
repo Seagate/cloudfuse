@@ -2344,6 +2344,14 @@ func (fc *FileCache) renameLocalFile(
 	localSrcPath := filepath.Join(fc.tmpPath, srcName)
 	localDstPath := filepath.Join(fc.tmpPath, dstName)
 
+	if !posixFileModes {
+		if dstInfo, dstErr := os.Stat(localDstPath); dstErr == nil {
+			if !dstInfo.IsDir() && dstInfo.Mode().Perm()&0o200 == 0 {
+				fc.clearCacheFileReadOnly(localDstPath)
+			}
+		}
+	}
+
 	err := os.Rename(localSrcPath, localDstPath)
 	switch {
 	case err == nil:
