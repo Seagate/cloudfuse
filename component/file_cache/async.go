@@ -38,6 +38,12 @@ import (
 	"github.com/netresearch/go-cron"
 )
 
+// bounds on the backoff between upload cycles that ended in failure
+const (
+	minRetryDelay = time.Second
+	maxRetryDelay = 15 * time.Second
+)
+
 type UploadWindow struct {
 	name        string `yaml:"name"`
 	cronExpr    string `yaml:"cron"`
@@ -217,12 +223,21 @@ func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 
 // persistent background thread function
 func (fc *FileCache) servicePendingOps() {
+	// grows while upload cycles keep failing, resets as soon as one succeeds
+	var retryDelay time.Duration
 	for {
 		select {
 		case <-fc.componentStopping:
 			log.Crit("FileCache::servicePendingOps : Stopping")
 			return
 		case <-fc.startScheduledUploads:
+			if retryDelay > 0 {
+				select {
+				case <-time.After(retryDelay):
+				case <-fc.componentStopping:
+					return
+				}
+			}
 			// check if we're connected
 			// exponential backoff is implemented inside CloudConnected(),
 			//  so we're safe to call it naively every second like this
@@ -239,7 +254,16 @@ func (fc *FileCache) servicePendingOps() {
 				"FileCache::servicePendingOps : Completed upload cycle, processed %d files",
 				numFilesProcessed,
 			)
-			if err == nil && numFilesProcessed == 0 {
+			if err != nil {
+				retryDelay = min(max(2*retryDelay, minRetryDelay), maxRetryDelay)
+				log.Warn(
+					"FileCache::servicePendingOps : Upload cycle failed, retrying in %v",
+					retryDelay,
+				)
+				break
+			}
+			retryDelay = 0
+			if numFilesProcessed == 0 {
 				// we're online but there's nothing to do
 				// wait for a task to be added
 				select {
