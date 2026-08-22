@@ -221,7 +221,6 @@ func (fc *FileCache) servicePendingOps() {
 		select {
 		case <-fc.componentStopping:
 			log.Crit("FileCache::servicePendingOps : Stopping")
-			// TODO: Persist pending ops
 			return
 		case <-fc.startScheduledUploads:
 			// check if we're connected
