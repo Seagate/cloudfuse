@@ -221,6 +221,12 @@ func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 	}
 }
 
+// syncsPendingOps : whether servicePendingOps is running. Queueing an op without it
+// would pin the cached file forever, since eviction skips pending ops.
+func (fc *FileCache) syncsPendingOps() bool {
+	return len(fc.schedule) > 0 || fc.offlineAccess
+}
+
 // persistent background thread function
 func (fc *FileCache) servicePendingOps() {
 	// grows while upload cycles keep failing, resets as soon as one succeeds
