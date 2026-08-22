@@ -192,7 +192,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	} else {
 		close(fc.startScheduledUploads)
 	}
-	if len(fc.schedule) > 0 || fc.offlineAccess {
+	if fc.syncsPendingOps() {
 		fc.pendingOpAdded = make(chan struct{}, 1)
 		go fc.servicePendingOps()
 	}
@@ -2067,6 +2067,11 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 		// add file to upload queue
 		fc.addPendingOp(options.Handle.Path, pendingFlags{})
 		err = nil
+	case fc.syncsPendingOps():
+		log.Err("FileCache::flushFileCloud : %s upload failed [%v]", options.Handle.Path, err)
+		// queue for retry, which also protects the cached data from eviction.
+		// the error is still returned - the caller must not assume the data is safe
+		fc.addPendingOp(options.Handle.Path, pendingFlags{})
 	default:
 		log.Err("FileCache::flushFileCloud : %s upload failed [%v]", options.Handle.Path, err)
 	}

@@ -1324,6 +1324,8 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	defer os.Remove(f.Name())
 	_, err = f.Write(data)
 	s.assert.NoError(err)
+	err = f.Sync()
+	s.assert.NoError(err)
 
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 
