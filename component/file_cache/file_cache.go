@@ -1190,6 +1190,45 @@ func unlockAll(flocks []*common.LockMapItem) {
 	}
 }
 
+// cacheFileMode returns the mode to use for a local cache file. On platforms
+// without POSIX modes the caller's mode is meaningless and may leave the file
+// read-only, so the cache default is used instead.
+func (fc *FileCache) cacheFileMode(mode os.FileMode) os.FileMode {
+	if !posixFileModes {
+		return fc.defaultPermission
+	}
+	return mode
+}
+
+// clearCacheFileReadOnly drops the read-only attribute that older Windows builds
+// left on cache files, which blocks writes, truncates and replacing renames.
+// Reports whether the caller should retry. Where modes are real, so is the error.
+func (fc *FileCache) clearCacheFileReadOnly(path string) bool {
+	if posixFileModes {
+		return false
+	}
+	if err := os.Chmod(path, fc.defaultPermission); err != nil {
+		log.Warn("FileCache::clearCacheFileReadOnly : %s failed [%v]", path, err)
+		return false
+	}
+	log.Info("FileCache::clearCacheFileReadOnly : cleared read-only on %s", path)
+	return true
+}
+
+// openCacheFile opens a file in the local cache, recovering from a stale read-only
+// attribute if that is what blocked the open.
+func (fc *FileCache) openCacheFile(
+	path string,
+	flags int,
+	mode os.FileMode,
+) (*os.File, error) {
+	f, err := common.OpenFile(path, flags, mode)
+	if os.IsPermission(err) && fc.clearCacheFileReadOnly(path) {
+		f, err = common.OpenFile(path, flags, mode)
+	}
+	return f, err
+}
+
 // CreateFile: Create the file in local cache.
 func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::CreateFile")()
@@ -1250,7 +1289,11 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err := common.OpenFile(localPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, options.Mode)
+	f, err := fc.openCacheFile(
+		localPath,
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC,
+		fc.cacheFileMode(options.Mode),
+	)
 	if err != nil {
 		log.Err(
 			"FileCache::CreateFile : error opening local file %s [%s]",
@@ -1260,7 +1303,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, err
 	}
 	// The user might change permissions WHILE creating the file therefore we need to account for that
-	if options.Mode != common.DefaultFilePermissionBits {
+	if posixFileModes && options.Mode != common.DefaultFilePermissionBits {
 		fc.missedChmodList.LoadOrStore(options.Name, true)
 	}
 
@@ -1398,7 +1441,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 	fileOptions := val.(openFileOptions)
 	flags = fileOptions.flags
-	fMode = fileOptions.fMode
+	fMode = fc.cacheFileMode(fileOptions.fMode)
 	overwrite := flags&os.O_TRUNC != 0
 	create := flags&os.O_CREATE != 0
 
@@ -1444,7 +1487,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 		}
 
 		// Open a download handle
-		downloadHandle, err := common.OpenFile(localPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, fMode)
+		downloadHandle, err := fc.openCacheFile(localPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, fMode)
 		if err != nil {
 			log.Err("FileCache::openFileInternal : %s open dl handle failed [%v]", handle.Path, err)
 			return err
@@ -1482,7 +1525,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 		// Only set permissions when creating a new file (O_CREATE flag is set)
 		if create {
 			fileMode := fc.defaultPermission
-			if attr != nil && !attr.IsModeDefault() {
+			if posixFileModes && attr != nil && !attr.IsModeDefault() {
 				fileMode = attr.Mode
 			}
 
@@ -1516,7 +1559,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err := common.OpenFile(localPath, flags, fMode)
+	f, err := fc.openCacheFile(localPath, flags, fMode)
 	if err != nil {
 		log.Err(
 			"FileCache::openFileInternal : error opening cached file %s [%s]",
@@ -2301,6 +2344,14 @@ func (fc *FileCache) renameLocalFile(
 	localSrcPath := filepath.Join(fc.tmpPath, srcName)
 	localDstPath := filepath.Join(fc.tmpPath, dstName)
 
+	if !posixFileModes {
+		if dstInfo, dstErr := os.Stat(localDstPath); dstErr == nil {
+			if !dstInfo.IsDir() && dstInfo.Mode().Perm()&0o200 == 0 {
+				fc.clearCacheFileReadOnly(localDstPath)
+			}
+		}
+	}
+
 	err := os.Rename(localSrcPath, localDstPath)
 	switch {
 	case err == nil:
@@ -2413,7 +2464,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			// Recover missing fd on valid handles by reopening the cached path.
 			// This avoids issues when truncate arrives before the handle has a live file object.
 			localPath := filepath.Join(fc.tmpPath, options.Name)
-			reopened, reopenErr := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
+			reopened, reopenErr := fc.openCacheFile(localPath, os.O_RDWR, fc.defaultPermission)
 			if reopenErr == nil {
 				options.Handle.UnixFD = uint64(reopened.Fd())
 				options.Handle.SetFileObject(reopened)
@@ -2477,7 +2528,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			offlineOkay = true
 		case !needData:
 			log.Debug("FileCache::TruncateFile : %s Creating file (offline)", options.Name)
-			if f, err := common.OpenFile(
+			if f, err := fc.openCacheFile(
 				localPath,
 				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
 				fc.defaultPermission,
@@ -2506,6 +2557,9 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		fc.policy.CacheValid(localPath)
 		if info.Size() != options.NewSize {
 			err := os.Truncate(localPath, options.NewSize)
+			if os.IsPermission(err) && fc.clearCacheFileReadOnly(localPath) {
+				err = os.Truncate(localPath, options.NewSize)
+			}
 			if err != nil {
 				log.Err(
 					"FileCache::TruncateFile : %s failed to truncate cached file [%v]",

@@ -1454,7 +1454,9 @@ func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 		err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: f})
 		suite.assert.NoError(err)
 		info, _ := os.Stat(suite.cache_path + "/" + path)
-		suite.assert.Equal(info.Mode(), os.FileMode(0444))
+		// On Windows, cacheFileMode replaces the requested mode with defaultPermission;
+		// a writable file is reported as 0666 by os.Stat.
+		suite.assert.Equal(info.Mode(), os.FileMode(0666))
 	} else {
 		defer suite.cleanupTest()
 		// Default is to not create empty files on create file to support immutable storage.
