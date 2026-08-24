@@ -71,7 +71,11 @@ type CgofuseFS struct {
 	gid uint32
 }
 
-const windowsDefaultSDDL = "D:P(A;;FA;;;WD)" // Enables everyone on system to have access to mount
+// Grants everyone full access to the mount. The owner and group are required for
+// Explorer's basic Security tab to render, and OICI makes the ACE inheritable so
+// newly created files get the same access instead of the creating process's
+// default DACL (which WinFSP would map to a mode with no owner write bit).
+const windowsDefaultSDDL = "O:BAG:BAD:P(A;OICI;FA;;;WD)"
 const maxPathSize = 4096
 
 // Note: libfuse prepends "/" to the path.
@@ -1271,6 +1275,13 @@ func (cf *CgofuseFS) Chmod(path string, mode uint32) int {
 		return errno
 	}
 	log.Trace("Libfuse::Chmod : %s", name)
+
+	if runtime.GOOS == "windows" {
+		// WinFSP synthesizes this mode from the read-only attribute, so it carries no
+		// permission intent worth storing. Report success and discard it.
+		return 0
+	}
+
 	modeBits := fileModeFromFuse(mode)
 
 	err := fuseFS.NextComponent().Chmod(
