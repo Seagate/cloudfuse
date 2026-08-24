@@ -29,6 +29,7 @@ package e2e_tests
 
 import (
 	"crypto/rand"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,6 +38,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -146,6 +148,29 @@ func (suite *dirTestSuite) waitForCondition(
 		}
 		time.Sleep(interval)
 	}
+}
+
+func retryTransientIO(opName string, action func() error) error {
+	const maxAttempts = 3
+	const retryDelay = 200 * time.Millisecond
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err := action()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		// FUSE operations can intermittently return EIO under load. Retry briefly.
+		if !errors.Is(err, syscall.EIO) || attempt == maxAttempts {
+			return fmt.Errorf("%s failed after %d attempt(s): %w", opName, attempt, err)
+		}
+
+		time.Sleep(retryDelay)
+	}
+
+	return fmt.Errorf("%s failed: %w", opName, lastErr)
 }
 
 // -------------- Directory Tests -------------------
@@ -791,7 +816,9 @@ func (suite *dirTestSuite) TestStatfs() {
 	fileName := filepath.Join(dirName, "small_file_")
 	for i := range numberOfFiles {
 		newFile := fileName + strconv.Itoa(i)
-		err := os.WriteFile(newFile, suite.minBuff, 0777)
+		err := retryTransientIO("initial write "+newFile, func() error {
+			return os.WriteFile(newFile, suite.minBuff, 0777)
+		})
 		suite.NoError(err)
 	}
 	// flaky test
@@ -805,7 +832,9 @@ func (suite *dirTestSuite) TestStatfs() {
 
 	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
-		err := os.Truncate(file, 4096)
+		err := retryTransientIO("first truncate "+file, func() error {
+			return os.Truncate(file, 4096)
+		})
 		suite.NoError(err)
 	}
 	if suite.sizeTracker {
@@ -822,7 +851,9 @@ func (suite *dirTestSuite) TestStatfs() {
 
 	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
-		err := os.WriteFile(file, suite.medBuff, 0777)
+		err := retryTransientIO("second write "+file, func() error {
+			return os.WriteFile(file, suite.medBuff, 0777)
+		})
 		suite.NoError(err)
 	}
 	if suite.sizeTracker {
@@ -858,7 +889,9 @@ func (suite *dirTestSuite) TestStatfs() {
 
 	for i := range numberOfFiles {
 		file := renameFile + strconv.Itoa(i)
-		err := os.Truncate(file, 4096)
+		err := retryTransientIO("second truncate "+file, func() error {
+			return os.Truncate(file, 4096)
+		})
 		suite.NoError(err)
 	}
 	if suite.sizeTracker {
