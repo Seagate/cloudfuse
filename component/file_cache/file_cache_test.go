@@ -2870,9 +2870,8 @@ func (suite *fileCacheTestSuite) TestUpdateObjectOfflineErrorKeepsPending() {
 	suite.fileCache.addPendingOp(name, pendingFlags{})
 	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
 
-	err = suite.fileCache.updateObject(name, pendingFlags{})
-	suite.assert.Error(err)
-	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	success := suite.fileCache.updateObject(name, pendingFlags{})
+	suite.assert.False(success)
 
 	_, stillPending := suite.fileCache.pendingOps.Load(name)
 	suite.assert.True(
@@ -2897,8 +2896,8 @@ func (suite *fileCacheTestSuite) TestUpdateObjectDeletionMissingLocalFile() {
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: name}).Return(nil, nil)
 	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: name}).Return(nil)
 
-	err := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
-	suite.assert.NoError(err)
+	success := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
+	suite.assert.True(success)
 
 	_, stillPending := suite.fileCache.pendingOps.Load(name)
 	suite.assert.False(stillPending, "delete should be synced and removed from pendingOps")

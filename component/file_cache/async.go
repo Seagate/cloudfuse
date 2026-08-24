@@ -295,12 +295,7 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 		case <-fc.startScheduledUploads:
 			name := key.(string)
 			numFilesProcessed++
-			cycleErr = fc.updateObject(name, value.(pendingFlags))
-			if cycleErr != nil {
-				// a failure here is a property of the endpoint (offline, full, throttled,
-				// unauthorized) far more often than of the object, so stop the cycle
-				// instead of repeating a known failure against every remaining file
-				log.Err("FileCache::runPendingOpCycle : %s sync failed: %v", name, cycleErr)
+			if !fc.updateObject(name, value.(pendingFlags)) {
 				return false
 			}
 			return true
@@ -313,7 +308,8 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 }
 
 // synchronize pending operation with cloud storage
-func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
+// returns false if we should stop iterating (offline, etc.)
+func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 	log.Trace("FileCache::updateObject : %s", name)
 
 	// lock the file
@@ -324,7 +320,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// don't double upload
 	_, stillPending := fc.pendingOps.Load(name)
 	if !stillPending {
-		return nil
+		return true
 	}
 
 	// look up file (or folder!)
@@ -334,9 +330,10 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
 	if !flags.isDeletion && localErr != nil {
 		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, localErr)
-		// the op is resolved, not failed - dropping it must not end the cycle
+		// there is no file to upload, so consider the inconsistency resolved
 		fc.pendingOps.Delete(name)
-		return nil
+		// this file failed, but we can continue with the rest of the pending ops
+		return true
 	}
 	if flags.isDeletion && !localMissing {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
@@ -353,7 +350,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 		if flags.isDeletion && fc.notInCloud(name) {
 			log.Info("FileCache::updateObject : %s skipping cloud deletion (not in cloud)", name)
 			fc.pendingOps.Delete(name)
-			return nil
+			return true
 		}
 		if flags.isDir {
 			// delete folder
@@ -380,14 +377,14 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// handle errors
 	if cloudErr != nil {
 		log.Err("FileCache::updateObject : %s %s %s failed [%v]", name, objType, op, cloudErr)
-		return cloudErr
+		return false
 	}
 
 	// update state
 	log.Info("FileCache::updateObject : %s sync successful", name)
 	fc.pendingOps.Delete(name)
 
-	return nil
+	return true
 }
 
 // returns true if we *know* that this entity does not exist in cloud storage
