@@ -18,7 +18,7 @@ jobs:
     environment: testing
     strategy:
       matrix:
-        go: ["1.26"]
+        go: ["1.27"]
         job_name: ["linux-fuse3", "linux-fuse2"]
 
         include:
@@ -1029,7 +1029,7 @@ jobs:
     environment: testing
     strategy:
       matrix:
-        go: ["1.26"]
+        go: ["1.27"]
         job_name: ["windows"]
 
         include:
@@ -1956,7 +1956,7 @@ jobs:
     environment: testing
     strategy:
       matrix:
-        go: ["1.26"]
+        go: ["1.27"]
         job_name: ["linux"]
 
         include:

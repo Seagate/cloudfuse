@@ -27,7 +27,8 @@
 package winservice
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 	"os"
 	"path/filepath"
@@ -100,7 +101,7 @@ func getMountTrackerFile(useSystem bool) (string, error) {
 			return "", err
 		}
 
-		data, err := json.MarshalIndent(Mounts{}, "", " ")
+		data, err := json.Marshal(Mounts{}, jsontext.WithIndent(" "), jsontext.WithIndentPrefix(""))
 		if err != nil {
 			return "", err
 		}
@@ -137,7 +138,7 @@ func writeMounts(mounts Mounts, useSystem bool) error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(mounts, "", " ")
+	data, err := json.Marshal(mounts, jsontext.WithIndent(" "), jsontext.WithIndentPrefix(""))
 	if err != nil {
 		return err
 	}

@@ -68,7 +68,7 @@ jobs:
 
     env:
       cgo: "1"
-      go: "1.26"
+      go: "1.27"
       zig: 0.15.2
 
       AWS_ENDPOINT: http://localhost:4566
@@ -208,7 +208,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
-      go: "1.26"
+      go: "1.27"
       cgo: "0"
 
     steps:
@@ -242,7 +242,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: "1.26"
+      go: "1.27"
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

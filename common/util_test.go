@@ -73,7 +73,6 @@ func (suite *utilTestSuite) TestThreadSafeBitmap() {
 	var wg sync.WaitGroup
 
 	set := func() {
-		defer wg.Done()
 		<-start
 		for i := range 100000 {
 			bitmap.Set(uint64(i % 64))
@@ -81,7 +80,6 @@ func (suite *utilTestSuite) TestThreadSafeBitmap() {
 	}
 
 	access := func() {
-		defer wg.Done()
 		<-start
 		for i := range 100000 {
 			bitmap.IsSet(uint64(i % 64))
@@ -89,7 +87,6 @@ func (suite *utilTestSuite) TestThreadSafeBitmap() {
 	}
 
 	_clear := func() {
-		defer wg.Done()
 		<-start
 		for i := range 100000 {
 			bitmap.Clear(uint64(i % 64))
@@ -97,18 +94,16 @@ func (suite *utilTestSuite) TestThreadSafeBitmap() {
 	}
 
 	resetBitmap := func() {
-		defer wg.Done()
 		<-start
 		for range 100000 {
 			bitmap.Reset()
 		}
 	}
 
-	wg.Add(4)
-	go set()
-	go access()
-	go _clear()
-	go resetBitmap()
+	wg.Go(set)
+	wg.Go(access)
+	wg.Go(_clear)
+	wg.Go(resetBitmap)
 	close(start)
 	wg.Wait()
 }
