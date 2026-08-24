@@ -110,54 +110,71 @@ func (suite *updateTestSuite) SetupTest() {
 		checksumByAsset[name] = hex.EncodeToString(h[:])
 	}
 
-	suite.mockServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	suite.mockServer = httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
 
-		assets := []asset{
-			{Name: linuxDebAsset, BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxDebAsset},
-			{Name: linuxRpmAsset, BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxRpmAsset},
-			{Name: linuxTarAsset, BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxTarAsset},
-			{Name: windowsZipAsset, BrowserDownloadURL: suite.mockServer.URL + "/assets/" + windowsZipAsset},
-			{Name: windowsExeAsset, BrowserDownloadURL: suite.mockServer.URL + "/assets/" + windowsExeAsset},
-			{
-				Name:               "cloudfuse_checksums_sha256.txt",
-				BrowserDownloadURL: suite.mockServer.URL + "/checksums/cloudfuse_checksums_sha256.txt",
-			},
-		}
+			assets := []asset{
+				{
+					Name:               linuxDebAsset,
+					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxDebAsset,
+				},
+				{
+					Name:               linuxRpmAsset,
+					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxRpmAsset,
+				},
+				{
+					Name:               linuxTarAsset,
+					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxTarAsset,
+				},
+				{
+					Name:               windowsZipAsset,
+					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + windowsZipAsset,
+				},
+				{
+					Name:               windowsExeAsset,
+					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + windowsExeAsset,
+				},
+				{
+					Name:               "cloudfuse_checksums_sha256.txt",
+					BrowserDownloadURL: suite.mockServer.URL + "/checksums/cloudfuse_checksums_sha256.txt",
+				},
+			}
 
-		switch {
-		case r.URL.Path == "/latest":
-			_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
-				TagName: "v" + releaseVersion,
-				Name:    "Cloudfuse v" + releaseVersion,
-				Assets:  assets,
-			})
-		case r.URL.Path == "/tags/v1.8.0":
-			_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
-				TagName: "v1.8.0",
-				Name:    "Cloudfuse v1.8.0",
-				Assets:  assets,
-			})
-		case len(r.URL.Path) > len("/assets/") && r.URL.Path[:len("/assets/")] == "/assets/":
-			assetName := r.URL.Path[len("/assets/"):]
-			body, found := assetBodies[assetName]
-			if !found {
+			switch {
+			case r.URL.Path == "/latest":
+				_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
+					TagName: "v" + releaseVersion,
+					Name:    "Cloudfuse v" + releaseVersion,
+					Assets:  assets,
+				})
+			case r.URL.Path == "/tags/v1.8.0":
+				_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
+					TagName: "v1.8.0",
+					Name:    "Cloudfuse v1.8.0",
+					Assets:  assets,
+				})
+			case len(r.URL.Path) > len("/assets/") && r.URL.Path[:len("/assets/")] == "/assets/":
+				assetName := r.URL.Path[len("/assets/"):]
+				body, found := assetBodies[assetName]
+				if !found {
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte("asset not found"))
+					return
+				}
+				w.Header().Set("Content-Type", "application/octet-stream")
+				_, _ = w.Write(body)
+			case r.URL.Path == "/checksums/cloudfuse_checksums_sha256.txt":
+				w.Header().Set("Content-Type", "text/plain")
+				for name, sum := range checksumByAsset {
+					_, _ = fmt.Fprintf(w, "%s  %s\n", sum, name)
+				}
+			default:
 				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write([]byte("asset not found"))
-				return
+				_, _ = w.Write([]byte(`{"message":"Not Found"}`))
 			}
-			w.Header().Set("Content-Type", "application/octet-stream")
-			_, _ = w.Write(body)
-		case r.URL.Path == "/checksums/cloudfuse_checksums_sha256.txt":
-			w.Header().Set("Content-Type", "text/plain")
-			for name, sum := range checksumByAsset {
-				_, _ = fmt.Fprintf(w, "%s  %s\n", sum, name)
-			}
-		default:
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
-		}
-	}))
+		}),
+	)
 
 	releaseAPIBaseURL = suite.mockServer.URL
 
