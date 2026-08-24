@@ -1,5 +1,6 @@
 name: Weekly Live GitHub API Check
-permissions: {}
+permissions:
+  contents: read
 
 on:
   schedule:
