@@ -40,9 +40,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// posixFileModes reports whether the platform has meaningful POSIX file modes.
-const posixFileModes = false
-
 // Creates a new object attribute
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 	stat := info.Sys().(*syscall.Win32FileAttributeData)

@@ -1194,7 +1194,7 @@ func unlockAll(flocks []*common.LockMapItem) {
 // without POSIX modes the caller's mode is meaningless and may leave the file
 // read-only, so the cache default is used instead.
 func (fc *FileCache) cacheFileMode(mode os.FileMode) os.FileMode {
-	if !posixFileModes {
+	if runtime.GOOS == "windows" {
 		return fc.defaultPermission
 	}
 	return mode
@@ -1204,7 +1204,7 @@ func (fc *FileCache) cacheFileMode(mode os.FileMode) os.FileMode {
 // left on cache files, which blocks writes, truncates and replacing renames.
 // Reports whether the caller should retry. Where modes are real, so is the error.
 func (fc *FileCache) clearCacheFileReadOnly(path string) bool {
-	if posixFileModes {
+	if runtime.GOOS != "windows" {
 		return false
 	}
 	if err := os.Chmod(path, fc.defaultPermission); err != nil {
@@ -1303,7 +1303,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, err
 	}
 	// The user might change permissions WHILE creating the file therefore we need to account for that
-	if posixFileModes && options.Mode != common.DefaultFilePermissionBits {
+	if runtime.GOOS != "windows" && options.Mode != common.DefaultFilePermissionBits {
 		fc.missedChmodList.LoadOrStore(options.Name, true)
 	}
 
@@ -1525,7 +1525,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 		// Only set permissions when creating a new file (O_CREATE flag is set)
 		if create {
 			fileMode := fc.defaultPermission
-			if posixFileModes && attr != nil && !attr.IsModeDefault() {
+			if runtime.GOOS != "windows" && attr != nil && !attr.IsModeDefault() {
 				fileMode = attr.Mode
 			}
 
@@ -2344,7 +2344,7 @@ func (fc *FileCache) renameLocalFile(
 	localSrcPath := filepath.Join(fc.tmpPath, srcName)
 	localDstPath := filepath.Join(fc.tmpPath, dstName)
 
-	if !posixFileModes {
+	if runtime.GOOS == "windows" {
 		if dstInfo, dstErr := os.Stat(localDstPath); dstErr == nil {
 			if !dstInfo.IsDir() && dstInfo.Mode().Perm()&0o200 == 0 {
 				fc.clearCacheFileReadOnly(localDstPath)
