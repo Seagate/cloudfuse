@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## **2.3.2** ##
+
+August 24th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#1017](https://github.com/Seagate/cloudfuse/pull/1017) Fix Windows permissions and improve error handling
+- [#1013](https://github.com/Seagate/cloudfuse/pull/1013) Fix stat responses so du works (only relevant on Linux)
+
 ## **2.3.1** ##
 
 July 30th 2026
