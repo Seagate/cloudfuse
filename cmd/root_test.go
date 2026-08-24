@@ -29,7 +29,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
 	"testing"
@@ -131,11 +134,77 @@ func (suite *updateTestSuite) TestGetRelease() {
 		suite.T().Skip("Skipping test on Windows ARM")
 	}
 	defer suite.cleanupTest()
+
+	originalReleaseAPIBaseURL := releaseAPIBaseURL
+	defer func() {
+		releaseAPIBaseURL = originalReleaseAPIBaseURL
+	}()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		linuxFuseAsset := fmt.Sprintf(
+			"cloudfuse_%s_%s_%s_%s.tar.gz",
+			"1.8.0",
+			runtime.GOOS,
+			runtime.GOARCH,
+			common.FuseVersion,
+		)
+		windowsZipAsset := fmt.Sprintf(
+			"cloudfuse_%s_%s_%s.zip",
+			"1.8.0",
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
+		windowsExeAsset := fmt.Sprintf(
+			"cloudfuse_%s_%s_%s.exe",
+			"1.8.0",
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
+
+		assets := []asset{{
+			Name:               linuxFuseAsset,
+			BrowserDownloadURL: "https://example.invalid/" + linuxFuseAsset,
+		}, {
+			Name:               windowsZipAsset,
+			BrowserDownloadURL: "https://example.invalid/" + windowsZipAsset,
+		}, {
+			Name:               windowsExeAsset,
+			BrowserDownloadURL: "https://example.invalid/" + windowsExeAsset,
+		}, {
+			Name:               "cloudfuse_checksums_sha256.txt",
+			BrowserDownloadURL: "https://example.invalid/cloudfuse_checksums_sha256.txt",
+		}}
+
+		switch r.URL.Path {
+		case "/latest", "/tags/v1.8.0":
+			_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
+				TagName: "v1.8.0",
+				Name:    "Cloudfuse v1.8.0",
+				Assets:  assets,
+			})
+			return
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+		}
+	}))
+	defer server.Close()
+
+	releaseAPIBaseURL = server.URL
 	ctx := context.Background()
+
+	if runtime.GOOS == "windows" {
+		opt.Package = "zip"
+	} else {
+		opt.Package = "tar"
+	}
 
 	validVersion := "1.8.0"
 	resultVer, err := getRelease(ctx, validVersion)
-	suite.assert.NoError(err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(resultVer)
 	suite.assert.Equal(validVersion, resultVer.Version)
 
 	// When no version is passed, should get the latest version
