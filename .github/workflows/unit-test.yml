@@ -71,7 +71,7 @@ jobs:
     env:
       cgo: "1"
       go: "1.27"
-      zig: 0.15.2
+      zig: 0.16.0
 
       AWS_ENDPOINT: http://localhost:4566
       AWS_REGION: us-east-1
