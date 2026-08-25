@@ -1271,13 +1271,13 @@ func (bb *BlockBlob) WriteFromFile(
 	// Compute md5 of this file is requested by user
 	// If file is uploaded in one shot (no blocks created) then server is populating md5 on upload automatically.
 	// hence we take cost of calculating md5 only for files which are bigger in size and which will be converted to blocks.
-	md5sum := []byte{}
+	var md5sum []byte
 	if bb.Config.updateMD5 && stat.Size() >= blockblob.MaxUploadBlobBytes {
 		md5sum, err = common.GetMD5(fi)
 		if err != nil {
 			// Md5 sum generation failed so set nil while uploading
 			log.Warn("BlockBlob::WriteFromFile : Failed to generate md5 of %s", name)
-			md5sum = []byte{0}
+			md5sum = nil
 		}
 	}
 
