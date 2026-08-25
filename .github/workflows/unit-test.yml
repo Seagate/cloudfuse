@@ -61,6 +61,8 @@ jobs:
 
       azurite:
         image: mcr.microsoft.com/azure-storage/azurite:latest
+        env:
+          AZURITE_SKIP_API_VERSION_CHECK: "true"
         ports:
           - 10000:10000
           - 10001:10001
