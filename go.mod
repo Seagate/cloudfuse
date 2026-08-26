@@ -17,7 +17,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/go-viper/mapstructure/v2 v2.5.0
-	github.com/montanaflynn/stats v0.12.3
+	github.com/montanaflynn/stats v0.12.4
 	github.com/netresearch/go-cron v0.15.1
 	github.com/petermattis/goid v0.0.0-20260819104326-d9896a8858b2
 	github.com/radovskyb/watcher v1.0.7
@@ -27,7 +27,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/vibhansa-msft/blobfilter v0.0.0-20250115104552-d9d40722be3e
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
 	github.com/winfsp/cgofuse v1.6.0
@@ -82,5 +82,4 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
