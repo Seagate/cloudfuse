@@ -29,7 +29,7 @@ package cloudfuse_stats
 
 import (
 	"bytes"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"os"
 	"time"

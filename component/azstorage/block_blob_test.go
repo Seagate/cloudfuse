@@ -34,7 +34,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -3892,11 +3892,14 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 			s.assert.NoError(err)
 
 			blobClient := s.containerClient.NewBlobClient(name)
-			_, _ = blobClient.SetHTTPHeaders(
+			_, err = blobClient.SetHTTPHeaders(
 				context.Background(),
-				blob.HTTPHeaders{BlobContentMD5: []byte("cloudfuse")},
+				blob.HTTPHeaders{
+					BlobContentMD5: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+				},
 				nil,
 			)
+			s.assert.NoError(err)
 
 			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
@@ -4096,11 +4099,14 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 			_ = os.Remove(name)
 
 			blobClient := s.containerClient.NewBlobClient(name)
-			_, _ = blobClient.SetHTTPHeaders(
+			_, err = blobClient.SetHTTPHeaders(
 				context.Background(),
-				blob.HTTPHeaders{BlobContentMD5: []byte("cloudfuse")},
+				blob.HTTPHeaders{
+					BlobContentMD5: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+				},
 				nil,
 			)
+			s.assert.NoError(err)
 
 			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)
@@ -4170,11 +4176,14 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 			_ = os.Remove(name)
 
 			blobClient := s.containerClient.NewBlobClient(name)
-			_, _ = blobClient.SetHTTPHeaders(
+			_, err = blobClient.SetHTTPHeaders(
 				context.Background(),
-				blob.HTTPHeaders{BlobContentMD5: []byte("cloudfuse")},
+				blob.HTTPHeaders{
+					BlobContentMD5: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+				},
 				nil,
 			)
+			s.assert.NoError(err)
 
 			prop, err := s.az.storage.GetAttr(ctx, name)
 			s.assert.NoError(err)

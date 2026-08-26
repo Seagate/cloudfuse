@@ -201,7 +201,7 @@ func (p *lruPolicy) createSnapshot() *lruPolicySnapshot {
 
 	// Capture complete pendingOps map for reliable restoration
 	snapshot.PendingOps = make(map[string]pendingOpSnapshot)
-	p.pendingOps.Range(func(key, value interface{}) bool {
+	p.pendingOps.Range(func(key, value any) bool {
 		flags := value.(pendingFlags)
 		snapshot.PendingOps[key.(string)] = pendingOpSnapshot{
 			IsDir:      flags.isDir,

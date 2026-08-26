@@ -33,7 +33,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -1323,6 +1323,8 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	_, err = f.Write(data)
+	s.assert.NoError(err)
+	err = f.Sync()
 	s.assert.NoError(err)
 
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})

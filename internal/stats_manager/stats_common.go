@@ -188,7 +188,8 @@ func disableMonitoring() {
 }
 
 func init() {
-	stMgrOpt = statsManagerOpt{}
-	stMgrOpt.pollStarted = false
-	stMgrOpt.cmpTimeMap = make(map[string]string)
+	stMgrOpt = statsManagerOpt{
+		pollStarted: false,
+		cmpTimeMap:  make(map[string]string),
+	}
 }

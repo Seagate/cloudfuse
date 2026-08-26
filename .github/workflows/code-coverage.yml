@@ -18,16 +18,16 @@ jobs:
     environment: testing
     strategy:
       matrix:
-        go: ["1.26"]
+        go: ["1.27"]
         job_name: ["linux-fuse3", "linux-fuse2"]
 
         include:
           - job_name: linux-fuse3
-            os: ubuntu-latest
+            os: ubuntu-22.04
             containerName: "test-cnt-ubn-fuse3"
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
-            os: ubuntu-latest
+            os: ubuntu-22.04
             containerName: "test-cnt-ubn-fuse2"
             fuselib: libfuse-dev
 
@@ -42,7 +42,7 @@ jobs:
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
       MOUNT_READY_TIMEOUT: 60
-      zig: 0.15.2
+      zig: 0.16.0
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -50,12 +50,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -1029,7 +1029,7 @@ jobs:
     environment: testing
     strategy:
       matrix:
-        go: ["1.26"]
+        go: ["1.27"]
         job_name: ["windows"]
 
         include:
@@ -1055,12 +1055,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -1956,7 +1956,7 @@ jobs:
     environment: testing
     strategy:
       matrix:
-        go: ["1.26"]
+        go: ["1.27"]
         job_name: ["linux"]
 
         include:
@@ -1970,12 +1970,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true

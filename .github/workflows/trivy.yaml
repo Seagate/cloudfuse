@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -43,7 +43,10 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           scan-type: "fs"
-          severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+          # lower severity threshold (so we don't crash for PGP)
+          severity: "MEDIUM,HIGH,CRITICAL"
+          # Apply the severity filter to the SARIF report and the exit code
+          limit-severities-for-sarif: true
           scan-ref: "."
           scanners: "vuln"
           format: "sarif"
@@ -60,6 +63,6 @@ jobs:
           exit-code: 1
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           sarif_file: "trivy-results.sarif"

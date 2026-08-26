@@ -421,6 +421,7 @@ func createWindowsArchive(archPath string) error {
 		if strings.Contains(relPath, "cloudfuse") &&
 			regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(relPath) {
 			var file *os.File
+			//nolint:gosec // G122: path is from filepath.Walk callback, safe for operations within Walk
 			file, err = os.Open(path)
 			if err != nil {
 				return err

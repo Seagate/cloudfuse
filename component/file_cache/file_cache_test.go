@@ -1454,7 +1454,9 @@ func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 		err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: f})
 		suite.assert.NoError(err)
 		info, _ := os.Stat(suite.cache_path + "/" + path)
-		suite.assert.Equal(info.Mode(), os.FileMode(0444))
+		// On Windows, cacheFileMode replaces the requested mode with defaultPermission;
+		// a writable file is reported as 0666 by os.Stat.
+		suite.assert.Equal(info.Mode(), os.FileMode(0666))
 	} else {
 		defer suite.cleanupTest()
 		// Default is to not create empty files on create file to support immutable storage.
@@ -1873,8 +1875,13 @@ func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingData() {
 		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY, Mode: 0777},
 	)
 	suite.assert.Error(err)
-	suite.assert.NotNil(handle)
+	suite.assert.Nil(handle)
 	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+
+	// A failed open must not leak a handle reference, otherwise the LRU policy
+	// would never be able to evict this file.
+	flock := suite.fileCache.fileLocks.Get(path)
+	suite.assert.Zero(flock.Count())
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingAttrsWithOverwrite() {
@@ -2233,6 +2240,26 @@ func (suite *fileCacheTestSuite) TestOpenCloseHandleCount() {
 	suite.assert.NoError(err)
 
 	// check that flock handle count is correct
+	flock := suite.fileCache.fileLocks.Get(file)
+	suite.assert.Zero(flock.Count())
+}
+
+func (suite *fileCacheTestSuite) TestOpenFileErrorDoesNotLeakHandleCount() {
+	defer suite.cleanupTest()
+
+	file := "file_open_fail"
+	localPath := filepath.Join(suite.cache_path, file)
+	err := os.MkdirAll(localPath, 0777)
+	suite.assert.NoError(err)
+
+	// Use an invalid flag combination to force an error
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: file, Flags: os.O_RDWR | os.O_TRUNC, Mode: 0777},
+	)
+	suite.assert.Error(err)
+	suite.assert.Nil(handle)
+
+	// a failed open must not increment the handle count
 	flock := suite.fileCache.fileLocks.Get(file)
 	suite.assert.Zero(flock.Count())
 }
@@ -2843,9 +2870,8 @@ func (suite *fileCacheTestSuite) TestUpdateObjectOfflineErrorKeepsPending() {
 	suite.fileCache.addPendingOp(name, pendingFlags{})
 	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
 
-	err = suite.fileCache.updateObject(name, pendingFlags{})
-	suite.assert.Error(err)
-	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	success := suite.fileCache.updateObject(name, pendingFlags{})
+	suite.assert.False(success)
 
 	_, stillPending := suite.fileCache.pendingOps.Load(name)
 	suite.assert.True(
@@ -2870,8 +2896,8 @@ func (suite *fileCacheTestSuite) TestUpdateObjectDeletionMissingLocalFile() {
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: name}).Return(nil, nil)
 	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: name}).Return(nil)
 
-	err := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
-	suite.assert.NoError(err)
+	success := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
+	suite.assert.True(success)
 
 	_, stillPending := suite.fileCache.pendingOps.Load(name)
 	suite.assert.False(stillPending, "delete should be synced and removed from pendingOps")
@@ -2909,7 +2935,7 @@ func (suite *fileCacheTestSuite) TestServicePendingOpsProcessesPendingOnline() {
 
 	suite.fileCache.addPendingOp(name, pendingFlags{})
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		_, pending := suite.fileCache.pendingOps.Load(name)
 		if !pending {
 			break
@@ -3169,7 +3195,7 @@ loopbackfs:
 	// Verify updated data was uploaded - poll for the update
 	expectedData := append(data1, updatedData...)
 	var cloudData []byte
-	for i := 0; i < 300; i++ {
+	for range 300 {
 		cloudData, err = os.ReadFile(filepath.Join(suite.fake_storage_path, file1))
 		if err == nil && len(cloudData) == len(expectedData) {
 			break

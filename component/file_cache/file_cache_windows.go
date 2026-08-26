@@ -44,14 +44,18 @@ import (
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 	stat := info.Sys().(*syscall.Win32FileAttributeData)
 	attrs := &internal.ObjAttr{
-		Path:  common.NormalizeObjectName(path),
-		Name:  common.NormalizeObjectName(info.Name()),
-		Size:  info.Size(),
-		Mode:  info.Mode(),
+		Path: common.NormalizeObjectName(path),
+		Name: common.NormalizeObjectName(info.Name()),
+		Size: info.Size(),
+		// mask off the permission bits, which are meaningless on Windows
+		Mode:  info.Mode() &^ os.ModePerm,
 		Mtime: time.Unix(0, stat.LastWriteTime.Nanoseconds()),
 		Atime: time.Unix(0, stat.LastAccessTime.Nanoseconds()),
 		Ctime: time.Unix(0, stat.CreationTime.Nanoseconds()),
 	}
+
+	// let the fuse layer supply the configured default permission
+	attrs.Flags.Set(internal.PropFlagModeDefault)
 
 	if info.Mode()&os.ModeSymlink != 0 {
 		attrs.Flags.Set(internal.PropFlagSymlink)

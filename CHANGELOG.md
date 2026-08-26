@@ -1,5 +1,46 @@
 # Cloudfuse Changelog #
 
+## **2.3.2** ##
+
+August 24th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#1017](https://github.com/Seagate/cloudfuse/pull/1017) Fix Windows permissions and improve error handling
+- [#1013](https://github.com/Seagate/cloudfuse/pull/1013) Fix stat responses so du works (only relevant on Linux)
+
+## **2.3.1** ##
+
+July 30th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#991](https://github.com/Seagate/cloudfuse/pull/991) Fix issue causing file cache to fill all available capacity
+- [#974](https://github.com/Seagate/cloudfuse/pull/974) Enable go security scanning & fix security issues
+
+## **2.3.0** ##
+
+May 28th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Features ###
+
+- [#705](https://github.com/Seagate/cloudfuse/pull/705) Add offline access feature (see [documentation](component/file_cache/OfflineAccess.md))
+- [#910](https://github.com/Seagate/cloudfuse/pull/910) Make cloud storage components connection-aware
+- [#909](https://github.com/Seagate/cloudfuse/pull/909) Improve GetAttr performance by avoiding unnecessary cloud storage calls
+- [#848](https://github.com/Seagate/cloudfuse/pull/848) Add hard limit to size tracker if size is over bucket capacity
+
+### Changes ###
+
+- [#897](https://github.com/Seagate/cloudfuse/pull/897) Remove file_cache flags: ignore-sync & sync-to-flush (sync will flush)
+
+### Bug Fixes ###
+
+- [#831](https://github.com/Seagate/cloudfuse/pull/831) Fix cron and async issues in file cache scheduler / pending ops code (thanks @CybotTM!)
+- [#913](https://github.com/Seagate/cloudfuse/pull/913) Fix file cache async bugs
+
 ## **2.2.0** ##
 
 April 7th 2026
