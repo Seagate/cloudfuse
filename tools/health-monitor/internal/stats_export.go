@@ -74,16 +74,22 @@ func NewStatsExporter() (*StatsExporter, error) {
 		expLock.Lock()
 		defer expLock.Unlock()
 		if se == nil {
-			se = &StatsExporter{}
-			se.channel = make(chan ExportedStat, 10000)
-			se.wg.Add(1)
-			go se.StatsExporter()
+			tmp := &StatsExporter{}
+			tmp.channel = make(chan ExportedStat, 10000)
+			tmp.wg.Add(1)
+			go tmp.StatsExporter()
 
-			err := se.getNewFile()
+			err := tmp.getNewFile()
 			if err != nil {
+				// Close the channel to let the goroutine exit and avoid leaking resources.
+				close(tmp.channel)
+				tmp.wg.Wait()
 				log.Err("stats_exporter::NewStatsExporter : [%v]", err)
 				return nil, err
 			}
+
+			// Only publish to the global singleton after successful initialization.
+			se = tmp
 		}
 	}
 
