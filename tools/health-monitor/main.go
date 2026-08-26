@@ -95,7 +95,13 @@ func main() {
 	}
 
 	if hmcommon.OutputPath == "" {
-		hmcommon.OutputPath = hmcommon.DefaultWorkDir
+		currDir, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("health-monitor : failed to get current directory [%s]\n", err.Error())
+			log.Err("main::main : failed to get current directory [%s]\n", err.Error())
+			return
+		}
+		hmcommon.OutputPath = currDir
 	}
 
 	common.TransferPipe += "_" + hmcommon.Pid

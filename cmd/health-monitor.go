@@ -101,6 +101,12 @@ var healthMonCmd = &cobra.Command{
 			return fmt.Errorf("invalid health_monitor config: %w", err)
 		}
 
+		// Default output path to the cloudfuse working directory when not set
+		// via config. This keeps JSON stats files alongside cloudfuse logs.
+		if options.MonitorOpt.OutputPath == "" {
+			options.MonitorOpt.OutputPath = hmcommon.DefaultWorkDir
+		}
+
 		cliParams := buildCliParamForMonitor()
 		log.Debug("health-monitor : Options = %v", cliParams)
 		log.Debug("health-monitor : Starting health-monitor for cloudfuse pid = %s", pid)
