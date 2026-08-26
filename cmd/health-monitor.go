@@ -26,7 +26,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -104,27 +106,20 @@ var healthMonCmd = &cobra.Command{
 		log.Debug("health-monitor : Starting health-monitor for cloudfuse pid = %s", pid)
 
 		var hmcmd *exec.Cmd
+		hmBinary := hmcommon.CfuseMon
 		if runtime.GOOS == "windows" {
-			path, err := filepath.Abs(hmcommon.CfuseMon + ".exe")
-			if err != nil {
-				return fmt.Errorf("failed to start health monitor: %w", err)
-			}
-			//nolint:gosec // G204: executable path is resolved explicitly; args are passed directly without shell.
-			hmcmd = exec.Command(path, cliParams...)
-		} else {
-			monPath, err := exec.LookPath(hmcommon.CfuseMon)
-			if err != nil {
-				return fmt.Errorf(
-					"failed to start health monitor: failed to locate health monitor binary: %w",
-					err,
-				)
-			}
-			//nolint:gosec // G204: executable is resolved via LookPath; args are not interpreted by a shell.
-			hmcmd = exec.Command(monPath, cliParams...)
+			hmBinary += ".exe"
 		}
-		cliOut, err := hmcmd.Output()
-		if len(cliOut) > 0 {
-			log.Debug("health-monitor : cliout = %v", string(cliOut))
+
+		monPath, err := findHMBinary(hmBinary)
+		if err == nil {
+			//nolint:gosec // G204: executable path is resolved via LookPath; args are not interpreted by a shell.
+			hmcmd = exec.Command(monPath, cliParams...)
+			var cliOut []byte
+			cliOut, err = hmcmd.Output()
+			if len(cliOut) > 0 {
+				log.Debug("health-monitor : cliout = %v", string(cliOut))
+			}
 		}
 
 		if err != nil {
@@ -205,6 +200,25 @@ func buildCliParamForMonitor() []string {
 	}
 
 	return cliParams
+}
+
+// findHMBinary locates the health-monitor binary.
+// It first checks the directory of the running cloudfuse executable, then falls back to PATH.
+func findHMBinary(hmBinary string) (string, error) {
+	// search PATH
+	foundPath, err := exec.LookPath(hmBinary)
+	if errors.Is(err, exec.ErrDot) {
+		return filepath.Abs(foundPath)
+	}
+	// fallback to a sibling of the current executable
+	if exePath, err := os.Executable(); err == nil {
+		sibling := filepath.Join(filepath.Dir(exePath), hmBinary)
+		if _, err := os.Stat(sibling); err == nil {
+			return sibling, nil
+		}
+	}
+
+	return "", fmt.Errorf("health-monitor binary %s not found", hmBinary)
 }
 
 func init() {
