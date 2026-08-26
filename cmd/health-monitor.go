@@ -105,6 +105,22 @@ var healthMonCmd = &cobra.Command{
 		log.Debug("health-monitor : Options = %v", cliParams)
 		log.Debug("health-monitor : Starting health-monitor for cloudfuse pid = %s", pid)
 
+		// Ensure the output directory exists before spawning the monitor subprocess.
+		// This is important when running as a service where the child process may
+		// have more restrictive permissions than the parent.
+		if options.MonitorOpt.OutputPath != "" {
+			err := os.MkdirAll(options.MonitorOpt.OutputPath, 0755)
+			if err != nil {
+				common.EnableMonitoring = false
+				log.Err(
+					"health-monitor : failed to create output directory [%s] [%s]",
+					options.MonitorOpt.OutputPath,
+					err.Error(),
+				)
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
+		}
+
 		var hmcmd *exec.Cmd
 		hmBinary := hmcommon.CfuseMon
 		if runtime.GOOS == "windows" {
