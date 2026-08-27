@@ -159,6 +159,19 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.assert.Equal(types.ChecksumAlgorithm("CRC32C"), s.s3.stConfig.checksumAlgorithm)
 }
 
+func (s *configTestSuite) TestRequireDirMarkersRequiresMarkerSupport() {
+	s.opt.RequireDirMarkers = true
+
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
+	s.assert.ErrorIs(err, errInvalidConfigField)
+
+	s.opt.EnableDirMarker = true
+	err = ParseAndValidateConfig(s.s3, s.opt, s.secrets)
+	s.assert.NoError(err)
+	s.assert.True(s.s3.stConfig.enableDirMarker)
+	s.assert.True(s.s3.stConfig.requireDirMarkers)
+}
+
 func (s *configTestSuite) TestInvalidChecksum() {
 	// When
 	s.opt.EnableChecksum = true
