@@ -381,7 +381,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudNoDirtyFile() {
 	val, ok := suite.tieredStorage.fileMap.Load(path)
 	node := val.(*FileNode)
 
-	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
+	suite.assert.True(node.cloudBacked.Load(), "File should be marked as cloud-backed")
 	suite.assert.True(ok, "File should be tracked in the fileMap")
 
 	//File should be "cloudBacked" and not dirty so on release the file should be deleted from local and the handle clean
@@ -436,7 +436,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 	val, exists := suite.tieredStorage.fileMap.Load(path)
 	node := val.(*FileNode)
 
-	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
+	suite.assert.True(node.cloudBacked.Load(), "File should be marked as cloud-backed")
 	suite.assert.True(exists, "File should be tracked in the fileMap")
 
 	//File should be "cloudBacked" and dirty so on release the file should be deleted from local and the handle clean
@@ -548,7 +548,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	val, exists := suite.tieredStorage.fileMap.Load(path)
 	node := val.(*FileNode)
 
-	suite.assert.True(node.cloudBacked, "File should be marked as cloud-backed")
+	suite.assert.True(node.cloudBacked.Load(), "File should be marked as cloud-backed")
 	suite.assert.True(exists, "File should be tracked in the fileMap")
 
 	//1. Write to handle
@@ -597,7 +597,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	val, _ = suite.tieredStorage.fileMap.Load(path)
 	node = val.(*FileNode)
 
-	suite.assert.True(node.isDirty, "File should be marked as dirty")
+	suite.assert.True(node.isDirty.Load(), "File should be marked as dirty")
 
 	//4. Release the read should upload to cloud
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle2})
@@ -649,7 +649,7 @@ func (suite *tieredStorageTestSuite) TestReleaseLocalToLRUQueue() {
 	val, exists := suite.tieredStorage.fileMap.Load(path)
 	node := val.(*FileNode)
 
-	suite.assert.False(node.cloudBacked, "File should not be marked as cloud-backed")
+	suite.assert.False(node.cloudBacked.Load(), "File should not be marked as cloud-backed")
 	suite.assert.True(exists, "File should be tracked in the fileMap")
 
 	// 2. Release this local file

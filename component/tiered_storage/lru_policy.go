@@ -36,53 +36,99 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
+const (
+	// evictionPassLimit caps how many nominate-and-wait rounds one eviction
+	// cycle may run, so a cache that cannot be drained does not spin.
+	evictionPassLimit = 8
+
+	// maxRetryBackoff bounds the delay applied to an object whose upload keeps
+	// failing.
+	maxRetryBackoff = 5 * time.Minute
+
+	// uploadQueueDepthPerWorker sizes the job channel. It only needs enough
+	// slack that the dispatcher is not serialised against the workers.
+	uploadQueueDepthPerWorker = 16
+)
+
+// nodeState records whether the queue or an eviction worker owns a node.
+type nodeState uint8
+
+const (
+	// nodeQueued: linked into the list and eligible for eviction.
+	nodeQueued nodeState = iota
+	// nodeEvicting: unlinked and owned by a worker. The node deliberately stays
+	// in nodeMap so a rename or delete can still find it and cancel the
+	// eviction. Dropping it from the map here instead would leave a renamed
+	// object in no queue at all, never to be uploaded or evicted again.
+	nodeEvicting
+	// nodeCancelled: the object was deleted or renamed while a worker owned it.
+	// The worker must skip the upload and drop the node.
+	nodeCancelled
+)
+
 type lruNode struct {
 	prev *lruNode
 	next *lruNode
 	name string
+
+	state nodeState
+	// consecutive failed uploads, and the time before which this object should
+	// not be nominated again
+	failures   uint32
+	retryAfter time.Time
 }
 
-//upload 50 files and then check
+// uploadJob is one nominated object. The waitgroup and counters belong to the
+// eviction pass that nominated it, so a pass waits only for its own batch.
+type uploadJob struct {
+	name    string
+	wg      *sync.WaitGroup
+	freed   *atomic.Int64
+	evicted *atomic.Int32
+}
 
+// lruQueue decides which local-only objects move to cloud storage.
+//
+// Locking: callers may hold a file lock and then take mu. The reverse is
+// forbidden - see the lock ordering note in tiered_storage.go. Nomination
+// therefore consults handle counts (which are atomic) instead of taking file
+// locks, and workers use TryLock so they never block on user I/O.
 type lruQueue struct {
-	mu sync.Mutex
-
-	nodeMap sync.Map
-
-	wg            sync.WaitGroup // tracks capacityChecker only
-	workerWg      sync.WaitGroup // tracks worker goroutines
-	numWorkers    int
-	activeWorkers int32
-
+	// mu guards head, tail and every field of every lruNode.
+	mu   sync.Mutex
 	head *lruNode
 	tail *lruNode
+	// nodeMap indexes nodes by object name. It is only written under mu; it is
+	// a sync.Map so callers can test membership without taking mu.
+	nodeMap sync.Map
 
-	uploadChan   chan string
-	doneChan     chan struct{}
-	hallPassChan chan bool
+	// evictMu serialises eviction cycles so two cycles cannot nominate the same
+	// objects or interleave their batches.
+	evictMu sync.Mutex
 
-	cachePath         string
-	maxCacheSize      float64
-	totalUploadedSize int64
+	checkerWg sync.WaitGroup
+	workerWg  sync.WaitGroup
+	stopOnce  sync.Once
 
-	threshold   float64
-	targetRatio float64
+	uploadChan chan uploadJob
+	doneChan   chan struct{}
 
-	tickerUnit time.Duration
-
+	cachePath string
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
+	size      *cacheSizeTracker
 
-	//Functions to wire later into tiered_storage package
-	//upload function from tiered storage WIRE THIS LATER in tiered storage because we are using a function from there
+	maxCacheSize float64
+	// eviction starts above threshold*maxCacheSize and runs until usage reaches
+	// targetRatio*maxCacheSize, both fractions in (0,1]
+	threshold    float64
+	targetRatio  float64
+	numWorkers   int
+	maxEviction  uint32
+	pollInterval time.Duration
+
+	// uploads the object to cloud storage and removes the local copy.
+	// Supplied by TieredStorage; called with the object's file lock held.
 	uploadandCleanFn func(name string) error
-
-	// //delete locally
-	// 		localPath := filepath.Join(c.tmpPath, options.Name)
-	// 		c.mu.Lock()
-	// 		delete(c.fileMap, options.Name)
-	// 		c.mu.Unlock()
-	// 		os.Remove(localPath)
-
 }
 
 func (q *lruQueue) StartPolicy() error {
@@ -92,26 +138,54 @@ func (q *lruQueue) StartPolicy() error {
 	if q.numWorkers <= 0 {
 		return fmt.Errorf("lruQueue: numWorkers must be > 0")
 	}
-	//initialize queue
+	if q.fileLocks == nil {
+		return fmt.Errorf("lruQueue: file locks not set")
+	}
+	if q.size == nil {
+		return fmt.Errorf("lruQueue: cache size tracker not set")
+	}
+	if q.pollInterval <= 0 {
+		q.pollInterval = capacityPollInterval
+	}
+	if q.maxEviction == 0 {
+		q.maxEviction = defaultMaxEviction
+	}
+
 	q.head = nil
 	q.tail = nil
-	//channels
 	q.doneChan = make(chan struct{})
-	q.hallPassChan = make(chan bool, 1)
-	q.hallPassChan <- true
+	q.uploadChan = make(chan uploadJob, q.numWorkers*uploadQueueDepthPerWorker)
 
-	//go routines
-	q.wg.Add(1)
+	q.workerWg.Add(q.numWorkers)
+	for range q.numWorkers {
+		go q.worker()
+	}
+
+	q.checkerWg.Add(1)
 	go q.capacityChecker()
 
 	return nil
 }
 
+// StopPolicy shuts the policy down and waits for uploads already in flight. It
+// does not drain the queue: local-only data is authoritative, so whatever has
+// not been evicted stays in the cache for the next mount.
 func (q *lruQueue) StopPolicy() error {
-	close(q.doneChan)
-	// Wait for capacityChecker to exit — its deferred close(uploadChan) fires here,
-	// signalling workers that no more jobs are coming.
-	q.wg.Wait()
+	q.stopOnce.Do(func() {
+		if q.doneChan == nil {
+			return
+		}
+		close(q.doneChan)
+		q.checkerWg.Wait()
+
+		// Block new eviction cycles before retiring the workers, so a
+		// concurrent EvictNow cannot send on a closed channel.
+		q.evictMu.Lock()
+		close(q.uploadChan)
+		q.evictMu.Unlock()
+
+		q.workerWg.Wait()
+	})
 	return nil
 }
 
@@ -119,62 +193,84 @@ func (q *lruQueue) Touch(name string) {
 	q.Enqueue(name)
 }
 
+// Enqueue makes name the most recently used object, adding it if it is new.
+// A node that a worker owns is left alone; the worker re-queues it itself if
+// the upload does not happen.
 func (q *lruQueue) Enqueue(name string) {
-	//Maybe have a duplicate , that touches essentially
-
-	//lock earlier
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	//search for new node first
 	val, found := q.nodeMap.Load(name)
-	if found {
-		// Node already exists, no need to create a new one, just touch
-		node := val.(*lruNode)
-		q.extractNode(node)
+	if !found {
+		node := &lruNode{name: name}
+		q.nodeMap.Store(name, node)
 		q.setHead(node)
-	} else {
-		// Node does not exist need to create a new one and put to top
-		newNode := &lruNode{name: name}
-		// if list is empty, set tail pointer to newNode
-		if q.tail == nil {
-			q.tail = newNode
-		}
-		q.nodeMap.Store(name, newNode)
-		q.setHead(newNode)
-	}
-}
-
-func (q *lruQueue) Dequeue(name string) {
-	log.Trace("lruPolicy::removeNode : %s", name)
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	val, found := q.nodeMap.LoadAndDelete(name)
-	if !found || val == nil {
 		return
 	}
 
 	node := val.(*lruNode)
-
+	if node.state != nodeQueued {
+		return
+	}
+	// the object was used, so give it a clean slate on retries
+	node.failures = 0
+	node.retryAfter = time.Time{}
 	q.extractNode(node)
+	q.setHead(node)
 }
 
+// Dequeue removes name from the queue. If a worker is currently evicting the
+// object then the eviction is cancelled instead, and the worker drops the node
+// once it notices.
+func (q *lruQueue) Dequeue(name string) {
+	log.Trace("lruQueue::Dequeue : %s", name)
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	val, found := q.nodeMap.Load(name)
+	if !found {
+		return
+	}
+
+	node := val.(*lruNode)
+	if node.state == nodeEvicting {
+		node.state = nodeCancelled
+		return
+	}
+
+	q.extractNode(node)
+	q.nodeMap.Delete(name)
+}
+
+// mu must be held
 func (q *lruQueue) setHead(node *lruNode) {
-	// insert node at the head
 	node.prev = nil
 	node.next = q.head
 	if q.head != nil {
 		q.head.prev = node
 	}
 	q.head = node
+	if q.tail == nil {
+		q.tail = node
+	}
 }
 
-func (q *lruQueue) extractNode(node *lruNode) {
-	// remove the node from its position in the list
+// mu must be held
+func (q *lruQueue) setTail(node *lruNode) {
+	node.next = nil
+	node.prev = q.tail
+	if q.tail != nil {
+		q.tail.next = node
+	}
+	q.tail = node
+	if q.head == nil {
+		q.head = node
+	}
+}
 
-	// head case
+// mu must be held
+func (q *lruQueue) extractNode(node *lruNode) {
 	if node == q.head {
 		q.head = node.next
 	}
@@ -193,203 +289,274 @@ func (q *lruQueue) extractNode(node *lruNode) {
 	node.next = nil
 }
 
-func (q *lruQueue) capacityChecker() {
-	defer q.wg.Done()
-	//defer close(q.uploadChan)
+func (q *lruQueue) stopping() bool {
+	select {
+	case <-q.doneChan:
+		return true
+	default:
+		return false
+	}
+}
 
-	ticker := time.NewTicker(q.tickerUnit)
+func (q *lruQueue) capacityChecker() {
+	defer q.checkerWg.Done()
+
+	ticker := time.NewTicker(q.pollInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
-			// eviction
-			select {
-			case <-q.hallPassChan:
-
-				//1. Check if we need eviction
-				curSize, err := common.GetUsage(q.cachePath)
-				if err != nil {
-					log.Err("lruPolicy::capacityChecker : failed to get usage: %v", err)
-					q.hallPassChan <- true
-					continue
-				}
-				if curSize/q.maxCacheSize <= q.threshold {
-					q.hallPassChan <- true
-					break
-				}
-				//targetRatio should always be less than thresholdRatio
-
-				//2. Find difference to evict down to target ratio
-				difference := curSize - q.maxCacheSize*q.targetRatio
-				curEvictedSpace := 0
-				actualEvictedSpace := 0
-				atomic.StoreInt64(&q.totalUploadedSize, 0)
-				evicFail := false
-
-				//3. LRU Eviction to match difference
-				for actualEvictedSpace < int(difference) && !evicFail {
-					// Start nomination from what's already been confirmed uploaded,
-					// so we only nominate enough new files to cover the remaining gap.
-					curEvictedSpace = actualEvictedSpace
-
-					//initialize channel
-					q.uploadChan = make(chan string, 1000)
-
-					//start workers here
-					q.workerWg.Add(q.numWorkers)
-					for i := 0; i < q.numWorkers; i++ {
-						go q.worker()
-					}
-
-					//populate upload channel for workers
-					for curEvictedSpace < int(difference) {
-						nodeSize, evicted := q.eviction()
-						if !evicted {
-							evicFail = true
-							break
-						}
-						curEvictedSpace += int(nodeSize)
-					}
-
-					//close upload chan and wait for workers to process all remaining jobs
-					close(q.uploadChan)
-					q.workerWg.Wait()
-
-					//update the actual evicted space here
-					actualEvictedSpace = int(q.totalUploadedSize)
-
-					//if done is closed we need to check shutdown to prevent infinite loop
-					select {
-					case <-q.doneChan:
-						return
-					default:
-					}
-
-					//we can also have a case here if no files were evicted then we can break on this tick if we so choose
-
-				}
-				//give hall pass back when actual evicted space is satisfied
-				q.hallPassChan <- true
-
-			case <-q.doneChan:
-				return
-
-			//default return?
-			default:
-			}
 		case <-q.doneChan:
+			return
+		case <-ticker.C:
+			q.size.Reconcile()
+			if float64(q.size.Used()) <= q.maxCacheSize*q.threshold {
+				continue
+			}
+			q.evictDownTo(int64(q.maxCacheSize * q.targetRatio))
+		}
+	}
+}
+
+// EvictNow synchronously makes room for growBytes more bytes of local data and
+// reports whether the cache has room afterwards. Callers may hold a file lock:
+// workers never block on file locks, so an object cannot deadlock against its
+// own eviction.
+func (q *lruQueue) EvictNow(growBytes int64) bool {
+	target := min(int64(q.maxCacheSize*q.targetRatio), int64(q.maxCacheSize)-growBytes)
+	q.evictDownTo(target)
+	return float64(q.size.Used()+growBytes) <= q.maxCacheSize
+}
+
+// evictDownTo uploads least-recently-used objects until usage reaches
+// targetUsed. It gives up as soon as a pass evicts nothing, which is what
+// happens when every remaining object is open, in use, or failing to upload.
+func (q *lruQueue) evictDownTo(targetUsed int64) {
+	q.evictMu.Lock()
+	defer q.evictMu.Unlock()
+
+	if q.stopping() {
+		return
+	}
+
+	// Work from a local estimate rather than re-reading the tracker each pass:
+	// the tracker is updated by the upload callback, so re-reading it would
+	// couple this loop to whenever that callback happens to run.
+	used := q.size.Used()
+
+	for pass := range evictionPassLimit {
+		if used <= targetUsed {
+			return
+		}
+
+		names := q.nominate(used-targetUsed, int(q.maxEviction))
+		if len(names) == 0 {
+			log.Info("lruQueue::evictDownTo : nothing is eligible for eviction")
+			return
+		}
+
+		freed, evicted := q.runBatch(names)
+		used -= freed
+
+		if evicted == 0 {
+			log.Warn(
+				"lruQueue::evictDownTo : pass %d evicted nothing (using %d, target %d)",
+				pass,
+				used,
+				targetUsed,
+			)
 			return
 		}
 	}
 }
 
-func (q *lruQueue) eviction() (int64, bool) {
-	q.mu.Lock()
-	nodeToEvict := q.tail
-	if nodeToEvict == nil {
-		q.mu.Unlock()
-		return 0, false
+// runBatch hands every name to the worker pool and waits for that batch to
+// finish. It returns the bytes and the number of objects actually evicted.
+func (q *lruQueue) runBatch(names []string) (int64, int32) {
+	var wg sync.WaitGroup
+	var freed atomic.Int64
+	var evicted atomic.Int32
+
+	wg.Add(len(names))
+	for i, name := range names {
+		select {
+		case q.uploadChan <- uploadJob{name: name, wg: &wg, freed: &freed, evicted: &evicted}:
+		case <-q.doneChan:
+			// shutting down - hand back everything we could not dispatch
+			for _, undelivered := range names[i:] {
+				q.requeue(undelivered, false)
+				wg.Done()
+			}
+			wg.Wait()
+			return freed.Load(), evicted.Load()
+		}
 	}
+	wg.Wait()
 
-	//1. loop through and find the first applicable node
-	for nodeToEvict != nil {
-		prevNode := nodeToEvict.prev
+	return freed.Load(), evicted.Load()
+}
 
-		flock := q.fileLocks.Get(nodeToEvict.name)
-		flock.RLock()
-		handleCount := flock.Count()
-		flock.RUnlock()
+// nominate detaches least-recently-used nodes until their combined size covers
+// bytesNeeded, marking each as owned by a worker. Objects with open handles are
+// promoted to the head instead: they are by definition in use, and promoting
+// them stops the next pass from considering them again.
+//
+// Each candidate is measured here, under mu. That is a syscall per nominated
+// object while the queue is locked, but the count is bounded by the deficit
+// being covered, and it keeps nomination from having to reach back into the
+// component's file map.
+func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-		if handleCount == 0 {
-			break
+	now := time.Now()
+	var names []string
+	var busy []*lruNode
+	var total int64
+
+	for node := q.tail; node != nil && len(names) < limit && total < bytesNeeded; {
+		// remember where to go next before the node is unlinked
+		prev := node.prev
+
+		switch {
+		case node.state != nodeQueued:
+			// a worker owns it; it should not be in the list at all
+
+		case now.Before(node.retryAfter):
+			// backing off after a failed upload
+
+		case q.fileLocks.Get(node.name).Count() > 0:
+			busy = append(busy, node)
+
+		default:
+			info, err := os.Stat(filepath.Join(q.cachePath, node.name))
+			if err != nil {
+				// there is no local copy left to evict
+				log.Warn("lruQueue::nominate : dropping %s [%v]", node.name, err)
+				q.extractNode(node)
+				q.nodeMap.Delete(node.name)
+				break
+			}
+			q.extractNode(node)
+			node.state = nodeEvicting
+			names = append(names, node.name)
+			total += info.Size()
 		}
 
-		//node has open handles touch node
-		q.extractNode(nodeToEvict)
-		q.setHead(nodeToEvict)
-		nodeToEvict = prevNode
+		node = prev
 	}
 
-	//all files are in use
-	if nodeToEvict == nil {
-		q.mu.Unlock()
-		return 0, false
+	// Promote busy nodes after the walk, not during it: re-linking a node while
+	// traversing can lead the walk back over nodes it already visited. The list
+	// is walked oldest-first, so promoting in that order preserves their
+	// relative recency.
+	for _, node := range busy {
+		q.extractNode(node)
+		q.setHead(node)
 	}
-	name := nodeToEvict.name
 
-	//2. Remove file from queue so not accidentally chosen again
-	q.extractNode(nodeToEvict)
+	return names
+}
+
+// claimed reports whether the worker may still upload name.
+func (q *lruQueue) claimed(name string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	val, found := q.nodeMap.Load(name)
+	return found && val.(*lruNode).state == nodeEvicting
+}
+
+// requeue returns a nominated node to the queue. A failed upload goes to the
+// tail with a backoff, so one unwritable object cannot monopolise the workers.
+// An object that was merely busy goes to the head, because being in use is what
+// the head of an LRU means.
+func (q *lruQueue) requeue(name string, failed bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	val, found := q.nodeMap.Load(name)
+	if !found {
+		return
+	}
+
+	node := val.(*lruNode)
+	if node.state == nodeCancelled {
+		q.nodeMap.Delete(name)
+		return
+	}
+
+	node.state = nodeQueued
+	if failed {
+		node.failures++
+		node.retryAfter = time.Now().Add(retryBackoff(node.failures))
+		q.setTail(node)
+		return
+	}
+	q.setHead(node)
+}
+
+// drop forgets a node whose local copy no longer exists.
+func (q *lruQueue) drop(name string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if val, found := q.nodeMap.Load(name); found {
+		q.extractNode(val.(*lruNode))
+	}
 	q.nodeMap.Delete(name)
+}
 
-	q.mu.Unlock()
-
-	//3. Get the node size that we evict
-	localPath := filepath.Join(q.cachePath, name)
-
-	fileInfo, err := os.Stat(localPath)
-	if err != nil {
-		log.Err("lruPolicy::capacityChecker : failed to stat file: %v", err)
-		return 0, false
-	}
-	nodeSize := fileInfo.Size()
-
-	//4. Send node to channel to be uploaded by workers
-	select {
-	case q.uploadChan <- name:
-	case <-q.doneChan:
-		return 0, false
-	}
-
-	return nodeSize, true
+func retryBackoff(failures uint32) time.Duration {
+	return min(time.Second*time.Duration(1<<min(failures, 10)), maxRetryBackoff)
 }
 
 func (q *lruQueue) worker() {
 	defer q.workerWg.Done()
-	for fileName := range q.uploadChan {
-
-		//1. Get handle count and file size
-		flock := q.fileLocks.Get(fileName)
-		flock.Lock()
-		handleCount := flock.Count()
-
-		localPath := filepath.Join(q.cachePath, fileName)
-		fileInfo, err := os.Stat(localPath)
-		if err != nil {
-			log.Warn(
-				"lruPolicy::worker : file %s no longer exists or stat failed, skipping: %v",
-				fileName,
-				err,
-			)
-			flock.Unlock()
-			continue
-		}
-
-		fileSize := fileInfo.Size()
-
-		//2. Check if file eligible to upload
-		if handleCount == 0 {
-			err := q.uploadandCleanFn(fileName)
-			flock.Unlock()
-			//handle when file doesn't exist during upload we do not requeue otherwise we do enqueue
-			if err != nil {
-				if os.IsNotExist(err) {
-					log.Warn(
-						"lruPolicy::worker : file %s was deleted during upload, skipping",
-						fileName,
-					)
-				} else {
-					log.Err("lruPolicy::worker : failed to upload file %s: %v", fileName, err)
-					//if upload fails we have to put the file back to the queue and map to retry later
-					q.Touch(fileName)
-				}
-			} else {
-				atomic.AddInt64(&q.totalUploadedSize, fileSize)
-			}
-			//file is in use skip upload touch file back to top of queue
-		} else {
-			flock.Unlock()
-			q.Touch(fileName)
-		}
+	for job := range q.uploadChan {
+		q.evictOne(job)
 	}
+}
+
+// evictOne uploads one object and removes its local copy. It never blocks on a
+// file lock: an object that user I/O has picked up in the meantime goes back
+// into the queue and is reconsidered on a later pass.
+func (q *lruQueue) evictOne(job uploadJob) {
+	defer job.wg.Done()
+
+	flock := q.fileLocks.Get(job.name)
+	if !flock.TryLock() {
+		q.requeue(job.name, false)
+		return
+	}
+	defer flock.Unlock()
+
+	// The object may have been deleted or renamed while the job sat in the
+	// channel. Uploading it now would resurrect data the user removed.
+	if !q.claimed(job.name) {
+		q.drop(job.name)
+		return
+	}
+
+	if flock.Count() > 0 {
+		q.requeue(job.name, false)
+		return
+	}
+
+	info, err := os.Stat(filepath.Join(q.cachePath, job.name))
+	if err != nil {
+		log.Warn("lruQueue::evictOne : %s has no local copy, dropping it [%v]", job.name, err)
+		q.drop(job.name)
+		return
+	}
+
+	if err := q.uploadandCleanFn(job.name); err != nil {
+		log.Err("lruQueue::evictOne : %s upload failed [%v]", job.name, err)
+		q.requeue(job.name, true)
+		return
+	}
+
+	job.freed.Add(info.Size())
+	job.evicted.Add(1)
+	q.drop(job.name)
 }

@@ -71,8 +71,11 @@ func (suite *lruPolicyTestSuite) setupTestHelper(
 		threshold:    threshold,
 		targetRatio:  targetRatio,
 		numWorkers:   numWorkers,
-		tickerUnit:   time.Millisecond,
-		fileLocks:    common.NewLockMap(), // required by eviction() and worker()
+		pollInterval: time.Millisecond,
+		fileLocks:    common.NewLockMap(), // required by nominate() and evictOne()
+		// reconcile on every tick: these tests create files directly on disk,
+		// so the tracker has no incremental updates to work from
+		size: newCacheSizeTracker(cachePath, 0),
 
 		uploadandCleanFn: func(name string) error {
 			return nil
