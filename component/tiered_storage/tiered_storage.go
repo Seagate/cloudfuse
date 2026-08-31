@@ -33,6 +33,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -233,6 +234,21 @@ func (c *TieredStorage) Configure(_ bool) error {
 
 // OnConfigChange : If component has registered, on config file change this method is called
 func (c *TieredStorage) OnConfigChange() {
+}
+
+// localPath resolves an object name beneath the tiered storage root.
+func (c *TieredStorage) localPath(name string) (string, error) {
+	name = filepath.FromSlash(common.NormalizeObjectName(name))
+	if filepath.IsAbs(name) || filepath.VolumeName(name) != "" {
+		return "", syscall.EINVAL
+	}
+
+	path := filepath.Join(c.tmpPath, name)
+	rel, err := filepath.Rel(c.tmpPath, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", syscall.EINVAL
+	}
+	return path, nil
 }
 
 // Directory operations
