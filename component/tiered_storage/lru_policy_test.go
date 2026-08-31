@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -164,6 +165,60 @@ func (suite *lruPolicyTestSuite) TestDequeue() {
 	suite.policy.Dequeue(fileName)
 	suite.assert.Equal(fileName2, suite.policy.head.name)
 	suite.assert.Equal(fileName2, suite.policy.tail.name)
+}
+
+func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
+	defer suite.cleanupTest()
+
+	cachePath := suite.T().TempDir()
+	size := newCacheSizeTracker(cachePath, time.Hour)
+	var uploaded atomic.Int32
+	policy := &lruQueue{
+		cachePath:    cachePath,
+		maxCacheSize: common.MbToBytes,
+		threshold:    0.8,
+		targetRatio:  0.6,
+		numWorkers:   1,
+		maxEviction:  1,
+		pollInterval: time.Hour,
+		fileLocks:    common.NewLockMap(),
+		size:         size,
+	}
+	policy.uploadandCleanFn = func(name string) error {
+		info, err := os.Stat(filepath.Join(cachePath, name))
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(filepath.Join(cachePath, name)); err != nil {
+			return err
+		}
+		size.Add(-info.Size())
+		uploaded.Add(1)
+		return nil
+	}
+	suite.Require().NoError(policy.StartPolicy())
+	defer policy.StopPolicy()
+
+	const fileSize = 250 * 1024
+	for i := 1; i <= 4; i++ {
+		name := fmt.Sprintf("file%d", i)
+		err := os.WriteFile(filepath.Join(cachePath, name), make([]byte, fileSize), 0644)
+		suite.Require().NoError(err)
+		policy.Enqueue(name)
+	}
+	size.Refresh()
+
+	policy.evictDownTo(int64(policy.maxCacheSize * policy.targetRatio))
+
+	suite.assert.EqualValues(1, uploaded.Load())
+	suite.assert.LessOrEqual(
+		float64(size.Used()),
+		policy.maxCacheSize*policy.threshold,
+	)
+	suite.assert.Greater(
+		float64(size.Used()),
+		policy.maxCacheSize*policy.targetRatio,
+	)
 }
 
 // 5. Capacity checker, two cases

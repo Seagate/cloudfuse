@@ -29,7 +29,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -37,14 +36,6 @@ import (
 )
 
 const (
-	// evictionPassLimit caps how many nominate-and-wait rounds one eviction
-	// cycle may run, so a cache that cannot be drained does not spin.
-	evictionPassLimit = 8
-
-	// maxRetryBackoff bounds the delay applied to an object whose upload keeps
-	// failing.
-	maxRetryBackoff = 5 * time.Minute
-
 	// uploadQueueDepthPerWorker sizes the job channel. It only needs enough
 	// slack that the dispatcher is not serialised against the workers.
 	uploadQueueDepthPerWorker = 16
@@ -72,19 +63,13 @@ type lruNode struct {
 	name string
 
 	state nodeState
-	// consecutive failed uploads, and the time before which this object should
-	// not be nominated again
-	failures   uint32
-	retryAfter time.Time
 }
 
-// uploadJob is one nominated object. The waitgroup and counters belong to the
-// eviction pass that nominated it, so a pass waits only for its own batch.
+// uploadJob is one nominated object. The waitgroup belongs to the eviction
+// pass that nominated it, so a pass waits only for its own batch.
 type uploadJob struct {
-	name    string
-	wg      *sync.WaitGroup
-	freed   *atomic.Int64
-	evicted *atomic.Int32
+	name string
+	wg   *sync.WaitGroup
 }
 
 // lruQueue decides which local-only objects move to cloud storage.
@@ -212,9 +197,6 @@ func (q *lruQueue) Enqueue(name string) {
 	if node.state != nodeQueued {
 		return
 	}
-	// the object was used, so give it a clean slate on retries
-	node.failures = 0
-	node.retryAfter = time.Time{}
 	q.extractNode(node)
 	q.setHead(node)
 }
@@ -328,9 +310,9 @@ func (q *lruQueue) EvictNow(growBytes int64) bool {
 	return float64(q.size.Used()+growBytes) <= q.maxCacheSize
 }
 
-// evictDownTo uploads least-recently-used objects until usage reaches
-// targetUsed. It gives up as soon as a pass evicts nothing, which is what
-// happens when every remaining object is open, in use, or failing to upload.
+// evictDownTo runs one eviction pass, nominating enough least-recently-used
+// objects to reach targetUsed. If the pass does not bring usage below the high
+// threshold, a later capacity check may try again.
 func (q *lruQueue) evictDownTo(targetUsed int64) {
 	q.evictMu.Lock()
 	defer q.evictMu.Unlock()
@@ -339,48 +321,36 @@ func (q *lruQueue) evictDownTo(targetUsed int64) {
 		return
 	}
 
-	// Work from a local estimate rather than re-reading the tracker each pass:
-	// the tracker is updated by the upload callback, so re-reading it would
-	// couple this loop to whenever that callback happens to run.
 	used := q.size.Used()
+	if used <= targetUsed {
+		return
+	}
 
-	for pass := range evictionPassLimit {
-		if used <= targetUsed {
-			return
-		}
+	names := q.nominate(used-targetUsed, int(q.maxEviction))
+	if len(names) == 0 {
+		log.Info("lruQueue::evictDownTo : nothing is eligible for eviction")
+		return
+	}
 
-		names := q.nominate(used-targetUsed, int(q.maxEviction))
-		if len(names) == 0 {
-			log.Info("lruQueue::evictDownTo : nothing is eligible for eviction")
-			return
-		}
-
-		freed, evicted := q.runBatch(names)
-		used -= freed
-
-		if evicted == 0 {
-			log.Warn(
-				"lruQueue::evictDownTo : pass %d evicted nothing (using %d, target %d)",
-				pass,
-				used,
-				targetUsed,
-			)
-			return
-		}
+	q.runBatch(names)
+	if usedAfter := q.size.Used(); float64(usedAfter) > q.maxCacheSize*q.threshold {
+		log.Err(
+			"lruQueue::evictDownTo : usage remains above high threshold after eviction (using %d, high threshold %.0f)",
+			usedAfter,
+			q.maxCacheSize*q.threshold,
+		)
 	}
 }
 
 // runBatch hands every name to the worker pool and waits for that batch to
-// finish. It returns the bytes and the number of objects actually evicted.
-func (q *lruQueue) runBatch(names []string) (int64, int32) {
+// finish.
+func (q *lruQueue) runBatch(names []string) {
 	var wg sync.WaitGroup
-	var freed atomic.Int64
-	var evicted atomic.Int32
 
 	wg.Add(len(names))
 	for i, name := range names {
 		select {
-		case q.uploadChan <- uploadJob{name: name, wg: &wg, freed: &freed, evicted: &evicted}:
+		case q.uploadChan <- uploadJob{name: name, wg: &wg}:
 		case <-q.doneChan:
 			// shutting down - hand back everything we could not dispatch
 			for _, undelivered := range names[i:] {
@@ -388,12 +358,10 @@ func (q *lruQueue) runBatch(names []string) (int64, int32) {
 				wg.Done()
 			}
 			wg.Wait()
-			return freed.Load(), evicted.Load()
+			return
 		}
 	}
 	wg.Wait()
-
-	return freed.Load(), evicted.Load()
 }
 
 // nominate detaches least-recently-used nodes until their combined size covers
@@ -409,7 +377,6 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	now := time.Now()
 	var names []string
 	var busy []*lruNode
 	var total int64
@@ -421,9 +388,6 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 		switch {
 		case node.state != nodeQueued:
 			// a worker owns it; it should not be in the list at all
-
-		case now.Before(node.retryAfter):
-			// backing off after a failed upload
 
 		case q.fileLocks.Get(node.name).Count() > 0:
 			busy = append(busy, node)
@@ -468,9 +432,8 @@ func (q *lruQueue) claimed(name string) bool {
 }
 
 // requeue returns a nominated node to the queue. A failed upload goes to the
-// tail with a backoff, so one unwritable object cannot monopolise the workers.
-// An object that was merely busy goes to the head, because being in use is what
-// the head of an LRU means.
+// tail for a future eviction cycle. An object that was merely busy goes to the
+// head, because being in use is what the head of an LRU means.
 func (q *lruQueue) requeue(name string, failed bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -490,8 +453,6 @@ func (q *lruQueue) requeue(name string, failed bool) {
 
 	node.state = nodeQueued
 	if failed {
-		node.failures++
-		node.retryAfter = time.Now().Add(retryBackoff(node.failures))
 		q.setTail(node)
 		return
 	}
@@ -508,11 +469,6 @@ func (q *lruQueue) drop(name string) {
 	}
 	q.nodeMap.Delete(name)
 }
-
-func retryBackoff(failures uint32) time.Duration {
-	return min(time.Second*time.Duration(1<<min(failures, 10)), maxRetryBackoff)
-}
-
 func (q *lruQueue) worker() {
 	defer q.workerWg.Done()
 	for job := range q.uploadChan {
@@ -545,7 +501,7 @@ func (q *lruQueue) evictOne(job uploadJob) {
 		return
 	}
 
-	info, err := os.Stat(filepath.Join(q.cachePath, job.name))
+	_, err := os.Stat(filepath.Join(q.cachePath, job.name))
 	if err != nil {
 		log.Warn("lruQueue::evictOne : %s has no local copy, dropping it [%v]", job.name, err)
 		q.drop(job.name)
@@ -558,7 +514,5 @@ func (q *lruQueue) evictOne(job uploadJob) {
 		return
 	}
 
-	job.freed.Add(info.Size())
-	job.evicted.Add(1)
 	q.drop(job.name)
 }

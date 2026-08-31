@@ -664,6 +664,8 @@ func (suite *tieredStorageTestSuite) TestReleaseLocalToLRUQueue() {
 }
 
 func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
+	defer suite.cleanupTest()
+
 	// Ok this next test is to essentially go through an iteration of LRU,
 	// 1. Initialize many local only file
 	//2. Create files that exceed the 80% threshold, max set at 1MB
@@ -736,8 +738,12 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.True(exists3)
 	suite.assert.True(exists4)
 
-	//4. Sleep to wait for eviction to kick in
-	time.Sleep(100 * time.Millisecond)
+	//4. Wait for eviction to kick in
+	suite.assert.Eventually(func() bool {
+		_, exists1 := suite.tieredStorage.policy.nodeMap.Load(path1)
+		_, exists2 := suite.tieredStorage.policy.nodeMap.Load(path2)
+		return !exists1 && !exists2
+	}, 2*capacityPollInterval, 10*time.Millisecond)
 
 	// 4. Some should then be released to the cloud essentially, the ones we wrote data to
 	//And the local files should be gone (uploaded and cleaned up), not in either map
