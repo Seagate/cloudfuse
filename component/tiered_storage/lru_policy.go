@@ -475,12 +475,14 @@ func (q *lruQueue) requeue(name string, failed bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	// get the node
 	val, found := q.nodeMap.Load(name)
 	if !found {
 		return
 	}
-
 	node := val.(*lruNode)
+
+	// was the file deleted or renamed?
 	if node.state == nodeCancelled {
 		q.nodeMap.Delete(name)
 		return
