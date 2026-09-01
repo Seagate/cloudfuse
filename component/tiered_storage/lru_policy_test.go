@@ -268,12 +268,13 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	suite.assert.True(ex3)
 	suite.assert.True(ex4)
 
-	//file4 should be in upload channel
-	time.Sleep(10 * time.Millisecond)
-
+	suite.assert.Eventually(func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(uploaded) >= 2
+	}, time.Second, time.Millisecond)
 	mu.Lock()
-	snapshot := make([]string, len(uploaded))
-	copy(snapshot, uploaded)
+	snapshot := append([]string(nil), uploaded...)
 	mu.Unlock()
 
 	// file1 and file2 are the LRU tail so they should be evicted to reach targetRatio (60%)
@@ -282,19 +283,6 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	// file3 and file4 are the most recently used, so they should NOT be evicted
 	suite.assert.NotContains(snapshot, "file3")
 	suite.assert.NotContains(snapshot, "file4")
-
-	fmt.Println("=== nodeMap contents ===")
-	suite.policy.nodeMap.Range(func(key, value interface{}) bool {
-		lruNode := value.(*lruNode)
-		fmt.Printf("  key=%q, name=%q, next=%v, prev=%v\n",
-			key,
-			lruNode.name,
-			lruNode.next,
-			lruNode.prev,
-		)
-		return true // continue iteration
-	})
-	fmt.Println("=== end nodeMap ===")
 
 	_, ex1 = suite.policy.nodeMap.Load("file1")
 	_, ex2 = suite.policy.nodeMap.Load("file2")
@@ -350,20 +338,20 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 	suite.assert.NoError(err)
 	suite.policy.Enqueue("file4")
 
-	time.Sleep(10 * time.Millisecond)
-
+	suite.assert.Eventually(func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(uploaded) >= 2
+	}, time.Second, time.Millisecond)
 	mu.Lock()
-	snapshot := make([]string, len(uploaded))
-	copy(snapshot, uploaded)
+	snapshot := append([]string(nil), uploaded...)
 	mu.Unlock()
 
-	fmt.Print(snapshot)
-	fmt.Print(suite.policy.head.name)
-	fmt.Print(suite.policy.tail.name)
-
 	//file1 should be head, file4 should be tail
+	suite.policy.mu.Lock()
 	suite.assert.Equal("file1", suite.policy.head.name)
 	suite.assert.Equal("file4", suite.policy.tail.name)
+	suite.policy.mu.Unlock()
 
 	// file1 and file2 are the LRU tail so they should be evicted to reach targetRatio (60%)
 	suite.assert.Contains(snapshot, "file2")

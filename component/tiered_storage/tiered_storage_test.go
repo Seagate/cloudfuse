@@ -166,6 +166,347 @@ func (suite *tieredStorageTestSuite) cleanupTest() {
 	suite.assert.NoError(err)
 }
 
+func TestLocalPath(t *testing.T) {
+	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "cache")}
+
+	tests := []struct {
+		name     string
+		expected string
+		valid    bool
+	}{
+		{name: "", expected: storage.tmpPath, valid: true},
+		{name: "dir/file", expected: filepath.Join(storage.tmpPath, "dir", "file"), valid: true},
+		{name: `dir\file`, expected: filepath.Join(storage.tmpPath, "dir", "file"), valid: true},
+		{name: "../file", valid: false},
+		{name: "dir/../../file", valid: false},
+		{name: filepath.Join(string(os.PathSeparator), "file"), valid: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path, err := storage.localPath(test.name)
+			if test.valid {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expected, path)
+				return
+			}
+			assert.ErrorIs(t, err, syscall.EINVAL)
+		})
+	}
+}
+
+func (suite *tieredStorageTestSuite) TestGetAttrLocalOnly() {
+	defer suite.cleanupTest()
+
+	const path = "local-only"
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("local data")},
+	)
+	suite.Require().NoError(err)
+
+	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.Equal(path, attrs.Path)
+	suite.assert.EqualValues(len("local data"), attrs.Size)
+}
+
+func (suite *tieredStorageTestSuite) TestGetAttrCloudOnly() {
+	defer suite.cleanupTest()
+
+	const path = "cloud-only"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	_, err = suite.loopback.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("cloud data")},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.EqualValues(len("cloud data"), attrs.Size)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+}
+
+func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
+	defer suite.cleanupTest()
+
+	const path = "local-and-cloud"
+	cloudHandle, err := suite.loopback.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.loopback.WriteFile(
+		&internal.WriteFileOptions{Handle: cloudHandle, Data: []byte("cloud")},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: cloudHandle}),
+	)
+
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte("local data")},
+	)
+	suite.Require().NoError(err)
+
+	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.EqualValues(len("local data"), attrs.Size)
+
+	cloudAttrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.EqualValues(len("cloud"), cloudAttrs.Size)
+}
+
+func (suite *tieredStorageTestSuite) TestRestartRestoresLocalStateAndLRUOrder() {
+	defer suite.cleanupTest()
+
+	for _, path := range []string{"older", "newer"} {
+		handle, err := suite.tieredStorage.CreateFile(
+			internal.CreateFileOptions{Name: path, Mode: 0644},
+		)
+		suite.Require().NoError(err)
+		_, err = suite.tieredStorage.WriteFile(
+			&internal.WriteFileOptions{Handle: handle, Data: []byte(path)},
+		)
+		suite.Require().NoError(err)
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+
+	suite.Require().NoError(suite.tieredStorage.Stop())
+	restarted := newTestTieredStorage(suite.loopback)
+	suite.Require().NoError(restarted.Start(context.Background()))
+	suite.tieredStorage = restarted
+
+	for _, path := range []string{"older", "newer"} {
+		value, found := restarted.fileMap.Load(path)
+		suite.Require().True(found)
+		node := value.(*FileNode)
+		suite.assert.False(node.cloudBacked.Load())
+		suite.assert.True(node.isDirty.Load())
+		_, queued := restarted.policy.nodeMap.Load(path)
+		suite.assert.True(queued)
+	}
+	suite.Require().NotNil(restarted.policy.head)
+	suite.Require().NotNil(restarted.policy.tail)
+	suite.assert.Equal("newer", restarted.policy.head.name)
+	suite.assert.Equal("older", restarted.policy.tail.name)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, tieredStorageSnapshotPath))
+}
+
+func (suite *tieredStorageTestSuite) TestRestartWithoutSnapshotRecoversConservatively() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.tieredStorage.Stop())
+	suite.Require().NoError(os.Remove(filepath.Join(suite.cache_path, tieredStorageSnapshotPath)))
+	suite.Require().NoError(
+		os.WriteFile(filepath.Join(suite.cache_path, "recovered"), []byte("data"), 0644),
+	)
+
+	restarted := newTestTieredStorage(suite.loopback)
+	suite.Require().NoError(restarted.Start(context.Background()))
+	suite.tieredStorage = restarted
+
+	value, found := restarted.fileMap.Load("recovered")
+	suite.Require().True(found)
+	node := value.(*FileNode)
+	suite.assert.False(node.cloudBacked.Load())
+	suite.assert.True(node.isDirty.Load())
+	_, queued := restarted.policy.nodeMap.Load("recovered")
+	suite.assert.True(queued)
+}
+
+func (suite *tieredStorageTestSuite) TestCreateFileRejectsExistingCloudObject() {
+	defer suite.cleanupTest()
+
+	const path = "existing-cloud"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	_, err = suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.assert.ErrorIs(err, syscall.EEXIST)
+}
+
+func (suite *tieredStorageTestSuite) TestCreateFileRejectsExistingLocalObject() {
+	defer suite.cleanupTest()
+
+	const path = "existing-local"
+	_, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+
+	_, err = suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.assert.ErrorIs(err, syscall.EEXIST)
+}
+
+func (suite *tieredStorageTestSuite) TestOpenFileExclusiveCreateRejectsExistingCloudObject() {
+	defer suite.cleanupTest()
+
+	const path = "exclusive-cloud"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	_, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{
+		Name: path, Flags: os.O_CREATE | os.O_EXCL | os.O_RDWR, Mode: 0644,
+	})
+	suite.assert.ErrorIs(err, syscall.EEXIST)
+}
+
+func (suite *tieredStorageTestSuite) TestOpenFileTruncatesCloudObjectWithoutDownloading() {
+	defer suite.cleanupTest()
+
+	const path = "truncate-cloud"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	_, err = suite.loopback.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("old cloud data")},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	handle, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{
+		Name: path, Flags: os.O_WRONLY | os.O_TRUNC, Mode: 0644,
+	})
+	suite.Require().NoError(err)
+	suite.assert.True(handle.Dirty())
+	info, err := os.Stat(filepath.Join(suite.cache_path, path))
+	suite.Require().NoError(err)
+	suite.assert.Zero(info.Size())
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+
+	attrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.Zero(attrs.Size)
+}
+
+func (suite *tieredStorageTestSuite) TestOpenFileHonorsReadOnlyFlag() {
+	defer suite.cleanupTest()
+
+	const path = "read-only"
+	data := []byte("cloud data")
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	_, err = suite.loopback.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	handle, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{
+		Name: path, Flags: os.O_RDONLY,
+	})
+	suite.Require().NoError(err)
+	buffer := make([]byte, len(data))
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: handle, Data: buffer},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Equal(data, buffer)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+}
+
+func (suite *tieredStorageTestSuite) TestStreamDirMergesLocalAndCloudEntries() {
+	defer suite.cleanupTest()
+
+	localHandle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "local", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: localHandle, Data: []byte("local data")},
+	)
+	suite.Require().NoError(err)
+
+	for _, path := range []string{"cloud", "shared"} {
+		handle, err := suite.loopback.CreateFile(
+			internal.CreateFileOptions{Name: path, Mode: 0644},
+		)
+		suite.Require().NoError(err)
+		_, err = suite.loopback.WriteFile(
+			&internal.WriteFileOptions{Handle: handle, Data: []byte("cloud")},
+		)
+		suite.Require().NoError(err)
+		suite.Require().NoError(
+			suite.loopback.ReleaseFile(
+				internal.ReleaseFileOptions{Handle: handle},
+			),
+		)
+	}
+	sharedHandle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "shared", Flags: os.O_RDWR, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: sharedHandle, Data: []byte("local data")},
+	)
+	suite.Require().NoError(err)
+
+	attrs, token, err := suite.tieredStorage.StreamDir(internal.StreamDirOptions{})
+	suite.Require().NoError(err)
+	suite.assert.Empty(token)
+	suite.Require().Len(attrs, 3)
+	suite.assert.Equal([]string{"cloud", "local", "shared"}, []string{
+		attrs[0].Name, attrs[1].Name, attrs[2].Name,
+	})
+	suite.assert.EqualValues(len("local data"), attrs[1].Size)
+	suite.assert.EqualValues(len("local data"), attrs[2].Size)
+}
+
+func (suite *tieredStorageTestSuite) TestCreateAndDeleteLocalDirectory() {
+	defer suite.cleanupTest()
+
+	const path = "directory"
+	suite.Require().NoError(
+		suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: path, Mode: 0755}),
+	)
+	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.True(attrs.IsDir())
+	suite.assert.True(suite.tieredStorage.IsDirEmpty(internal.IsDirEmptyOptions{Name: path}))
+	suite.Require().NoError(suite.tieredStorage.DeleteDir(internal.DeleteDirOptions{Name: path}))
+	_, err = suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.ErrorIs(err, syscall.ENOENT)
+}
+
+func (suite *tieredStorageTestSuite) TestStreamDirListsImplicitLocalDirectory() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "directory/file", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+	suite.Require().NoError(
+		suite.tieredStorage.OpenDir(internal.OpenDirOptions{Name: "directory"}),
+	)
+
+	attrs, token, err := suite.tieredStorage.StreamDir(
+		internal.StreamDirOptions{Name: "directory"},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Empty(token)
+	suite.Require().Len(attrs, 1)
+	suite.assert.Equal("directory/file", attrs[0].Path)
+	suite.Require().NoError(
+		suite.tieredStorage.CloseDir(internal.CloseDirOptions{Name: "directory"}),
+	)
+}
+
 //Testing OpenFile
 
 func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
