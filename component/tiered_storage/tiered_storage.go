@@ -48,29 +48,11 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
-/*
-   TieredStorage treats local storage as the authoritative tier and cloud
-   storage as an overflow tier behind it.
-
-   - Files created through the mount live only on local disk. They move to the
-     cloud when the LRU evicts them, and the local copy is removed at that point.
-   - Objects that are already in the cloud are cached locally on open and the
-     local copy is dropped on last close, after any changes are uploaded. Data is
-     therefore resident in both tiers for as short a time as possible.
-
-   Lock ordering. Acquire in this order and release in reverse:
-
-     1. the object's file lock (c.fileLocks) - at most one, except rename, which
-        takes source and destination in lexical order
-     2. lruQueue.evictMu
-     3. lruQueue.mu
-
-   Never take a file lock while holding lruQueue.mu. The eviction path obeys this
-   by reading handle counts (which are atomic) during nomination and by using
-   TryLock in its workers, so it never blocks on user I/O.
-*/
-
-// Common structure for Component
+// TieredStorage keeps new data local and uses cloud storage as overflow.
+// Cloud objects are cached only while open.
+//
+// Lock order: file lock, evictMu, then lruQueue.mu. Rename takes file locks in
+// lexical order. Never acquire a file lock while holding lruQueue.mu.
 type TieredStorage struct {
 	internal.BaseComponent
 
@@ -78,7 +60,6 @@ type TieredStorage struct {
 
 	policy *lruQueue
 
-	//use LockMap instead of mutex to allow parallel access to different files
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
 
@@ -86,8 +67,7 @@ type TieredStorage struct {
 	maxCacheSize float64
 }
 
-// FileNode tracks file state. Its atomic fields can be accessed concurrently.
-// Name changes can only be done while holding flock.
+// FileNode fields are atomic except name, which requires the file lock.
 type FileNode struct {
 	name        string
 	size        atomic.Int64
@@ -95,9 +75,7 @@ type FileNode struct {
 	isDirty     atomic.Bool
 }
 
-// Structure defining your config parameters
 type TieredStorageOptions struct {
-	// e.g. var1 uint32 `config:"var1"`
 	TmpPath   string  `config:"path"        yaml:"path,omitempty"`
 	MaxSizeMB float64 `config:"max-size-mb" yaml:"max-size-mb,omitempty"`
 }
@@ -114,7 +92,6 @@ const (
 	partialDownloadSuffix     = ".cloudfuse-partial"
 )
 
-// Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &TieredStorage{}
 
 func (c *TieredStorage) Name() string {
@@ -129,22 +106,15 @@ func (c *TieredStorage) SetNextComponent(nc internal.Component) {
 	c.BaseComponent.SetNextComponent(nc)
 }
 
-// Start : Pipeline calls this method to start the component functionality
-//
-//	this shall not block the call otherwise pipeline will not start
 func (c *TieredStorage) Start(ctx context.Context) error {
 	log.Trace("TieredStorage::Start : Starting component %s", c.Name())
 
-	// A crash can leave partial downloads behind. They are not valid object
-	// data, so remove them before anything can list, open or upload them.
 	c.removePartialDownloads()
 	snapshot, err := c.readSnapshot()
 	if err != nil {
 		log.Warn("TieredStorage::Start : ignoring invalid state snapshot [%v]", err)
 	}
 
-	// Seed the usage counter from what is actually on disk. This is the one
-	// place where measuring the whole directory is worth its cost.
 	c.cacheSize.Refresh()
 	if err := c.recoverLocalState(snapshot); err != nil {
 		return fmt.Errorf("TieredStorage: failed to recover local state: %w", err)
@@ -160,10 +130,7 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop : Stop the component functionality and kill all threads started
-//
-// The local cache is deliberately left in place: for this component it holds
-// the only copy of any data that has not been evicted yet.
+// Stop leaves local files in place for the next mount.
 func (c *TieredStorage) Stop() error {
 	log.Trace("TieredStorage::Stop : Stopping component %s", c.Name())
 
@@ -199,9 +166,6 @@ func (c *TieredStorage) removePartialDownloads() {
 	}
 }
 
-// Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
-//
-//	Return failure if any config is not valid to exit the process
 func (c *TieredStorage) Configure(_ bool) error {
 	log.Trace("TieredStorage::Configure : %s", c.Name())
 
@@ -242,7 +206,6 @@ func (c *TieredStorage) Configure(_ bool) error {
 	return nil
 }
 
-// OnConfigChange : If component has registered, on config file change this method is called
 func (c *TieredStorage) OnConfigChange() {
 }
 
@@ -411,10 +374,6 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 func (c *TieredStorage) createFileUnlocked(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
-	// A new file holds no data yet, so there is nothing to make room for.
-	// WriteFile reserves space as the file grows.
-
-	//Create the file in the local cache, we will ignore the create empty and cloud stuff for now
 	localPath, err := c.localPath(options.Name)
 	if err != nil {
 		return nil, err
@@ -425,7 +384,6 @@ func (c *TieredStorage) createFileUnlocked(
 		return nil, err
 	}
 
-	//Open local file
 	localFile, err := common.OpenFile(
 		localPath,
 		os.O_CREATE|os.O_EXCL|os.O_RDWR,
@@ -435,20 +393,16 @@ func (c *TieredStorage) createFileUnlocked(
 		return nil, err
 	}
 
-	//Add file node to file map with cloudBacked as false
 	node := &FileNode{name: options.Name}
 	node.isDirty.Store(true)
 	c.fileMap.Store(options.Name, node)
 
-	//create handle
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(localFile)
 
-	//Mark as dirty because the cloud doesn't know about it
 	c.setHandleDirty(handle)
 
 	return handle, nil
-
 }
 
 func (c *TieredStorage) CreateFile(
@@ -487,11 +441,8 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	// Read the state only after taking the lock: an eviction worker may have
-	// been uploading this object right up until we acquired it.
 	val, exists := c.fileMap.Load(options.Name)
 	if !exists {
-		// cloud only
 		err := c.NextComponent().DeleteFile(options)
 		if errors.Is(err, os.ErrNotExist) {
 			return syscall.ENOENT
@@ -506,17 +457,14 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 		}
 	}
 
-	// Cancel any eviction of this object before dropping our own state, so a
-	// worker cannot resurrect it in the cloud after the user deleted it.
+	// Cancel eviction before deleting state to prevent a stale upload.
 	c.policy.Dequeue(options.Name)
 	c.fileMap.Delete(options.Name)
 
 	return c.purgeLocal(options.Name)
 }
 
-// OpenFile: Makes the file available in the local cache for further file operations.
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
-	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -603,7 +551,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 		return nil, err
 	}
 
-	// Create handle and attach file object to it
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(localFile)
 	if options.Flags&os.O_APPEND != 0 {
@@ -612,13 +559,12 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	if options.Flags&os.O_TRUNC != 0 {
 		if value, found := c.fileMap.Load(options.Name); found {
 			node := value.(*FileNode)
-			c.recordSize(node, 0)
+			c.cacheSize.Add(-node.size.Swap(0))
 			node.isDirty.Store(true)
 		}
 		c.setHandleDirty(handle)
 	}
 
-	//increase handle count
 	flock.Inc()
 
 	return handle, nil
@@ -631,12 +577,7 @@ func (c *TieredStorage) cacheFileMode(mode os.FileMode) os.FileMode {
 	return mode
 }
 
-// downloadCopyFromCloud caches a cloud object on local storage.
-//
-// The data lands in a temporary file and is renamed into place only once it is
-// complete. A crash can therefore never leave a truncated file at the object's
-// real path, which matters because local data is authoritative here: a partial
-// download found at a real path would later be uploaded over the good cloud copy.
+// downloadCopyFromCloud publishes the local path only after a complete download.
 func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) error {
 	localPath, err := c.localPath(options.Name)
 	if err != nil {
@@ -657,7 +598,6 @@ func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) 
 		return err
 	}
 
-	//Download
 	err = c.NextComponent().CopyToFile(internal.CopyToFileOptions{
 		Name:   options.Name,
 		Offset: 0,
@@ -686,12 +626,10 @@ func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) 
 		c.cacheSize.Add(info.Size())
 	}
 
-	//some sort of mode handling
 	return nil
 }
 
-// replaceFile moves src over dst. Windows will not replace a destination that
-// another handle holds without share-delete, so fall back to removing it first.
+// replaceFile handles Windows rename-over-existing behavior.
 func replaceFile(src, dst string) error {
 	err := os.Rename(src, dst)
 	if err == nil {
@@ -719,20 +657,7 @@ func (c *TieredStorage) purgeLocal(name string) error {
 	return err
 }
 
-// recordSize updates what we believe a cached file's size to be and adjusts the
-// usage counter by the difference.
-func (c *TieredStorage) recordSize(node *FileNode, size int64) {
-	if node == nil {
-		return
-	}
-	c.cacheSize.Add(size - node.size.Swap(size))
-}
-
-// ensure there is enough available space for local storage to grow by the given amount.
-// evict files if necessary. Return ENOSPC if there is no way to make room for the new data.
-//
-// Callers may hold a file lock. Eviction workers never block on file locks, so
-// the object being written cannot deadlock against its own eviction.
+// reserveSpace evicts files as needed. Workers never block on file locks.
 func (c *TieredStorage) reserveSpace(numBytes int64) error {
 	if c.maxCacheSize <= 0 || numBytes <= 0 {
 		return nil
@@ -772,7 +697,6 @@ func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int
 }
 
 func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
-	//1.Get the file object
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		return 0, syscall.EBADF
@@ -783,7 +707,6 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		node = val.(*FileNode)
 	}
 
-	//2. Make room for however much bigger this write makes the file
 	appending := options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend)
 	growth := int64(len(options.Data))
 	if !appending && node != nil {
@@ -793,26 +716,20 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		return 0, err
 	}
 
-	//3. Decide where to write in file
 	var bytesWritten int
 	var err error
 	if appending {
-		//write to end of file, standard
 		bytesWritten, err = f.Write(options.Data)
 	} else {
-		//write to specific offset, need to use WriteAt
 		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
 	}
 
-	//4. Mark file as dirty for release later
 	if err == nil {
 		c.setHandleDirty(options.Handle)
 		if node != nil {
 			node.isDirty.Store(true)
-			// One fstat is the cheapest way to be right about the new size for
-			// every kind of write - appending, sparse, or overwriting in place.
 			if info, statErr := f.Stat(); statErr == nil {
-				c.recordSize(node, info.Size())
+				c.cacheSize.Add(info.Size() - node.size.Swap(info.Size()))
 			}
 		}
 	} else {
@@ -836,24 +753,20 @@ func (c *TieredStorage) SyncFile(options internal.SyncFileOptions) error {
 }
 
 func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
-	//Ok so we just need to flush locally, which means just write it to the disc
 	log.Trace(
 		"TieredStorage::FlushFile : handle=%d, path=%s",
 		options.Handle.ID,
 		options.Handle.Path,
 	)
 
-	//1. Only need to flush dirty files
 	if !options.Handle.Dirty() {
 		return nil
 	}
-	//2. Check if there is local file object form handle
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("TieredStorage::FlushFile : %s no file object in handle", options.Handle.Path)
 		return syscall.EBADF
 	}
-	//3. Sync to Disk
 	err := f.Sync()
 	if err != nil {
 		log.Err("TieredStorage::FlushFile : %s sync failed [%v]", options.Handle.Path, err)
@@ -864,35 +777,27 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 }
 
 func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
-	// get the file lock, so only one open call can proceed for a file, other calls will wait here until lock is released
 	flock := c.fileLocks.Get(options.Handle.Path)
 	flock.Lock()
 	defer flock.Unlock()
 
-	//Dec Handle Count First
 	flock.Dec()
 
-	//close file associated with handle
 	if f := options.Handle.GetFileObject(); f != nil {
 		f.Close()
 	}
 
-	//clean handle state
 	c.clearHandleDirty(options.Handle)
 	options.Handle.Cleanup()
 
-	//remove from global handle map
 	handlemap.Delete(options.Handle.ID)
 
-	//Only the last handle decides what happens to the local copy
 	if flock.Count() > 0 {
 		return nil
 	}
 
 	val, ok := c.fileMap.Load(options.Handle.Path)
 	if !ok {
-		// the object was deleted or evicted while it was open - closing a
-		// deleted file is normal, so this is not an error
 		log.Debug(
 			"TieredStorage::ReleaseFile : %s has no local data left",
 			options.Handle.Path,
@@ -902,17 +807,13 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	node := val.(*FileNode)
 
 	if !node.cloudBacked.Load() {
-		// Local-only data is authoritative. The LRU decides when it moves to
-		// cloud storage, and the local copy stays until it does.
 		c.policy.Enqueue(options.Handle.Path)
 		return nil
 	}
 
 	if node.isDirty.Load() {
 		if err := c.uploadCachedFile(options.Handle.Path); err != nil {
-			// Keep the local copy: it is newer than the cloud object. Hand it
-			// to the LRU so the upload is retried, rather than stranding the
-			// only good copy of the data in the cache with nothing watching it.
+			// Keep failed uploads local and eligible for eviction.
 			log.Err(
 				"TieredStorage::ReleaseFile : upload failed for %s [%v]",
 				options.Handle.Path,
@@ -924,38 +825,28 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		node.isDirty.Store(false)
 	}
 
-	// Cached cloud data is dropped as soon as the last handle closes, so an
-	// object spends as little time as possible resident in both tiers.
 	c.fileMap.Delete(options.Handle.Path)
 	return c.purgeLocal(options.Handle.Path)
 }
 
 func (c *TieredStorage) uploadCachedFile(name string) error {
-	//get the local path
 	localPath, err := c.localPath(name)
 	if err != nil {
 		return err
 	}
-	_, err = os.Stat(localPath)
-	if err != nil {
-		log.Err("TieredStorage::uploadFile : %s stat failed [%v]", name, err)
-		return err
-	}
 
-	//open read-only handle/file for uploading
-	f, openErr := common.Open(localPath)
-	if openErr != nil {
-		log.Err("TieredStorage::uploadFile : %s open failed [%v]", name, openErr)
-		return openErr
+	f, err := common.Open(localPath)
+	if err != nil {
+		log.Err("TieredStorage::uploadFile : %s open failed [%v]", name, err)
+		return err
 	}
 	defer f.Close()
 
-	//upload
-	uploadErr := c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
-	if uploadErr != nil {
-		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, uploadErr)
+	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	if err != nil {
+		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, err)
 	}
-	return uploadErr
+	return err
 }
 
 // uploadandCleanFile moves an object to cloud storage and removes the local
@@ -976,8 +867,6 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 }
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
-	//Ok we are going to follow DeleteFile, we have to rename this File in the various states that its in
-	//So First we lock in alphabetical order
 	log.Trace("TieredStorage::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
 
 	sflock := c.fileLocks.Get(options.Src)
@@ -993,24 +882,15 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	defer sflock.Unlock()
 	defer dflock.Unlock()
 
-	//Ok now we have to consider all the states
-	//Rename File that is Local Only
-	//sync map in both local and in the LRU, also need to rename the node in the queue
-	//Check that it exists
 	val, exists := c.fileMap.Load(options.Src)
-	//Potential local or local + cloud state
 	if exists {
 		node := val.(*FileNode)
-		// //Local and Cloud State
 		if node.cloudBacked.Load() {
-			//just rename from the cloud
 			err := c.NextComponent().RenameFile(options)
 			if err != nil {
 				return err
 			}
 		}
-		//Local only State, this will happen anyways if it exists local
-		//Rename
 		srcPath, err := c.localPath(options.Src)
 		if err != nil {
 			return err
@@ -1027,18 +907,13 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		node.name = options.Dst
 		c.fileMap.Store(options.Dst, node)
 
-		// Move the queue entry across. The source is still in nodeMap even if a
-		// worker is mid-eviction, and Dequeue cancels that eviction - which is
-		// what stops a renamed object from falling out of the queue entirely.
+		// Dequeue also cancels an in-flight eviction.
 		_, wasQueued := c.policy.nodeMap.Load(options.Src)
 		c.policy.Dequeue(options.Src)
 		if wasQueued {
 			c.policy.Enqueue(options.Dst)
 		}
-		//Change the handle and the lock counts
 		c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
-
-		//Cloud only state
 	} else {
 		err := c.NextComponent().RenameFile(options)
 		if err != nil {
@@ -1048,14 +923,12 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	return nil
 }
 
-// flock must be locked for both files
+// Both file locks must be held.
 func (c *TieredStorage) renameOpenHandles(
 	srcName, dstName string,
 	sflock, dflock *common.LockMapItem,
 ) {
-	// update open handles
 	if sflock.Count() > 0 {
-		// update any open handles to the file with its new name
 		handlemap.GetHandles().Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
 			handle.Lock()
@@ -1065,7 +938,6 @@ func (c *TieredStorage) renameOpenHandles(
 			handle.Unlock()
 			return true
 		})
-		// copy the number of open handles to the new name
 		for sflock.Count() > 0 {
 			sflock.Dec()
 			dflock.Inc()
@@ -1096,7 +968,6 @@ func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, erro
 	return "", nil
 }
 
-// Dirty Handle Operations
 func (c *TieredStorage) setHandleDirty(handle *handlemap.Handle) {
 	handle.Lock()
 	alreadyDirty := handle.Dirty()
@@ -1109,7 +980,6 @@ func (c *TieredStorage) setHandleDirty(handle *handlemap.Handle) {
 	}
 }
 
-// setter
 func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 	handle.Lock()
 	wasDirty := handle.Dirty()
@@ -1122,7 +992,6 @@ func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 	}
 }
 
-// Filesystem level operations
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	localPath, err := c.localPath(options.Name)
 	if err != nil {
