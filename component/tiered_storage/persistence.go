@@ -25,7 +25,6 @@
 package tiered_storage
 
 import (
-	"bytes"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -93,18 +92,13 @@ func (c *TieredStorage) writeSnapshot() error {
 	}
 	c.policy.mu.Unlock()
 
-	var data bytes.Buffer
-	if err := gob.NewEncoder(&data).Encode(snapshot); err != nil {
-		return fmt.Errorf("encode state snapshot: %w", err)
-	}
-
 	path := filepath.Join(c.tmpPath, tieredStorageSnapshotPath)
 	tmpPath := path + ".tmp"
 	file, err := common.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("create state snapshot: %w", err)
 	}
-	if _, err = file.Write(data.Bytes()); err == nil {
+	if err = gob.NewEncoder(file).Encode(snapshot); err == nil {
 		err = file.Sync()
 	}
 	if closeErr := file.Close(); err == nil {
@@ -124,7 +118,7 @@ func (c *TieredStorage) writeSnapshot() error {
 func (c *TieredStorage) readSnapshot() (*tieredStorageSnapshot, error) {
 	path := filepath.Join(c.tmpPath, tieredStorageSnapshotPath)
 	_ = os.Remove(path + ".tmp")
-	data, err := os.ReadFile(path)
+	file, err := common.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
@@ -132,9 +126,10 @@ func (c *TieredStorage) readSnapshot() (*tieredStorageSnapshot, error) {
 		return nil, err
 	}
 	defer os.Remove(path)
+	defer file.Close()
 
 	var snapshot tieredStorageSnapshot
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&snapshot); err != nil {
+	if err := gob.NewDecoder(file).Decode(&snapshot); err != nil {
 		return nil, fmt.Errorf("decode state snapshot: %w", err)
 	}
 	if snapshot.Version != tieredStorageSnapshotVersion {
