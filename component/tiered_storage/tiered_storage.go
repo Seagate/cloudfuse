@@ -877,8 +877,9 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 	flock.Dec()
 
+	var closeErr error
 	if f := options.Handle.GetFileObject(); f != nil {
-		f.Close()
+		closeErr = f.Close()
 	}
 
 	c.clearHandleDirty(options.Handle)
@@ -887,7 +888,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	handlemap.Delete(options.Handle.ID)
 
 	if flock.Count() > 0 {
-		return nil
+		return closeErr
 	}
 
 	val, ok := c.fileMap.Load(options.Handle.Path)
@@ -896,13 +897,13 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 			"TieredStorage::ReleaseFile : %s has no local data left",
 			options.Handle.Path,
 		)
-		return nil
+		return closeErr
 	}
 	node := val.(*FileNode)
 
 	if !node.cloudBacked.Load() {
 		c.policy.Enqueue(options.Handle.Path)
-		return nil
+		return closeErr
 	}
 
 	if node.isDirty.Load() {
@@ -920,7 +921,10 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	}
 
 	c.fileMap.Delete(options.Handle.Path)
-	return c.purgeLocal(options.Handle.Path)
+	if err := c.purgeLocal(options.Handle.Path); err != nil {
+		return err
+	}
+	return closeErr
 }
 
 func (c *TieredStorage) uploadCachedFile(name string) error {
@@ -1276,6 +1280,9 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 }
 
 func (c *TieredStorage) FileUsed(name string) error {
+	if _, found := c.fileMap.Load(name); found {
+		c.policy.Enqueue(name)
+	}
 	return nil
 }
 
@@ -1298,6 +1305,26 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 		Namemax: 255,
 	}
 	return stat, true, nil
+}
+
+func (c *TieredStorage) GetFileBlockOffsets(
+	options internal.GetFileBlockOffsetsOptions,
+) (*common.BlockOffsetList, error) {
+	return nil, syscall.ENOTSUP
+}
+
+func (c *TieredStorage) GetCommittedBlockList(
+	name string,
+) (*internal.CommittedBlockList, error) {
+	return nil, syscall.ENOTSUP
+}
+
+func (c *TieredStorage) StageData(options internal.StageDataOptions) error {
+	return syscall.ENOTSUP
+}
+
+func (c *TieredStorage) CommitData(options internal.CommitDataOptions) error {
+	return syscall.ENOTSUP
 }
 
 // ------------------------- Factory -------------------------------------------

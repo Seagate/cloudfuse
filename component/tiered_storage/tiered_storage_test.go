@@ -1303,6 +1303,54 @@ func (suite *tieredStorageTestSuite) TestReleaseLocalToLRUQueue() {
 
 }
 
+func (suite *tieredStorageTestSuite) TestFileUsedPromotesLocalFile() {
+	defer suite.cleanupTest()
+
+	for _, path := range []string{"first", "second"} {
+		handle, err := suite.tieredStorage.CreateFile(
+			internal.CreateFileOptions{Name: path, Mode: 0644},
+		)
+		suite.Require().NoError(err)
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+	suite.assert.Equal("first", suite.tieredStorage.policy.tail.name)
+	suite.Require().NoError(suite.tieredStorage.FileUsed("first"))
+	suite.assert.Equal("first", suite.tieredStorage.policy.head.name)
+}
+
+func (suite *tieredStorageTestSuite) TestReleaseReturnsCloseError() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "close-error", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(handle.GetFileObject().Close())
+	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.Error(err)
+	_, queued := suite.tieredStorage.policy.nodeMap.Load("close-error")
+	suite.assert.True(queued)
+}
+
+func (suite *tieredStorageTestSuite) TestBlockAPIsUnsupported() {
+	defer suite.cleanupTest()
+
+	_, err := suite.tieredStorage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{})
+	suite.assert.ErrorIs(err, syscall.ENOTSUP)
+	_, err = suite.tieredStorage.GetCommittedBlockList("file")
+	suite.assert.ErrorIs(err, syscall.ENOTSUP)
+	suite.assert.ErrorIs(
+		suite.tieredStorage.StageData(internal.StageDataOptions{}),
+		syscall.ENOTSUP,
+	)
+	suite.assert.ErrorIs(
+		suite.tieredStorage.CommitData(internal.CommitDataOptions{}),
+		syscall.ENOTSUP,
+	)
+}
+
 func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	defer suite.cleanupTest()
 
