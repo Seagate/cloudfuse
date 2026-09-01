@@ -705,6 +705,81 @@ func (suite *tieredStorageTestSuite) TestStreamDirListsImplicitLocalDirectory() 
 	)
 }
 
+func (suite *tieredStorageTestSuite) TestRenameLocalOnlyDirectory() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src/file", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+
+	suite.Require().NoError(suite.tieredStorage.RenameDir(
+		internal.RenameDirOptions{Src: "src", Dst: "dst"},
+	))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "src", "file"))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst", "file"))
+	_, oldFound := suite.tieredStorage.fileMap.Load("src/file")
+	_, newFound := suite.tieredStorage.fileMap.Load("dst/file")
+	suite.assert.False(oldFound)
+	suite.assert.True(newFound)
+	_, oldQueued := suite.tieredStorage.policy.nodeMap.Load("src/file")
+	_, newQueued := suite.tieredStorage.policy.nodeMap.Load("dst/file")
+	suite.assert.False(oldQueued)
+	suite.assert.True(newQueued)
+}
+
+func (suite *tieredStorageTestSuite) TestRenameMixedDirectory() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.loopback.CreateDir(
+		internal.CreateDirOptions{Name: "src", Mode: 0755},
+	))
+	cloudHandle, err := suite.loopback.CreateFile(
+		internal.CreateFileOptions{Name: "src/cloud", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: cloudHandle}),
+	)
+	localHandle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src/local", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: localHandle}),
+	)
+
+	suite.Require().NoError(suite.tieredStorage.RenameDir(
+		internal.RenameDirOptions{Src: "src", Dst: "dst"},
+	))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst", "local"))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dst", "cloud"))
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, "src"))
+	suite.assert.NoDirExists(filepath.Join(suite.fake_storage_path, "src"))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src/open", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	handlemap.Add(handle)
+	suite.Require().NoError(suite.tieredStorage.RenameDir(
+		internal.RenameDirOptions{Src: "src", Dst: "dst"},
+	))
+	suite.assert.Equal("dst/open", handle.Path)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+	_, queued := suite.tieredStorage.policy.nodeMap.Load("dst/open")
+	suite.assert.True(queued)
+}
+
 //Testing OpenFile
 
 func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {

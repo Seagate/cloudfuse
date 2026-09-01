@@ -377,6 +377,90 @@ func (c *TieredStorage) CloseDir(options internal.CloseDirOptions) error {
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
+	srcPath, err := c.localPath(options.Src)
+	if err != nil {
+		return err
+	}
+	dstPath, err := c.localPath(options.Dst)
+	if err != nil {
+		return err
+	}
+	_, localErr := os.Stat(srcPath)
+	localExists := localErr == nil
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return localErr
+	}
+
+	prefix := common.JoinUnixFilepath(options.Src) + "/"
+	var srcNames []string
+	c.fileMap.Range(func(key, _ any) bool {
+		name := key.(string)
+		if strings.HasPrefix(name, prefix) {
+			srcNames = append(srcNames, name)
+		}
+		return true
+	})
+
+	type renameEntry struct {
+		src string
+		dst string
+	}
+	entries := make([]renameEntry, 0, len(srcNames))
+	lockNames := make([]string, 0, len(srcNames)*2)
+	for _, src := range srcNames {
+		dst := common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, prefix))
+		entries = append(entries, renameEntry{src: src, dst: dst})
+		lockNames = append(lockNames, src, dst)
+	}
+	slices.Sort(lockNames)
+	lockNames = slices.Compact(lockNames)
+	locks := make([]*common.LockMapItem, 0, len(lockNames))
+	for _, name := range lockNames {
+		flock := c.fileLocks.Get(name)
+		flock.Lock()
+		locks = append(locks, flock)
+	}
+	defer func() {
+		for _, flock := range slices.Backward(locks) {
+			flock.Unlock()
+		}
+	}()
+
+	cloudErr := c.NextComponent().RenameDir(options)
+	if cloudErr != nil && !(localExists && errors.Is(cloudErr, os.ErrNotExist)) {
+		return cloudErr
+	}
+	if !localExists {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+		return err
+	}
+	if err := os.Rename(srcPath, dstPath); err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		value, found := c.fileMap.LoadAndDelete(entry.src)
+		if !found {
+			continue
+		}
+		node := value.(*FileNode)
+		node.name = entry.dst
+		c.fileMap.Store(entry.dst, node)
+
+		_, queued := c.policy.nodeMap.Load(entry.src)
+		c.policy.Dequeue(entry.src)
+		if queued {
+			c.policy.Enqueue(entry.dst)
+		}
+		c.renameOpenHandles(
+			entry.src,
+			entry.dst,
+			c.fileLocks.Get(entry.src),
+			c.fileLocks.Get(entry.dst),
+		)
+	}
 	return nil
 }
 
