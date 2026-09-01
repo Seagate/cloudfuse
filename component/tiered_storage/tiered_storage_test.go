@@ -536,6 +536,20 @@ func (suite *tieredStorageTestSuite) TestTruncateInvalidSize() {
 	suite.assert.ErrorIs(err, syscall.EINVAL)
 }
 
+func (suite *tieredStorageTestSuite) TestSymlink() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.tieredStorage.CreateLink(
+		internal.CreateLinkOptions{Name: "link", Target: "target"},
+	))
+	target, err := suite.tieredStorage.ReadLink(
+		internal.ReadLinkOptions{Name: "link"},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Equal("target", target)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "link"))
+}
+
 func (suite *tieredStorageTestSuite) TestStreamDirMergesLocalAndCloudEntries() {
 	defer suite.cleanupTest()
 

@@ -960,11 +960,11 @@ func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {
 
 // Symlink operations
 func (c *TieredStorage) CreateLink(options internal.CreateLinkOptions) error {
-	return nil
+	return c.NextComponent().CreateLink(options)
 }
 
 func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, error) {
-	return "", nil
+	return c.NextComponent().ReadLink(options)
 }
 
 func (c *TieredStorage) setHandleDirty(handle *handlemap.Handle) {
