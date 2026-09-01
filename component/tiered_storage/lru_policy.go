@@ -63,7 +63,6 @@ type lruQueue struct {
 
 	checkerWg sync.WaitGroup
 	workerWg  sync.WaitGroup
-	stopOnce  sync.Once
 
 	uploadChan chan uploadJob
 	doneChan   chan struct{}
@@ -120,20 +119,18 @@ func (q *lruQueue) StartPolicy() error {
 
 // StopPolicy waits for in-flight uploads but leaves queued files local.
 func (q *lruQueue) StopPolicy() error {
-	q.stopOnce.Do(func() {
-		if q.doneChan == nil {
-			return
-		}
-		close(q.doneChan)
-		q.checkerWg.Wait()
+	if q.doneChan == nil {
+		return nil
+	}
+	close(q.doneChan)
+	q.checkerWg.Wait()
 
-		// Prevent EvictNow from sending while uploadChan is closed.
-		q.evictMu.Lock()
-		close(q.uploadChan)
-		q.evictMu.Unlock()
+	// Prevent EvictNow from sending while uploadChan is closed.
+	q.evictMu.Lock()
+	close(q.uploadChan)
+	q.evictMu.Unlock()
 
-		q.workerWg.Wait()
-	})
+	q.workerWg.Wait()
 	return nil
 }
 
