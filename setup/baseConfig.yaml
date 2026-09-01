@@ -3,7 +3,7 @@
 #   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory) are set to 'false' by default.
 #      No need to mention them in your config file unless you are setting them to true.
 #   2. 'loopbackfs' is purely for testing and shall not be used in production configuration.
-#   3. 'stream', 'block-cache', and 'file_cache' can not co-exist and config file shall have only one of them based on your use case.
+#   3. 'stream', 'xload', 'block_cache', 'file_cache', and 'tiered_storage' can not co-exist. Choose one based on your use case.
 #   4. By default log level is set to 'log_warning' level and are redirected to syslog.
 #      Either use 'base' logging or syslog filters to redirect logs to separate file.
 #      To install syslog filter follow below steps:
@@ -23,7 +23,8 @@
 #   8. If data in your storage account (non-HNS) is created using cloudfuse or AzCopy then there are marker files present
 #      in your container to mark a directory. In such cases you can optimize your listing by setting 'virtual-directory'
 #      flag to false in mount command.
-#   9. If you are using 'file_cache' component then make sure you have enough disk space available for cache.
+#   9. If using 'file_cache' or 'tiered_storage', make sure the configured path has enough disk space.
+#      Tiered storage may keep the only copy of a file locally, so never clean its path as a cache.
 #  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
@@ -55,6 +56,7 @@ components:
   - xload
   - block_cache
   - file_cache
+  - tiered_storage
   - attr_cache
   - s3storage
   - azstorage
@@ -121,6 +123,16 @@ file_cache:
   offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
+
+# Tiered storage configuration
+tiered_storage:
+  path: <path to local storage. Files remain local until eviction.>
+  max-size-mb: <maximum local storage size in MB. Required.>
+  high-threshold: <% local storage consumed which triggers eviction. Default - 80>
+  low-threshold: <% local storage consumed which eviction targets. Must be less than high-threshold. Default - 60>
+  max-eviction: <maximum files selected in one eviction pass. Default - 5000>
+  parallelism: <number of parallel cloud uploads. Default - 8>
+  poll-interval-sec: <seconds between capacity checks. Default - 1>
 
 # Attribute cache related configuration
 attr_cache:

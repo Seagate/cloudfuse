@@ -314,6 +314,12 @@ Cloudfuse now supports offline access through the `file_cache` component. When c
 
 > **Note:** Cloudfuse uses eventual consistency with last-writer-wins semantics. Offline access can extend the consistency window indefinitely and **increases the risk of data conflicts in multi-client setups!** See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
 
+## Tiered Storage
+
+The `tiered_storage` component treats local storage as the primary tier and cloud storage as overflow. New files remain local until capacity-driven LRU eviction uploads them and removes the local copy. Cloud objects are downloaded while open and removed locally on close after any changes are uploaded.
+
+The configured local path can contain the only copy of un-evicted data. Do not treat it as a disposable cache or enable cleanup for it. See `sample_configs/sampleTieredStorageConfigAzure.yaml` and `setup/baseConfig.yaml` for configuration.
+
 ## Limitations
 
 ### NOTICE

@@ -1,0 +1,27 @@
+# Refer to setup/baseConfig.yaml for all configuration parameters.
+
+config-version: 1.0.0
+
+logging:
+  type: syslog
+  level: log_warning
+
+components:
+  - libfuse
+  - tiered_storage
+  - attr_cache
+  - azstorage
+
+tiered_storage:
+  path: /<PATH>/<TO>/<LOCAL_STORAGE>
+  max-size-mb: 102400
+
+attr_cache:
+  timeout-sec: 120
+
+azstorage:
+  type: block
+  account-name: <ACCOUNT_NAME>
+  account-key: <ACCOUNT_KEY>
+  mode: key
+  container: <CONTAINER_NAME>
