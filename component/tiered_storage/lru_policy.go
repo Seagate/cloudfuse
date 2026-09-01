@@ -41,10 +41,8 @@ type nodeState uint8
 const (
 	// nodeQueued: linked into the list and eligible for eviction.
 	nodeQueued nodeState = iota
-	// nodeEvicting: unlinked and owned by a worker. The node deliberately stays
-	// in nodeMap so a rename or delete can still find it and cancel the
-	// eviction. Dropping it from the map here instead would leave a renamed
-	// object in no queue at all, never to be uploaded or evicted again.
+	// nodeEvicting: removed from the LRU and owned by a worker.
+	// The node stays in nodeMap so rename or delete can still find it.
 	nodeEvicting
 	// nodeCancelled: the object was deleted or renamed while a worker owned it.
 	// The worker must skip the upload and drop the node.
@@ -193,26 +191,28 @@ func (q *lruQueue) Enqueue(name string) {
 	q.setHead(node)
 }
 
-// Dequeue removes name from the queue. If a worker is currently evicting the
-// object then the eviction is cancelled instead, and the worker drops the node
-// once it notices.
+// Remove deleted or renamed object from the LRU and cancel any in-flight eviction.
 func (q *lruQueue) Dequeue(name string) {
 	log.Trace("lruQueue::Dequeue : %s", name)
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	// if the node doesn't exist, there is nothing to do
 	val, found := q.nodeMap.Load(name)
 	if !found {
 		return
 	}
 
+	// if the node is being evicted, it has already been extracted from the list.
+	// Mark it cancelled so the worker can skip the upload and drop it from the map.
 	node := val.(*lruNode)
 	if node.state == nodeEvicting {
 		node.state = nodeCancelled
 		return
 	}
 
+	// unlink and delete the node
 	q.extractNode(node)
 	q.nodeMap.Delete(name)
 }
