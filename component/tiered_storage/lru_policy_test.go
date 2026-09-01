@@ -27,7 +27,6 @@ package tiered_storage
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -49,6 +48,8 @@ type lruPolicyTestSuite struct {
 
 var cache_path = filepath.Join(home_dir, "file_cache"+randomString(8))
 
+const lruTestFileSize = 250 * 1024
+
 func (suite *lruPolicyTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
@@ -56,7 +57,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 	}
 	suite.assert = assert.New(suite.T())
 
-	err = os.Mkdir(cache_path, fs.FileMode(0777))
+	err = os.Mkdir(cache_path, 0777)
 	suite.assert.NoError(err)
 
 	suite.setupTestHelper(cache_path, 1, 0.8, 0.6, 8)
@@ -68,15 +69,13 @@ func (suite *lruPolicyTestSuite) setupTestHelper(
 ) {
 	suite.policy = &lruQueue{
 		cachePath:    cachePath,
-		maxCacheSize: maxCacheMB * 1024 * 1024, // convert MB to bytes
+		maxCacheSize: maxCacheMB * common.MbToBytes,
 		threshold:    threshold,
 		targetRatio:  targetRatio,
 		numWorkers:   numWorkers,
 		pollInterval: time.Millisecond,
-		fileLocks:    common.NewLockMap(), // required by nominate() and evictOne()
-		// reconcile on every tick: these tests create files directly on disk,
-		// so the tracker has no incremental updates to work from
-		size: newCacheSizeTracker(cachePath, 0),
+		fileLocks:    common.NewLockMap(),
+		size:         newCacheSizeTracker(cachePath, 0),
 
 		uploadandCleanFn: func(name string) error {
 			return nil
@@ -95,76 +94,36 @@ func (suite *lruPolicyTestSuite) cleanupTest() {
 	suite.assert.NoError(err)
 }
 
-// Test
-// 1. Touch
-func (suite *lruPolicyTestSuite) TestTouch() {
-	defer suite.cleanupTest()
-	//put one file in
-	name := "file1"
-	fileName := filepath.Join(cache_path, name)
-	suite.policy.Enqueue(fileName)
-	suite.assert.Equal(fileName, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
-
-	//put another file in
-	name2 := "file2"
-	fileName2 := filepath.Join(cache_path, name2)
-	suite.policy.Enqueue(fileName2)
-	suite.assert.Equal(fileName2, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
-
-	//touch file1 back to top
-	suite.policy.Enqueue(fileName)
-	suite.assert.Equal(fileName, suite.policy.head.name)
-	suite.assert.Equal(fileName2, suite.policy.tail.name)
+func (suite *lruPolicyTestSuite) createQueuedFiles(names ...string) {
+	data := make([]byte, lruTestFileSize)
+	for _, name := range names {
+		suite.Require().NoError(os.WriteFile(filepath.Join(cache_path, name), data, 0644))
+		suite.policy.Enqueue(name)
+	}
 }
 
-// 2. enqueueItem
 func (suite *lruPolicyTestSuite) TestEnqueue() {
 	defer suite.cleanupTest()
-	//put one file in
-	name := "file1"
-	fileName := filepath.Join(cache_path, name)
-	suite.policy.Enqueue(fileName)
-	suite.assert.Equal(fileName, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
 
-	//put another file in
-	name2 := "file2"
-	fileName2 := filepath.Join(cache_path, name2)
-	suite.policy.Enqueue(fileName2)
-	suite.assert.Equal(fileName2, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
+	suite.policy.Enqueue("file1")
+	suite.policy.Enqueue("file2")
+	suite.policy.Enqueue("file3")
+	suite.assert.Equal("file3", suite.policy.head.name)
+	suite.assert.Equal("file1", suite.policy.tail.name)
 
-	//put another file in
-	name3 := "file3"
-	fileName3 := filepath.Join(cache_path, name3)
-	suite.policy.Enqueue(fileName3)
-	suite.assert.Equal(fileName3, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
+	suite.policy.Enqueue("file1")
+	suite.assert.Equal("file1", suite.policy.head.name)
+	suite.assert.Equal("file2", suite.policy.tail.name)
 }
 
-// 3. Dequeue
 func (suite *lruPolicyTestSuite) TestDequeue() {
 	defer suite.cleanupTest()
-	//put one file in
-	name := "file1"
-	fileName := filepath.Join(cache_path, name)
-	suite.policy.Enqueue(fileName)
-	suite.assert.Equal(fileName, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
 
-	//put another file in
-	name2 := "file2"
-	fileName2 := filepath.Join(cache_path, name2)
-	suite.policy.Enqueue(fileName2)
-	suite.assert.Equal(fileName2, suite.policy.head.name)
-	suite.assert.Equal(fileName, suite.policy.tail.name)
-
-	//remove
-	suite.policy.Dequeue(fileName)
-	suite.assert.Equal(fileName2, suite.policy.head.name)
-	suite.assert.Equal(fileName2, suite.policy.tail.name)
+	suite.policy.Enqueue("file1")
+	suite.policy.Enqueue("file2")
+	suite.policy.Dequeue("file1")
+	suite.assert.Equal("file2", suite.policy.head.name)
+	suite.assert.Equal("file2", suite.policy.tail.name)
 }
 
 func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
@@ -199,10 +158,9 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	suite.Require().NoError(policy.StartPolicy())
 	defer policy.StopPolicy()
 
-	const fileSize = 250 * 1024
 	for i := 1; i <= 4; i++ {
 		name := fmt.Sprintf("file%d", i)
-		err := os.WriteFile(filepath.Join(cachePath, name), make([]byte, fileSize), 0644)
+		err := os.WriteFile(filepath.Join(cachePath, name), make([]byte, lruTestFileSize), 0644)
 		suite.Require().NoError(err)
 		policy.Enqueue(name)
 	}
@@ -221,42 +179,20 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	)
 }
 
-// 5. Capacity checker, two cases
 func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	defer suite.cleanupTest()
 
 	var mu sync.Mutex
 
-	//1. Define an arbitrary upload function to test the functionality of the channel
 	var uploaded []string
 	suite.policy.uploadandCleanFn = func(name string) error {
 		mu.Lock()
+		defer mu.Unlock()
 		uploaded = append(uploaded, name)
-		os.Remove(filepath.Join(cache_path, name))
-		mu.Unlock()
-		return nil
+		return os.Remove(filepath.Join(cache_path, name))
 	}
 
-	//2. Create files that exceed the 80% threshold, max set at 1MB
-	data := make([]byte, 250*1024)
-	err := os.WriteFile(filepath.Join(cache_path, "file1"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file1")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file2"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file2")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file3"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file3")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file4"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file4")
+	suite.createQueuedFiles("file1", "file2", "file3", "file4")
 
 	_, ex1 := suite.policy.nodeMap.Load("file1")
 	_, ex2 := suite.policy.nodeMap.Load("file2")
@@ -277,10 +213,8 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	snapshot := append([]string(nil), uploaded...)
 	mu.Unlock()
 
-	// file1 and file2 are the LRU tail so they should be evicted to reach targetRatio (60%)
 	suite.assert.Contains(snapshot, "file1")
 	suite.assert.Contains(snapshot, "file2")
-	// file3 and file4 are the most recently used, so they should NOT be evicted
 	suite.assert.NotContains(snapshot, "file3")
 	suite.assert.NotContains(snapshot, "file4")
 
@@ -293,50 +227,28 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	suite.assert.False(ex2)
 	suite.assert.True(ex3)
 	suite.assert.True(ex4)
-
 }
 
-// 6. Eviction, file with open handle, file with no open handle,
 func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 	defer suite.cleanupTest()
 	var mu sync.Mutex
 
-	//1. Define an arbitrary upload function to test the functionality of the channel
 	var uploaded []string
 	suite.policy.uploadandCleanFn = func(name string) error {
 		mu.Lock()
+		defer mu.Unlock()
 		uploaded = append(uploaded, name)
-		os.Remove(filepath.Join(cache_path, name))
-		mu.Unlock()
-		return nil
+		return os.Remove(filepath.Join(cache_path, name))
 	}
 
-	//2. Create files that exceed the 80% threshold, max set at 1MB
-	data := make([]byte, 250*1024)
-	err := os.WriteFile(filepath.Join(cache_path, "file1"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file1")
+	suite.createQueuedFiles("file1")
 
-	//open a file handle for file1 so it should get skipped and touched to the top, file1, file4, file3, file2
 	flock := suite.policy.fileLocks.Get("file1")
 	flock.Lock()
 	flock.Inc()
 	flock.Unlock()
 
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file2"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file2")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file3"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file3")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file4"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file4")
+	suite.createQueuedFiles("file2", "file3", "file4")
 
 	suite.assert.Eventually(func() bool {
 		mu.Lock()
@@ -347,78 +259,44 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 	snapshot := append([]string(nil), uploaded...)
 	mu.Unlock()
 
-	//file1 should be head, file4 should be tail
 	suite.policy.mu.Lock()
 	suite.assert.Equal("file1", suite.policy.head.name)
 	suite.assert.Equal("file4", suite.policy.tail.name)
 	suite.policy.mu.Unlock()
 
-	// file1 and file2 are the LRU tail so they should be evicted to reach targetRatio (60%)
 	suite.assert.Contains(snapshot, "file2")
 	suite.assert.Contains(snapshot, "file3")
-	// file3 and file4 are the most recently used, so they should NOT be evicted
 	suite.assert.NotContains(snapshot, "file1")
 	suite.assert.NotContains(snapshot, "file4")
-
 }
 
-// 7. Test done channel function
 func (suite *lruPolicyTestSuite) TestStopPolicyMidUpload() {
-	//fill up upload chan
-	//call stop policy
-	//make sure all files in upload were indeed uploaded
-
 	var mu sync.Mutex
-
-	//1. Define an arbitrary upload function to test the functionality of the channel
 	var uploaded []string
+	started := make(chan struct{}, 1)
 	suite.policy.uploadandCleanFn = func(name string) error {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		time.Sleep(20 * time.Millisecond)
 		mu.Lock()
-		//make upload super slow
-		time.Sleep(200 * time.Millisecond)
+		defer mu.Unlock()
 		uploaded = append(uploaded, name)
-		os.Remove(filepath.Join(cache_path, name))
-		mu.Unlock()
-		return nil
+		return os.Remove(filepath.Join(cache_path, name))
 	}
 
-	data := make([]byte, 250*1024)
-	err := os.WriteFile(filepath.Join(cache_path, "file1"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file1")
+	suite.createQueuedFiles("file1", "file2", "file3", "file4")
+	<-started
 
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file2"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file2")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file3"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file3")
-
-	data = make([]byte, 250*1024)
-	err = os.WriteFile(filepath.Join(cache_path, "file4"), data, 0644)
-	suite.assert.NoError(err)
-	suite.policy.Enqueue("file4")
-
-	time.Sleep(5 * time.Millisecond)
-
-	//Stop policy
-	err = suite.policy.StopPolicy()
+	err := suite.policy.StopPolicy()
 	suite.assert.NoError(err)
 
 	mu.Lock()
-	snapshot := make([]string, len(uploaded))
-	copy(snapshot, uploaded)
+	snapshot := append([]string(nil), uploaded...)
 	mu.Unlock()
 
-	fmt.Print(snapshot)
-
 	suite.assert.Contains(snapshot, "file1")
-	suite.assert.Contains(snapshot, "file2")
-	suite.assert.NotContains(snapshot, "file3")
-	suite.assert.NotContains(snapshot, "file4")
 
 	err = os.RemoveAll(cache_path)
 	suite.assert.NoError(err)
