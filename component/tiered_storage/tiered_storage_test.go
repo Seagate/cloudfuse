@@ -27,6 +27,7 @@ package tiered_storage
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -387,6 +388,92 @@ func (suite *tieredStorageTestSuite) TestRestartWithoutSnapshotRecoversConservat
 	suite.assert.True(node.isDirty.Load())
 	_, queued := restarted.policy.nodeMap.Load("recovered")
 	suite.assert.True(queued)
+}
+
+func (suite *tieredStorageTestSuite) TestRestartWithCorruptSnapshotRecoversFile() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.tieredStorage.Stop())
+	suite.Require().NoError(os.WriteFile(
+		filepath.Join(suite.cache_path, tieredStorageSnapshotPath),
+		[]byte("invalid snapshot"),
+		0600,
+	))
+	suite.Require().NoError(
+		os.WriteFile(filepath.Join(suite.cache_path, "recovered"), []byte("data"), 0644),
+	)
+
+	restarted := newTestTieredStorage(suite.loopback)
+	suite.Require().NoError(restarted.Start(context.Background()))
+	suite.tieredStorage = restarted
+	value, found := restarted.fileMap.Load("recovered")
+	suite.Require().True(found)
+	suite.assert.True(value.(*FileNode).isDirty.Load())
+}
+
+func (suite *tieredStorageTestSuite) TestRestartWithStaleSnapshotKeepsChangedFile() {
+	defer suite.cleanupTest()
+
+	const path = "changed"
+	localPath := filepath.Join(suite.cache_path, path)
+	suite.Require().NoError(os.WriteFile(localPath, []byte("old"), 0644))
+	node := &FileNode{name: path}
+	node.size.Store(3)
+	node.cloudBacked.Store(true)
+	suite.tieredStorage.fileMap.Store(path, node)
+	suite.Require().NoError(suite.tieredStorage.Stop())
+	suite.Require().NoError(os.WriteFile(localPath, []byte("changed"), 0644))
+
+	restarted := newTestTieredStorage(suite.loopback)
+	suite.Require().NoError(restarted.Start(context.Background()))
+	suite.tieredStorage = restarted
+	value, found := restarted.fileMap.Load(path)
+	suite.Require().True(found)
+	recovered := value.(*FileNode)
+	suite.assert.False(recovered.cloudBacked.Load())
+	suite.assert.True(recovered.isDirty.Load())
+	suite.assert.FileExists(localPath)
+}
+
+func (suite *tieredStorageTestSuite) TestRestartRemovesPartialDownload() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.tieredStorage.Stop())
+	partialPath := filepath.Join(
+		suite.cache_path,
+		"file.123"+partialDownloadSuffix,
+	)
+	suite.Require().NoError(os.WriteFile(partialPath, []byte("partial"), 0644))
+
+	restarted := newTestTieredStorage(suite.loopback)
+	suite.Require().NoError(restarted.Start(context.Background()))
+	suite.tieredStorage = restarted
+	suite.assert.NoFileExists(partialPath)
+	_, found := restarted.fileMap.Load("file.123" + partialDownloadSuffix)
+	suite.assert.False(found)
+}
+
+func TestUploadFailureKeepsLocalFile(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	cachePath := t.TempDir()
+	localPath := filepath.Join(cachePath, "file")
+	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
+
+	storage := &TieredStorage{
+		tmpPath:   cachePath,
+		fileLocks: common.NewLockMap(),
+		cacheSize: newCacheSizeTracker(cachePath, 0),
+	}
+	storage.SetNextComponent(next)
+	storage.fileMap.Store("file", &FileNode{name: "file"})
+	next.EXPECT().CopyFromFile(gomock.Any()).Return(errors.New("upload failed"))
+
+	err := storage.uploadandCleanFile("file")
+	require.Error(t, err)
+	assert.FileExists(t, localPath)
+	_, found := storage.fileMap.Load("file")
+	assert.True(t, found)
 }
 
 func (suite *tieredStorageTestSuite) TestCreateFileRejectsExistingCloudObject() {
