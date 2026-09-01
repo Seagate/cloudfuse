@@ -33,6 +33,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -298,8 +300,11 @@ func (c *TieredStorage) createFileUnlocked(
 	// WriteFile reserves space as the file grows.
 
 	//Create the file in the local cache, we will ignore the create empty and cloud stuff for now
-	localPath := filepath.Join(c.tmpPath, options.Name)
-	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return nil, err
+	}
+	err = os.MkdirAll(filepath.Dir(localPath), 0755)
 
 	if err != nil {
 		return nil, err
@@ -308,8 +313,8 @@ func (c *TieredStorage) createFileUnlocked(
 	//Open local file
 	localFile, err := common.OpenFile(
 		localPath,
-		os.O_CREATE|os.O_RDWR,
-		options.Mode,
+		os.O_CREATE|os.O_EXCL|os.O_RDWR,
+		c.cacheFileMode(options.Mode),
 	)
 	if err != nil {
 		return nil, err
@@ -337,6 +342,21 @@ func (c *TieredStorage) CreateFile(
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
+
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return nil, err
+	}
+	_, err = c.getAttrUnlocked(
+		internal.GetAttrOptions{Name: options.Name},
+		localPath,
+	)
+	if err == nil {
+		return nil, syscall.EEXIST
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
 	handle, err := c.createFileUnlocked(options)
 	if err != nil {
 		return nil, err
@@ -382,79 +402,83 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	flock.Lock()
 	defer flock.Unlock()
 
-	//Go through flag cases, might need to explore O_TRUNC
-
-	//Case 1: OpenFile with O_Create
-	if options.Flags&os.O_CREATE != 0 {
-		//Check if file first exists, then proceed
-		_, exists := c.fileMap.Load(options.Name)
-		if !exists {
-			handle, err := c.createFileUnlocked(
-				internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
-			)
-			if err != nil {
-				return nil, err
-			}
-			flock.Inc()
-			return handle, nil
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return nil, err
+	}
+	attrs, attrErr := c.getAttrUnlocked(internal.GetAttrOptions{Name: options.Name}, localPath)
+	if attrErr != nil && !errors.Is(attrErr, os.ErrNotExist) {
+		return nil, attrErr
+	}
+	exists := attrErr == nil
+	if options.Flags&os.O_CREATE != 0 && options.Flags&os.O_EXCL != 0 && exists {
+		return nil, syscall.EEXIST
+	}
+	if !exists {
+		if options.Flags&os.O_CREATE == 0 {
+			return nil, syscall.ENOENT
 		}
+		handle, err := c.createFileUnlocked(
+			internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
+		)
+		if err != nil {
+			return nil, err
+		}
+		flock.Inc()
+		return handle, nil
 	}
 
-	//1. Initial Check Map
-	_, exists := c.fileMap.Load(options.Name)
-
-	//if exists skip to opening file since it should already be in local cache
-	if !exists {
-		//2. Check if File exists in Disk, if not check cloud
-		info, err := os.Stat(filepath.Join(c.tmpPath, options.Name))
-		if err == nil {
+	_, tracked := c.fileMap.Load(options.Name)
+	if !tracked {
+		info, statErr := os.Stat(localPath)
+		if statErr == nil {
 			log.Warn(
 				"TieredStorage::OpenFile : Warning file exists locally on disk but not in tiered storage cache: %s",
 				options.Name,
 			)
-			//Read from local disk, create file node and add to file map
 			node := &FileNode{name: options.Name}
 			node.size.Store(info.Size())
+			node.isDirty.Store(true)
 			c.fileMap.Store(options.Name, node)
-
 		} else {
-			//3. Check if File exists in Cloud
-			info, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
-			if err != nil {
-				// file does not exist in cloud, return error
-				log.Err("TieredStorage::OpenFile : File Does not exist in cloud or local cache: %s",
-					options.Name,
-				)
-				return nil, err
-			}
-			// file exists in cloud, create local copy (name doesn't matter)and add to file map
 			localCopyNode := &FileNode{name: options.Name}
-			localCopyNode.size.Store(info.Size)
+			localCopyNode.size.Store(attrs.Size)
 			localCopyNode.cloudBacked.Store(true)
 
-			// make room for the copy we are about to download
-			if err := c.reserveSpace(info.Size); err != nil {
-				return nil, err
-			}
-			//download it to the local cache and add to file map
-			err = c.downloadCopyFromCloud(options)
-			if err != nil {
-				return nil, err
+			if options.Flags&os.O_TRUNC != 0 {
+				if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+					return nil, err
+				}
+				file, err := common.OpenFile(
+					localPath,
+					os.O_CREATE|os.O_EXCL|os.O_RDWR,
+					c.cacheFileMode(options.Mode),
+				)
+				if err != nil {
+					return nil, err
+				}
+				if err := file.Close(); err != nil {
+					return nil, err
+				}
+				localCopyNode.size.Store(0)
+				localCopyNode.isDirty.Store(true)
+			} else {
+				if err := c.reserveSpace(attrs.Size); err != nil {
+					return nil, err
+				}
+				if err := c.downloadCopyFromCloud(options); err != nil {
+					return nil, err
+				}
 			}
 			c.fileMap.Store(options.Name, localCopyNode)
-
 		}
-
 	}
 
-	//At this point the file should be in the local cache, so we can proceed to open it
-
-	//Open the file in the local cache
-	localPath := filepath.Join(c.tmpPath, options.Name)
+	openFlags := options.Flags &^ (os.O_CREATE | os.O_EXCL)
 	localFile, err := common.OpenFile(
 		localPath,
-		os.O_RDWR,
-		options.Mode,
+		openFlags,
+		c.cacheFileMode(options.Mode),
 	)
 	if err != nil {
 		return nil, err
@@ -466,11 +490,26 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	if options.Flags&os.O_APPEND != 0 {
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
+	if options.Flags&os.O_TRUNC != 0 {
+		if value, found := c.fileMap.Load(options.Name); found {
+			node := value.(*FileNode)
+			c.recordSize(node, 0)
+			node.isDirty.Store(true)
+		}
+		c.setHandleDirty(handle)
+	}
 
 	//increase handle count
 	flock.Inc()
 
 	return handle, nil
+}
+
+func (c *TieredStorage) cacheFileMode(mode os.FileMode) os.FileMode {
+	if mode == 0 || runtime.GOOS == "windows" {
+		return common.DefaultFilePermissionBits
+	}
+	return mode
 }
 
 // downloadCopyFromCloud caches a cloud object on local storage.
@@ -480,8 +519,11 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 // real path, which matters because local data is authoritative here: a partial
 // download found at a real path would later be uploaded over the good cloud copy.
 func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) error {
-	localPath := filepath.Join(c.tmpPath, options.Name)
-	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(filepath.Dir(localPath), 0755)
 	if err != nil {
 		return err
 	}
@@ -490,7 +532,7 @@ func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) 
 	partFile, err := common.OpenFile(
 		partPath,
 		os.O_CREATE|os.O_TRUNC|os.O_RDWR,
-		options.Mode,
+		c.cacheFileMode(options.Mode),
 	)
 	if err != nil {
 		return err
@@ -545,10 +587,13 @@ func replaceFile(src, dst string) error {
 // purgeLocal removes an object's local copy and updates the usage counter.
 // The object's file lock must be held.
 func (c *TieredStorage) purgeLocal(name string) error {
-	localPath := filepath.Join(c.tmpPath, name)
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
 
 	info, statErr := os.Stat(localPath)
-	err := os.Remove(localPath)
+	err = os.Remove(localPath)
 	if err == nil && statErr == nil {
 		c.cacheSize.Add(-info.Size())
 	}
@@ -772,8 +817,11 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 func (c *TieredStorage) uploadCachedFile(name string) error {
 	//get the local path
-	localPath := filepath.Join(c.tmpPath, name)
-	_, err := os.Stat(localPath)
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
+	_, err = os.Stat(localPath)
 	if err != nil {
 		log.Err("TieredStorage::uploadFile : %s stat failed [%v]", name, err)
 		return err
@@ -848,10 +896,15 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		}
 		//Local only State, this will happen anyways if it exists local
 		//Rename
-		err := os.Rename(
-			filepath.Join(c.tmpPath, options.Src),
-			filepath.Join(c.tmpPath, options.Dst),
-		)
+		srcPath, err := c.localPath(options.Src)
+		if err != nil {
+			return err
+		}
+		dstPath, err := c.localPath(options.Dst)
+		if err != nil {
+			return err
+		}
+		err = os.Rename(srcPath, dstPath)
 		if err != nil {
 			return err
 		}
