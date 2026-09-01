@@ -136,10 +136,17 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 	// A crash can leave partial downloads behind. They are not valid object
 	// data, so remove them before anything can list, open or upload them.
 	c.removePartialDownloads()
+	snapshot, err := c.readSnapshot()
+	if err != nil {
+		log.Warn("TieredStorage::Start : ignoring invalid state snapshot [%v]", err)
+	}
 
 	// Seed the usage counter from what is actually on disk. This is the one
 	// place where measuring the whole directory is worth its cost.
 	c.cacheSize.Refresh()
+	if err := c.recoverLocalState(snapshot); err != nil {
+		return fmt.Errorf("TieredStorage: failed to recover local state: %w", err)
+	}
 
 	if c.policy != nil {
 		if err := c.policy.StartPolicy(); err != nil {
@@ -159,10 +166,11 @@ func (c *TieredStorage) Stop() error {
 	log.Trace("TieredStorage::Stop : Stopping component %s", c.Name())
 
 	if c.policy != nil {
-		return c.policy.StopPolicy()
+		if err := c.policy.StopPolicy(); err != nil {
+			return err
+		}
 	}
-
-	return nil
+	return c.writeSnapshot()
 }
 
 // removePartialDownloads deletes interrupted downloads left by a previous run.

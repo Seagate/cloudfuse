@@ -136,8 +136,6 @@ func (q *lruQueue) StartPolicy() error {
 		q.maxEviction = defaultMaxEviction
 	}
 
-	q.head = nil
-	q.tail = nil
 	q.doneChan = make(chan struct{})
 	q.uploadChan = make(chan uploadJob, q.numWorkers*uploadQueueDepthPerWorker)
 
