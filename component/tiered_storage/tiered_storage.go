@@ -75,15 +75,19 @@ type FileNode struct {
 }
 
 type TieredStorageOptions struct {
-	TmpPath   string  `config:"path"        yaml:"path,omitempty"`
-	MaxSizeMB float64 `config:"max-size-mb" yaml:"max-size-mb,omitempty"`
+	TmpPath         string  `config:"path"              yaml:"path,omitempty"`
+	MaxSizeMB       float64 `config:"max-size-mb"       yaml:"max-size-mb,omitempty"`
+	HighThreshold   uint32  `config:"high-threshold"    yaml:"high-threshold,omitempty"`
+	LowThreshold    uint32  `config:"low-threshold"     yaml:"low-threshold,omitempty"`
+	MaxEviction     uint32  `config:"max-eviction"      yaml:"max-eviction,omitempty"`
+	Parallelism     uint32  `config:"parallelism"       yaml:"parallelism,omitempty"`
+	PollIntervalSec uint32  `config:"poll-interval-sec" yaml:"poll-interval-sec,omitempty"`
 }
 
 const (
-	compName = "tiered_storage"
-	// TODO: make thresholds configurable
-	defaultHighThreshold      = 0.8
-	defaultLowThreshold       = 0.6
+	compName                  = "tiered_storage"
+	defaultHighThreshold      = 80
+	defaultLowThreshold       = 60
 	defaultParallelism        = 8
 	defaultMaxEviction        = 5000
 	capacityPollInterval      = time.Second
@@ -160,6 +164,31 @@ func (c *TieredStorage) Configure(_ bool) error {
 		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
 		return fmt.Errorf("TieredStorage: failed to create tmp path: %w", err)
 	}
+	if conf.MaxSizeMB <= 0 {
+		return fmt.Errorf("TieredStorage: max-size-mb must be greater than 0")
+	}
+
+	if conf.HighThreshold == 0 {
+		conf.HighThreshold = defaultHighThreshold
+	}
+	if conf.LowThreshold == 0 {
+		conf.LowThreshold = defaultLowThreshold
+	}
+	if conf.LowThreshold >= conf.HighThreshold || conf.HighThreshold > 100 {
+		return fmt.Errorf(
+			"TieredStorage: thresholds must satisfy 0 < low-threshold < high-threshold <= 100",
+		)
+	}
+	if conf.MaxEviction == 0 {
+		conf.MaxEviction = defaultMaxEviction
+	}
+	if conf.Parallelism == 0 {
+		conf.Parallelism = defaultParallelism
+	}
+	pollInterval := time.Duration(conf.PollIntervalSec) * time.Second
+	if pollInterval == 0 {
+		pollInterval = capacityPollInterval
+	}
 
 	c.maxCacheSize = conf.MaxSizeMB * common.MbToBytes
 	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
@@ -169,11 +198,11 @@ func (c *TieredStorage) Configure(_ bool) error {
 		maxCacheSize:     c.maxCacheSize,
 		fileLocks:        c.fileLocks,
 		size:             c.cacheSize,
-		threshold:        defaultHighThreshold,
-		targetRatio:      defaultLowThreshold,
-		numWorkers:       defaultParallelism,
-		maxEviction:      defaultMaxEviction,
-		pollInterval:     capacityPollInterval,
+		threshold:        float64(conf.HighThreshold) / 100,
+		targetRatio:      float64(conf.LowThreshold) / 100,
+		numWorkers:       int(conf.Parallelism),
+		maxEviction:      conf.MaxEviction,
+		pollInterval:     pollInterval,
 		uploadandCleanFn: c.uploadandCleanFile,
 	}
 

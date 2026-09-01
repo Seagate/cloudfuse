@@ -44,6 +44,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -191,6 +192,60 @@ func TestLocalPath(t *testing.T) {
 				return
 			}
 			assert.ErrorIs(t, err, syscall.EINVAL)
+		})
+	}
+}
+
+func TestTieredStoragePolicyConfig(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       string
+		wantErr      bool
+		high         float64
+		low          float64
+		maxEviction  uint32
+		parallelism  int
+		pollInterval time.Duration
+	}{
+		{
+			name:   "defaults",
+			config: "max-size-mb: 1",
+			high:   0.8, low: 0.6, maxEviction: 5000, parallelism: 8,
+			pollInterval: time.Second,
+		},
+		{
+			name: "custom",
+			config: "max-size-mb: 2\n  high-threshold: 90\n  low-threshold: 70\n" +
+				"  max-eviction: 25\n  parallelism: 3\n  poll-interval-sec: 4",
+			high: 0.9, low: 0.7, maxEviction: 25, parallelism: 3,
+			pollInterval: 4 * time.Second,
+		},
+		{name: "missing capacity", config: "high-threshold: 80", wantErr: true},
+		{name: "reversed thresholds", config: "max-size-mb: 1\n  high-threshold: 60\n  low-threshold: 80", wantErr: true},
+		{name: "high threshold over 100", config: "max-size-mb: 1\n  high-threshold: 101", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configuration := fmt.Sprintf(
+				"tiered_storage:\n  path: %s\n  %s",
+				t.TempDir(),
+				test.config,
+			)
+			require.NoError(t, config.ReadConfigFromReader(strings.NewReader(configuration)))
+
+			storage := NewTieredStorageComponent().(*TieredStorage)
+			err := storage.Configure(true)
+			if test.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.high, storage.policy.threshold)
+			assert.Equal(t, test.low, storage.policy.targetRatio)
+			assert.Equal(t, test.maxEviction, storage.policy.maxEviction)
+			assert.Equal(t, test.parallelism, storage.policy.numWorkers)
+			assert.Equal(t, test.pollInterval, storage.policy.pollInterval)
 		})
 	}
 }
