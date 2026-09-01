@@ -35,12 +35,6 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
-const (
-	// uploadQueueDepthPerWorker sizes the job channel. It only needs enough
-	// slack that the dispatcher is not serialised against the workers.
-	uploadQueueDepthPerWorker = 16
-)
-
 // nodeState records whether the queue or an eviction worker owns a node.
 type nodeState uint8
 
@@ -137,7 +131,7 @@ func (q *lruQueue) StartPolicy() error {
 	}
 
 	q.doneChan = make(chan struct{})
-	q.uploadChan = make(chan uploadJob, q.numWorkers*uploadQueueDepthPerWorker)
+	q.uploadChan = make(chan uploadJob)
 
 	q.workerWg.Add(q.numWorkers)
 	for range q.numWorkers {
