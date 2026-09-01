@@ -316,7 +316,7 @@ func (c *TieredStorage) StreamDir(
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return nil, "", localErr
 	}
-	if cloudErr != nil && !(localExists && errors.Is(cloudErr, os.ErrNotExist)) {
+	if cloudErr != nil && (!localExists || !errors.Is(cloudErr, os.ErrNotExist)) {
 		return attrs, token, cloudErr
 	}
 	if cloudErr != nil {
@@ -427,7 +427,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	}()
 
 	cloudErr := c.NextComponent().RenameDir(options)
-	if cloudErr != nil && !(localExists && errors.Is(cloudErr, os.ErrNotExist)) {
+	if cloudErr != nil && (!localExists || !errors.Is(cloudErr, os.ErrNotExist)) {
 		return cloudErr
 	}
 	if !localExists {
@@ -1169,7 +1169,7 @@ func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
 		localErr == nil && info.IsDir()
 	if cloudBacked {
 		err = c.NextComponent().Chmod(options)
-		if err != nil && !(localErr == nil && errors.Is(err, os.ErrNotExist)) {
+		if err != nil && (localErr != nil || !errors.Is(err, os.ErrNotExist)) {
 			return err
 		}
 	}
@@ -1205,7 +1205,7 @@ func (c *TieredStorage) Chown(options internal.ChownOptions) error {
 		localErr == nil && info.IsDir()
 	if cloudBacked {
 		err = c.NextComponent().Chown(options)
-		if err != nil && !(localErr == nil && errors.Is(err, os.ErrNotExist)) {
+		if err != nil && (localErr != nil || !errors.Is(err, os.ErrNotExist)) {
 			return err
 		}
 	}

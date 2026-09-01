@@ -163,6 +163,7 @@ func (c *TieredStorage) recoverLocalState(snapshot *tieredStorageSnapshot) error
 			if err != nil {
 				return err
 			}
+			//nolint:gosec // WalkDir is confined to c.tmpPath.
 			if err := os.Remove(path); err != nil {
 				return err
 			}
@@ -197,6 +198,7 @@ func (c *TieredStorage) recoverLocalState(snapshot *tieredStorageSnapshot) error
 		}
 
 		if state.CloudBacked && !state.Dirty {
+			//nolint:gosec // WalkDir is confined to c.tmpPath.
 			if err := os.Remove(path); err != nil {
 				return err
 			}
