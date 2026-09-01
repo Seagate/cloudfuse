@@ -102,19 +102,19 @@ func (suite *lruPolicyTestSuite) TestTouch() {
 	//put one file in
 	name := "file1"
 	fileName := filepath.Join(cache_path, name)
-	suite.policy.Touch(fileName)
+	suite.policy.Enqueue(fileName)
 	suite.assert.Equal(fileName, suite.policy.head.name)
 	suite.assert.Equal(fileName, suite.policy.tail.name)
 
 	//put another file in
 	name2 := "file2"
 	fileName2 := filepath.Join(cache_path, name2)
-	suite.policy.Touch(fileName2)
+	suite.policy.Enqueue(fileName2)
 	suite.assert.Equal(fileName2, suite.policy.head.name)
 	suite.assert.Equal(fileName, suite.policy.tail.name)
 
 	//touch file1 back to top
-	suite.policy.Touch(fileName)
+	suite.policy.Enqueue(fileName)
 	suite.assert.Equal(fileName, suite.policy.head.name)
 	suite.assert.Equal(fileName2, suite.policy.tail.name)
 }

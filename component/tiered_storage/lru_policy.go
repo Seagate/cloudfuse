@@ -35,52 +35,30 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
-// nodeState records whether the queue or an eviction worker owns a node.
-type nodeState uint8
-
-const (
-	// nodeQueued: linked into the list and eligible for eviction.
-	nodeQueued nodeState = iota
-	// nodeEvicting: removed from the LRU and owned by a worker.
-	// The node stays in nodeMap so rename or delete can still find it.
-	nodeEvicting
-	// nodeCancelled: the object was deleted or renamed while a worker owned it.
-	// The worker must skip the upload and drop the node.
-	nodeCancelled
-)
-
 type lruNode struct {
 	prev *lruNode
 	next *lruNode
 	name string
 
-	state nodeState
+	evicting bool
 }
 
-// uploadJob is one nominated object. The waitgroup belongs to the eviction
-// pass that nominated it, so a pass waits only for its own batch.
 type uploadJob struct {
 	name string
 	wg   *sync.WaitGroup
 }
 
-// lruQueue decides which local-only objects move to cloud storage.
-//
-// Locking: callers may hold a file lock and then take mu. The reverse is
-// forbidden - see the lock ordering note in tiered_storage.go. Nomination
-// therefore consults handle counts (which are atomic) instead of taking file
-// locks, and workers use TryLock so they never block on user I/O.
+// lruQueue moves local-only objects to cloud storage.
+// File locks may be held before mu, never after it.
 type lruQueue struct {
-	// mu guards head, tail and every field of every lruNode.
+	// mu guards the list and its nodes.
 	mu   sync.Mutex
 	head *lruNode
 	tail *lruNode
-	// nodeMap indexes nodes by object name. It is only written under mu; it is
-	// a sync.Map so callers can test membership without taking mu.
+	// nodeMap is written under mu, but may be read without it.
 	nodeMap sync.Map
 
-	// evictMu serialises eviction cycles so two cycles cannot nominate the same
-	// objects or interleave their batches.
+	// evictMu serializes eviction cycles.
 	evictMu sync.Mutex
 
 	checkerWg sync.WaitGroup
@@ -95,16 +73,14 @@ type lruQueue struct {
 	size      *cacheSizeTracker
 
 	maxCacheSize float64
-	// eviction starts above threshold*maxCacheSize and runs until usage reaches
-	// targetRatio*maxCacheSize, both fractions in (0,1]
+	// threshold and targetRatio are fractions of maxCacheSize.
 	threshold    float64
 	targetRatio  float64
 	numWorkers   int
 	maxEviction  uint32
 	pollInterval time.Duration
 
-	// uploads the object to cloud storage and removes the local copy.
-	// Supplied by TieredStorage; called with the object's file lock held.
+	// Called with the object's file lock held.
 	uploadandCleanFn func(name string) error
 }
 
@@ -142,9 +118,7 @@ func (q *lruQueue) StartPolicy() error {
 	return nil
 }
 
-// StopPolicy shuts the policy down and waits for uploads already in flight. It
-// does not drain the queue: local-only data is authoritative, so whatever has
-// not been evicted stays in the cache for the next mount.
+// StopPolicy waits for in-flight uploads but leaves queued files local.
 func (q *lruQueue) StopPolicy() error {
 	q.stopOnce.Do(func() {
 		if q.doneChan == nil {
@@ -153,8 +127,7 @@ func (q *lruQueue) StopPolicy() error {
 		close(q.doneChan)
 		q.checkerWg.Wait()
 
-		// Block new eviction cycles before retiring the workers, so a
-		// concurrent EvictNow cannot send on a closed channel.
+		// Prevent EvictNow from sending while uploadChan is closed.
 		q.evictMu.Lock()
 		close(q.uploadChan)
 		q.evictMu.Unlock()
@@ -164,13 +137,7 @@ func (q *lruQueue) StopPolicy() error {
 	return nil
 }
 
-func (q *lruQueue) Touch(name string) {
-	q.Enqueue(name)
-}
-
-// Enqueue makes name the most recently used object, adding it if it is new.
-// A node that a worker owns is left alone; the worker re-queues it itself if
-// the upload does not happen.
+// Enqueue adds or promotes an object unless a worker owns it.
 func (q *lruQueue) Enqueue(name string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -184,37 +151,29 @@ func (q *lruQueue) Enqueue(name string) {
 	}
 
 	node := val.(*lruNode)
-	if node.state != nodeQueued {
+	if node.evicting {
 		return
 	}
 	q.extractNode(node)
 	q.setHead(node)
 }
 
-// Remove deleted or renamed object from the LRU and cancel any in-flight eviction.
+// Dequeue removes an object and cancels any in-flight eviction.
 func (q *lruQueue) Dequeue(name string) {
 	log.Trace("lruQueue::Dequeue : %s", name)
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// if the node doesn't exist, there is nothing to do
-	val, found := q.nodeMap.Load(name)
+	val, found := q.nodeMap.LoadAndDelete(name)
 	if !found {
 		return
 	}
 
-	// if the node is being evicted, it has already been extracted from the list.
-	// Mark it cancelled so the worker can skip the upload and drop it from the map.
 	node := val.(*lruNode)
-	if node.state == nodeEvicting {
-		node.state = nodeCancelled
-		return
+	if !node.evicting {
+		q.extractNode(node)
 	}
-
-	// unlink and delete the node
-	q.extractNode(node)
-	q.nodeMap.Delete(name)
 }
 
 // mu must be held
@@ -248,7 +207,6 @@ func (q *lruQueue) extractNode(node *lruNode) {
 	if node == q.head {
 		q.head = node.next
 	}
-	//tail case
 	if node == q.tail {
 		q.tail = node.prev
 	}
@@ -261,15 +219,6 @@ func (q *lruQueue) extractNode(node *lruNode) {
 	}
 	node.prev = nil
 	node.next = nil
-}
-
-func (q *lruQueue) stopping() bool {
-	select {
-	case <-q.doneChan:
-		return true
-	default:
-		return false
-	}
 }
 
 func (q *lruQueue) capacityChecker() {
@@ -292,25 +241,22 @@ func (q *lruQueue) capacityChecker() {
 	}
 }
 
-// EvictNow synchronously makes room for growBytes more bytes of local data and
-// reports whether the cache has room afterwards. Callers may hold a file lock:
-// workers never block on file locks, so an object cannot deadlock against its
-// own eviction.
+// EvictNow synchronously makes room for growBytes.
 func (q *lruQueue) EvictNow(growBytes int64) bool {
 	target := min(int64(q.maxCacheSize*q.targetRatio), int64(q.maxCacheSize)-growBytes)
 	q.evictDownTo(target)
 	return float64(q.size.Used()+growBytes) <= q.maxCacheSize
 }
 
-// evictDownTo runs one eviction pass, nominating enough least-recently-used
-// objects to reach targetUsed. If the pass does not bring usage below the high
-// threshold, a later capacity check may try again.
+// evictDownTo runs one eviction pass toward targetUsed.
 func (q *lruQueue) evictDownTo(targetUsed int64) {
 	q.evictMu.Lock()
 	defer q.evictMu.Unlock()
 
-	if q.stopping() {
+	select {
+	case <-q.doneChan:
 		return
+	default:
 	}
 
 	used := q.size.Used()
@@ -334,8 +280,6 @@ func (q *lruQueue) evictDownTo(targetUsed int64) {
 	}
 }
 
-// runBatch hands every name to the worker pool and waits for that batch to
-// finish.
 func (q *lruQueue) runBatch(names []string) {
 	var wg sync.WaitGroup
 
@@ -344,7 +288,6 @@ func (q *lruQueue) runBatch(names []string) {
 		select {
 		case q.uploadChan <- uploadJob{name: name, wg: &wg}:
 		case <-q.doneChan:
-			// shutting down - hand back everything we could not dispatch
 			for _, undelivered := range names[i:] {
 				q.requeue(undelivered, false)
 				wg.Done()
@@ -356,15 +299,8 @@ func (q *lruQueue) runBatch(names []string) {
 	wg.Wait()
 }
 
-// nominate detaches least-recently-used nodes until their combined size covers
-// bytesNeeded, marking each as owned by a worker. Objects with open handles are
-// promoted to the head instead: they are by definition in use, and promoting
-// them stops the next pass from considering them again.
-//
-// Each candidate is measured here, under mu. That is a syscall per nominated
-// object while the queue is locked, but the count is bounded by the deficit
-// being covered, and it keeps nomination from having to reach back into the
-// component's file map.
+// nominate claims enough least-recently-used files to cover bytesNeeded.
+// Open files are promoted instead.
 func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -374,38 +310,28 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 	var total int64
 
 	for node := q.tail; node != nil && len(names) < limit && total < bytesNeeded; {
-		// remember where to go next before the node is unlinked
 		prev := node.prev
 
-		switch {
-		case node.state != nodeQueued:
-			// a worker owns it; it should not be in the list at all
-
-		case q.fileLocks.Get(node.name).Count() > 0:
+		if q.fileLocks.Get(node.name).Count() > 0 {
 			busy = append(busy, node)
-
-		default:
+		} else {
 			info, err := os.Stat(filepath.Join(q.cachePath, node.name))
 			if err != nil {
-				// there is no local copy left to evict
 				log.Warn("lruQueue::nominate : dropping %s [%v]", node.name, err)
 				q.extractNode(node)
 				q.nodeMap.Delete(node.name)
-				break
+			} else {
+				q.extractNode(node)
+				node.evicting = true
+				names = append(names, node.name)
+				total += info.Size()
 			}
-			q.extractNode(node)
-			node.state = nodeEvicting
-			names = append(names, node.name)
-			total += info.Size()
 		}
 
 		node = prev
 	}
 
-	// Promote busy nodes after the walk, not during it: re-linking a node while
-	// traversing can lead the walk back over nodes it already visited. The list
-	// is walked oldest-first, so promoting in that order preserves their
-	// relative recency.
+	// Relink after walking so traversal cannot revisit promoted nodes.
 	for _, node := range busy {
 		q.extractNode(node)
 		q.setHead(node)
@@ -414,36 +340,26 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 	return names
 }
 
-// claimed reports whether the worker may still upload name.
 func (q *lruQueue) claimed(name string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	val, found := q.nodeMap.Load(name)
-	return found && val.(*lruNode).state == nodeEvicting
+	return found && val.(*lruNode).evicting
 }
 
-// requeue returns a nominated node to the queue. A failed upload goes to the
-// tail for a future eviction cycle. An object that was merely busy goes to the
-// head, because being in use is what the head of an LRU means.
+// Failed uploads return to the tail; busy files return to the head.
 func (q *lruQueue) requeue(name string, failed bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// get the node
 	val, found := q.nodeMap.Load(name)
 	if !found {
 		return
 	}
 	node := val.(*lruNode)
 
-	// was the file deleted or renamed?
-	if node.state == nodeCancelled {
-		q.nodeMap.Delete(name)
-		return
-	}
-
-	node.state = nodeQueued
+	node.evicting = false
 	if failed {
 		q.setTail(node)
 		return
@@ -451,16 +367,13 @@ func (q *lruQueue) requeue(name string, failed bool) {
 	q.setHead(node)
 }
 
-// drop forgets a node whose local copy no longer exists.
 func (q *lruQueue) drop(name string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if val, found := q.nodeMap.Load(name); found {
-		q.extractNode(val.(*lruNode))
-	}
 	q.nodeMap.Delete(name)
 }
+
 func (q *lruQueue) worker() {
 	defer q.workerWg.Done()
 	for job := range q.uploadChan {
@@ -468,9 +381,6 @@ func (q *lruQueue) worker() {
 	}
 }
 
-// evictOne uploads one object and removes its local copy. It never blocks on a
-// file lock: an object that user I/O has picked up in the meantime goes back
-// into the queue and is reconsidered on a later pass.
 func (q *lruQueue) evictOne(job uploadJob) {
 	defer job.wg.Done()
 
@@ -481,8 +391,7 @@ func (q *lruQueue) evictOne(job uploadJob) {
 	}
 	defer flock.Unlock()
 
-	// The object may have been deleted or renamed while the job sat in the
-	// channel. Uploading it now would resurrect data the user removed.
+	// Dequeue may cancel the job while it waits for a worker.
 	if !q.claimed(job.name) {
 		q.drop(job.name)
 		return
