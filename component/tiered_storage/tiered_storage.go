@@ -1042,6 +1042,52 @@ func (c *TieredStorage) Chown(options internal.ChownOptions) error {
 }
 
 func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error {
+	if options.NewSize < 0 {
+		return syscall.EINVAL
+	}
+	if options.Handle == nil {
+		handle, err := c.OpenFile(internal.OpenFileOptions{
+			Name:  options.Name,
+			Flags: os.O_RDWR,
+			Mode:  common.DefaultFilePermissionBits,
+		})
+		if err != nil {
+			return err
+		}
+		options.Handle = handle
+		if err := c.TruncateFile(options); err != nil {
+			_ = c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+			return err
+		}
+		return c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	}
+
+	name := options.Handle.Path
+	flock := c.fileLocks.Get(name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	file := options.Handle.GetFileObject()
+	if file == nil {
+		return syscall.EBADF
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if err := c.reserveSpace(max(options.NewSize-info.Size(), 0)); err != nil {
+		return err
+	}
+	if err := file.Truncate(options.NewSize); err != nil {
+		return err
+	}
+
+	c.setHandleDirty(options.Handle)
+	if value, found := c.fileMap.Load(name); found {
+		node := value.(*FileNode)
+		node.isDirty.Store(true)
+		c.cacheSize.Add(options.NewSize - node.size.Swap(options.NewSize))
+	}
 	return nil
 }
 

@@ -221,8 +221,16 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 			pollInterval: 4 * time.Second,
 		},
 		{name: "missing capacity", config: "high-threshold: 80", wantErr: true},
-		{name: "reversed thresholds", config: "max-size-mb: 1\n  high-threshold: 60\n  low-threshold: 80", wantErr: true},
-		{name: "high threshold over 100", config: "max-size-mb: 1\n  high-threshold: 101", wantErr: true},
+		{
+			name:    "reversed thresholds",
+			config:  "max-size-mb: 1\n  high-threshold: 60\n  low-threshold: 80",
+			wantErr: true,
+		},
+		{
+			name:    "high threshold over 100",
+			config:  "max-size-mb: 1\n  high-threshold: 101",
+			wantErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -471,6 +479,61 @@ func (suite *tieredStorageTestSuite) TestOpenFileHonorsReadOnlyFlag() {
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 	)
+}
+
+func (suite *tieredStorageTestSuite) TestTruncateOpenLocalFile() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "local-truncate", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("original")},
+	)
+	suite.Require().NoError(err)
+
+	err = suite.tieredStorage.TruncateFile(internal.TruncateFileOptions{
+		Name: "local-truncate", Handle: handle, NewSize: 3,
+	})
+	suite.Require().NoError(err)
+	info, err := handle.GetFileObject().Stat()
+	suite.Require().NoError(err)
+	suite.assert.EqualValues(3, info.Size())
+	suite.assert.True(handle.Dirty())
+	value, found := suite.tieredStorage.fileMap.Load("local-truncate")
+	suite.Require().True(found)
+	suite.assert.EqualValues(3, value.(*FileNode).size.Load())
+}
+
+func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
+	defer suite.cleanupTest()
+
+	const path = "cloud-truncate"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	_, err = suite.loopback.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("cloud data")},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	suite.Require().NoError(suite.tieredStorage.TruncateFile(
+		internal.TruncateFileOptions{Name: path, NewSize: 4},
+	))
+	attrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.Require().NoError(err)
+	suite.assert.EqualValues(4, attrs.Size)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+}
+
+func (suite *tieredStorageTestSuite) TestTruncateInvalidSize() {
+	defer suite.cleanupTest()
+
+	err := suite.tieredStorage.TruncateFile(
+		internal.TruncateFileOptions{Name: "invalid", NewSize: -1},
+	)
+	suite.assert.ErrorIs(err, syscall.EINVAL)
 }
 
 func (suite *tieredStorageTestSuite) TestStreamDirMergesLocalAndCloudEntries() {
