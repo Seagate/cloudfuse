@@ -942,7 +942,45 @@ func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 
 // Filesystem level operations
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	return c.NextComponent().GetAttr(options)
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	flock := c.fileLocks.Get(options.Name)
+	flock.RLock()
+	defer flock.RUnlock()
+	return c.getAttrUnlocked(options, localPath)
+}
+
+// getAttrUnlocked merges local and cloud attributes. The object's file lock
+// must already be held.
+func (c *TieredStorage) getAttrUnlocked(
+	options internal.GetAttrOptions,
+	localPath string,
+) (*internal.ObjAttr, error) {
+	info, localErr := os.Stat(localPath)
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return nil, localErr
+	}
+
+	attrs, cloudErr := c.NextComponent().GetAttr(options)
+	if localErr != nil {
+		return attrs, cloudErr
+	}
+
+	localAttrs := newTieredStorageObjAttr(options.Name, info)
+	if cloudErr != nil || attrs == nil {
+		return localAttrs, nil
+	}
+	if info.IsDir() {
+		return attrs, nil
+	}
+
+	merged := *attrs
+	merged.Size = localAttrs.Size
+	merged.Mtime = localAttrs.Mtime
+	return &merged, nil
 }
 
 func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
