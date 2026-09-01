@@ -728,29 +728,25 @@ func (c *TieredStorage) recordSize(node *FileNode, size int64) {
 	c.cacheSize.Add(size - node.size.Swap(size))
 }
 
-// reserveSpace makes room for growBytes more bytes of local data.
-//
-// Running out of local space is not an error in this component: cloud storage
-// is the overflow tier, so the first response is to evict. ENOSPC is only the
-// right answer when nothing can be evicted - every object is open, or uploads
-// are failing.
+// ensure there is enough available space for local storage to grow by the given amount.
+// evict files if necessary. Return ENOSPC if there is no way to make room for the new data.
 //
 // Callers may hold a file lock. Eviction workers never block on file locks, so
 // the object being written cannot deadlock against its own eviction.
-func (c *TieredStorage) reserveSpace(growBytes int64) error {
-	if c.maxCacheSize <= 0 || growBytes <= 0 {
+func (c *TieredStorage) reserveSpace(numBytes int64) error {
+	if c.maxCacheSize <= 0 || numBytes <= 0 {
 		return nil
 	}
-	if float64(c.cacheSize.Used()+growBytes) <= c.maxCacheSize {
+	if float64(c.cacheSize.Used()+numBytes) <= c.maxCacheSize {
 		return nil
 	}
-	if c.policy == nil || c.policy.EvictNow(growBytes) {
+	if c.policy == nil || c.policy.EvictNow(numBytes) {
 		return nil
 	}
 
 	log.Err(
 		"TieredStorage::reserveSpace : cache is full and nothing can be evicted (need %d bytes, using %d of %d)",
-		growBytes,
+		numBytes,
 		c.cacheSize.Used(),
 		int64(c.maxCacheSize),
 	)
