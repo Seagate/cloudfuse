@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 )
@@ -145,6 +146,17 @@ func (c *TieredStorage) recoverLocalState(snapshot *tieredStorageSnapshot) error
 			return walkErr
 		}
 		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		if strings.HasSuffix(entry.Name(), partialDownloadSuffix) {
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+			c.cacheSize.Add(-info.Size())
 			return nil
 		}
 		if entry.Name() == tieredStorageSnapshotPath ||

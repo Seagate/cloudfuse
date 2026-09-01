@@ -30,7 +30,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -109,7 +108,6 @@ func (c *TieredStorage) SetNextComponent(nc internal.Component) {
 func (c *TieredStorage) Start(ctx context.Context) error {
 	log.Trace("TieredStorage::Start : Starting component %s", c.Name())
 
-	c.removePartialDownloads()
 	snapshot, err := c.readSnapshot()
 	if err != nil {
 		log.Warn("TieredStorage::Start : ignoring invalid state snapshot [%v]", err)
@@ -140,30 +138,6 @@ func (c *TieredStorage) Stop() error {
 		}
 	}
 	return c.writeSnapshot()
-}
-
-// removePartialDownloads deletes interrupted downloads left by a previous run.
-func (c *TieredStorage) removePartialDownloads() {
-	err := filepath.WalkDir(c.tmpPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d == nil || d.IsDir() {
-			return nil //nolint:nilerr // an unreadable entry is not worth aborting the sweep
-		}
-		if filepath.Ext(path) != partialDownloadSuffix {
-			return nil
-		}
-		log.Info("TieredStorage::removePartialDownloads : removing %s", path)
-		if rmErr := os.Remove(path); rmErr != nil {
-			log.Warn(
-				"TieredStorage::removePartialDownloads : %s remove failed [%v]",
-				path,
-				rmErr,
-			)
-		}
-		return nil
-	})
-	if err != nil {
-		log.Warn("TieredStorage::removePartialDownloads : %s walk failed [%v]", c.tmpPath, err)
-	}
 }
 
 func (c *TieredStorage) Configure(_ bool) error {
@@ -318,15 +292,17 @@ func (c *TieredStorage) StreamDir(
 
 	localAttrs := make(map[string]*internal.ObjAttr, len(entries))
 	for _, entry := range entries {
-		if c.internalCacheEntry(options.Name, entry.Name()) {
+		name := entry.Name()
+		if strings.HasSuffix(name, partialDownloadSuffix) || options.Name == "" &&
+			(name == tieredStorageSnapshotPath || name == tieredStorageSnapshotPath+".tmp") {
 			continue
 		}
-		entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
+		entryPath := common.JoinUnixFilepath(options.Name, name)
 		info, err := entry.Info()
 		if err != nil {
 			return nil, "", err
 		}
-		localAttrs[entry.Name()] = newTieredStorageObjAttr(entryPath, info)
+		localAttrs[name] = newTieredStorageObjAttr(entryPath, info)
 	}
 
 	listed := make(map[string]struct{}, len(attrs))
@@ -951,12 +927,6 @@ func (c *TieredStorage) renameOpenHandles(
 
 func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {
 	return c.NextComponent().SyncDir(options)
-}
-
-func (c *TieredStorage) internalCacheEntry(directory, name string) bool {
-	return directory == "" &&
-		(name == tieredStorageSnapshotPath || name == tieredStorageSnapshotPath+".tmp") ||
-		strings.HasSuffix(name, partialDownloadSuffix)
 }
 
 // Symlink operations
