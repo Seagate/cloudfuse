@@ -72,6 +72,11 @@ type FileNode struct {
 	size        atomic.Int64
 	cloudBacked atomic.Bool
 	isDirty     atomic.Bool
+	mode        atomic.Uint32
+	modeDirty   atomic.Bool
+	owner       atomic.Int64
+	group       atomic.Int64
+	ownerDirty  atomic.Bool
 }
 
 type TieredStorageOptions struct {
@@ -850,8 +855,36 @@ func (c *TieredStorage) uploadCachedFile(name string) error {
 	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 	if err != nil {
 		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, err)
+		return err
 	}
-	return err
+
+	value, found := c.fileMap.Load(name)
+	if !found {
+		return nil
+	}
+	node := value.(*FileNode)
+	if node.modeDirty.Load() {
+		err = c.NextComponent().Chmod(internal.ChmodOptions{
+			Name: name,
+			Mode: os.FileMode(node.mode.Load()),
+		})
+		if err != nil && !errors.Is(err, syscall.ENOTSUP) {
+			return err
+		}
+		node.modeDirty.Store(false)
+	}
+	if node.ownerDirty.Load() {
+		err = c.NextComponent().Chown(internal.ChownOptions{
+			Name:  name,
+			Owner: int(node.owner.Load()),
+			Group: int(node.group.Load()),
+		})
+		if err != nil && !errors.Is(err, syscall.ENOTSUP) {
+			return err
+		}
+		node.ownerDirty.Store(false)
+	}
+	return nil
 }
 
 // uploadandCleanFile moves an object to cloud storage and removes the local
@@ -1034,10 +1067,77 @@ func (c *TieredStorage) getAttrUnlocked(
 }
 
 func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	info, localErr := os.Stat(localPath)
+	value, tracked := c.fileMap.Load(options.Name)
+	cloudBacked := !tracked || value.(*FileNode).cloudBacked.Load() ||
+		localErr == nil && info.IsDir()
+	if cloudBacked {
+		err = c.NextComponent().Chmod(options)
+		if err != nil && !(localErr == nil && errors.Is(err, os.ErrNotExist)) {
+			return err
+		}
+	}
+	if localErr != nil {
+		if cloudBacked {
+			return nil
+		}
+		return localErr
+	}
+	if err := os.Chmod(localPath, options.Mode); err != nil {
+		return err
+	}
+	if tracked && !value.(*FileNode).cloudBacked.Load() {
+		node := value.(*FileNode)
+		node.mode.Store(uint32(options.Mode))
+		node.modeDirty.Store(true)
+	}
 	return nil
 }
 
 func (c *TieredStorage) Chown(options internal.ChownOptions) error {
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	info, localErr := os.Stat(localPath)
+	value, tracked := c.fileMap.Load(options.Name)
+	cloudBacked := !tracked || value.(*FileNode).cloudBacked.Load() ||
+		localErr == nil && info.IsDir()
+	if cloudBacked {
+		err = c.NextComponent().Chown(options)
+		if err != nil && !(localErr == nil && errors.Is(err, os.ErrNotExist)) {
+			return err
+		}
+	}
+	if localErr != nil {
+		if cloudBacked {
+			return nil
+		}
+		return localErr
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chown(localPath, options.Owner, options.Group); err != nil {
+			return err
+		}
+	}
+	if tracked && !value.(*FileNode).cloudBacked.Load() {
+		node := value.(*FileNode)
+		node.owner.Store(int64(options.Owner))
+		node.group.Store(int64(options.Group))
+		node.ownerDirty.Store(true)
+	}
 	return nil
 }
 

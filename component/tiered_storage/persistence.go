@@ -47,6 +47,11 @@ type persistedFileState struct {
 	Mtime       int64
 	CloudBacked bool
 	Dirty       bool
+	Mode        uint32
+	ModeDirty   bool
+	Owner       int64
+	Group       int64
+	OwnerDirty  bool
 }
 
 type tieredStorageSnapshot struct {
@@ -83,6 +88,11 @@ func (c *TieredStorage) writeSnapshot() error {
 			Mtime:       info.ModTime().UnixNano(),
 			CloudBacked: node.cloudBacked.Load(),
 			Dirty:       node.isDirty.Load(),
+			Mode:        node.mode.Load(),
+			ModeDirty:   node.modeDirty.Load(),
+			Owner:       node.owner.Load(),
+			Group:       node.group.Load(),
+			OwnerDirty:  node.ownerDirty.Load(),
 		}
 		return true
 	})
@@ -210,6 +220,11 @@ func (c *TieredStorage) recoverLocalState(snapshot *tieredStorageSnapshot) error
 		node.size.Store(file.info.Size())
 		node.cloudBacked.Store(file.state.CloudBacked)
 		node.isDirty.Store(file.state.Dirty)
+		node.mode.Store(file.state.Mode)
+		node.modeDirty.Store(file.state.ModeDirty)
+		node.owner.Store(file.state.Owner)
+		node.group.Store(file.state.Group)
+		node.ownerDirty.Store(file.state.OwnerDirty)
 		c.fileMap.Store(file.name, node)
 	}
 

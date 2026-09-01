@@ -550,6 +550,72 @@ func (suite *tieredStorageTestSuite) TestSymlink() {
 	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "link"))
 }
 
+func (suite *tieredStorageTestSuite) TestChmodLocalFilePersistsOnUpload() {
+	defer suite.cleanupTest()
+
+	const path = "local-chmod"
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.tieredStorage.Chmod(
+		internal.ChmodOptions{Name: path, Mode: 0600},
+	))
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+
+	flock := suite.tieredStorage.fileLocks.Get(path)
+	flock.Lock()
+	suite.Require().NoError(suite.tieredStorage.uploadandCleanFile(path))
+	flock.Unlock()
+	info, err := os.Stat(filepath.Join(suite.fake_storage_path, path))
+	suite.Require().NoError(err)
+	suite.assert.Equal(os.FileMode(0600), info.Mode().Perm())
+}
+
+func (suite *tieredStorageTestSuite) TestChmodCloudBackedFileUpdatesBothTiers() {
+	defer suite.cleanupTest()
+
+	const path = "cloud-chmod"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	handle, err = suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+
+	suite.Require().NoError(suite.tieredStorage.Chmod(
+		internal.ChmodOptions{Name: path, Mode: 0600},
+	))
+	localInfo, err := os.Stat(filepath.Join(suite.cache_path, path))
+	suite.Require().NoError(err)
+	cloudInfo, err := os.Stat(filepath.Join(suite.fake_storage_path, path))
+	suite.Require().NoError(err)
+	suite.assert.Equal(os.FileMode(0600), localInfo.Mode().Perm())
+	suite.assert.Equal(os.FileMode(0600), cloudInfo.Mode().Perm())
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+}
+
+func (suite *tieredStorageTestSuite) TestChmodCloudOnlyFile() {
+	defer suite.cleanupTest()
+
+	const path = "cloud-only-chmod"
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	suite.Require().NoError(suite.tieredStorage.Chmod(
+		internal.ChmodOptions{Name: path, Mode: 0600},
+	))
+	info, err := os.Stat(filepath.Join(suite.fake_storage_path, path))
+	suite.Require().NoError(err)
+	suite.assert.Equal(os.FileMode(0600), info.Mode().Perm())
+}
+
 func (suite *tieredStorageTestSuite) TestStreamDirMergesLocalAndCloudEntries() {
 	defer suite.cleanupTest()
 
