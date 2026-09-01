@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/internal"
+	"golang.org/x/sys/unix"
 )
 
 func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
@@ -53,4 +54,12 @@ func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 		attrs.Flags.Set(internal.PropFlagIsDir)
 	}
 	return attrs
+}
+
+func (c *TieredStorage) getAvailableSize() (uint64, error) {
+	stat := &unix.Statfs_t{}
+	if err := unix.Statfs(c.tmpPath, stat); err != nil {
+		return 0, err
+	}
+	return stat.Bavail * uint64(stat.Bsize), nil
 }

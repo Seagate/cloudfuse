@@ -536,6 +536,32 @@ func (suite *tieredStorageTestSuite) TestTruncateInvalidSize() {
 	suite.assert.ErrorIs(err, syscall.EINVAL)
 }
 
+func (suite *tieredStorageTestSuite) TestStatFs() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "usage", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{
+		Handle: handle,
+		Data:   make([]byte, 4096),
+	})
+	suite.Require().NoError(err)
+
+	stat, populated, err := suite.tieredStorage.StatFs()
+	suite.Require().NoError(err)
+	suite.assert.True(populated)
+	suite.assert.EqualValues(4096, stat.Bsize)
+	suite.assert.EqualValues(uint64(suite.tieredStorage.maxCacheSize)/4096, stat.Blocks)
+	expectedAvailable := max(
+		int64(suite.tieredStorage.maxCacheSize)-suite.tieredStorage.cacheSize.Used(),
+		0,
+	)
+	suite.assert.EqualValues(uint64(expectedAvailable)/4096, stat.Bavail)
+	suite.assert.Greater(stat.Bfree, uint64(0))
+}
+
 func (suite *tieredStorageTestSuite) TestSymlink() {
 	defer suite.cleanupTest()
 

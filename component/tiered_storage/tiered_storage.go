@@ -1280,7 +1280,24 @@ func (c *TieredStorage) FileUsed(name string) error {
 }
 
 func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
-	return nil, false, nil
+	const blockSize = 4096
+
+	physicalFree, err := c.getAvailableSize()
+	if err != nil {
+		return nil, false, err
+	}
+	available := max(int64(c.maxCacheSize)-c.cacheSize.Used(), 0)
+	stat := &common.Statfs_t{
+		Blocks:  uint64(c.maxCacheSize) / blockSize,
+		Bavail:  uint64(available) / blockSize,
+		Bfree:   physicalFree / blockSize,
+		Bsize:   blockSize,
+		Frsize:  blockSize,
+		Files:   1e9,
+		Ffree:   1e9,
+		Namemax: 255,
+	}
+	return stat, true, nil
 }
 
 // ------------------------- Factory -------------------------------------------

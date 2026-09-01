@@ -34,6 +34,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/internal"
+	"golang.org/x/sys/windows"
 )
 
 func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
@@ -55,4 +56,16 @@ func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 		attrs.Flags.Set(internal.PropFlagIsDir)
 	}
 	return attrs
+}
+
+func (c *TieredStorage) getAvailableSize() (uint64, error) {
+	path, err := windows.UTF16PtrFromString(c.tmpPath)
+	if err != nil {
+		return 0, err
+	}
+	var free, total, available uint64
+	if err := windows.GetDiskFreeSpaceEx(path, &free, &total, &available); err != nil {
+		return 0, err
+	}
+	return available, nil
 }
