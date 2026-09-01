@@ -263,29 +263,144 @@ func (c *TieredStorage) localPath(name string) (string, error) {
 
 // Directory operations
 func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
+	if _, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name}); err == nil {
+		return syscall.EEXIST
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	mode := options.Mode
+	if mode == 0 || runtime.GOOS == "windows" {
+		mode = common.DefaultDirectoryPermissionBits
+	}
+	if err := os.Mkdir(localPath, mode); err != nil {
+		return err
+	}
+	if err := c.NextComponent().CreateDir(options); err != nil && !errors.Is(err, os.ErrExist) {
+		return err
+	}
 	return nil
 }
 
 func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	cloudErr := c.NextComponent().DeleteDir(options)
+	if cloudErr != nil && !errors.Is(cloudErr, os.ErrNotExist) {
+		return cloudErr
+	}
+	localErr := os.Remove(localPath)
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return localErr
+	}
+	if errors.Is(localErr, os.ErrNotExist) && errors.Is(cloudErr, os.ErrNotExist) {
+		return syscall.ENOENT
+	}
 	return nil
 }
 
 func (c *TieredStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
-	return false
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return false
+	}
+	entries, localErr := os.ReadDir(localPath)
+	if localErr == nil && len(entries) > 0 {
+		return false
+	}
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return false
+	}
+	return c.NextComponent().IsDirEmpty(options)
 }
 
 func (c *TieredStorage) OpenDir(options internal.OpenDirOptions) error {
-	return nil
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	if info, err := os.Stat(localPath); err == nil && info.IsDir() {
+		return nil
+	}
+	return c.NextComponent().OpenDir(options)
 }
 
 func (c *TieredStorage) StreamDir(
 	options internal.StreamDirOptions,
 ) ([]*internal.ObjAttr, string, error) {
-	return nil, "", nil
+	localPath, pathErr := c.localPath(options.Name)
+	if pathErr != nil {
+		return nil, "", pathErr
+	}
+
+	attrs, token, cloudErr := c.NextComponent().StreamDir(options)
+	entries, localErr := os.ReadDir(localPath)
+	localExists := localErr == nil
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return nil, "", localErr
+	}
+	if cloudErr != nil && !(localExists && errors.Is(cloudErr, os.ErrNotExist)) {
+		return attrs, token, cloudErr
+	}
+	if cloudErr != nil {
+		attrs = nil
+		token = ""
+	}
+
+	localAttrs := make(map[string]*internal.ObjAttr, len(entries))
+	for _, entry := range entries {
+		if c.internalCacheEntry(options.Name, entry.Name()) {
+			continue
+		}
+		entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			return nil, "", err
+		}
+		localAttrs[entry.Name()] = newTieredStorageObjAttr(entryPath, info)
+	}
+
+	listed := make(map[string]struct{}, len(attrs))
+	for index, attr := range attrs {
+		listed[attr.Name] = struct{}{}
+		local, found := localAttrs[attr.Name]
+		if !found || attr.IsDir() {
+			continue
+		}
+		merged := *attr
+		merged.Size = local.Size
+		merged.Mtime = local.Mtime
+		attrs[index] = &merged
+	}
+
+	if token == "" {
+		for name, attr := range localAttrs {
+			if _, found := listed[name]; !found {
+				attrs = append(attrs, attr)
+			}
+		}
+	}
+	slices.SortFunc(attrs, func(a, b *internal.ObjAttr) int {
+		return strings.Compare(a.Path, b.Path)
+	})
+	return attrs, token, nil
 }
 
 func (c *TieredStorage) CloseDir(options internal.CloseDirOptions) error {
-	return nil
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	if info, err := os.Stat(localPath); err == nil && info.IsDir() {
+		return nil
+	}
+	return c.NextComponent().CloseDir(options)
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
@@ -963,7 +1078,13 @@ func (c *TieredStorage) renameOpenHandles(
 }
 
 func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {
-	return nil
+	return c.NextComponent().SyncDir(options)
+}
+
+func (c *TieredStorage) internalCacheEntry(directory, name string) bool {
+	return directory == "" &&
+		(name == tieredStorageSnapshotPath || name == tieredStorageSnapshotPath+".tmp") ||
+		strings.HasSuffix(name, partialDownloadSuffix)
 }
 
 // Symlink operations
