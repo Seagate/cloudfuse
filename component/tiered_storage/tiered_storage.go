@@ -492,7 +492,11 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	val, exists := c.fileMap.Load(options.Name)
 	if !exists {
 		// cloud only
-		return c.NextComponent().DeleteFile(options)
+		err := c.NextComponent().DeleteFile(options)
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		return err
 	}
 
 	node := val.(*FileNode)
