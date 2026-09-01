@@ -81,11 +81,6 @@ func (t *cacheSizeTracker) Add(delta int64) {
 	}
 }
 
-// Resize records one cached file changing from oldSize to newSize bytes.
-func (t *cacheSizeTracker) Resize(oldSize, newSize int64) {
-	t.Add(newSize - oldSize)
-}
-
 // Refresh measures the cache directory and replaces the running total.
 // Changes made while the measurement is in flight are lost, which is inherent
 // to reconciling against a moving target and is why it is not the hot path.
@@ -110,8 +105,7 @@ func (t *cacheSizeTracker) Refresh() {
 	}
 }
 
-// Reconcile refreshes the running total, but no more often than
-// reconcileInterval. An interval of zero refreshes on every call.
+// Reconcile refreshes the running total, but no more often than reconcileInterval.
 func (t *cacheSizeTracker) Reconcile() {
 	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
 		return

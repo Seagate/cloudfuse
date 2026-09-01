@@ -725,7 +725,7 @@ func (c *TieredStorage) recordSize(node *FileNode, size int64) {
 	if node == nil {
 		return
 	}
-	c.cacheSize.Resize(node.size.Swap(size), size)
+	c.cacheSize.Add(size - node.size.Swap(size))
 }
 
 // reserveSpace makes room for growBytes more bytes of local data.
