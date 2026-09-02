@@ -115,7 +115,7 @@ var healthMonCmd = &cobra.Command{
 		// This is important when running as a service where the child process may
 		// have more restrictive permissions than the parent.
 		if options.MonitorOpt.OutputPath != "" {
-			err := os.MkdirAll(options.MonitorOpt.OutputPath, 0755)
+			err := os.MkdirAll(options.MonitorOpt.OutputPath, 0o700)
 			if err != nil {
 				common.EnableMonitoring = false
 				log.Err(
