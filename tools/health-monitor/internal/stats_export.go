@@ -272,7 +272,11 @@ func (se *StatsExporter) getNewFile() error {
 
 	// Ensure the output directory exists
 	if err := os.MkdirAll(hmcommon.OutputPath, 0755); err != nil {
-		log.Err("stats_exporter::getNewFile : Unable to create output directory [%s] [%v]", hmcommon.OutputPath, err)
+		log.Err(
+			"stats_exporter::getNewFile : Unable to create output directory [%s] [%v]",
+			hmcommon.OutputPath,
+			err,
+		)
 		return err
 	}
 
