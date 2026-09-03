@@ -34,7 +34,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/ini.v1 v1.67.3
 )
