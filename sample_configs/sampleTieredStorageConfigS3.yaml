@@ -10,7 +10,7 @@ components:
   - libfuse
   - tiered_storage
   - attr_cache
-  - azstorage
+  - s3storage
 
 tiered_storage:
   path: /<PATH>/<TO>/<LOCAL_STORAGE>
@@ -19,9 +19,10 @@ tiered_storage:
 attr_cache:
   timeout-sec: 120
 
-azstorage:
-  type: block
-  account-name: <ACCOUNT_NAME>
-  account-key: <ACCOUNT_KEY>
-  mode: key
-  container: <CONTAINER_NAME>
+s3storage:
+  bucket-name: <ACCOUNT_NAME>
+  key-id: <ACCOUNT_ACCESS_KEY>
+  secret-key: <ACCOUNT_SECRET_KEY>
+  endpoint: https://s3.us-east-1.lyvecloud.seagate.com
+  region: us-east-1
+  enable-dir-marker: true

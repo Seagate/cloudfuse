@@ -22,7 +22,7 @@
 
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
-Cloudfuse uses file caching to provide the performance of local storage, or you can use streaming mode to efficiently access small parts of large files (e.g. video playback).
+Cloudfuse can run in two modes: caching, where the cloud is the source of truth and local disk holds a temporary copy for speed, or tiered storage, where local disk is the primary copy and the cloud is overflow for data that no longer fits locally.
 Cloudfuse is a fork of [blobfuse2](https://github.com/Azure/azure-storage-fuse), and adds S3 support and Windows support.
 Cloudfuse supports clouds with an S3 or Azure interface.
 
@@ -145,10 +145,10 @@ manually install Cloudfuse.
 
 ## Basic Use
 
-The following describes how to use the Cloudfuse CLI. If you would like to use a GUI checkout the Cloudfuse GUI repo at <https://github.com/Seagate/cloudfuse-gui>.
+The following describes how to use the Cloudfuse CLI.
 
 1. Create a basic configuration file (TUI):
-   If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
+   If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. The TUI does not currently support tiering. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
 
    ```bash
    cloudfuse config
@@ -316,9 +316,9 @@ Cloudfuse now supports offline access through the `file_cache` component. When c
 
 ## Tiered Storage
 
-The `tiered_storage` component treats local storage as the primary tier and cloud storage as overflow. New files remain local until capacity-driven LRU eviction uploads them and removes the local copy. Cloud objects are downloaded while open and removed locally on close after any changes are uploaded.
+The `tiered_storage` component augments your local storage with the cloud rather than backing it up. New files stay local. Once local storage fills up, the oldest data is moved to the cloud. This keeps cloud storage costs down, since only the overflow that doesn't fit locally is ever uploaded.
 
-The configured local path can contain the only copy of un-evicted data. Do not treat it as a disposable cache or enable cleanup for it. See `sample_configs/sampleTieredStorageConfigAzure.yaml` and `setup/baseConfig.yaml` for configuration.
+Because only overflow data lives in the cloud, the cloud copy is never a complete picture of your data - files that fit locally exist only on local storage - Cloudfuse does not make copies. See `sample_configs/sampleTieredStorageConfigS3.yaml` and `setup/baseConfig.yaml` for configuration.
 
 ## Limitations
 
