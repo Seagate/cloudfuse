@@ -153,6 +153,7 @@ func (suite *dirTestSuite) waitForCondition(
 func retryTransientIO(opName string, action func() error) error {
 	const maxAttempts = 3
 	const retryDelay = 200 * time.Millisecond
+	const windowsIODeviceError = syscall.Errno(1117)
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -163,7 +164,9 @@ func retryTransientIO(opName string, action func() error) error {
 		lastErr = err
 
 		// FUSE operations can intermittently return EIO under load. Retry briefly.
-		if !errors.Is(err, syscall.EIO) || attempt == maxAttempts {
+		// Windows reports the same transient storage failure as ERROR_IO_DEVICE.
+		if !(errors.Is(err, syscall.EIO) || errors.Is(err, windowsIODeviceError)) ||
+			attempt == maxAttempts {
 			return fmt.Errorf("%s failed after %d attempt(s): %w", opName, attempt, err)
 		}
 
