@@ -680,7 +680,18 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_STREAM_CFG: ${{ env.cloudfuse_STREAM_CFG }}
-        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_stream.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_STREAM_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/* || true\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
+        run: |-
+          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_stream.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_STREAM_CFG} --foreground=true &
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
+          ps -aux | grep cloudfuse
+          rm -rf ${MOUNT_DIR}/* || true
+          cd test/e2e_tests
+          go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
+          cd -
+          sudo fusermount -u ${MOUNT_DIR}
+          sleep 5
 
       - name: Create Config File - Block Blob
         env:
@@ -971,7 +982,18 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${MOUNT_DIR}/* || true\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}\ncd -\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
+        run: |-
+          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
+          ps -aux | grep cloudfuse
+          rm -rf ${MOUNT_DIR}/* || true
+          cd test/e2e_tests
+          go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
+          cd -
+          sudo fusermount -u ${MOUNT_DIR}
+          sleep 5
 
       - name: Create Config File - ADLS Proxy
         env:
