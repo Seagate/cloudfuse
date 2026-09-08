@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -46,6 +47,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -357,6 +359,10 @@ func createTestContainerWithRetry(create func() error) error {
 	for i := 0; i < 5; i++ {
 		err = create()
 		if err == nil {
+			return nil
+		}
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusConflict {
 			return nil
 		}
 		if i < 4 {
