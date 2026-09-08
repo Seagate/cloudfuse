@@ -91,8 +91,8 @@ type TieredStorageOptions struct {
 
 const (
 	compName                  = "tiered_storage"
-	defaultHighThreshold      = 80
-	defaultLowThreshold       = 60
+	defaultHighThreshold      = 90
+	defaultLowThreshold       = 80
 	defaultParallelism        = 8
 	defaultMaxEviction        = 5000
 	capacityPollInterval      = time.Second

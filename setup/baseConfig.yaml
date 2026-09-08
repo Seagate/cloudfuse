@@ -128,8 +128,8 @@ file_cache:
 tiered_storage:
   path: <path to local storage. Files remain local until eviction.>
   max-size-mb: <maximum local storage size in MB. Required.>
-  high-threshold: <% local storage consumed which triggers eviction. Default - 80>
-  low-threshold: <% local storage consumed which eviction targets. Must be less than high-threshold. Default - 60>
+  high-threshold: <% local storage consumed which triggers eviction. Default - 90>
+  low-threshold: <% local storage consumed which eviction targets. Must be less than high-threshold. Default - 80>
   max-eviction: <maximum files selected in one eviction pass. Default - 5000>
   parallelism: <number of parallel cloud uploads. Default - 8>
   poll-interval-sec: <seconds between capacity checks. Default - 1>
