@@ -659,7 +659,18 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_STREAM_CFG: ${{ env.cloudfuse_STREAM_CFG }}
-        run: "rm -rf ${MOUNT_DIR}/*\nrm -rf ${TEMP_DIR}/*\n./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_stream_prep.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_STREAM_CFG} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nfor i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${WORK_DIR}/myfile_{}'\nfor i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp ${WORK_DIR}/myfile_{} ${MOUNT_DIR}/'\nsudo fusermount -u ${MOUNT_DIR} \nsleep 5"
+        run: |-
+          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_stream_prep.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_STREAM_CFG} --foreground=true &
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
+
+          ps -aux | grep cloudfuse
+          for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${WORK_DIR}/myfile_{}'
+          for i in 10 50 100; do cp ${WORK_DIR}/myfile_${i} ${MOUNT_DIR}/; done
+
+          sudo fusermount -u ${MOUNT_DIR} -z
+          sleep 5
 
       - name: Block Blob Stream Coverage
         env:
