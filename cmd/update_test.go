@@ -28,7 +28,6 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -114,46 +113,24 @@ func (suite *updateTestSuite) SetupTest() {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 
-			assets := []asset{
-				{
-					Name:               linuxDebAsset,
-					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxDebAsset,
+			assets := mockReleaseAssets(
+				suite.mockServer.URL,
+				releaseAssetDef{Name: linuxDebAsset, DownloadPath: "/assets/" + linuxDebAsset},
+				releaseAssetDef{Name: linuxRpmAsset, DownloadPath: "/assets/" + linuxRpmAsset},
+				releaseAssetDef{Name: linuxTarAsset, DownloadPath: "/assets/" + linuxTarAsset},
+				releaseAssetDef{Name: windowsZipAsset, DownloadPath: "/assets/" + windowsZipAsset},
+				releaseAssetDef{Name: windowsExeAsset, DownloadPath: "/assets/" + windowsExeAsset},
+				releaseAssetDef{
+					Name:         "cloudfuse_checksums_sha256.txt",
+					DownloadPath: "/checksums/cloudfuse_checksums_sha256.txt",
 				},
-				{
-					Name:               linuxRpmAsset,
-					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxRpmAsset,
-				},
-				{
-					Name:               linuxTarAsset,
-					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + linuxTarAsset,
-				},
-				{
-					Name:               windowsZipAsset,
-					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + windowsZipAsset,
-				},
-				{
-					Name:               windowsExeAsset,
-					BrowserDownloadURL: suite.mockServer.URL + "/assets/" + windowsExeAsset,
-				},
-				{
-					Name:               "cloudfuse_checksums_sha256.txt",
-					BrowserDownloadURL: suite.mockServer.URL + "/checksums/cloudfuse_checksums_sha256.txt",
-				},
-			}
+			)
 
 			switch {
 			case r.URL.Path == "/latest":
-				_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
-					TagName: "v" + releaseVersion,
-					Name:    "Cloudfuse v" + releaseVersion,
-					Assets:  assets,
-				})
+				writeMockRelease(w, releaseVersion, assets)
 			case r.URL.Path == "/tags/v1.8.0":
-				_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
-					TagName: "v1.8.0",
-					Name:    "Cloudfuse v1.8.0",
-					Assets:  assets,
-				})
+				writeMockRelease(w, "1.8.0", assets)
 			case len(r.URL.Path) > len("/assets/") && r.URL.Path[:len("/assets/")] == "/assets/":
 				assetName := r.URL.Path[len("/assets/"):]
 				body, found := assetBodies[assetName]

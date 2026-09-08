@@ -29,7 +29,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -134,34 +133,23 @@ func withMockReleaseAPI(t *testing.T, latestVersion string) func() {
 			runtime.GOARCH,
 		)
 
-		assets := []asset{{
-			Name:               linuxFuseAsset,
-			BrowserDownloadURL: "https://example.invalid/" + linuxFuseAsset,
-		}, {
-			Name:               windowsZipAsset,
-			BrowserDownloadURL: "https://example.invalid/" + windowsZipAsset,
-		}, {
-			Name:               windowsExeAsset,
-			BrowserDownloadURL: "https://example.invalid/" + windowsExeAsset,
-		}, {
-			Name:               "cloudfuse_checksums_sha256.txt",
-			BrowserDownloadURL: "https://example.invalid/cloudfuse_checksums_sha256.txt",
-		}}
+		assets := mockReleaseAssets(
+			"https://example.invalid",
+			releaseAssetDef{Name: linuxFuseAsset, DownloadPath: "/" + linuxFuseAsset},
+			releaseAssetDef{Name: windowsZipAsset, DownloadPath: "/" + windowsZipAsset},
+			releaseAssetDef{Name: windowsExeAsset, DownloadPath: "/" + windowsExeAsset},
+			releaseAssetDef{
+				Name:         "cloudfuse_checksums_sha256.txt",
+				DownloadPath: "/cloudfuse_checksums_sha256.txt",
+			},
+		)
 
 		switch r.URL.Path {
 		case "/latest":
-			_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
-				TagName: "v" + latestVersion,
-				Name:    "Cloudfuse v" + latestVersion,
-				Assets:  assets,
-			})
+			writeMockRelease(w, latestVersion, assets)
 			return
 		case "/tags/v1.8.0":
-			_ = json.NewEncoder(w).Encode(GithubApiReleaseData{
-				TagName: "v1.8.0",
-				Name:    "Cloudfuse v1.8.0",
-				Assets:  assets,
-			})
+			writeMockRelease(w, "1.8.0", assets)
 			return
 		default:
 			w.WriteHeader(http.StatusNotFound)
