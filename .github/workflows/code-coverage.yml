@@ -169,13 +169,15 @@ jobs:
           echo "}" >> $cnfFile
 
       - name: UT Code Coverage
+        shell: bash
         env:
           JOB_NAME: ${{ matrix.job_name }}
         run: |
+          PKGS=$(go list ./... | grep -v '/test/e2e_tests$')
           if [ "${JOB_NAME}" == "linux-fuse2" ]; then
-            go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+            go test -v -timeout=1h ${PKGS} --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
           else
-            go test -v -timeout=1h ./... --tags=unittest,storagetest,fuse3 -covermode count -coverprofile ./cloudfuse_ut.cov
+            go test -v -timeout=1h ${PKGS} --tags=unittest,storagetest,fuse3 -covermode count -coverprofile ./cloudfuse_ut.cov
           fi
 
       - name: Build coverage binary
@@ -1173,7 +1175,10 @@ jobs:
         shell: powershell
 
       - name: UT Code Coverage
-        run: go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+        shell: bash
+        run: |
+          PKGS=$(go list ./... | grep -v '/test/e2e_tests$')
+          go test -v -timeout=1h ${PKGS} --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
 
       - name: Build coverage binary
         run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
