@@ -173,12 +173,13 @@ jobs:
         env:
           JOB_NAME: ${{ matrix.job_name }}
         run: |
-          PKGS=$(go list ./... | grep -v '/test/e2e_tests$')
           if [ "${JOB_NAME}" == "linux-fuse2" ]; then
-            go test -v -timeout=1h ${PKGS} --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+            TAGS=unittest,storagetest
           else
-            go test -v -timeout=1h ${PKGS} --tags=unittest,storagetest,fuse3 -covermode count -coverprofile ./cloudfuse_ut.cov
+            TAGS=unittest,storagetest,fuse3
           fi
+          PKGS=$(go list -tags=${TAGS} ./... | grep -v '/test/e2e_tests$')
+          go test -v -timeout=1h ${PKGS} --tags=${TAGS} -covermode count -coverprofile ./cloudfuse_ut.cov
 
       - name: Build coverage binary
         env:
@@ -1209,7 +1210,7 @@ jobs:
       - name: UT Code Coverage
         shell: bash
         run: |
-          PKGS=$(go list ./... | grep -v '/test/e2e_tests$')
+          PKGS=$(go list -tags=unittest,storagetest ./... | grep -v '/test/e2e_tests$')
           go test -v -timeout=1h ${PKGS} --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
 
       - name: Build coverage binary
