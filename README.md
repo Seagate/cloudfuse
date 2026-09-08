@@ -316,9 +316,18 @@ Cloudfuse now supports offline access through the `file_cache` component. When c
 
 ## Tiered Storage
 
-The `tiered_storage` component augments your local storage with the cloud rather than backing it up. New files stay local. Once local storage fills up, the oldest data is moved to the cloud. This keeps cloud storage costs down, since only the overflow that doesn't fit locally is ever uploaded.
+Use `tiered_storage` for on-prem-first configurations, when you want cloud storage to expand existing local storage. To minimize cloud storage costs, `tiered_storage` only maintains one copy of each file, moving old files to cloud storage once local storage fills up.
 
-Because only overflow data lives in the cloud, the cloud copy is never a complete picture of your data - files that fit locally exist only on local storage - Cloudfuse does not make copies. See `sample_configs/sampleTieredStorageConfigS3.yaml` and `setup/baseConfig.yaml` for configuration.
+Note: Do not use `tiered_storage` if you use cloud storage to access your data remotely. Only overflow data will be present in the cloud.
+
+See `sample_configs/sampleTieredStorageConfigS3.yaml` and `setup/baseConfig.yaml` for configuration.
+
+### Expanding Existing Local Storage Using Tiered Storage
+
+When using `tiered_storage` to add cloud capacity to an existing local storage location, please ensure all access is done through the Cloudfuse mount path / virtual drive. The `tiered_storage` `path` and all its existing contents will become *internal* local storage. Accessing the `tiered_storage` `path` directly may have unpredictable results.
+For example, if you want expand the capacity of your existing local drive, `D:`, you could change that local drive's letter to `E:` first, then set `tiered_storage` `path` to `E:` and mount cloudfuse to `D:`. Then any existing applications or workflows that normally use `D:` would continue as normal, now pointed at the cloudfuse mount location.
+
+**Cloudfuse may upload and delete local files under `path` as part of normal overflow eviction, so anything still reading or writing there directly can lose data or see missing files.**
 
 ## Limitations
 
