@@ -165,7 +165,7 @@ func retryTransientIO(opName string, action func() error) error {
 
 		// FUSE operations can intermittently return EIO under load. Retry briefly.
 		// Windows reports the same transient storage failure as ERROR_IO_DEVICE.
-		if !(errors.Is(err, syscall.EIO) || errors.Is(err, windowsIODeviceError)) ||
+		if !errors.Is(err, syscall.EIO) && !errors.Is(err, windowsIODeviceError) ||
 			attempt == maxAttempts {
 			return fmt.Errorf("%s failed after %d attempt(s): %w", opName, attempt, err)
 		}
