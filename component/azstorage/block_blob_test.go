@@ -60,6 +60,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -278,7 +279,11 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 	s.serviceClient = s.az.storage.(*BlockBlob).Service // Grab the service client to do some validation
 	s.containerClient = s.serviceClient.NewContainerClient(s.container)
 	if create {
-		_, _ = s.containerClient.Create(ctx, nil)
+		err := createTestContainerWithRetry(func() error {
+			_, err := s.containerClient.Create(ctx, nil)
+			return err
+		})
+		require.NoError(s.T(), err, "failed to create test container %q", s.container)
 	}
 }
 
@@ -346,6 +351,20 @@ func randomString(length int) string {
 
 func generateContainerName() string {
 	return "fuseutc" + randomString(8)
+}
+
+func createTestContainerWithRetry(create func() error) error {
+	var err error
+	for i := 0; i < 5; i++ {
+		err = create()
+		if err == nil {
+			return nil
+		}
+		if i < 4 {
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+	return err
 }
 
 func generateCPKInfo() (CPKEncryptionKey string, CPKEncryptionKeySHA256 string) {
@@ -1767,8 +1786,8 @@ func (s *blockBlobTestSuite) TestTruncateEmptyFileToLargeSize() {
 	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.NoError(err)
-	s.assert.NotNil(props)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), props)
 	s.assert.Equal(blobSize, props.Size)
 
 	err = s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
