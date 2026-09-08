@@ -1035,7 +1035,6 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=true -tmp-path=${TEMP_DIR}
           cd -
           ./cloudfuse.test unmount all
-          sleep 5
 
       - name: Save coverage report
         env:
