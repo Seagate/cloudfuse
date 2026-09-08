@@ -671,8 +671,8 @@ jobs:
           for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${WORK_DIR}/myfile_{}'
           for i in 10 50 100; do cp ${WORK_DIR}/myfile_${i} ${MOUNT_DIR}/; done
 
-          sudo fusermount -u ${MOUNT_DIR} -z
-          sleep 5
+          sudo fusermount -u ${MOUNT_DIR}
+          timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
 
       - name: Block Blob Stream Coverage
         env:
@@ -691,7 +691,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          sleep 5
+          timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
 
       - name: Create Config File - Block Blob
         env:
@@ -993,7 +993,7 @@ jobs:
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${TEMP_DIR}
           cd -
           sudo fusermount -u ${MOUNT_DIR}
-          sleep 5
+          timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
 
       - name: Create Config File - ADLS Proxy
         env:
