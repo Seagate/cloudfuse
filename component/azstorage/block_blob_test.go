@@ -248,10 +248,6 @@ func (s *blockBlobTestSuite) SetupTest() {
 		fmt.Println("Failed to parse the config file")
 		os.Exit(1)
 	}
-	if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" &&
-		storageTestConfigurationParameters.Endpoint == "" {
-		storageTestConfigurationParameters.Endpoint = "http://127.0.0.1:10000/devstoreaccount1"
-	}
 
 	cfgFile.Close()
 	s.setupTestHelper("", "", true)
@@ -263,19 +259,12 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 	}
 	s.container = container
 	if configuration == "" {
-		endpoint := storageTestConfigurationParameters.Endpoint
-		useHTTP := ""
-		if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" {
-			endpoint = "http://127.0.0.1:10000/devstoreaccount1"
-			useHTTP = "\n  use-http: true"
-		}
 		configuration = fmt.Sprintf(
-			"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s%s\n  fail-unsupported-op: true",
+			"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 			storageTestConfigurationParameters.BlockAccount,
-			endpoint,
+			storageTestConfigurationParameters.Endpoint,
 			storageTestConfigurationParameters.BlockKey,
 			s.container,
-			useHTTP,
 		)
 	}
 	s.config = configuration
@@ -326,11 +315,7 @@ func (s *blockBlobTestSuite) TestDefault() {
 		s.az.stConfig.authConfig.AccountName,
 	)
 	s.assert.Equal(EAccountType.BLOCK(), s.az.stConfig.authConfig.AccountType)
-	if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" {
-		s.assert.True(s.az.stConfig.authConfig.UseHTTP)
-	} else {
-		s.assert.False(s.az.stConfig.authConfig.UseHTTP)
-	}
+	s.assert.False(s.az.stConfig.authConfig.UseHTTP)
 	accountKey, _ := s.az.stConfig.authConfig.AccountKey.Open()
 	defer accountKey.Destroy()
 	s.assert.Equal(storageTestConfigurationParameters.BlockKey, accountKey.String())
@@ -439,8 +424,9 @@ func (s *blockBlobTestSuite) TestAccountType() {
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
 	config := fmt.Sprintf(
-		"azstorage:\n  account-name: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.Endpoint,
 		storageTestConfigurationParameters.BlockKey,
 		s.container,
 	)

@@ -158,11 +158,7 @@ func (s *datalakeTestSuite) TestDefault() {
 		s.az.stConfig.authConfig.AccountName,
 	)
 	s.assert.Equal(EAccountType.ADLS(), s.az.stConfig.authConfig.AccountType)
-	if storageTestConfigurationParameters.AdlsAccount == "devstoreaccount1" {
-		s.assert.True(s.az.stConfig.authConfig.UseHTTP)
-	} else {
-		s.assert.False(s.az.stConfig.authConfig.UseHTTP)
-	}
+	s.assert.False(s.az.stConfig.authConfig.UseHTTP)
 	accountKey, _ := s.az.stConfig.authConfig.AccountKey.Open()
 	defer accountKey.Destroy()
 	s.assert.Equal(accountKey.String(), storageTestConfigurationParameters.AdlsKey)
