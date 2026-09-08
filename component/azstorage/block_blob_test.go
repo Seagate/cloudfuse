@@ -248,6 +248,10 @@ func (s *blockBlobTestSuite) SetupTest() {
 		fmt.Println("Failed to parse the config file")
 		os.Exit(1)
 	}
+	if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" &&
+		storageTestConfigurationParameters.Endpoint == "" {
+		storageTestConfigurationParameters.Endpoint = "http://127.0.0.1:10000/devstoreaccount1"
+	}
 
 	cfgFile.Close()
 	s.setupTestHelper("", "", true)
@@ -259,12 +263,19 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 	}
 	s.container = container
 	if configuration == "" {
+		endpoint := storageTestConfigurationParameters.Endpoint
+		useHTTP := ""
+		if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" {
+			endpoint = "http://127.0.0.1:10000/devstoreaccount1"
+			useHTTP = "\n  use-http: true"
+		}
 		configuration = fmt.Sprintf(
-			"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+			"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s%s\n  fail-unsupported-op: true",
 			storageTestConfigurationParameters.BlockAccount,
-			storageTestConfigurationParameters.Endpoint,
+			endpoint,
 			storageTestConfigurationParameters.BlockKey,
 			s.container,
+			useHTTP,
 		)
 	}
 	s.config = configuration
