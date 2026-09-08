@@ -60,7 +60,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -283,7 +282,7 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 			_, err := s.containerClient.Create(ctx, nil)
 			return err
 		})
-		require.NoError(s.T(), err, "failed to create test container %q", s.container)
+		s.assert.NoError(err, "failed to create test container %q", s.container)
 	}
 }
 
@@ -1786,8 +1785,10 @@ func (s *blockBlobTestSuite) TestTruncateEmptyFileToLargeSize() {
 	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	require.NoError(s.T(), err)
-	require.NotNil(s.T(), props)
+	s.assert.NoError(err)
+	if !s.assert.NotNil(props) {
+		return
+	}
 	s.assert.Equal(blobSize, props.Size)
 
 	err = s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
