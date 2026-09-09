@@ -779,10 +779,9 @@ jobs:
           echo "    - abcd" >> /tmp/configMountall.yaml
           cat /tmp/configMountall.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt_all.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 || exit 1
-          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --log-level=log_debug --foreground=true & } || exit 1
-          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
-          ./cloudfuse.test unmount all
-          timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
+          # allowlist "abcd" matches no real container, so 0 containers mount and the command exits on its own
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --log-level=log_debug || exit 1
+          mount | grep -q "${MOUNT_DIR}" && exit 1 || true
 
       - name: "CLI : Mount all with secure config 2"
         env:
