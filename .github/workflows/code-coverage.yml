@@ -778,8 +778,8 @@ jobs:
           echo "  container-allowlist:" >> /tmp/configMountall.yaml
           echo "    - abcd" >> /tmp/configMountall.yaml
           cat /tmp/configMountall.yaml
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt_all.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 || exit 1
-          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --log-level=log_debug --foreground=true & } || exit 1
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt_all.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 || exit 1
+          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --log-level=log_debug --foreground=true & } || exit 1
           timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
           ./cloudfuse.test unmount all
           timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
@@ -797,8 +797,8 @@ jobs:
           echo "  container-denylist:" >> /tmp/configMountall.yaml
           echo "    - abcd" >> /tmp/configMountall.yaml
           cat /tmp/configMountall.yaml
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt_all2.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 || exit 1
-          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure2.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --log-level=log_debug --foreground=true & } || exit 1
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt_all2.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 || exit 1
+          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure2.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --log-level=log_debug --foreground=true & } || exit 1
           timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
           ./cloudfuse.test unmount all
           timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
@@ -882,15 +882,15 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test unmount all
           ./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt.cov secure encrypt --config-file=${cloudfuse_CFG} --output-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 || exit 1
-          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_secure.cov mount ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 & } || exit 1
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt.cov secure encrypt --config-file=${cloudfuse_CFG} --output-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 || exit 1
+          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_secure.cov mount ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 & } || exit 1
           timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
           ps -aux | grep cloudfuse
           rm -rf ${MOUNT_DIR}/* || true
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=false -tmp-path=${TEMP_DIR}
           cd -
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_set.cov secure set --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --key=logging.level --value=log_debug
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_set.cov secure set --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --key=logging.level --value=log_debug
           ./cloudfuse.test unmount all
           timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'
 
@@ -1869,15 +1869,15 @@ jobs:
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test unmount all
           ./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt.cov secure encrypt --config-file=${cloudfuse_CFG} --output-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 || exit 1
-        # ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_secure.cov mount ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --foreground=true &
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt.cov secure encrypt --config-file=${cloudfuse_CFG} --output-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 || exit 1
+        # ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_secure.cov mount ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --foreground=true &
         # sleep 10
         # pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         # rm -rf ${MOUNT_DIR}/*
         # cd test/e2e_tests
         # go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -adls=false -tmp-path=${TEMP_DIR}
         # cd -
-        # ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_set.cov secure set --config-file=${WORK_DIR}/cloudfuse.azsec --passphrase=12312312312312312312312312312312 --key=logging.level --value=log_debug
+        # ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_set.cov secure set --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --key=logging.level --value=log_debug
         # kill $pid
         # sleep 5
 
