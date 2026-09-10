@@ -336,7 +336,11 @@ func (c *TieredStorage) StreamDir(
 		if err != nil {
 			return nil, "", err
 		}
-		localAttrs[name] = newTieredStorageObjAttr(entryPath, info)
+		localAttr := newTieredStorageObjAttr(entryPath, info)
+		if value, tracked := c.fileMap.Load(entryPath); tracked {
+			localAttr.Size = value.(*FileNode).size.Load()
+		}
+		localAttrs[name] = localAttr
 	}
 
 	listed := make(map[string]struct{}, len(attrs))
