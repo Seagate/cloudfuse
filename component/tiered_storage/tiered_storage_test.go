@@ -250,8 +250,8 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, test.high, storage.policy.threshold)
-			assert.Equal(t, test.low, storage.policy.targetRatio)
+			assert.InEpsilon(t, test.high, storage.policy.threshold, 0.0001)
+			assert.InEpsilon(t, test.low, storage.policy.targetRatio, 0.0001)
 			assert.Equal(t, test.maxEviction, storage.policy.maxEviction)
 			assert.Equal(t, test.parallelism, storage.policy.numWorkers)
 			assert.Equal(t, test.pollInterval, storage.policy.pollInterval)
@@ -640,13 +640,13 @@ func (suite *tieredStorageTestSuite) TestStatFs() {
 	suite.Require().NoError(err)
 	suite.assert.True(populated)
 	suite.assert.EqualValues(4096, stat.Bsize)
-	suite.assert.EqualValues(uint64(suite.tieredStorage.maxCacheSize)/4096, stat.Blocks)
+	suite.assert.Equal(uint64(suite.tieredStorage.maxCacheSize)/4096, stat.Blocks)
 	expectedAvailable := max(
 		int64(suite.tieredStorage.maxCacheSize)-suite.tieredStorage.cacheSize.Used(),
 		0,
 	)
-	suite.assert.EqualValues(uint64(expectedAvailable)/4096, stat.Bavail)
-	suite.assert.Greater(stat.Bfree, uint64(0))
+	suite.assert.Equal(uint64(expectedAvailable)/4096, stat.Bavail)
+	suite.assert.Positive(stat.Bfree)
 }
 
 func (suite *tieredStorageTestSuite) TestSymlink() {
@@ -1452,7 +1452,8 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(path1, handle.Path)
 
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.assert.NoError(err)
 	suite.assert.True(handle.Dirty())
 
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
@@ -1465,7 +1466,8 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(path2, handle.Path)
 
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.assert.NoError(err)
 	suite.assert.True(handle.Dirty())
 
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
@@ -1478,7 +1480,8 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(path3, handle.Path)
 
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.assert.NoError(err)
 	suite.assert.True(handle.Dirty())
 
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
@@ -1491,7 +1494,8 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(path4, handle.Path)
 
-	suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.assert.NoError(err)
 	suite.assert.True(handle.Dirty())
 
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
