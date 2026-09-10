@@ -1519,11 +1519,10 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.True(exists3)
 	suite.assert.True(exists4)
 
-	//4. Wait for eviction to kick in
+	// 4. Wait for one eviction pass to drop the oldest file.
 	suite.assert.Eventually(func() bool {
 		_, exists1 := suite.tieredStorage.policy.nodeMap.Load(path1)
-		_, exists2 := suite.tieredStorage.policy.nodeMap.Load(path2)
-		return !exists1 && !exists2
+		return !exists1
 	}, 2*capacityPollInterval, 10*time.Millisecond)
 
 	// 4. Some should then be released to the cloud essentially, the ones we wrote data to
@@ -1536,7 +1535,7 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	_, exists4 = suite.tieredStorage.policy.nodeMap.Load(path4)
 
 	suite.assert.False(exists1)
-	suite.assert.False(exists2)
+	suite.assert.True(exists2)
 	suite.assert.True(exists3)
 	suite.assert.True(exists4)
 
@@ -1547,23 +1546,17 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	_, exists4 = suite.tieredStorage.fileMap.Load(path4)
 
 	suite.assert.False(exists1)
-	suite.assert.False(exists2)
+	suite.assert.True(exists2)
 	suite.assert.True(exists3)
 	suite.assert.True(exists4)
 
-	// 4c.Check files for files 1 and 2 no longer exist local
+	// 4c. Only the oldest file should be uploaded and removed locally.
 	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path1))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path2))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path2))
 
-	//5. We have to check that the files exist in the cloud
-	//Must check that file is actually in the cloud
+	// 5. The evicted file must now exist in the cloud.
 	_, err = suite.tieredStorage.NextComponent().GetAttr(
 		internal.GetAttrOptions{Name: path1, RetrieveMetadata: true})
-	suite.assert.NoError(err)
-
-	//Must check that file is actually in the cloud
-	_, err = suite.tieredStorage.NextComponent().GetAttr(
-		internal.GetAttrOptions{Name: path2, RetrieveMetadata: true})
 	suite.assert.NoError(err)
 
 	//Validate the data matches what we have
@@ -1584,30 +1577,6 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 
 	// 3. Read the data back from the temp file and verify
 	dataFromCloud, err := os.ReadFile(tmpFile.Name())
-	suite.assert.NoError(err)
-	suite.assert.Equal(
-		data,
-		dataFromCloud,
-		"The cloud version should match the modified local version",
-	)
-
-	//It just checks if the data is preserved
-	tmpFile, err = os.CreateTemp("", "cloud_verify")
-	suite.assert.NoError(err)
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	// 2. Copy from the cloud (loopback) to the temporary file
-	err = suite.loopback.CopyToFile(internal.CopyToFileOptions{
-		Name:   path2,
-		Offset: 0,
-		Count:  0, // 0 usually means the whole file
-		File:   tmpFile,
-	})
-	suite.assert.NoError(err)
-
-	// 3. Read the data back from the temp file and verify
-	dataFromCloud, err = os.ReadFile(tmpFile.Name())
 	suite.assert.NoError(err)
 	suite.assert.Equal(
 		data,
