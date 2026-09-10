@@ -22,7 +22,7 @@
 
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
-Cloudfuse uses file caching to provide the performance of local storage, or you can use streaming mode to efficiently access small parts of large files (e.g. video playback).
+Cloudfuse can run in two modes: caching, where the cloud is the source of truth and local disk holds a temporary copy for speed, or tiered storage, where local disk is the primary copy and the cloud is overflow for data that no longer fits locally.
 Cloudfuse is a fork of [blobfuse2](https://github.com/Azure/azure-storage-fuse), and adds S3 support and Windows support.
 Cloudfuse supports clouds with an S3 or Azure interface.
 
@@ -145,10 +145,10 @@ manually install Cloudfuse.
 
 ## Basic Use
 
-The following describes how to use the Cloudfuse CLI. If you would like to use a GUI checkout the Cloudfuse GUI repo at <https://github.com/Seagate/cloudfuse-gui>.
+The following describes how to use the Cloudfuse CLI.
 
 1. Create a basic configuration file (TUI):
-   If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
+   If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. The TUI does not currently support tiering. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
 
    ```bash
    cloudfuse config
@@ -313,6 +313,21 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 Cloudfuse now supports offline access through the `file_cache` component. When cloud storage is unreachable, reads and writes continue against the local cache and are flushed to cloud storage once connectivity is restored. The feature is **enabled by default** and can be disabled via the `block-offline-access` flag.
 
 > **Note:** Cloudfuse uses eventual consistency with last-writer-wins semantics. Offline access can extend the consistency window indefinitely and **increases the risk of data conflicts in multi-client setups!** See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
+
+## Tiered Storage
+
+Use `tiered_storage` for on-prem-first configurations, when you want cloud storage to expand existing local storage. To minimize cloud storage costs, `tiered_storage` only maintains one copy of each file, moving old files to cloud storage once local storage fills up.
+
+Note: Do not use `tiered_storage` if you use cloud storage to access your data remotely. Only overflow data will be present in the cloud.
+
+See `sample_configs/sampleTieredStorageConfigS3.yaml` and `setup/baseConfig.yaml` for configuration.
+
+### Expanding Existing Local Storage Using Tiered Storage
+
+When using `tiered_storage` to add cloud capacity to an existing local storage location, please ensure all access is done through the Cloudfuse mount path / virtual drive. The `tiered_storage` `path` and all its existing contents will become *internal* local storage. Accessing the `tiered_storage` `path` directly may have unpredictable results.
+For example, if you want expand the capacity of your existing local drive, `D:`, you could change that local drive's letter to `E:` first, then set `tiered_storage` `path` to `E:` and mount cloudfuse to `D:`. Then any existing applications or workflows that normally use `D:` would continue as normal, now pointed at the cloudfuse mount location.
+
+**Cloudfuse may upload and delete local files under `path` as part of normal overflow eviction, so anything still reading or writing there directly can lose data or see missing files.**
 
 ## Limitations
 
