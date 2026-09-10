@@ -60,27 +60,25 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 	err = os.Mkdir(cache_path, 0777)
 	suite.assert.NoError(err)
 
-	suite.setupTestHelper(cache_path, 1, 0.8, 0.6, 8)
-}
-
-// setupTestHelper creates and starts an lruQueue for testing.
-func (suite *lruPolicyTestSuite) setupTestHelper(
-	cachePath string, maxCacheMB float64, threshold float64, targetRatio float64, numWorkers int,
-) {
-	suite.policy = &lruQueue{
-		cachePath:    cachePath,
-		maxCacheSize: maxCacheMB * common.MbToBytes,
-		threshold:    threshold,
-		targetRatio:  targetRatio,
-		numWorkers:   numWorkers,
+	suite.setupTestHelper(lruQueueConfig{
+		cachePath:    cache_path,
+		maxCacheSize: 1 * common.MbToBytes,
+		threshold:    0.8,
+		targetRatio:  0.6,
+		numWorkers:   8,
 		pollInterval: time.Millisecond,
 		fileLocks:    common.NewLockMap(),
-		size:         newCacheSizeTracker(cachePath, 0),
+		size:         newCacheSizeTracker(cache_path, 0),
 
 		uploadandCleanFn: func(name string) error {
 			return nil
 		},
-	}
+	})
+}
+
+// setupTestHelper creates and starts an lruQueue for testing.
+func (suite *lruPolicyTestSuite) setupTestHelper(cfg lruQueueConfig) {
+	suite.policy = newLRUQueue(cfg)
 
 	err := suite.policy.StartPolicy()
 	suite.assert.NoError(err)
@@ -128,11 +126,12 @@ func (suite *lruPolicyTestSuite) TestDequeue() {
 
 func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default policy generated in SetupTest
 
 	cachePath := suite.T().TempDir()
 	size := newCacheSizeTracker(cachePath, time.Hour)
 	var uploaded atomic.Int32
-	policy := &lruQueue{
+	suite.setupTestHelper(lruQueueConfig{
 		cachePath:    cachePath,
 		maxCacheSize: common.MbToBytes,
 		threshold:    0.8,
@@ -142,40 +141,39 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 		pollInterval: time.Hour,
 		fileLocks:    common.NewLockMap(),
 		size:         size,
-	}
-	policy.uploadandCleanFn = func(name string) error {
-		info, err := os.Stat(filepath.Join(cachePath, name))
-		if err != nil {
-			return err
-		}
-		if err := os.Remove(filepath.Join(cachePath, name)); err != nil {
-			return err
-		}
-		size.Add(-info.Size())
-		uploaded.Add(1)
-		return nil
-	}
-	suite.Require().NoError(policy.StartPolicy())
-	defer policy.StopPolicy()
+
+		uploadandCleanFn: func(name string) error {
+			info, err := os.Stat(filepath.Join(cachePath, name))
+			if err != nil {
+				return err
+			}
+			if err := os.Remove(filepath.Join(cachePath, name)); err != nil {
+				return err
+			}
+			size.Add(-info.Size())
+			uploaded.Add(1)
+			return nil
+		},
+	})
 
 	for i := 1; i <= 4; i++ {
 		name := fmt.Sprintf("file%d", i)
 		err := os.WriteFile(filepath.Join(cachePath, name), make([]byte, lruTestFileSize), 0644)
 		suite.Require().NoError(err)
-		policy.Enqueue(name)
+		suite.policy.Enqueue(name)
 	}
 	size.Refresh()
 
-	policy.evictDownTo(int64(policy.maxCacheSize * policy.targetRatio))
+	suite.policy.evictDownTo(int64(suite.policy.maxCacheSize * suite.policy.targetRatio))
 
 	suite.assert.EqualValues(1, uploaded.Load())
 	suite.assert.LessOrEqual(
 		float64(size.Used()),
-		policy.maxCacheSize*policy.threshold,
+		suite.policy.maxCacheSize*suite.policy.threshold,
 	)
 	suite.assert.Greater(
 		float64(size.Used()),
-		policy.maxCacheSize*policy.targetRatio,
+		suite.policy.maxCacheSize*suite.policy.targetRatio,
 	)
 }
 
