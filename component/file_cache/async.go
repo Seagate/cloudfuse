@@ -27,6 +27,7 @@ package file_cache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -296,6 +297,8 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 			name := key.(string)
 			numFilesProcessed++
 			if !fc.updateObject(name, value.(pendingFlags)) {
+				// record the failure so the caller backs off instead of busy-retrying
+				cycleErr = fmt.Errorf("sync failed for %s", name)
 				return false
 			}
 			return true
