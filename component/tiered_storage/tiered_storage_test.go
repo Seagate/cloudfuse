@@ -170,6 +170,8 @@ func (suite *tieredStorageTestSuite) cleanupTest() {
 
 func TestLocalPath(t *testing.T) {
 	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "cache")}
+	absoluteName, err := filepath.Abs("file")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -181,7 +183,7 @@ func TestLocalPath(t *testing.T) {
 		{name: `dir\file`, expected: filepath.Join(storage.tmpPath, "dir", "file"), valid: true},
 		{name: "../file", valid: false},
 		{name: "dir/../../file", valid: false},
-		{name: filepath.Join(string(os.PathSeparator), "file"), valid: false},
+		{name: absoluteName, valid: false},
 	}
 
 	for _, test := range tests {
