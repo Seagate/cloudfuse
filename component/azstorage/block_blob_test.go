@@ -1798,9 +1798,7 @@ func (s *blockBlobTestSuite) TestTruncateEmptyFileToLargeSize() {
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.NoError(err)
-	if !s.assert.NotNil(props) {
-		return
-	}
+	s.assert.NotNil(props)
 	s.assert.Equal(blobSize, props.Size)
 
 	err = s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
