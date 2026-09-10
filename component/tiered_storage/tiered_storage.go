@@ -198,7 +198,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 	c.maxCacheSize = conf.MaxSizeMB * common.MbToBytes
 	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
 
-	c.policy = &lruQueue{
+	c.policy = newLRUQueue(lruQueueConfig{
 		cachePath:        c.tmpPath,
 		maxCacheSize:     c.maxCacheSize,
 		fileLocks:        c.fileLocks,
@@ -209,7 +209,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		maxEviction:      conf.MaxEviction,
 		pollInterval:     pollInterval,
 		uploadandCleanFn: c.uploadandCleanFile,
-	}
+	})
 
 	return nil
 }

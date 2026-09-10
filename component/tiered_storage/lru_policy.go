@@ -48,6 +48,24 @@ type uploadJob struct {
 	wg   *sync.WaitGroup
 }
 
+// lruQueueConfig holds the fields needed to construct an lruQueue.
+type lruQueueConfig struct {
+	cachePath string
+	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
+	size      *cacheSizeTracker
+
+	maxCacheSize float64
+	// threshold and targetRatio are fractions of maxCacheSize.
+	threshold    float64
+	targetRatio  float64
+	numWorkers   int
+	maxEviction  uint32
+	pollInterval time.Duration
+
+	// Called with the object's file lock held.
+	uploadandCleanFn func(name string) error
+}
+
 // lruQueue moves local-only objects to cloud storage.
 // File locks may be held before mu, never after it.
 type lruQueue struct {
@@ -67,20 +85,11 @@ type lruQueue struct {
 	uploadChan chan uploadJob
 	doneChan   chan struct{}
 
-	cachePath string
-	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
-	size      *cacheSizeTracker
+	lruQueueConfig
+}
 
-	maxCacheSize float64
-	// threshold and targetRatio are fractions of maxCacheSize.
-	threshold    float64
-	targetRatio  float64
-	numWorkers   int
-	maxEviction  uint32
-	pollInterval time.Duration
-
-	// Called with the object's file lock held.
-	uploadandCleanFn func(name string) error
+func newLRUQueue(cfg lruQueueConfig) *lruQueue {
+	return &lruQueue{lruQueueConfig: cfg}
 }
 
 func (q *lruQueue) StartPolicy() error {
