@@ -211,7 +211,7 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 		{
 			name:   "defaults",
 			config: "max-size-mb: 1",
-			high:   0.8, low: 0.6, maxEviction: 5000, parallelism: 8,
+			high:   0.9, low: 0.8, maxEviction: 5000, parallelism: 8,
 			pollInterval: time.Second,
 		},
 		{
