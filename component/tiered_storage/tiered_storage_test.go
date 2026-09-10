@@ -1209,7 +1209,7 @@ func (suite *tieredStorageTestSuite) TestReadInBuffer() {
 	// Setup
 	file := "file14"
 
-	//put file in cloud abd write to it
+	// put file in cloud and write to it
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"
 	data := []byte(testData)
@@ -1220,7 +1220,7 @@ func (suite *tieredStorageTestSuite) TestReadInBuffer() {
 	err = suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	//Must check that file by its data is actually in the cloud
+	// Must check that file by its data is actually in the cloud
 	_, err = suite.tieredStorage.NextComponent().GetAttr(
 		internal.GetAttrOptions{Name: file, RetrieveMetadata: true})
 	suite.assert.NoError(err)
@@ -1615,13 +1615,13 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 
 }
 
-// ok we gonna do file in local, cloud, file doesnt exist
+// ok we gonna do file in local, cloud, file doesn't exist
 func (suite *tieredStorageTestSuite) TestDeleteFileCloud() {
 	defer suite.cleanupTest()
 	// Setup
 	file := "file22"
 
-	//put file in cloud abd write to it
+	// put file in cloud and write to it
 	handle, err := suite.tieredStorage.CreateFile(
 		internal.CreateFileOptions{Name: file, Mode: 0777},
 	)
