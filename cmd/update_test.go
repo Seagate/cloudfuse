@@ -26,7 +26,11 @@
 package cmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"runtime"
 	"testing"
@@ -40,6 +44,9 @@ import (
 type updateTestSuite struct {
 	suite.Suite
 	assert *assert.Assertions
+
+	mockServer                *httptest.Server
+	originalReleaseAPIBaseURL string
 }
 
 func (suite *updateTestSuite) SetupTest() {
@@ -51,9 +58,112 @@ func (suite *updateTestSuite) SetupTest() {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 
+	suite.originalReleaseAPIBaseURL = releaseAPIBaseURL
+	releaseVersion := "9.9.9"
+
+	linuxDebAsset := fmt.Sprintf(
+		"cloudfuse_%s_%s_%s_%s.deb",
+		releaseVersion,
+		runtime.GOOS,
+		runtime.GOARCH,
+		common.FuseVersion,
+	)
+	linuxRpmAsset := fmt.Sprintf(
+		"cloudfuse_%s_%s_%s_%s.rpm",
+		releaseVersion,
+		runtime.GOOS,
+		runtime.GOARCH,
+		common.FuseVersion,
+	)
+	linuxTarAsset := fmt.Sprintf(
+		"cloudfuse_%s_%s_%s_%s.tar.gz",
+		releaseVersion,
+		runtime.GOOS,
+		runtime.GOARCH,
+		common.FuseVersion,
+	)
+	windowsZipAsset := fmt.Sprintf(
+		"cloudfuse_%s_%s_%s.zip",
+		releaseVersion,
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+	windowsExeAsset := fmt.Sprintf(
+		"cloudfuse_%s_%s_%s.exe",
+		releaseVersion,
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+
+	assetBodies := map[string][]byte{
+		linuxDebAsset:   []byte("mock deb content"),
+		linuxRpmAsset:   []byte("mock rpm content"),
+		linuxTarAsset:   []byte("mock tar content"),
+		windowsZipAsset: []byte("mock zip content"),
+		windowsExeAsset: []byte("mock exe content"),
+	}
+
+	checksumByAsset := make(map[string]string, len(assetBodies))
+	for name, body := range assetBodies {
+		h := sha256.Sum256(body)
+		checksumByAsset[name] = hex.EncodeToString(h[:])
+	}
+
+	suite.mockServer = httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+
+			assets := mockReleaseAssets(
+				suite.mockServer.URL,
+				releaseAssetDef{Name: linuxDebAsset, DownloadPath: "/assets/" + linuxDebAsset},
+				releaseAssetDef{Name: linuxRpmAsset, DownloadPath: "/assets/" + linuxRpmAsset},
+				releaseAssetDef{Name: linuxTarAsset, DownloadPath: "/assets/" + linuxTarAsset},
+				releaseAssetDef{Name: windowsZipAsset, DownloadPath: "/assets/" + windowsZipAsset},
+				releaseAssetDef{Name: windowsExeAsset, DownloadPath: "/assets/" + windowsExeAsset},
+				releaseAssetDef{
+					Name:         "cloudfuse_checksums_sha256.txt",
+					DownloadPath: "/checksums/cloudfuse_checksums_sha256.txt",
+				},
+			)
+
+			switch {
+			case r.URL.Path == "/latest":
+				writeMockRelease(w, releaseVersion, assets)
+			case r.URL.Path == "/tags/v1.8.0":
+				writeMockRelease(w, "1.8.0", assets)
+			case len(r.URL.Path) > len("/assets/") && r.URL.Path[:len("/assets/")] == "/assets/":
+				assetName := r.URL.Path[len("/assets/"):]
+				body, found := assetBodies[assetName]
+				if !found {
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte("asset not found"))
+					return
+				}
+				w.Header().Set("Content-Type", "application/octet-stream")
+				_, _ = w.Write(body)
+			case r.URL.Path == "/checksums/cloudfuse_checksums_sha256.txt":
+				w.Header().Set("Content-Type", "text/plain")
+				for name, sum := range checksumByAsset {
+					_, _ = fmt.Fprintf(w, "%s  %s\n", sum, name)
+				}
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+			}
+		}),
+	)
+
+	releaseAPIBaseURL = suite.mockServer.URL
+
 }
 
 func (suite *updateTestSuite) cleanupTest() {
+	if suite.mockServer != nil {
+		suite.mockServer.Close()
+		suite.mockServer = nil
+	}
+	releaseAPIBaseURL = suite.originalReleaseAPIBaseURL
+
 	resetCLIFlags(*updateCmd)
 	resetCLIFlags(*rootCmd)
 }

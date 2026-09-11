@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -46,6 +47,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -278,7 +280,11 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 	s.serviceClient = s.az.storage.(*BlockBlob).Service // Grab the service client to do some validation
 	s.containerClient = s.serviceClient.NewContainerClient(s.container)
 	if create {
-		_, _ = s.containerClient.Create(ctx, nil)
+		err := createTestContainerWithRetry(func() error {
+			_, err := s.containerClient.Create(ctx, nil)
+			return err
+		})
+		s.assert.NoError(err, "failed to create test container %q", s.container)
 	}
 }
 
@@ -348,6 +354,24 @@ func generateContainerName() string {
 	return "fuseutc" + randomString(8)
 }
 
+func createTestContainerWithRetry(create func() error) error {
+	var err error
+	for i := 0; i < 5; i++ {
+		err = create()
+		if err == nil {
+			return nil
+		}
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusConflict {
+			return nil
+		}
+		if i < 4 {
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+	return err
+}
+
 func generateCPKInfo() (CPKEncryptionKey string, CPKEncryptionKeySHA256 string) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
@@ -396,12 +420,18 @@ func (s *blockBlobTestSuite) TestModifyEndpoint() {
 // }
 
 func (s *blockBlobTestSuite) TestAccountType() {
+	// Skip test on Azurite: IsAccountADLS detects HNS via a "permissions" query
+	// param that Azurite doesn't emulate the same error behavior for as real Azure.
+	if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
 	config := fmt.Sprintf(
-		"azstorage:\n  account-name: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		"azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.Endpoint,
 		storageTestConfigurationParameters.BlockKey,
 		s.container,
 	)

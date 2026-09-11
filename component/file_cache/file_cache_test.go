@@ -2499,6 +2499,43 @@ func (suite *fileCacheTestSuite) TestFlushFileOffline() {
 	}
 }
 
+func (suite *fileCacheTestSuite) TestFlushFileNoRetryOnEnospc() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	file := "enospc-flush-file"
+	localPath := filepath.Join(suite.cache_path, file)
+	err := os.MkdirAll(filepath.Dir(localPath), 0777)
+	suite.assert.NoError(err)
+	f, err := os.OpenFile(localPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+	suite.assert.NoError(err)
+	_, err = f.Write([]byte("enospc flush data"))
+	suite.assert.NoError(err)
+
+	handle := handlemap.NewHandle(file)
+	handle.SetFileObject(f)
+	handle.Flags.Set(handlemap.HandleFlagDirty)
+	defer f.Close()
+
+	suite.mock.EXPECT().
+		CopyFromFile(gomock.Any()).
+		Return(syscall.ENOSPC)
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.ErrorIs(err, syscall.ENOSPC)
+
+	_, exists := suite.fileCache.pendingOps.Load(file)
+	suite.assert.False(exists, "ENOSPC should not be queued in pendingOps")
+	suite.assert.True(handle.Dirty(), "ENOSPC should keep handle dirty")
+}
+
 func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 	defer suite.cleanupTest()
 	// Setup
