@@ -26,7 +26,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -99,32 +101,47 @@ var healthMonCmd = &cobra.Command{
 			return fmt.Errorf("invalid health_monitor config: %w", err)
 		}
 
+		// Default output path to the cloudfuse working directory when not set
+		// via config. This keeps JSON stats files alongside cloudfuse logs.
+		if options.MonitorOpt.OutputPath == "" {
+			options.MonitorOpt.OutputPath = hmcommon.DefaultWorkDir
+		}
+
 		cliParams := buildCliParamForMonitor()
 		log.Debug("health-monitor : Options = %v", cliParams)
 		log.Debug("health-monitor : Starting health-monitor for cloudfuse pid = %s", pid)
 
-		var hmcmd *exec.Cmd
-		if runtime.GOOS == "windows" {
-			path, err := filepath.Abs(hmcommon.CfuseMon + ".exe")
+		// Ensure the output directory exists before spawning the monitor subprocess.
+		// This is important when running as a service where the child process may
+		// have more restrictive permissions than the parent.
+		if options.MonitorOpt.OutputPath != "" {
+			err := os.MkdirAll(options.MonitorOpt.OutputPath, 0o700)
 			if err != nil {
-				return fmt.Errorf("failed to start health monitor: %w", err)
-			}
-			//nolint:gosec // G204: executable path is resolved explicitly; args are passed directly without shell.
-			hmcmd = exec.Command(path, cliParams...)
-		} else {
-			monPath, err := exec.LookPath(hmcommon.CfuseMon)
-			if err != nil {
-				return fmt.Errorf(
-					"failed to start health monitor: failed to locate health monitor binary: %w",
-					err,
+				common.EnableMonitoring = false
+				log.Err(
+					"health-monitor : failed to create output directory [%s] [%s]",
+					options.MonitorOpt.OutputPath,
+					err.Error(),
 				)
+				return fmt.Errorf("failed to create output directory: %w", err)
 			}
-			//nolint:gosec // G204: executable is resolved via LookPath; args are not interpreted by a shell.
-			hmcmd = exec.Command(monPath, cliParams...)
 		}
-		cliOut, err := hmcmd.Output()
-		if len(cliOut) > 0 {
-			log.Debug("health-monitor : cliout = %v", string(cliOut))
+
+		var hmcmd *exec.Cmd
+		hmBinary := hmcommon.CfuseMon
+		if runtime.GOOS == "windows" {
+			hmBinary += ".exe"
+		}
+
+		monPath, err := findHMBinary(hmBinary)
+		if err == nil {
+			//nolint:gosec // G204: executable path is resolved via LookPath; args are not interpreted by a shell.
+			hmcmd = exec.Command(monPath, cliParams...)
+			var cliOut []byte
+			cliOut, err = hmcmd.Output()
+			if len(cliOut) > 0 {
+				log.Debug("health-monitor : cliout = %v", string(cliOut))
+			}
 		}
 
 		if err != nil {
@@ -205,6 +222,25 @@ func buildCliParamForMonitor() []string {
 	}
 
 	return cliParams
+}
+
+// findHMBinary locates the health-monitor binary.
+// It first checks the directory of the running cloudfuse executable, then falls back to PATH.
+func findHMBinary(hmBinary string) (string, error) {
+	// search PATH
+	foundPath, err := exec.LookPath(hmBinary)
+	if errors.Is(err, exec.ErrDot) {
+		return filepath.Abs(foundPath)
+	}
+	// fallback to a sibling of the current executable
+	if exePath, err := os.Executable(); err == nil {
+		sibling := filepath.Join(filepath.Dir(exePath), hmBinary)
+		if _, err := os.Stat(sibling); err == nil {
+			return sibling, nil
+		}
+	}
+
+	return "", fmt.Errorf("health-monitor binary %s not found", hmBinary)
 }
 
 func init() {
