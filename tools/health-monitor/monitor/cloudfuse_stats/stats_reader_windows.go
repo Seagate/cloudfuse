@@ -63,22 +63,15 @@ func (cfs *CloudfuseStats) statsReader() error {
 		// happens then we can safely start writing to the named pipe.
 		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 		err = windows.ConnectNamedPipe(handle, nil)
-		if err == windows.ERROR_PIPE_CONNECTED {
-			log.Err(
-				"StatsReader::statsReader : There is a process at other end of pipe %s: retrying... [%v]",
-				cfs.transferPipe,
-				err,
-			)
-			windows.Close(handle)
-			time.Sleep(1 * time.Second)
-		} else if err != nil {
+		if err != nil && err != windows.ERROR_PIPE_CONNECTED {
 			log.Err(
 				"StatsReader::statsReader : unable to connect to named pipe %s: [%v]",
 				cfs.transferPipe,
 				err,
 			)
 			windows.Close(handle)
-			return err
+			time.Sleep(1 * time.Second)
+			continue
 		}
 		log.Info("StatsReader::statsReader : Connected transfer pipe %s", cfs.transferPipe)
 

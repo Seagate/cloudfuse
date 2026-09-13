@@ -123,6 +123,7 @@ file_cache:
   create-empty-file: true|false <create an empty file on container when create call is received from kernel>
   allow-non-empty-temp: true|false <allow non empty temp directory at startup. Set true to persist local cache across reboots.>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
+  block-offline-access: true|false <stop local file accesses while cloud storage is inaccessible>
   policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
   offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
@@ -227,7 +228,7 @@ health_monitor:
   enable-monitoring: true|false <enable health monitor>
   stats-poll-interval-sec: <Cloudfuse stats polling interval (in sec). Default - 10 sec>
   process-monitor-interval-sec: <CPU, memory and network usage polling interval (in sec). Default - 30 sec>
-  output-path: <Path where health monitor will generate its output file. File name will be monitor_<pid>.json>
+  output-path: <Path where health monitor will generate its output file. Default - '$HOME/.cloudfuse/monitor_<pid>.json'>
   # list of monitors to be disabled
   monitor-disable-list:
     - cloudfuse_stats <Disable cloudfuse stats polling>
