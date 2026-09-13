@@ -2,7 +2,7 @@
 
 ## **2.3.3** ##
 
-September 13th 2026
+September 14th 2026
 This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
 
 ### Bug Fixes ###
