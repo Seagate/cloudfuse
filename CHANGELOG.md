@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## **2.3.3** ##
+
+September 14th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#1048](https://github.com/Seagate/cloudfuse/pull/1048) Don't take new writes to file cache when size tracker reports full.
+- [#1030](https://github.com/Seagate/cloudfuse/pull/1030) Fix health monitor startup failures on Windows.
+
 ## **2.3.2** ##
 
 August 24th 2026
