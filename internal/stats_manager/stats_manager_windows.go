@@ -184,7 +184,7 @@ func statsPolling() {
 	// happens then we can safely start writing to the named pipe.
 	// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 	err = windows.ConnectNamedPipe(handle, nil)
-	if err != nil {
+	if err != nil && err != windows.ERROR_PIPE_CONNECTED {
 		log.Err(
 			"stats_manager::statsPolling : unable to connect to named pipe %s: [%v]",
 			common.PollingPipe,

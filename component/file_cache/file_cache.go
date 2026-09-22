@@ -2105,6 +2105,8 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 	case err == nil:
 		fc.clearHandleDirty(options.Handle)
 		fc.pendingOps.Delete(options.Handle.Path)
+	case errors.Is(err, syscall.ENOSPC):
+		log.Err("FileCache::flushFileCloud : %s upload failed [%v]", options.Handle.Path, err)
 	case isOffline(err) && fc.offlineAccess:
 		log.Warn("FileCache::flushFileCloud : %s upload delayed (offline)", options.Handle.Path)
 		// add file to upload queue
