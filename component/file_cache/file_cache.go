@@ -2205,12 +2205,8 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// Path in local cache, open, and dirty so cache is the source of truth for attributes.
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, localErr := os.Stat(localPath)
-	if localErr != nil && !isNotExist(localErr) {
-		log.Warn("FileCache::GetAttr : %s unexpected stat error [%v]", options.Name, localErr)
-	}
 	if flock.Count() > 0 && flock.DirtyCount() > 0 {
-		if localErr == nil && !info.IsDir() {
+		if info, err := os.Stat(localPath); err == nil && !info.IsDir() {
 			flock.RUnlock()
 			return newObjAttr(options.Name, info), nil
 		}
@@ -2219,7 +2215,19 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// To cover case 1, get attributes from storage
 	inCloud := false
 	attrs, remoteErr := fc.NextComponent().GetAttr(options)
+
+	// Only stat the local copy when it can change the answer: the file is tracked by the cache policy
+	// (case 3), or cloud storage did not return it (case 2). This avoids a syscall on most lookups.
+	var info os.FileInfo
+	localErr := os.ErrNotExist
+	if remoteErr != nil || attrs == nil || (!attrs.IsDir() && fc.policy.IsCached(localPath)) {
+		info, localErr = os.Stat(localPath)
+		if localErr != nil && !isNotExist(localErr) {
+			log.Warn("FileCache::GetAttr : %s unexpected stat error [%v]", options.Name, localErr)
+		}
+	}
 	flock.RUnlock()
+
 	switch {
 	case remoteErr == nil: // object found
 		inCloud = true
