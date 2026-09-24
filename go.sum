@@ -101,8 +101,8 @@ github.com/lucasb-eyer/go-colorful v1.3.0 h1:2/yBRLdWBZKrf7gB40FoiKfAWYQ0lqNcbuQ
 github.com/lucasb-eyer/go-colorful v1.3.0/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
 github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 h1:6E+4a0GO5zZEnZ81pIr0yLvtUWk2if982qA3F3QD6H4=
 github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0/go.mod h1:zJYVVT2jmtg6P3p1VtQj7WsuWi/y4VnjVBn7F8KPB3I=
-github.com/montanaflynn/stats v0.12.5 h1:bmGi2m9LQJ6qKrDAvd/xZ3IKz+BEfZT2JnCYVbYKU7Y=
-github.com/montanaflynn/stats v0.12.5/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
+github.com/montanaflynn/stats v0.12.6 h1:fnoYp0JJjFNZKWYM2HgcSEXnQ6ZN9E5Mnpmz3rAfMEg=
+github.com/montanaflynn/stats v0.12.6/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/netresearch/go-cron v0.16.0 h1:b14Vnfobzm8pyBuyqbVvyV4xAi3DDREJz+5mzWil8Ew=
 github.com/netresearch/go-cron v0.16.0/go.mod h1:IADGFX1B9VxD6hc1WdmXjhRwe2g3SKIAEbEZQ/ON8Oo=
 github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdDPYVpY=
