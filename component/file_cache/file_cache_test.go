@@ -3330,6 +3330,62 @@ func (suite *fileCacheTestSuite) TestGetAttrDirtyOpenHandle() {
 	suite.assert.NoError(err)
 }
 
+func (suite *fileCacheTestSuite) TestGetAttrLocalOverlayRequiresCachePolicy() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	file := "overlay-file"
+	localPath := filepath.Join(suite.cache_path, file)
+	err := os.WriteFile(localPath, []byte("local data"), 0777)
+	suite.assert.NoError(err)
+	cloudAttr := &internal.ObjAttr{Path: file, Name: file, Size: 3, Mtime: time.Now()}
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(cloudAttr, nil).
+		Times(2)
+
+	// a stray local file the cache policy does not track would be re-downloaded, so cloud wins
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(3, attr.Size)
+
+	// a tracked local file overrides the cloud size and mtime
+	suite.fileCache.policy.CacheValid(localPath)
+	attr, err = suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len("local data"), attr.Size)
+	suite.assert.EqualValues(3, cloudAttr.Size, "cloud attributes must not be modified")
+}
+
+func (suite *fileCacheTestSuite) TestGetAttrDirectoryIgnoresLocalCopy() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	dir := "overlay-dir"
+	err := os.Mkdir(filepath.Join(suite.cache_path, dir), 0777)
+	suite.assert.NoError(err)
+	cloudAttr := internal.CreateObjAttrDir(dir)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dir}).Return(cloudAttr, nil)
+
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: dir})
+	suite.assert.NoError(err)
+	suite.assert.Same(cloudAttr, attr)
+}
+
 func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	defer suite.cleanupTest()
 
