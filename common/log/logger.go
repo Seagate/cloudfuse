@@ -28,6 +28,12 @@ package log
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"runtime/debug"
+	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"

@@ -2660,7 +2660,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileWithCPKEnabledAndPrefixPath() {
 	s.assert.False(props.IsDir())
 }
 
-func (s *blockBlobTestSuite) TestReadDirWithCPKEnabledAndPrefixPath() {
+func (s *blockBlobTestSuite) TestStreamDirWithCPKEnabledAndPrefixPath() {
 	defer s.cleanupTest()
 	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
 	config := fmt.Sprintf(
@@ -2689,8 +2689,8 @@ func (s *blockBlobTestSuite) TestReadDirWithCPKEnabledAndPrefixPath() {
 	// Set the prefix path to the subdirectory
 	_ = s.az.storage.SetPrefixPath(prefix)
 
-	// ReadDir should list the file correctly without duplicating the prefix path
-	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: "/"})
+	// StreamDir should list the file correctly without duplicating the prefix path
+	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/"})
 	s.assert.NoError(err)
 	s.assert.NotEmpty(entries)
 
@@ -2704,7 +2704,7 @@ func (s *blockBlobTestSuite) TestReadDirWithCPKEnabledAndPrefixPath() {
 			break
 		}
 	}
-	s.assert.True(found, "Expected file not found in ReadDir results")
+	s.assert.True(found, "Expected file not found in StreamDir results")
 }
 
 func (s *blockBlobTestSuite) TestGetAttrFile() {
@@ -4609,10 +4609,10 @@ func (s *blockBlobTestSuite) TestBlobTagFilter() {
 
 	// GetAttr on a non-matching blob should report ENOENT via the filter,
 	// while a matching one should succeed.
-	_, err = bb.GetAttr(name + "/c.txt")
+	_, err = bb.GetAttr(ctx, name + "/c.txt")
 	s.assert.Equal(syscall.ENOENT, err)
 
-	attr, err := bb.GetAttr(name + "/a.txt")
+	attr, err := bb.GetAttr(ctx, name + "/a.txt")
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 

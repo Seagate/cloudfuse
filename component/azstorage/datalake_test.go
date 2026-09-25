@@ -3555,10 +3555,10 @@ func (s *datalakeTestSuite) TestBlobTagFilter() {
 	s.assert.True(got["a.txt"])
 	s.assert.True(got["b.txt"])
 
-	_, err = dl.GetAttr(name + "/c.txt")
+	_, err = dl.GetAttr(ctx, name + "/c.txt")
 	s.assert.Equal(syscall.ENOENT, err)
 
-	attr, err := dl.GetAttr(name + "/a.txt")
+	attr, err := dl.GetAttr(ctx, name + "/a.txt")
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 

@@ -713,16 +713,6 @@ func GetGoroutineID() uint64 {
 	return (uint64)(goid.Get())
 }
 
-// TotalMemoryBytes returns the total physical RAM of the system in bytes.
-// Returns 0 if the syscall fails.
-func TotalMemoryBytes() uint64 {
-	var info syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&info); err != nil {
-		return 0
-	}
-	return uint64(info.Totalram) * uint64(info.Unit)
-}
-
 // GetAvailableMemoryBytes returns the available system memory in bytes.
 // It uses MemAvailable from /proc/meminfo and falls back to MemFree when MemAvailable is unavailable.
 func GetAvailableMemoryBytes() (uint64, error) {

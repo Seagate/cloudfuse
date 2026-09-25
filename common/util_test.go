@@ -790,16 +790,6 @@ func (suite *utilTestSuite) TestGetGoroutineIDParallel() {
 	suite.Len(idMap, workers, "expected unique goroutine ids equal to workers")
 }
 
-func TestTotalMemoryBytesIsPositive(t *testing.T) {
-	mem := TotalMemoryBytes()
-	assert.Positive(t, mem, "TotalMemoryBytes should return a positive value on Linux")
-}
-
-func TestTotalMemoryBytesAtLeast1MB(t *testing.T) {
-	mem := TotalMemoryBytes()
-	assert.GreaterOrEqual(t, mem, uint64(1<<20), "TotalMemoryBytes should be at least 1 MB")
-}
-
 func (suite *utilTestSuite) TestGetAvailableMemoryBytesFromMeminfoFallback() {
 	availableMemory := uint64(1024)
 	freeMemory := uint64(512)

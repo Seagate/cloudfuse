@@ -837,10 +837,13 @@ func (bb *BlockBlob) processBlobItems(
 	return blobList, dirList, nil
 }
 
-func (bb *BlockBlob) getBlobAttr(blobInfo *container.BlobItem) (*internal.ObjAttr, error) {
+func (bb *BlockBlob) getBlobAttr(
+	ctx context.Context,
+	blobInfo *container.BlobItem,
+) (*internal.ObjAttr, error) {
 	if blobInfo.Properties.CustomerProvidedKeySHA256 != nil && *blobInfo.Properties.CustomerProvidedKeySHA256 != "" {
 		log.Trace("BlockBlob::List : blob is encrypted with customer provided key so fetching metadata explicitly using REST")
-		return bb.getAttrUsingRest(removePrefixPath(bb.Config.prefixPath, *blobInfo.Name))
+		return bb.getAttrUsingRest(ctx, removePrefixPath(bb.Config.prefixPath, *blobInfo.Name))
 	}
 	mode, err := bb.getFileMode(blobInfo.Properties.Permissions)
 	if err != nil {
