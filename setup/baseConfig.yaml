@@ -128,6 +128,7 @@ attr_cache:
   no-cache-on-list: true|false <do not cache attributes or directory contents during listing. Enabling may cause performance problems.>
   enable-symlinks: true|false <enable symlink support. When false, symlinks will be treated like regular files. Enabling may cause performance problems.>
   max-files: <maximum number of files in the attribute cache at a time. Default - 5000000>
+  dir-prefetch-threshold: <number of attribute cache misses in one directory (within timeout-sec) after which the whole directory is listed, caching the attributes of all its entries. Speeds up stat-heavy workloads. 0 disables. Default - 0>
 
 # Loopback configuration
 loopbackfs:
