@@ -354,21 +354,8 @@ func (p *lruPolicy) CachePurge(name string) {
 }
 
 func (p *lruPolicy) IsCached(name string) bool {
-	log.Trace("lruPolicy::IsCached : %s", name)
-
 	val, found := p.nodeMap.Load(name)
-	if found {
-		node := val.(*lruNode)
-		node.RLock()
-		defer node.RUnlock()
-		deleted := node.deleted.Load()
-		log.Debug("lruPolicy::IsCached : %s, deleted:%t", name, deleted)
-		if !deleted {
-			return true
-		}
-	}
-	log.Trace("lruPolicy::IsCached : %s, found %t", name, found)
-	return false
+	return found && !val.(*lruNode).deleted.Load()
 }
 
 func (p *lruPolicy) Name() string {
