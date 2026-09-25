@@ -7,7 +7,7 @@ toolchain go1.27.1
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.6.0
 	github.com/awnumar/memguard v0.23.0
 	github.com/aws/aws-sdk-go-v2 v1.47.0
@@ -44,6 +44,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.8.0 // indirect
+	github.com/apache/arrow-go/v18 v18.7.0 // indirect
 	github.com/awnumar/memcall v0.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.0 // indirect
@@ -62,14 +63,19 @@ require (
 	github.com/ebitengine/purego v0.10.2 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
+	github.com/klauspost/compress v1.19.2 // indirect
+	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
+	github.com/pierrec/lz4/v4 v4.1.28 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -81,6 +87,8 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	github.com/zeebo/xxh3 v1.1.0 // indirect
+	golang.org/x/exp v0.0.0-20260813180055-c1d0aacb2297 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
