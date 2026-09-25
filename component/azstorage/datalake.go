@@ -86,6 +86,7 @@ func transformConfig(dlConfig AzStorageConfig) AzStorageConfig {
 	bbConfig := dlConfig
 	bbConfig.authConfig.AccountType = EAccountType.BLOCK()
 	bbConfig.authConfig.Endpoint = transformAccountEndpoint(dlConfig.authConfig.Endpoint)
+	bbConfig.isHNS = true
 	return bbConfig
 }
 
@@ -300,6 +301,9 @@ func (dl *Datalake) CreateDirectory(ctx context.Context, name string) error {
 				err.Error(),
 			)
 			return syscall.EEXIST
+		case ErrPathTooDeep:
+			log.Err("Datalake::CreateDirectory : Path is too deep for %s [%s]", name, err.Error())
+			return syscall.ENAMETOOLONG
 		default:
 			log.Err(
 				"Datalake::CreateDirectory : Failed to create directory %s [%s]",
@@ -427,10 +431,19 @@ func (dl *Datalake) RenameDirectory(ctx context.Context, source string, target s
 	)
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
-		if serr == ErrFileNotFound {
+		switch serr {
+		case ErrFileNotFound:
 			log.Err("Datalake::RenameDirectory : %s does not exist", source)
 			return syscall.ENOENT
-		} else {
+		case ErrPathTooDeep:
+			log.Err(
+				"Datalake::RenameDirectory : Path is too deep for %s -> %s [%s]",
+				source,
+				target,
+				err.Error(),
+			)
+			return syscall.ENAMETOOLONG
+		default:
 			log.Err(
 				"Datalake::RenameDirectory : Failed to rename directory %s to %s [%s]",
 				source,
@@ -518,11 +531,20 @@ func (dl *Datalake) GetAttr(
 	}
 
 	if dl.Config.filter != nil {
-		if !dl.Config.filter.IsAcceptable(&blobfilter.BlobAttr{
+		filterAttr := &blobfilter.BlobAttr{
 			Name:  blobAttr.Name,
 			Mtime: blobAttr.Mtime,
 			Size:  blobAttr.Size,
-		}) {
+		}
+		if dl.Config.filterHasTag && !blobAttr.IsDir() {
+			tagResp, err := fileClient.GetTags(context.Background(), nil)
+			if err != nil {
+				log.Err("Datalake::GetAttr : Failed to get tags for %s [%s]", name, err.Error())
+				return blobAttr, syscall.EACCES
+			}
+			filterAttr.Tags = parseBlobTags(&tagResp.BlobTags)
+		}
+		if !dl.Config.filter.IsAcceptable(filterAttr) {
 			log.Debug("Datalake::GetAttr : Filtered out %s", name)
 			return nil, syscall.ENOENT
 		}
@@ -749,12 +771,14 @@ func (dl *Datalake) CommitBlocks(
 func (dl *Datalake) SetFilter(filter string) error {
 	if filter == "" {
 		dl.Config.filter = nil
+		dl.Config.filterHasTag = false
 	} else {
 		dl.Config.filter = &blobfilter.BlobFilter{}
 		err := dl.Config.filter.Configure(filter)
 		if err != nil {
 			return err
 		}
+		dl.Config.filterHasTag = filterReferencesTag(filter)
 	}
 
 	return dl.BlockBlob.SetFilter(filter)

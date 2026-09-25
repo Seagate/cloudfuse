@@ -125,3 +125,8 @@ func (v Version) OlderThan(v2 Version) bool {
 func (v Version) NewerThan(v2 Version) bool {
 	return v.compare(v2) == 1
 }
+
+// return the original version string
+func (v Version) String() string {
+	return v.original
+}

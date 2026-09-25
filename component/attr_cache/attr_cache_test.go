@@ -308,7 +308,7 @@ func (suite *attrCacheTestSuite) cleanupTest() {
 func (suite *attrCacheTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
-	suite.assert.EqualValues(120, suite.attrCache.cacheTimeout)
+	suite.assert.Equal(120, suite.attrCache.cacheTimeout)
 	suite.assert.True(suite.attrCache.cacheOnList)
 	suite.assert.False(suite.attrCache.enableSymlinks)
 }
@@ -323,7 +323,7 @@ func (suite *attrCacheTestSuite) TestConfig() {
 	) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
-	suite.assert.EqualValues(60, suite.attrCache.cacheTimeout)
+	suite.assert.Equal(60, suite.attrCache.cacheTimeout)
 	suite.assert.False(suite.attrCache.cacheOnList)
 	suite.assert.True(suite.attrCache.enableSymlinks)
 }
@@ -341,8 +341,8 @@ func (suite *attrCacheTestSuite) TestOldConfig() {
 	suite.assert.True(suite.attrCache.enableSymlinks)
 }
 
-// Tests max files config
-func (suite *attrCacheTestSuite) TestConfigMaxFiles() {
+// Tests max-size-mb config
+func (suite *attrCacheTestSuite) TestConfigMaxSizeMB() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
 	cacheTimeout := 1
@@ -1636,6 +1636,7 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 
+			someErr := errors.New("some unexpected error")
 			options := internal.GetAttrOptions{Name: path}
 			suite.mock.EXPECT().GetAttr(options).Return(nil, errOther)
 
@@ -2097,8 +2098,257 @@ func (suite *attrCacheTestSuite) TestChown() {
 	}
 }
 
+// TestLRUEvictionOnMemoryLimit verifies that the LRU evicts the least-recently-used entry
+// when the cache exceeds its configured memory limit.
+func (suite *attrCacheTestSuite) TestLRUEvictionOnMemoryLimit() {
+	defer suite.cleanupTest()
+	suite.cleanupTest()
+
+	// setupTestHelper creates and starts the cache.
+	suite.setupTestHelper(emptyConfig)
+
+	// Insert one entry to measure its cost, then rebuild the LRU capped at 2 entries.
+	path0 := "measure"
+	item0 := &attrCacheItem{
+		attr:     getPathAttr(path0, defaultSize, fs.FileMode(defaultMode), false),
+		exists:   true,
+		cachedAt: time.Now(),
+	}
+	suite.attrCache.lru.Put(path0, item0)
+	singleEntrySize := suite.attrCache.lru.Size()
+	// Set max to exactly 2 entries.
+	suite.attrCache.lru = newAttrCacheLRU(singleEntrySize * 2)
+
+	// Add 3 entries (A, B, C in insertion order: A is LRU).
+	pathA, pathB, pathLast := "lru_a", "lru_b", "lru_c"
+	for _, p := range []string{pathA, pathB, pathLast} {
+		item := &attrCacheItem{
+			attr:     getPathAttr(p, defaultSize, fs.FileMode(defaultMode), false),
+			exists:   true,
+			cachedAt: time.Now(),
+		}
+		suite.attrCache.lru.Put(p, item)
+	}
+
+	// Only 2 entries should remain, and A (the LRU) should have been evicted.
+	suite.assert.Equal(2, suite.attrCache.lru.Len())
+	suite.assert.False(suite.attrCache.lru.Has(pathA), "LRU entry should have been evicted")
+	suite.assert.True(suite.attrCache.lru.Has(pathB))
+	suite.assert.True(suite.attrCache.lru.Has(pathLast))
+	suite.assert.LessOrEqual(suite.attrCache.lru.Size(), singleEntrySize*2)
+}
+
+// TestLRUOrderPreservesRecentlyAccessed verifies that a recently-accessed entry
+// survives eviction over an older, less-recently-used entry.
+func (suite *attrCacheTestSuite) TestLRUOrderPreservesRecentlyAccessed() {
+	defer suite.cleanupTest()
+	suite.cleanupTest()
+
+	suite.setupTestHelper(emptyConfig)
+
+	// Measure single entry size and set limit to exactly 2 entries.
+	path0 := "measure"
+	item0 := &attrCacheItem{
+		attr:     getPathAttr(path0, defaultSize, fs.FileMode(defaultMode), false),
+		exists:   true,
+		cachedAt: time.Now(),
+	}
+	suite.attrCache.lru.Put(path0, item0)
+	singleEntrySize := suite.attrCache.lru.Size()
+	suite.attrCache.lru = newAttrCacheLRU(singleEntrySize * 2)
+
+	// Insert A, then B.  Order: B (MRU) → A (LRU).
+	pathA, pathB := "ord_a", "ord_b"
+	for _, p := range []string{pathA, pathB} {
+		item := &attrCacheItem{
+			attr:     getPathAttr(p, defaultSize, fs.FileMode(defaultMode), false),
+			exists:   true,
+			cachedAt: time.Now(),
+		}
+		suite.attrCache.lru.Put(p, item)
+	}
+
+	// Access A via GetAttr — this promotes A to MRU.  Order: A (MRU) → B (LRU).
+	// pathA is valid in cache; GetAttr serves it without calling the mock.
+	_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: pathA})
+	suite.assert.NoError(err)
+
+	// Add C — this should evict B (now LRU), not A.
+	pathLast := "ord_c"
+	itemLast := &attrCacheItem{
+		attr:     getPathAttr(pathLast, defaultSize, fs.FileMode(defaultMode), false),
+		exists:   true,
+		cachedAt: time.Now(),
+	}
+	suite.attrCache.lru.Put(pathLast, itemLast)
+
+	suite.assert.Equal(2, suite.attrCache.lru.Len())
+	suite.assert.True(suite.attrCache.lru.Has(pathA), "A was recently accessed and should survive")
+	suite.assert.False(suite.attrCache.lru.Has(pathB), "B should be evicted (LRU)")
+	suite.assert.True(suite.attrCache.lru.Has(pathLast))
+}
+
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestAttrCacheTestSuite(t *testing.T) {
 	suite.Run(t, new(attrCacheTestSuite))
+}
+
+// ---- TTL sweeper tests ----
+
+type sweeperTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
+}
+
+func (s *sweeperTestSuite) SetupTest() {
+	s.assert = assert.New(s.T())
+}
+
+// newSweeperCache builds a minimal AttrCache with no mock next-component,
+// suitable for testing sweepExpired directly.
+func newSweeperCache(timeout time.Duration) *AttrCache {
+	ac := &AttrCache{cacheTimeout: timeout}
+	ac.lru = newAttrCacheLRU(1 * 1024 * 1024)
+	return ac
+}
+
+func expiredItem() *attrCacheItem {
+	return &attrCacheItem{
+		cachedAt: time.Now().Add(-1 * time.Hour),
+		exists:   true,
+		attr:     makeAttr("x"),
+	}
+}
+
+func freshItem() *attrCacheItem {
+	return &attrCacheItem{cachedAt: time.Now(), exists: true, attr: makeAttr("x")}
+}
+
+// TestSweepExpiredRemovesExpiredEntries verifies that entries past their TTL are deleted
+// and fresh entries within TTL are kept.
+func (s *sweeperTestSuite) TestSweepExpiredRemovesExpiredEntries() {
+	ac := newSweeperCache(100 * time.Millisecond)
+	ac.lru.Put(
+		"expired",
+		&attrCacheItem{
+			cachedAt: time.Now().Add(-200 * time.Millisecond),
+			exists:   true,
+			attr:     makeAttr("expired"),
+		},
+	)
+	ac.lru.Put("fresh", freshItem())
+
+	ac.sweepExpired()
+
+	s.assert.Equal(1, ac.lru.Len())
+	_, ok := ac.lru.Peek("expired")
+	s.assert.False(ok)
+	_, ok = ac.lru.Peek("fresh")
+	s.assert.True(ok)
+}
+
+// TestSweepExpiredKeepsFreshEntries verifies that no entries are removed when none have expired.
+func (s *sweeperTestSuite) TestSweepExpiredKeepsFreshEntries() {
+	ac := newSweeperCache(1 * time.Hour)
+	ac.lru.Put("a", freshItem())
+	ac.lru.Put("b", freshItem())
+
+	ac.sweepExpired()
+
+	s.assert.Equal(2, ac.lru.Len())
+}
+
+// TestSweepExpiredRemovesNegativeEntries verifies that expired tombstones are swept too.
+func (s *sweeperTestSuite) TestSweepExpiredRemovesNegativeEntries() {
+	ac := newSweeperCache(100 * time.Millisecond)
+	ac.lru.Put(
+		"tombstone",
+		&attrCacheItem{cachedAt: time.Now().Add(-200 * time.Millisecond), exists: false},
+	)
+
+	ac.sweepExpired()
+
+	s.assert.Equal(0, ac.lru.Len())
+}
+
+// TestSweepExpiredSkipsWhenCacheIsActive verifies the idle gate: if lastOp is recent
+// (within cacheTimeout/2), the sweep is skipped entirely.
+func (s *sweeperTestSuite) TestSweepExpiredSkipsWhenCacheIsActive() {
+	ac := newSweeperCache(1 * time.Hour)
+	ac.lru.Put("expired", expiredItem())
+
+	// Simulate recent cache activity — well within the cacheTimeout/2 idle gate.
+	ac.lru.lastOp.Store(time.Now().Unix())
+
+	ac.sweepExpired()
+
+	s.assert.Equal(1, ac.lru.Len(), "sweep must be skipped when cache is active")
+}
+
+// TestSweepExpiredRunsWhenCacheIsIdle verifies that entries are swept when lastOp
+// indicates the cache has been idle for longer than cacheTimeout/2.
+func (s *sweeperTestSuite) TestSweepExpiredRunsWhenCacheIsIdle() {
+	ac := newSweeperCache(100 * time.Millisecond)
+	ac.lru.Put("expired", &attrCacheItem{cachedAt: time.Now().Add(-200 * time.Millisecond)})
+
+	// Simulate the cache being idle for 2 hours.
+	ac.lru.lastOp.Store(time.Now().Add(-2 * time.Hour).Unix())
+
+	ac.sweepExpired()
+
+	s.assert.Equal(0, ac.lru.Len())
+}
+
+// TestSweepExpiredNoopWhenTimeoutZero verifies that sweep is a no-op when cacheTimeout == 0,
+// preventing all entries from being treated as instantly expired.
+func (s *sweeperTestSuite) TestSweepExpiredNoopWhenTimeoutZero() {
+	ac := newSweeperCache(0)
+	ac.lru.Put("entry", freshItem())
+
+	ac.sweepExpired()
+
+	s.assert.Equal(1, ac.lru.Len())
+}
+
+// TestSweeperGoroutineEvictsEntries is an integration test that starts the sweeper goroutine
+// and verifies it removes expired entries within a few sweep cycles.
+func (s *sweeperTestSuite) TestSweeperGoroutineEvictsEntries() {
+	const timeout = 50 * time.Millisecond
+	ac := &AttrCache{cacheTimeout: timeout}
+	_ = ac.Start(context.Background())
+	defer func() { _ = ac.Stop() }()
+
+	ac.lru.cachePositiveEntry("file", makeAttr("file"))
+
+	// Wait for the entry to expire and at least two sweep cycles to complete.
+	time.Sleep(4 * timeout)
+
+	s.assert.Equal(0, ac.lru.Len(), "sweeper goroutine must have removed the expired entry")
+}
+
+// TestGetAttrUpdatesLastOp verifies that GetAttr refreshes the idle-gate timestamp,
+// preventing the sweeper from running during active lookup traffic.
+func (s *sweeperTestSuite) TestGetAttrUpdatesLastOp() {
+	ac := newSweeperCache(1 * time.Hour)
+	ac.SetNextComponent(&attrCacheNoopNext{})
+
+	before := time.Now()
+	_, _ = ac.GetAttr(internal.GetAttrOptions{Name: "any"})
+
+	stored := ac.lru.lastOp.Load()
+	s.assert.NotZero(stored)
+	s.assert.GreaterOrEqual(stored, before.Unix(), "lastOp must be updated by GetAttr")
+}
+
+// attrCacheNoopNext is a minimal Component stub used by sweeper tests that need
+// a non-nil next component but don't care about its behaviour.
+type attrCacheNoopNext struct{ internal.BaseComponent }
+
+func (n *attrCacheNoopNext) GetAttr(_ internal.GetAttrOptions) (*internal.ObjAttr, error) {
+	return nil, os.ErrNotExist
+}
+
+func TestSweeperTestSuite(t *testing.T) {
+	suite.Run(t, new(sweeperTestSuite))
 }

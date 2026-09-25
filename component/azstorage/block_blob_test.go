@@ -40,6 +40,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -2622,6 +2623,90 @@ func (s *blockBlobTestSuite) TestGetAttrDirWithCPKEnabled() {
 	s.assert.True(checkMetadata(props.Metadata, folderKey, "true"))
 }
 
+func (s *blockBlobTestSuite) TestGetAttrFileWithCPKEnabledAndPrefixPath() {
+	defer s.cleanupTest()
+	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: block\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n  account-key: %s\n  mode: key\n  container: %s\n",
+		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.BlockAccount,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+		storageTestConfigurationParameters.BlockKey,
+		s.container,
+	)
+
+	s.tearDownTestHelper(false)
+	s.setupTestHelper(config, s.container, false)
+
+	// Create a subdirectory to use as a prefix path and a file inside it
+	prefix := generateDirectoryName()
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: prefix})
+	s.assert.NoError(err)
+
+	fileName := generateFileName()
+	filePath := prefix + "/" + fileName
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: filePath})
+	s.assert.NoError(err)
+
+	// Set the prefix path to the subdirectory
+	_ = s.az.storage.SetPrefixPath(prefix)
+
+	// GetAttr should resolve the file correctly without duplicating the prefix path
+	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: fileName})
+	s.assert.NoError(err)
+	s.assert.NotNil(props)
+	s.assert.Equal(fileName, props.Path)
+	s.assert.False(props.IsDir())
+}
+
+func (s *blockBlobTestSuite) TestReadDirWithCPKEnabledAndPrefixPath() {
+	defer s.cleanupTest()
+	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: block\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n  account-key: %s\n  mode: key\n  container: %s\n",
+		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.BlockAccount,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+		storageTestConfigurationParameters.BlockKey,
+		s.container,
+	)
+
+	s.tearDownTestHelper(false)
+	s.setupTestHelper(config, s.container, false)
+
+	// Create a subdirectory to use as a prefix path with files inside it
+	prefix := generateDirectoryName()
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: prefix})
+	s.assert.NoError(err)
+
+	fileName := generateFileName()
+	filePath := prefix + "/" + fileName
+	_, err = s.az.CreateFile(internal.CreateFileOptions{Name: filePath})
+	s.assert.NoError(err)
+
+	// Set the prefix path to the subdirectory
+	_ = s.az.storage.SetPrefixPath(prefix)
+
+	// ReadDir should list the file correctly without duplicating the prefix path
+	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: "/"})
+	s.assert.NoError(err)
+	s.assert.NotEmpty(entries)
+
+	// Verify the file path does not have a duplicated prefix
+	found := false
+	for _, entry := range entries {
+		if entry.Name == fileName {
+			found = true
+			s.assert.Equal(fileName, entry.Path)
+			s.assert.False(entry.IsDir())
+			break
+		}
+	}
+	s.assert.True(found, "Expected file not found in ReadDir results")
+}
+
 func (s *blockBlobTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf(
@@ -4459,12 +4544,92 @@ func (s *blockBlobTestSuite) TestBlobFilters() {
 	s.assert.NoError(err)
 }
 
+func (s *blockBlobTestSuite) TestBlobTagFilter() {
+	defer s.cleanupTest()
+	// Setup: create files and stamp blob index tags on a subset
+	bb := s.az.storage.(*BlockBlob)
+
+	name := generateDirectoryName()
+	err := s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
+
+	type blobSpec struct {
+		path string
+		tags map[string]string
+	}
+	specs := []blobSpec{
+		{name + "/a.txt", map[string]string{"domain": "optical"}},
+		{name + "/b.txt", map[string]string{"domain": "optical", "owner": "team-a"}},
+		{name + "/c.txt", map[string]string{"domain": "radar"}},
+		{name + "/d.txt", nil},
+	}
+	for _, sp := range specs {
+		_, err = s.az.CreateFile(internal.CreateFileOptions{Name: sp.path})
+		s.assert.NoError(err)
+		if sp.tags != nil {
+			client := bb.Container.NewBlockBlobClient(sp.path)
+			_, err = client.SetTags(ctx, sp.tags, nil)
+			s.assert.NoError(err)
+		}
+	}
+
+	// list should return all entries when no filter is applied
+	listAll := func() []*internal.ObjAttr {
+		out := make([]*internal.ObjAttr, 0)
+		marker := ""
+		for {
+			page, next, err := s.az.StreamDir(
+				internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+			)
+			s.assert.NoError(err)
+			out = append(out, page...)
+			marker = next
+			if marker == "" {
+				return out
+			}
+		}
+	}
+
+	s.assert.Len(listAll(), 4)
+
+	// Filter by an existing tag - should match the two blobs tagged optical
+	err = bb.SetFilter("tag=domain:optical")
+	s.assert.NoError(err)
+	s.assert.True(bb.Config.filterHasTag)
+
+	blobs := listAll()
+	s.assert.Len(blobs, 2)
+
+	got := map[string]bool{}
+	for _, b := range blobs {
+		got[filepath.Base(b.Path)] = true
+	}
+	s.assert.True(got["a.txt"])
+	s.assert.True(got["b.txt"])
+
+	// GetAttr on a non-matching blob should report ENOENT via the filter,
+	// while a matching one should succeed.
+	_, err = bb.GetAttr(name + "/c.txt")
+	s.assert.Equal(syscall.ENOENT, err)
+
+	attr, err := bb.GetAttr(name + "/a.txt")
+	s.assert.NoError(err)
+	s.assert.NotNil(attr)
+
+	// Filter that does not reference tags should not flip filterHasTag.
+	err = bb.SetFilter("name=^a.*")
+	s.assert.NoError(err)
+	s.assert.False(bb.Config.filterHasTag)
+
+	err = bb.SetFilter("")
+	s.assert.NoError(err)
+	s.assert.False(bb.Config.filterHasTag)
+}
+
 func (s *blockBlobTestSuite) UtilityFunctionTestTruncateFileToSmaller(
 	size int,
 	truncatedLength int,
 ) {
-	s.T().Helper()
-
 	defer s.cleanupTest()
 	// Setup
 	vdConfig := fmt.Sprintf(

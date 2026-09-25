@@ -225,6 +225,8 @@ type AzStorageOptions struct {
 	PreserveACL             bool   `config:"preserve-acl"                  yaml:"preserve-acl"`
 	Filter                  string `config:"filter"                        yaml:"filter"`
 	UserAssertion           string `config:"user-assertion"                yaml:"user-assertions"`
+	CapMbpsRead             int64  `config:"cap-mbps-read" yaml:"cap-mbps-read"`
+	CapIOps                 int64  `config:"cap-iops" yaml:"cap-iops"`
 }
 
 // RegisterEnvVariables : Register environment variables
@@ -585,44 +587,15 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		}
 	}
 
-	log.Crit(
-		"ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v, restricted-characters-windows %v",
-		az.stConfig.authConfig.AccountName,
-		az.stConfig.container,
-		az.stConfig.authConfig.AccountType,
-		az.stConfig.authConfig.AuthMode,
-		az.stConfig.prefixPath,
-		az.stConfig.authConfig.Endpoint,
-		az.stConfig.validateMD5,
-		az.stConfig.updateMD5,
-		az.stConfig.virtualDirectory,
-		az.stConfig.disableCompression,
-		az.stConfig.cpkEnabled,
-		az.stConfig.restrictedCharsWin,
-	)
-	log.Crit(
-		"ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %v, fail-unsupported-op %t, mount-all-containers %t",
-		az.stConfig.authConfig.UseHTTP,
-		az.stConfig.blockSize,
-		az.stConfig.maxConcurrency,
-		az.stConfig.defaultTier,
-		az.stConfig.ignoreAccessModifiers,
-		az.stConfig.mountAllContainers,
-	)
-	log.Crit(
-		"ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d, preserve-acl: %v",
-		az.stConfig.maxRetries,
-		az.stConfig.maxTimeout,
-		az.stConfig.backoffTime,
-		az.stConfig.maxRetryDelay,
-		az.stConfig.preserveACL,
-	)
+	log.Crit("ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v",
+		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
+		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory, az.stConfig.disableCompression, az.stConfig.cpkEnabled)
+	log.Crit("ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %v, fail-unsupported-op %t, mount-all-containers %t", az.stConfig.authConfig.UseHTTP, az.stConfig.blockSize, az.stConfig.maxConcurrency, az.stConfig.defaultTier, az.stConfig.ignoreAccessModifiers, az.stConfig.mountAllContainers)
+	log.Crit("ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d, preserve-acl: %v",
+		az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay, az.stConfig.preserveACL)
 
-	log.Crit(
-		"ParseAndValidateConfig : Telemetry : %s, honour-ACL %v",
-		az.stConfig.telemetry,
-		az.stConfig.honourACL,
-	)
+	log.Crit("ParseAndValidateConfig : Telemetry : %s, honour-ACL %v, cap-mbps-read %d, cap-iops %d",
+		az.stConfig.telemetry, az.stConfig.honourACL, az.stConfig.capMbpsRead, az.stConfig.capIOps)
 
 	return nil
 }
@@ -641,9 +614,32 @@ func configureBlobFilter(azStorage *AzStorage, opt AzStorageOptions) error {
 		log.Err("configureBlobFilter : Failed to configure blob filter %s", err.Error())
 		return errors.New("failed to configure blob filter")
 	}
+	azStorage.stConfig.filterHasTag = filterReferencesTag(opt.Filter)
 
 	log.Crit("configureBlobFilter : Blob filter configured %s", opt.Filter)
 	return nil
+}
+
+// filterReferencesTag returns true when the raw filter expression includes a
+// `tag=` clause. The blobfilter package does not expose its parsed filter set,
+// so we inspect the input string ourselves to know whether GetAttr paths must
+// fetch blob index tags before evaluating the filter.
+func filterReferencesTag(filter string) bool {
+	for clause := range strings.SplitSeq(filter, "||") {
+		for sub := range strings.SplitSeq(clause, "&&") {
+			token := strings.TrimSpace(sub)
+			lowered := strings.ToLower(strings.Map(func(r rune) rune {
+				if r == ' ' || r == '\t' {
+					return -1
+				}
+				return r
+			}, token))
+			if strings.HasPrefix(lowered, "tag=") || strings.HasPrefix(lowered, "tag!=") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ParseAndReadDynamicConfig : On config change read only the required config
@@ -736,6 +732,18 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 				return errors.New("SAS key update failure") //nolint
 			}
 		}
+	}
+
+	// Rate limiting, default is no limit
+	az.stConfig.capMbpsRead = -1
+	az.stConfig.capIOps = -1
+
+	if opt.CapMbpsRead > 0 {
+		az.stConfig.capMbpsRead = opt.CapMbpsRead
+	}
+
+	if opt.CapIOps > 0 {
+		az.stConfig.capIOps = opt.CapIOps
 	}
 
 	return nil

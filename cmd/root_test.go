@@ -95,7 +95,6 @@ func (suite *rootCmdSuite) SetupTest() {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
-	// suite.testExecute()
 }
 
 func (suite *rootCmdSuite) cleanupTest() {

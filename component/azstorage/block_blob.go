@@ -99,7 +99,12 @@ func (bb *BlockBlob) Configure(cfg AzStorageConfig) error {
 	}
 
 	bb.listDetails = container.ListBlobsInclude{
-		Metadata:    true,
+		Metadata: true,
+		// Include.Tags is only honored on Block Blob (flat namespace) accounts.
+		// On HNS (ADLS Gen2), the list endpoint does not populate BlobTags in
+		// the response; tags must be fetched per-blob via GetTags — handled in
+		// processBlobItems.
+		Tags:        bb.Config.filterHasTag && !bb.Config.isHNS,
 		Deleted:     false,
 		Snapshots:   false,
 		Permissions: false, //Added to get permissions, acl, group, owner for HNS accounts
@@ -655,23 +660,52 @@ func (bb *BlockBlob) GetAttr(ctx context.Context, name string) (attr *internal.O
 
 	// To support virtual directories with no marker blob, we call list instead of get properties since list will not return a 404
 	if bb.Config.virtualDirectory {
-		attr, err = bb.getAttrUsingList(ctx, name)
-	} else {
-		attr, err = bb.getAttrUsingRest(ctx, name)
+		// getAttrUsingList -> List -> processBlobItems already evaluates the
+		// filter (including tag filters), so a successful return means the blob
+		// passed the filter.
+		return bb.getAttrUsingList(ctx, name)
 	}
 
+	attr, err = bb.getAttrUsingRest(ctx, name)
+	if err != nil {
+		return attr, err
+	}
 	if bb.Config.filter != nil && attr != nil {
-		if !bb.Config.filter.IsAcceptable(&blobfilter.BlobAttr{
+		filterAttr := blobfilter.BlobAttr{
 			Name:  attr.Name,
 			Mtime: attr.Mtime,
 			Size:  attr.Size,
-		}) {
+		}
+		// GetProperties does not return blob index tags. When the configured
+		// filter references tags, fetch them explicitly before deciding.
+		if bb.Config.filterHasTag && !attr.IsDir() {
+			tags, terr := bb.getBlobTags(name)
+			if terr != nil {
+				log.Err("BlockBlob::GetAttr : Failed to get tags for %s [%s]", name, terr.Error())
+				return attr, syscall.EACCES
+			}
+			filterAttr.Tags = tags
+		}
+
+		if !bb.Config.filter.IsAcceptable(&filterAttr) {
 			log.Debug("BlockBlob::GetAttr : Filtered out %s", name)
 			return nil, syscall.ENOENT
 		}
 	}
 
 	return attr, err
+}
+
+// getBlobTags fetches blob index tags for the given blob name and returns them
+// as a flat map. Returns nil if the blob has no tags.
+func (bb *BlockBlob) getBlobTags(name string) (map[string]string, error) {
+	blobClient := bb.Container.NewBlockBlobClient(filepath.Join(bb.Config.prefixPath, name))
+	resp, err := blobClient.GetTags(context.Background(), nil)
+	if err != nil {
+		log.Err("BlockBlob::getBlobTags : Failed to get tags for %s [%s]", name, err.Error())
+		return nil, err
+	}
+	return parseBlobTags(&resp.BlobTags), nil
 }
 
 // List : Get a list of blobs matching the given prefix
@@ -713,7 +747,7 @@ func (bb *BlockBlob) List(
 	// APIs that may be affected include IsDirEmpty, ReadDir and StreamDir
 
 	if err != nil {
-		log.Err("BlockBlob::List : Failed to list the container with the prefix [%s]", err.Error())
+		log.Err("BlockBlob::List : Failed to list the container with the prefix %s: %v", listPath, err)
 		return nil, nil, err
 	}
 
@@ -772,6 +806,23 @@ func (bb *BlockBlob) processBlobItems(
 			filterAttr.Name = blobAttr.Name
 			filterAttr.Mtime = blobAttr.Mtime
 			filterAttr.Size = blobAttr.Size
+			filterAttr.Tags = nil
+			if bb.Config.filterHasTag {
+				// HNS (ADLS Gen2) does not return blob index tags in the list response
+				// (BlobTags is nil and BlobTagCount is not populated on list items even
+				// when Include.Tags is requested). Fetch tags per-blob via GetTags so
+				// the tag filter can be evaluated. This N+1 cost only applies when a
+				// tag= filter is configured on an HNS account.
+				if bb.Config.isHNS {
+					tags, err := bb.getBlobTags(blobAttr.Path)
+					if err != nil {
+						return nil, nil, syscall.EACCES
+					}
+					filterAttr.Tags = tags
+				} else {
+					filterAttr.Tags = parseBlobTags(blobInfo.BlobTags)
+				}
+			}
 
 			if bb.Config.filter.IsAcceptable(&filterAttr) {
 				blobList = append(blobList, blobAttr)
@@ -786,16 +837,10 @@ func (bb *BlockBlob) processBlobItems(
 	return blobList, dirList, nil
 }
 
-func (bb *BlockBlob) getBlobAttr(
-	ctx context.Context,
-	blobInfo *container.BlobItem,
-) (*internal.ObjAttr, error) {
-	if blobInfo.Properties.CustomerProvidedKeySHA256 != nil &&
-		*blobInfo.Properties.CustomerProvidedKeySHA256 != "" {
-		log.Trace(
-			"BlockBlob::List : blob is encrypted with customer provided key so fetching metadata explicitly using REST",
-		)
-		return bb.getAttrUsingRest(ctx, *blobInfo.Name)
+func (bb *BlockBlob) getBlobAttr(blobInfo *container.BlobItem) (*internal.ObjAttr, error) {
+	if blobInfo.Properties.CustomerProvidedKeySHA256 != nil && *blobInfo.Properties.CustomerProvidedKeySHA256 != "" {
+		log.Trace("BlockBlob::List : blob is encrypted with customer provided key so fetching metadata explicitly using REST")
+		return bb.getAttrUsingRest(removePrefixPath(bb.Config.prefixPath, *blobInfo.Name))
 	}
 	mode, err := bb.getFileMode(blobInfo.Properties.Permissions)
 	if err != nil {
@@ -1382,11 +1427,7 @@ func (bb *BlockBlob) GetFileBlockOffsets(
 	)
 
 	if err != nil {
-		log.Err(
-			"BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]",
-			name,
-			err.Error(),
-		)
+		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]", name, err.Error())
 		return &common.BlockOffsetList{}, err
 	}
 
@@ -1924,11 +1965,7 @@ func (bb *BlockBlob) Write(ctx context.Context, options *internal.WriteFileOptio
 		if exceedsFileBlocks {
 			newBufferSize, err = bb.createNewBlocks(fileOffsets, offset, length)
 			if err != nil {
-				log.Err(
-					"BlockBlob::Write : Failed to create new blocks for file %s [%s]",
-					name,
-					err.Error(),
-				)
+				log.Err("BlockBlob::Write : Failed to create new blocks for file %s [%s]", name, err.Error())
 				return err
 			}
 		}
@@ -2154,11 +2191,7 @@ func (bb *BlockBlob) GetCommittedBlockList(
 	)
 
 	if err != nil {
-		log.Err(
-			"BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]",
-			name,
-			err.Error(),
-		)
+		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s [%s]", name, err.Error())
 		return nil, err
 	}
 
@@ -2285,9 +2318,18 @@ func (bb *BlockBlob) getFormattedPath(name string) string {
 func (bb *BlockBlob) SetFilter(filter string) error {
 	if filter == "" {
 		bb.Config.filter = nil
+		bb.Config.filterHasTag = false
+		bb.listDetails.Tags = false
 		return nil
 	}
 
 	bb.Config.filter = &blobfilter.BlobFilter{}
-	return bb.Config.filter.Configure(filter)
+	if err := bb.Config.filter.Configure(filter); err != nil {
+		return err
+	}
+	bb.Config.filterHasTag = filterReferencesTag(filter)
+	// HNS accounts do not populate tags in the list response; leave Include.Tags off
+	// and let processBlobItems fetch tags per-blob when needed.
+	bb.listDetails.Tags = bb.Config.filterHasTag && !bb.Config.isHNS
+	return nil
 }

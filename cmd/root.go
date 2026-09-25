@@ -339,6 +339,28 @@ func parseArgs(cmdArgs []string) []string {
 	return args
 }
 
+func getTransport() *http.Transport {
+	// Prefer cloning the default transport so we inherit standard
+	// proxy/TLS settings (including HTTP(S)_PROXY and NO_PROXY).
+	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+		cp := dt.Clone()
+		cp.MaxIdleConns = 10
+		cp.IdleConnTimeout = 30 * time.Second
+		cp.DisableCompression = true // GitHub API responses are small
+		cp.DisableKeepAlives = false // Connections are reused
+		return cp
+	}
+
+	// Fallback: construct a transport that at least respects proxy env vars.
+	return &http.Transport{
+		Proxy:              http.ProxyFromEnvironment,
+		MaxIdleConns:       10,
+		IdleConnTimeout:    30 * time.Second,
+		DisableCompression: true,  // GitHub API responses are small
+		DisableKeepAlives:  false, // Connections are reused
+	}
+}
+
 // Execute : Actual command execution starts from here
 func Execute() error {
 	parsedArgs := parseArgs(os.Args)

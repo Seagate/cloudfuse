@@ -44,8 +44,8 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
-// By default attr cache is valid for 120 seconds
-const defaultAttrCacheTimeout uint32 = (120)
+// defaultAttrCacheTimeout is the default TTL for cached attributes (seconds).
+const defaultAttrCacheTimeout uint32 = 120
 
 // Common structure for AttrCache Component
 type AttrCache struct {
@@ -69,18 +69,19 @@ type AttrCacheOptions struct {
 	// hidden option for backward compatibility
 	NoSymlinks bool `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
 
-	//maximum file attributes overall to be cached
-	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
+// AttrCacheOptions holds the configuration for the attribute cache.
+type AttrCacheOptions struct {
+	Timeout       uint32 `config:"timeout-sec"      yaml:"timeout-sec,omitempty"`
+	NoCacheOnList bool   `config:"no-cache-on-list" yaml:"no-cache-on-list,omitempty"`
+	NoSymlinks    bool   `config:"no-symlinks"      yaml:"no-symlinks,omitempty"`
+	MaxSizeMB     uint32 `config:"max-size-mb"      yaml:"max-size-mb,omitempty"`
+	MaxFiles      uint32 `config:"max-files"        yaml:"max-files,omitempty"`
 
 	// support v1
 	CacheOnList bool `config:"cache-on-list"`
 }
 
 const compName = "attr_cache"
-
-// caching only first 5 mil files by default
-// caching more means increased memory usage of the process
-const defaultMaxFiles = 5000000 // 5 million max files overall to be cached
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &AttrCache{}
@@ -101,10 +102,8 @@ func (ac *AttrCache) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.LevelTwo()
 }
 
-// Start : Pipeline calls this method to start the component functionality
-//
-//	this shall not block the call otherwise pipeline will not start
-func (ac *AttrCache) Start(ctx context.Context) error {
+// Start initialises the cache and launches the background TTL sweeper.
+func (ac *AttrCache) Start(_ context.Context) error {
 	log.Trace("AttrCache::Start : Starting component %s", ac.Name())
 
 	// AttrCache : start code goes here
@@ -118,20 +117,68 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop : Stop the component functionality and kill all threads started
+// Stop cancels the background sweeper and waits for it to exit before returning.
+// Memory held by expired entries is reclaimed by the GC once the component is released.
 func (ac *AttrCache) Stop() error {
 	log.Trace("AttrCache::Stop : Stopping component %s", ac.Name())
-
-	// Stop the background cleanup goroutine
-	if ac.cleanupStop != nil {
-		ac.cleanupStop()
-		<-ac.cleanupDone // Wait for cleanup goroutine to finish
+	if ac.stopCh != nil {
+		close(ac.stopCh)
+		ac.sweepWg.Wait()
+		ac.stopCh = nil
 	}
-
 	return nil
 }
 
-// GenConfig : Generate the default config for the component
+// ttlSweeper ticks every cacheTimeout and evicts expired entries when the cache is idle.
+func (ac *AttrCache) ttlSweeper() {
+	ticker := time.NewTicker(ac.cacheTimeout)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			ac.sweepExpired()
+		case <-ac.stopCh:
+			return
+		}
+	}
+}
+
+// sweepExpired removes all TTL-expired entries from the LRU.
+// The idle gate skips the sweep if the cache was used within the last cacheTimeout/2
+// to avoid holding the write lock during active traffic.
+func (ac *AttrCache) sweepExpired() {
+	if ac.cacheTimeout <= 0 {
+		return
+	}
+
+	// Only apply the idle gate when the cache is memory-bounded. If MaxSize()==0 (unlimited),
+	// skipping sweeps under continuous traffic can let TTL-expired entries accumulate forever.
+	idleThreshold := ac.cacheTimeout / 2
+	if idleThreshold > 0 && ac.lru.MaxSize() > 0 {
+		if last := ac.lru.lastOp.Load(); last != 0 {
+			if time.Since(time.Unix(last, 0)) < idleThreshold {
+				return
+			}
+		}
+	}
+	timeout := ac.cacheTimeout
+	cutoff := time.Now().Add(-timeout)
+	before := ac.lru.Size()
+	ac.lru.DeleteIf(func(_ string, item *attrCacheItem) bool {
+		return !item.cachedAt.After(cutoff)
+	})
+	maxSize := ac.lru.MaxSize()
+	maxMB := (maxSize + (1 << 20) - 1) >> 20
+	if maxSize == 0 {
+		log.Debug("AttrCache::sweepExpired : size %d MB (unbounded) (%d entries), reclaimed %d MB",
+			ac.lru.Size()>>20, ac.lru.Len(), (before-ac.lru.Size())>>20)
+		return
+	}
+	log.Debug("AttrCache::sweepExpired : size %d MB / %d MB (%d entries), reclaimed %d MB",
+		ac.lru.Size()>>20, maxMB, ac.lru.Len(), (before-ac.lru.Size())>>20)
+}
+
+// GenConfig returns a default configuration snippet for this component.
 func (ac *AttrCache) GenConfig() string {
 	log.Info("AttrCache::Configure : config generation started")
 
@@ -142,13 +189,10 @@ func (ac *AttrCache) GenConfig() string {
 	return sb.String()
 }
 
-// Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
-//
-//	Return failure if any config is not valid to exit the process
+// Configure reads component configuration and applies it.
 func (ac *AttrCache) Configure(_ bool) error {
 	log.Trace("AttrCache::Configure : %s", ac.Name())
 
-	// >> If you do not need any config parameters remove below code and return nil
 	conf := AttrCacheOptions{}
 	err := config.UnmarshalKey(ac.Name(), &conf)
 	if err != nil {
@@ -157,7 +201,7 @@ func (ac *AttrCache) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".timeout-sec") {
-		ac.cacheTimeout = conf.Timeout
+		ac.cacheTimeout = time.Duration(conf.Timeout) * time.Second
 	} else {
 		ac.cacheTimeout = defaultAttrCacheTimeout
 	}
@@ -191,10 +235,9 @@ func (ac *AttrCache) Configure(_ bool) error {
 	return nil
 }
 
-// OnConfigChange : If component has registered, on config file change this method is called
+// OnConfigChange logs that attr_cache settings cannot be applied safely at runtime.
 func (ac *AttrCache) OnConfigChange() {
-	log.Trace("AttrCache::OnConfigChange : %s", ac.Name())
-	_ = ac.Configure(true)
+	log.Warn("AttrCache::OnConfigChange : config change detected but not applied; restart required to apply new attr_cache settings")
 }
 
 // Helper Methods
@@ -837,7 +880,7 @@ func (ac *AttrCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return h, err
 }
 
-// DeleteFile : Mark the file deleted
+// DeleteFile marks the file as deleted in the cache.
 func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
 
@@ -932,16 +975,15 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-// WriteFile : Mark the file invalid
+// WriteFile retrieves metadata from the cache, forwards the write, then invalidates.
 func (ac *AttrCache) WriteFile(options *internal.WriteFileOptions) (int, error) {
-
 	// GetAttr on cache hit will serve from cache, on cache miss will serve from next component.
 	attr, err := ac.GetAttr(
 		internal.GetAttrOptions{Name: options.Handle.Path, RetrieveMetadata: true},
 	)
 	if err != nil {
-		// Ignore not exists errors - this can happen if createEmptyFile is set to false
-		if !os.IsNotExist(err) && err != syscall.ENOENT {
+		// Ignore not-exists errors — this can happen if createEmptyFile is set to false.
+		if !errors.Is(err, os.ErrNotExist) {
 			return 0, err
 		}
 	}
@@ -975,7 +1017,7 @@ func (ac *AttrCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	return size, err
 }
 
-// TruncateFile : Update the file with its truncated size
+// TruncateFile invalidates the cached entry so the next GetAttr fetches updated ETag/timestamps.
 func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("AttrCache::TruncateFile : %s", options.Name)
 
@@ -1022,11 +1064,10 @@ func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
 func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AttrCache::CopyFromFile : %s", options.Name)
 
-	// GetAttr on cache hit will serve from cache, on cache miss will serve from next component.
 	attr, err := ac.GetAttr(internal.GetAttrOptions{Name: options.Name, RetrieveMetadata: true})
 	if err != nil {
 		// Ignore not exists errors - this can happen if createEmptyFile is set to false
-		if !os.IsNotExist(err) && err != syscall.ENOENT {
+		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
@@ -1107,7 +1148,8 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 	return err
 }
 
-// GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
+// GetAttr serves from cache on hit (promoting the entry to MRU), or fetches from the
+// next component and caches the result on miss.
 func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	// Don't log these by default, as it noticeably affects performance
 	// log.Trace("AttrCache::GetAttr : %s", options.Name)
@@ -1227,7 +1269,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	return err
 }
 
-// FlushFile : flush file
+// FlushFile invalidates the cached entry after a flush.
 func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("AttrCache::FlushFile : %s", options.Handle.Path)
 	err := ac.NextComponent().FlushFile(options)
@@ -1246,7 +1288,8 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 	return err
 }
 
-// Chmod : Update the file with its new permissions
+// Chmod updates the cached mode for a file or directory.
+// It puts a new immutable item so concurrent readers see a consistent snapshot.
 func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("AttrCache::Chmod : Change mode of file/directory %s", options.Name)
 
@@ -1268,7 +1311,7 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	return err
 }
 
-// Chown : Update the file with its new owner and group (when datalake chown is implemented)
+// Chown updates the file owner (when datalake chown is implemented).
 func (ac *AttrCache) Chown(options internal.ChownOptions) error {
 	log.Trace("AttrCache::Chown : Change owner of file/directory %s", options.Name)
 
@@ -1278,6 +1321,7 @@ func (ac *AttrCache) Chown(options internal.ChownOptions) error {
 	return err
 }
 
+// CommitData invalidates the cached entry after a data commit.
 func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 	log.Trace("AttrCache::CommitData : %s", options.Name)
 	err := ac.NextComponent().CommitData(options)
@@ -1299,8 +1343,7 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 
 // ------------------------- Factory -------------------------------------------
 
-// Pipeline will call this method to create your object, initialize your variables here
-// << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
+// NewAttrCacheComponent creates a new AttrCache component.
 func NewAttrCacheComponent() internal.Component {
 	comp := &AttrCache{}
 	comp.SetName(compName)
@@ -1309,7 +1352,6 @@ func NewAttrCacheComponent() internal.Component {
 	return comp
 }
 
-// On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, NewAttrCacheComponent)
 }

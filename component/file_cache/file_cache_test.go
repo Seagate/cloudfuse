@@ -40,6 +40,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -52,6 +54,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"go.uber.org/mock/gomock"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -65,6 +68,7 @@ type fileCacheTestSuite struct {
 	loopback          internal.Component
 	cache_path        string // uses os.Separator (filepath.Join)
 	fake_storage_path string // uses os.Separator (filepath.Join)
+	configString      string
 	useMock           bool
 	mockCtrl          *gomock.Controller
 	mock              *internal.MockComponent
@@ -136,6 +140,7 @@ func (suite *fileCacheTestSuite) SetupTest() {
 
 func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
+	suite.configString = configuration
 
 	err := config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.assert.NoError(err)
@@ -3180,6 +3185,282 @@ loopbackfs:
 	suite.assert.Equal(expectedData, cloudData,
 		"File should be updated immediately in the second window")
 }
+// setupMockFileCacheForFlush creates a file cache backed by a gomock NextComponent
+// and returns (fileCache, mockComponent, cachePath, cleanup).
+// The caller must defer cleanup() to stop the independent file cache and remove its temp dir.
+// The suite-level loopback and fileCache are left running throughout and are not affected.
+func (suite *fileCacheTestSuite) setupMockFileCacheForFlush(mockCtrl *gomock.Controller) (*FileCache, *internal.MockComponent, string, func()) {
+	mockComponent := internal.NewMockComponent(mockCtrl)
+
+	randStr := randomString(8)
+	cachePath := filepath.Join(home_dir, "file_cache"+randStr)
+	cfg := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0", cachePath)
+
+	// Overwrite global config to configure the independent FileCache, then immediately
+	// restore the original config so the suite-level components are unaffected.
+	err := config.ReadConfigFromReader(strings.NewReader(cfg))
+	suite.assert.NoError(err)
+
+	fcComp := NewFileCacheComponent()
+	fcComp.SetNextComponent(mockComponent)
+	err = fcComp.Configure(true)
+	suite.assert.NoError(err)
+
+	// Restore the suite's original config so subsequent suite-level operations work correctly.
+	err = config.ReadConfigFromReader(strings.NewReader(suite.configString))
+	suite.assert.NoError(err)
+
+	mockComponent.EXPECT().Start(gomock.Any()).Return(nil).Times(1)
+	mockComponent.EXPECT().Stop().Return(nil).Times(1)
+
+	err = mockComponent.Start(context.Background())
+	suite.assert.NoError(err)
+	err = fcComp.Start(context.Background())
+	suite.assert.NoError(err)
+
+	fc := fcComp.(*FileCache)
+
+	cleanup := func() {
+		_ = fc.Stop()
+		_ = mockComponent.Stop()
+		os.RemoveAll(cachePath)
+	}
+
+	return fc, mockComponent, cachePath, cleanup
+}
+
+// TestFlushFileConcurrent verifies that concurrent FlushFile calls for the same file
+// are serialized by the per-file lock.
+//
+// The mock NextComponent's CopyFromFile tracks the number of concurrent in-flight
+// uploads via an atomic counter and sleeps briefly to widen the race window.
+// If two uploads ever overlap (counter > 1), the mock returns an error that mimics
+// the Azure Storage InvalidBlockList failure.
+// With the per-file lock this can never happen; without it, the overlapping calls
+// would cause the test to fail.
+func (suite *fileCacheTestSuite) TestFlushFileConcurrent() {
+	defer suite.cleanupTest()
+	mockCtrl := gomock.NewController(suite.T())
+	defer mockCtrl.Finish()
+
+	fc, mockComponent, cachePath, cleanup := suite.setupMockFileCacheForFlush(mockCtrl)
+	defer cleanup()
+
+	// Create a real local file in the cache (createEmptyFile=false means no NextComponent call).
+	path := "concurrent_flush.txt"
+	localPath := filepath.Join(cachePath, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+	suite.assert.NoError(err)
+	f, err := os.Create(localPath)
+	suite.assert.NoError(err)
+	_, err = f.WriteString("concurrent flush test data")
+	suite.assert.NoError(err)
+
+	handle := handlemap.NewHandle(path)
+	handle.UnixFD = uint64(f.Fd())
+	handle.SetFileObject(f)
+	handle.Flags.Set(handlemap.HandleFlagDirty)
+	fc.fileLocks.Get(path).Inc() // simulate an open handle
+
+	// Track concurrent in-flight CopyFromFile calls.
+	var inFlight atomic.Int32
+	var maxInFlight atomic.Int32
+
+	// The mock CopyFromFile blocks briefly so that without serialization,
+	// multiple goroutines would be inside it at the same time.
+	mockComponent.EXPECT().
+		CopyFromFile(gomock.Any()).
+		DoAndReturn(func(opts internal.CopyFromFileOptions) error {
+			cur := inFlight.Add(1)
+			// Record the high-water mark of concurrent callers.
+			for {
+				old := maxInFlight.Load()
+				if cur <= old || maxInFlight.CompareAndSwap(old, cur) {
+					break
+				}
+			}
+
+			// Hold the "upload" open long enough for other goroutines to arrive.
+			time.Sleep(50 * time.Millisecond)
+
+			inFlight.Add(-1)
+
+			if cur > 1 {
+				// This is what Azure Storage would return when two PutBlockList calls race.
+				return fmt.Errorf("InvalidBlockList: concurrent upload detected (%d in-flight)", cur)
+			}
+			return nil
+		}).
+		AnyTimes()
+
+	// Launch concurrent flushes (simulating multiple libfuse_flush calls from dup'd fds).
+	concurrency := 5
+	var wg sync.WaitGroup
+	errs := make([]error, concurrency)
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			// Re-dirty the handle before each flush so that the fast-path dirty check
+			// doesn't skip the upload. In the real world each fd's close sets dirty via
+			// libfuse_flush (fileHandle.dirty != 0).
+			handle.Flags.Set(handlemap.HandleFlagDirty)
+			errs[idx] = fc.FlushFile(internal.FlushFileOptions{Handle: handle})
+		}(i)
+	}
+	wg.Wait()
+
+	for i, e := range errs {
+		suite.assert.NoError(e, "FlushFile goroutine %d returned error: %v", i, e)
+	}
+
+	// The per-file lock must have serialized all uploads; at no point should more
+	// than one CopyFromFile have been in-flight simultaneously.
+	suite.assert.EqualValues(1, maxInFlight.Load(),
+		"expected max 1 concurrent CopyFromFile, got %d — uploads were not serialized", maxInFlight.Load())
+
+	f.Close()
+}
+
+// TestFlushFileConcurrentWithRelease verifies that a concurrent FlushFile call
+// (from libfuse_flush) and ReleaseFile (close) are properly serialized so that
+// CopyFromFile never runs in parallel.
+func (suite *fileCacheTestSuite) TestFlushFileConcurrentWithRelease() {
+	defer suite.cleanupTest()
+	mockCtrl := gomock.NewController(suite.T())
+	defer mockCtrl.Finish()
+
+	fc, mockComponent, cachePath, cleanup := suite.setupMockFileCacheForFlush(mockCtrl)
+	defer cleanup()
+
+	path := "concurrent_flush_release.txt"
+	localPath := filepath.Join(cachePath, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+	suite.assert.NoError(err)
+	f, err := os.Create(localPath)
+	suite.assert.NoError(err)
+	_, err = f.WriteString("concurrent flush release test data")
+	suite.assert.NoError(err)
+
+	handle := handlemap.NewHandle(path)
+	handle.UnixFD = uint64(f.Fd())
+	handle.SetFileObject(f)
+	handle.Flags.Set(handlemap.HandleFlagDirty)
+	fc.fileLocks.Get(path).Inc() // simulate an open handle
+
+	var inFlight atomic.Int32
+	var maxInFlight atomic.Int32
+
+	mockComponent.EXPECT().
+		CopyFromFile(gomock.Any()).
+		DoAndReturn(func(opts internal.CopyFromFileOptions) error {
+			cur := inFlight.Add(1)
+			for {
+				old := maxInFlight.Load()
+				if cur <= old || maxInFlight.CompareAndSwap(old, cur) {
+					break
+				}
+			}
+			time.Sleep(50 * time.Millisecond)
+			inFlight.Add(-1)
+			if cur > 1 {
+				return fmt.Errorf("InvalidBlockList: concurrent upload detected (%d in-flight)", cur)
+			}
+			return nil
+		}).
+		AnyTimes()
+
+	// Start a concurrent flush to simulate libfuse_flush from a dup'd fd.
+	var wg sync.WaitGroup
+	var flushErr error
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		flushErr = fc.FlushFile(internal.FlushFileOptions{Handle: handle})
+	}()
+
+	// ReleaseFile on the same handle races with the flush above.
+	// releaseFileInternal calls FlushFile internally, so both paths compete.
+	releaseErr := fc.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+
+	wg.Wait()
+	suite.assert.NoError(flushErr, "concurrent FlushFile should not fail")
+	suite.assert.NoError(releaseErr, "ReleaseFile should not fail")
+	suite.assert.EqualValues(1, maxInFlight.Load(),
+		"expected max 1 concurrent CopyFromFile, got %d — uploads were not serialized", maxInFlight.Load())
+}
+
+// TestFlushFileSyncFileConcurrent verifies that SyncFile (which calls FlushFile internally
+// when syncToFlush is enabled) and a direct FlushFile call are serialized so that
+// CopyFromFile never runs concurrently.
+func (suite *fileCacheTestSuite) TestFlushFileSyncFileConcurrent() {
+	defer suite.cleanupTest()
+	mockCtrl := gomock.NewController(suite.T())
+	defer mockCtrl.Finish()
+
+	fc, mockComponent, cachePath, cleanup := suite.setupMockFileCacheForFlush(mockCtrl)
+	defer cleanup()
+	fc.syncToFlush = true
+
+	path := "sync_flush_concurrent.txt"
+	localPath := filepath.Join(cachePath, path)
+	err := os.MkdirAll(filepath.Dir(localPath), 0755)
+	suite.assert.NoError(err)
+	f, err := os.Create(localPath)
+	suite.assert.NoError(err)
+	_, err = f.WriteString("sync flush concurrent test data")
+	suite.assert.NoError(err)
+
+	handle := handlemap.NewHandle(path)
+	handle.UnixFD = uint64(f.Fd())
+	handle.SetFileObject(f)
+	handle.Flags.Set(handlemap.HandleFlagDirty)
+	fc.fileLocks.Get(path).Inc() // simulate an open handle
+
+	var inFlight atomic.Int32
+	var maxInFlight atomic.Int32
+
+	mockComponent.EXPECT().
+		CopyFromFile(gomock.Any()).
+		DoAndReturn(func(opts internal.CopyFromFileOptions) error {
+			cur := inFlight.Add(1)
+			for {
+				old := maxInFlight.Load()
+				if cur <= old || maxInFlight.CompareAndSwap(old, cur) {
+					break
+				}
+			}
+			time.Sleep(50 * time.Millisecond)
+			inFlight.Add(-1)
+			if cur > 1 {
+				return fmt.Errorf("InvalidBlockList: concurrent upload detected (%d in-flight)", cur)
+			}
+			return nil
+		}).
+		AnyTimes()
+
+	// Launch concurrent SyncFile (calls FlushFile internally) and direct FlushFile.
+	var wg sync.WaitGroup
+	var syncErr, flushErr error
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		syncErr = fc.SyncFile(internal.SyncFileOptions{Handle: handle})
+	}()
+	go func() {
+		defer wg.Done()
+		flushErr = fc.FlushFile(internal.FlushFileOptions{Handle: handle})
+	}()
+	wg.Wait()
+
+	suite.assert.NoError(syncErr, "SyncFile should not fail")
+	suite.assert.NoError(flushErr, "FlushFile should not fail")
+	suite.assert.EqualValues(1, maxInFlight.Load(),
+		"expected max 1 concurrent CopyFromFile, got %d — uploads were not serialized", maxInFlight.Load())
+
+	f.Close()
+}
 
 func (suite *fileCacheTestSuite) TestGetAttrCase1() {
 	defer suite.cleanupTest()
@@ -4351,6 +4632,98 @@ func (suite *fileCacheTestSuite) createRemoteDirectoryStructure() {
 	suite.assert.NoError(err)
 
 	err = os.MkdirAll(filepath.Join(suite.fake_storage_path, "h", "l", "m", "n"), 0777)
+	suite.assert.NoError(err)
+}
+
+// TestOpenFileDownloadFailure tests that when CopyToFile fails during OpenFile,
+// the correct download error is returned (not the cleanup error) and the
+// partially downloaded file is removed from the cache.
+func (suite *fileCacheTestSuite) TestOpenFileDownloadFailure() {
+	// Create a mock controller and component
+	mockCtrl := gomock.NewController(suite.T())
+	defer mockCtrl.Finish()
+
+	mockComponent := internal.NewMockComponent(mockCtrl)
+
+	// Create a new file cache with the mock component
+	// First, stop the default file cache
+	err := suite.fileCache.Stop()
+	suite.assert.NoError(err)
+	err = suite.loopback.Stop()
+	suite.assert.NoError(err)
+
+	randStr := randomString(8)
+	cachePath := filepath.Join(home_dir, "file_cache"+randStr)
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0", cachePath)
+
+	err = config.ReadConfigFromReader(strings.NewReader(defaultConfig))
+	suite.assert.NoError(err)
+
+	fileCache := NewFileCacheComponent()
+	fileCache.SetNextComponent(mockComponent)
+	err = fileCache.Configure(true)
+	suite.assert.NoError(err)
+
+	// Expect Start and Stop calls
+	mockComponent.EXPECT().Start(gomock.Any()).Return(nil).Times(1)
+	mockComponent.EXPECT().Stop().Return(nil).Times(1)
+
+	err = mockComponent.Start(context.Background())
+	suite.assert.NoError(err)
+
+	err = fileCache.Start(context.Background())
+	suite.assert.NoError(err)
+
+	fc := fileCache.(*FileCache)
+
+	// Test file path
+	path := "test_download_failure.txt"
+	localPath := filepath.Join(cachePath, path)
+
+	// Set up expectations for GetAttr to return a valid file that exists in storage
+	mockComponent.EXPECT().
+		GetAttr(gomock.Any()).
+		Return(&internal.ObjAttr{
+			Path:  path,
+			Name:  filepath.Base(path),
+			Size:  1024,
+			Mode:  0644,
+			Flags: internal.NewFileBitMap(),
+		}, nil).
+		Times(1)
+
+	// Set up expectation for CopyToFile to fail with a download error
+	downloadErr := fmt.Errorf("simulated download failure")
+	mockComponent.EXPECT().
+		CopyToFile(gomock.Any()).
+		Return(downloadErr).
+		Times(1)
+
+	// Attempt to open the file - this should fail
+	handle, err := fc.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0644})
+
+	// Assert that the error returned is the download error, not a cleanup error
+	suite.assert.Error(err)
+	suite.assert.Equal(downloadErr, err)
+	suite.assert.Nil(handle)
+
+	// Verify that the partially downloaded file was cleaned up from the cache
+	_, statErr := os.Stat(localPath)
+	suite.assert.True(os.IsNotExist(statErr), "Partially downloaded file should be cleaned up from cache")
+
+	// Clean up
+	err = fc.Stop()
+	suite.assert.NoError(err)
+	err = mockComponent.Stop()
+	suite.assert.NoError(err)
+	os.RemoveAll(cachePath)
+
+	// Restart the default file cache for other tests
+	suite.loopback = newLoopbackFS()
+	suite.fileCache = newTestFileCache(suite.loopback)
+	err = suite.loopback.Start(context.Background())
+	suite.assert.NoError(err)
+	err = suite.fileCache.Start(context.Background())
 	suite.assert.NoError(err)
 }
 

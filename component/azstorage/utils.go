@@ -35,6 +35,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
 
@@ -74,6 +76,9 @@ const (
 	DisableKeepAlives      bool          = false
 	DisableCompression     bool          = false
 	MaxResponseHeaderBytes int64         = 0
+
+	X_Ms_Range  string = "x-ms-range"
+	RangeHeader string = "Range"
 )
 
 // getAzStorageClientOptions : Create client options based on the config
@@ -114,11 +119,19 @@ func getAzStorageClientOptions(conf *AzStorageConfig) (azcore.ClientOptions, err
 		perCallPolicies = append(perCallPolicies, newServiceVersionPolicy(serviceApiVersion))
 	}
 
+	perRetryPolicies := []policy.Policy{}
+	if conf.capMbpsRead > 0 || conf.capIOps > 0 {
+		// Convert Mbps to Bytes/sec: 1 Mbps = (1024* 1024) / 8 = 131072 Bytes/sec
+		bytesPerSec := conf.capMbpsRead * 131072
+		perRetryPolicies = append(perRetryPolicies, newRateLimitingPolicy(bytesPerSec, conf.capIOps))
+	}
+
 	return azcore.ClientOptions{
-		Retry:           retryOptions,
-		Logging:         logOptions,
-		PerCallPolicies: perCallPolicies,
-		Transport:       transportOptions,
+		Retry:            retryOptions,
+		Logging:          logOptions,
+		PerCallPolicies:  perCallPolicies,
+		PerRetryPolicies: perRetryPolicies,
+		Transport:        transportOptions,
 	}, err
 }
 
@@ -234,6 +247,7 @@ const (
 	InvalidRange
 	BlobIsUnderLease
 	InvalidPermission
+	ErrPathTooDeep
 )
 
 // For detailed error list refer below link,
@@ -281,6 +295,8 @@ func storeDatalakeErrToErr(err error) uint16 {
 			return InvalidPermission
 		case datalakeerror.BlobNotFound:
 			return ErrFileNotFound
+		case datalakeerror.PathIsTooDeep:
+			return ErrPathTooDeep
 		default:
 			return ErrUnknown
 		}
@@ -604,20 +620,65 @@ func sanitizeEtag(ETag *azcore.ETag) string {
 	return ""
 }
 
-// func parseBlobTags(tags *container.BlobTags) map[string]string {
+// parseRangeHeader parses the x-ms-range header and returns the size of the range requested.
+// Examples of x-ms-range header:
+//
+//	bytes=0-499       --> returns 500
+//	bytes=500-999     --> returns 500
+//	bytes=500-        --> returns error (open ended range)
+//	bytes=-500        --> returns error
+//	bytes=1000-500    --> returns error (invalid range)
+func parseRangeHeader(rangeHeader string) (int64, error) {
+	if rangeHeader == "" {
+		return 0, fmt.Errorf("empty x-ms-range header")
+	}
 
-// 	if tags == nil {
-// 		return nil
-// 	}
+	if !strings.HasPrefix(rangeHeader, "bytes=") {
+		return 0, fmt.Errorf("invalid x-ms-range header format %s", rangeHeader)
+	}
 
-// 	blobtags := make(map[string]string)
-// 	for _, tag := range tags.BlobTagSet {
-// 		if tag != nil {
-// 			if tag.Key != nil {
-// 				blobtags[*tag.Key] = *tag.Value
-// 			}
-// 		}
-// 	}
+	parts := strings.Split(strings.TrimPrefix(rangeHeader, "bytes="), "-")
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid x-ms-range header format %s", rangeHeader)
+	}
 
-// 	return blobtags
-// }
+	start, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// Open ended range
+	if parts[1] == "" {
+		return 0, fmt.Errorf("invalid x-ms-range header format %s, open ended range not supported", rangeHeader)
+	}
+
+	end, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// Invalid range
+	if end < start {
+		return 0, fmt.Errorf("invalid range %s", rangeHeader)
+	}
+
+	return end - start + 1, nil
+}
+
+// parseBlobTags converts the SDK BlobTags into a flat map suitable for the
+// blobfilter package. Returns nil if no tag set is present.
+func parseBlobTags(tags *container.BlobTags) map[string]string {
+	if tags == nil || len(tags.BlobTagSet) == 0 {
+		return nil
+	}
+
+	blobtags := make(map[string]string, len(tags.BlobTagSet))
+	for _, tag := range tags.BlobTagSet {
+		if tag == nil || tag.Key == nil || tag.Value == nil {
+			continue
+		}
+		blobtags[*tag.Key] = *tag.Value
+	}
+
+	return blobtags
+}

@@ -75,7 +75,10 @@ type Libfuse struct {
 	umask                 uint32
 	displayCapacityMb     uint64
 	windowsSDDL           string
-	disableKernelCache    bool
+	disableKernelCache      bool
+	maxBackground           uint32 // libfuse max_background: max pending background requests
+	kernelListCacheTtlInSec uint32
+	kernelListCacheTracker  *kernelListCacheTracker
 }
 
 // To support pagination in readdir calls this structure holds a block of items for a given directory
@@ -111,6 +114,7 @@ type LibfuseOptions struct {
 	Umask                   uint32 `config:"umask"                         yaml:"umask,omitempty"`
 	DisplayCapacityMb       uint64 `config:"display-capacity-mb"           yaml:"display-capacity-mb,omitempty"`
 	WindowsSSDL             string `config:"windows-sddl"                  yaml:"windows-sddl,omitempty"`
+		KernelListCacheTtlInSec uint32 `config:"kernel-list-cache-expiration-sec" yaml:"kernel-list-cache-expiration-sec,omitempty"`
 }
 
 const compName = "libfuse"
@@ -120,6 +124,11 @@ const defaultNegativeEntryExpiration = 120
 const defaultMaxFuseThreads = 128
 const maxNameSize = 255
 const blockSize = 4096
+const defaultKernelListCacheTtlInSec = 120
+
+// defaultMaxBackground is the libfuse max_background parameter default (max pending requests, not threads)
+// It controls how many async I/O requests the FUSE kernel module keeps outstanding to FUSE userspace.
+const defaultMaxBackground = 128
 
 var fuseFS *Libfuse
 
@@ -172,10 +181,20 @@ func (lf *Libfuse) Start(ctx context.Context) error {
 	// This marks the global fuse object so shall be the first statement
 	fuseFS = lf
 
+	if lf.kernelListCacheTtlInSec > 0 {
+		lf.kernelListCacheTracker = newKernelListCacheTracker(lf.kernelListCacheTtlInSec)
+		lf.kernelListCacheTracker.start()
+	}
+
 	// This starts the libfuse process and hence shall always be the last statement
 	err := lf.initFuse()
 	if err != nil {
 		log.Err("Libfuse::Start : Failed to init fuse [%s]", err.Error())
+		// Clean up tracker goroutine on init failure to prevent leak
+		if lf.kernelListCacheTracker != nil {
+			lf.kernelListCacheTracker.stop()
+			lf.kernelListCacheTracker = nil
+		}
 		return err
 	}
 
@@ -185,6 +204,10 @@ func (lf *Libfuse) Start(ctx context.Context) error {
 // Stop : Stop the component functionality and kill all threads started
 func (lf *Libfuse) Stop() error {
 	log.Trace("Libfuse::Stop : Stopping component %s", lf.Name())
+	if lf.kernelListCacheTracker != nil {
+		lf.kernelListCacheTracker.stop()
+		lf.kernelListCacheTracker = nil
+	}
 	_ = lf.destroyFuse()
 	libfuseStatsCollector.Destroy()
 	return nil
@@ -207,6 +230,11 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.ownerUID = opt.Uid
 	lf.umask = opt.Umask
 	lf.windowsSDDL = opt.WindowsSSDL
+	if config.IsSet(compName + ".kernel-list-cache-expiration-sec") {
+		lf.kernelListCacheTtlInSec = opt.KernelListCacheTtlInSec
+	} else {
+		lf.kernelListCacheTtlInSec = defaultKernelListCacheTtlInSec
+	}
 
 	if lf.disableKernelCache {
 		opt.DirectIO = true
@@ -252,13 +280,15 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.negativeTimeout = 0
 		lf.attributeExpiration = 0
 		lf.entryExpiration = 0
+		lf.kernelListCacheTtlInSec = 0
+
 		log.Crit("Libfuse::Validate : DirectIO enabled, setting fuse timeouts to 0")
 	}
 
 	if config.IsSet(compName + ".max-fuse-threads") {
-		lf.maxFuseThreads = opt.MaxFuseThreads
+		lf.maxBackground = opt.MaxBackground
 	} else {
-		lf.maxFuseThreads = defaultMaxFuseThreads
+		lf.maxBackground = defaultMaxBackground
 	}
 
 	if config.IsSet(compName+".display-capacity-mb") && opt.DisplayCapacityMb > 0 {
@@ -371,29 +401,8 @@ func (lf *Libfuse) Configure(_ bool) error {
 		}
 	}
 
-	log.Crit(
-		"Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
-			"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v, displayCapacityMb %v",
-		lf.readOnly,
-		lf.allowOther,
-		lf.allowRoot,
-		lf.filePermission,
-		lf.entryExpiration,
-		lf.attributeExpiration,
-		lf.negativeTimeout,
-		lf.ignoreOpenFlags,
-		lf.nonEmptyMount,
-		lf.networkShare,
-		lf.directIO,
-		lf.maxFuseThreads,
-		lf.traceEnable,
-		lf.extensionPath,
-		lf.disableWritebackCache,
-		lf.dirPermission,
-		lf.mountPath,
-		lf.umask,
-		lf.displayCapacityMb,
-	)
+	log.Crit("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, ignore-open-flags %t, nonempty %t, direct_io %t, max_background %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v, disableKernelCache %v, kernelListCacheExpirationSec %v",
+		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout, lf.ignoreOpenFlags, lf.nonEmptyMount, lf.directIO, lf.maxBackground, lf.traceEnable, lf.extensionPath, lf.disableWritebackCache, lf.dirPermission, lf.mountPath, lf.umask, lf.disableKernelCache, lf.kernelListCacheTtlInSec)
 
 	return nil
 }

@@ -149,6 +149,10 @@ var DefaultWorkDir string
 var DefaultLogFilePath string
 var StatsConfigFilePath string
 
+// SyslogFilePath is where rsyslog routes blobfuse2-tagged messages (see setup/11-blobfuse2.conf).
+// Used as a fallback target for runtime crash dumps when the syslog logger is in use.
+var SyslogFilePath = "/var/log/blobfuse2.log"
+
 var EnableMonitoring = false
 var CfsDisabled = false
 
