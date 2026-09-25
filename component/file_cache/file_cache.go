@@ -1794,7 +1794,9 @@ func (fc *FileCache) isDownloadRequired(
 
 // ReleaseFile: Flush the file and invalidate it from the cache.
 func (fc *FileCache) ReleaseFile(options internal.ReleaseFileOptions) error {
-	log.Trace("FileCache::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+	// Lock the file so that while close is in progress no one can open the file again
+	flock := fc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
 
 	// Async close is called so schedule the upload and return here
 	fc.fileCloseOpt.Add(1)
@@ -2004,14 +2006,6 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 // }
 
 // FlushFile: Flush the local file to storage
-// FlushFile can be called concurrently by multiple libfuse_flush calls for different file descriptors
-// (e.g. due to dup(), dup2() or fork()) for the same file. Without serialization, each fd would independently
-// call CopyFromFile (which does PutBlock + PutBlockList), leading to InvalidBlockList errors when
-// concurrent PutBlockList calls race against each other.
-// To prevent this, we acquire a per-file lock before uploading the file.
-//
-// Fast-path: If the handle is not dirty, or if lazyWrite defers the upload, we return immediately
-// without acquiring the lock to avoid unnecessary contention on the hot flush path.
 func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 	// update the cache policy

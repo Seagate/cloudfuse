@@ -1514,10 +1514,6 @@ func testRenameDirEnametoolong(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	src := "src"
 	dst := "dst"
-	srcPath := C.CString("/" + src)
-	dstPath := C.CString("/" + dst)
-	defer C.free(unsafe.Pointer(srcPath))
-	defer C.free(unsafe.Pointer(dstPath))
 
 	srcAttr := &internal.ObjAttr{Name: src}
 	srcAttr.Flags.Set(internal.PropFlagIsDir)
@@ -1526,8 +1522,8 @@ func testRenameDirEnametoolong(suite *libfuseTestSuite) {
 	options := internal.RenameDirOptions{Src: src, Dst: dst}
 	suite.mock.EXPECT().RenameDir(options).Return(syscall.ENAMETOOLONG)
 
-	err := libfuse2_rename(srcPath, dstPath)
-	suite.assert.Equal(C.int(-C.ENAMETOOLONG), err)
+	err := cfuseFS.Rename("/"+src, "/"+dst)
+	suite.assert.Equal(-fuse.ENAMETOOLONG, err)
 }
 
 func testSymlink(suite *libfuseTestSuite) {

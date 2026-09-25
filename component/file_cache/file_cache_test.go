@@ -54,7 +54,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"go.uber.org/mock/gomock"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

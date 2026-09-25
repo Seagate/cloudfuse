@@ -166,9 +166,6 @@ func (lf *Libfuse) initFuse() error {
 	// prevent Windows from calling GetAttr redundantly
 	lf.host.SetCapReaddirPlus(true)
 
-	if lf.extensionPath != "" {
-		log.Trace("Libfuse::InitFuse : Going for extension mounting [%s]", lf.extensionPath)
-
 	options := fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
 		lf.ownerUID,
 		lf.ownerGID,
@@ -1205,6 +1202,11 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 		log.Err("Libfuse::Readlink : error reading link file %s [%s]", name, err.Error())
 		return fuseErrnoFromError(err), targetPath
 	}
+
+	// Don't think we need when with using cgofuse
+	// data := (*[1 << 30]byte)(unsafe.Pointer(buf))
+	// copy(data, targetPath)
+	// data[len(targetPath)] = 0
 
 	libfuseStatsCollector.PushEvents(readLink, name, map[string]any{trgt: targetPath})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, readLink, (int64)(1))
