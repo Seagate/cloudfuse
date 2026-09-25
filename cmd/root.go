@@ -27,7 +27,7 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -63,6 +63,7 @@ type Blob struct {
 }
 
 var disableVersionCheck bool
+var releaseAPIBaseURL = common.CloudfuseReleaseURL
 
 // Command group IDs for organizing help output (Cobra v1.6.0+)
 const (
@@ -91,9 +92,9 @@ var rootCmd = &cobra.Command{
 }
 
 func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
-	url := common.CloudfuseReleaseURL + "/latest"
+	url := releaseAPIBaseURL + "/latest"
 	if version != "" {
-		url = fmt.Sprintf(common.CloudfuseReleaseURL+"/tags/v%s", version)
+		url = fmt.Sprintf(releaseAPIBaseURL+"/tags/v%s", version)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -124,7 +125,7 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	}
 
 	var rel GithubApiReleaseData
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &rel); err != nil {
 		return nil, err
 	}
 

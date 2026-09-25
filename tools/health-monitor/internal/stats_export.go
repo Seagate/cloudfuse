@@ -26,7 +26,8 @@
 package internal
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -73,16 +74,22 @@ func NewStatsExporter() (*StatsExporter, error) {
 		expLock.Lock()
 		defer expLock.Unlock()
 		if se == nil {
-			se = &StatsExporter{}
-			se.channel = make(chan ExportedStat, 10000)
-			se.wg.Add(1)
-			go se.StatsExporter()
+			tmp := &StatsExporter{}
+			tmp.channel = make(chan ExportedStat, 10000)
+			tmp.wg.Add(1)
+			go tmp.StatsExporter()
 
-			err := se.getNewFile()
+			err := tmp.getNewFile()
 			if err != nil {
+				// Close the channel to let the goroutine exit and avoid leaking resources.
+				close(tmp.channel)
+				tmp.wg.Wait()
 				log.Err("stats_exporter::NewStatsExporter : [%v]", err)
 				return nil, err
 			}
+
+			// Only publish to the global singleton after successful initialization.
+			se = tmp
 		}
 	}
 
@@ -95,7 +102,7 @@ func (se *StatsExporter) Destroy() {
 
 	// write remaining data to the output file
 	for i, op := range se.outputList {
-		jsonData, err := json.MarshalIndent(op, "", "\t")
+		jsonData, err := json.Marshal(op, jsontext.WithIndent("\t"), jsontext.WithIndentPrefix(""))
 		if err != nil {
 			log.Err("stats_exporter::Destroy : unable to marshal [%v]", err)
 		}
@@ -198,7 +205,7 @@ func (se *StatsExporter) checkInList(t string) int {
 
 func (se *StatsExporter) addToOutputFile(op *Output) error {
 	log.Debug("stats_exporter::addToOutputFile : Writing to output file")
-	jsonData, err := json.MarshalIndent(op, "", "\t")
+	jsonData, err := json.Marshal(op, jsontext.WithIndent("\t"), jsontext.WithIndentPrefix(""))
 	if err != nil {
 		log.Err("stats_exporter::addToOutputFile : unable to marshal [%v]", err)
 		return err
@@ -262,6 +269,16 @@ func (se *StatsExporter) getNewFile() error {
 	var fname string
 	var fnameNew string
 	var err error
+
+	// Ensure the output directory exists
+	if err := os.MkdirAll(hmcommon.OutputPath, 0o700); err != nil {
+		log.Err(
+			"stats_exporter::getNewFile : Unable to create output directory [%s] [%v]",
+			hmcommon.OutputPath,
+			err,
+		)
+		return err
+	}
 
 	baseName := filepath.Join(hmcommon.OutputPath, hmcommon.OutputFileName)
 

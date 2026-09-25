@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -232,8 +233,8 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 	// test synchronous file and folder deletion
 	// purge all aPaths, in reverse order
 	aPaths, abPaths, acPaths := suite.generateNestedDirectory("temp")
-	for i := len(aPaths) - 1; i >= 0; i-- {
-		suite.policy.CachePurge(aPaths[i])
+	for _, aPath := range slices.Backward(aPaths) {
+		suite.policy.CachePurge(aPath)
 	}
 
 	// validate all aPaths were deleted

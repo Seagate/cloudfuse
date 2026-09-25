@@ -199,6 +199,7 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 
 // saveToFile: Save the newly generated config file and delete the source if requested
 func saveToFile(configFileName string, data []byte, deleteSource bool) error {
+	//nolint:gosec // G703: configFileName from CLI flags marked as filename, path is user-controlled output file
 	err := os.WriteFile(configFileName, data, 0644)
 	if err != nil {
 		return err

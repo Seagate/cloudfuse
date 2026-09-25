@@ -27,7 +27,7 @@
 package s3storage
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"os"

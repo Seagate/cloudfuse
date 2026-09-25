@@ -17,10 +17,10 @@ Always reference these instructions first and fallback to search or bash command
   sudo apt install -y libfuse3-dev fuse3 gcc
   ```
 
-- Install Go 1.26.1+ (already available in most environments):
+- Install Go 1.27.0+ (already available in most environments; version is pinned in [go.mod](../go.mod)):
 
   ```bash
-  go version  # Should show 1.26.1 or higher
+  go version  # Should show 1.27.0 or higher
   ```
 
 - Build cloudfuse binary:
@@ -123,8 +123,9 @@ Always reference these instructions first and fallback to search or bash command
   - `./build.sh fuse2` - legacy fuse2 build
   - `./build.sh health` - health monitor binary
 - **Output**: `cloudfuse` binary (~30MB) and optionally `cfusemon` binary (~6MB)
-- **Go Version**: Requires Go (specified in go.mod)
-- **Tags**: Use `fuse3` tag for testing/building (default), `fuse2` for legacy systems
+- **Go Version**: Requires Go 1.27.0+ (specified in [go.mod](../go.mod))
+- **Linux CGO compiler**: `zig` (see [build.sh](../build.sh)); Windows uses `CGO_ENABLED=0`
+- **Build Tags**: `fuse3` (default) or `fuse2` (legacy). Test tags also include `unittest`, and CI uses `azurite` and `authtest`. Source files use modern `//go:build` constraints (e.g. `//go:build linux`, `//go:build windows`, `//go:build !fuse3`) with platform suffixes like `_linux.go` / `_windows.go` — edit the file matching the target OS/tag.
 
 ## Testing Infrastructure
 
@@ -142,6 +143,17 @@ Always reference these instructions first and fallback to search or bash command
 - **internal/**: Internal APIs and pipeline management
 - **test/**: All testing code and scripts
 - **tools/health-monitor/**: cloudfuse monitoring tool
+
+### Component Pipeline Conventions
+
+Components are stacked into a pipeline ordered by priority (see [internal/pipeline.go](../internal/pipeline.go) and [internal/component.go](../internal/component.go)):
+
+- Register in `init()` via `internal.AddComponent(name, constructor)`.
+- Embed `internal.BaseComponent`; set priority with `Producer()` (1000) → `LevelMid()` (500) → `LevelOne()` (400) → `LevelTwo()` (300) → `Consumer()` (100).
+- Load config with `config.UnmarshalKey(compName, &opts)`.
+- Scaffold a new component with `go generate` (see [internal/component.template](../internal/component.template) and the `//go:generate` directive in [main.go](../main.go)).
+- Log via the `common/log` package (`log.Debug/Info/Err/Crit/Trace`), never `fmt.Println`.
+- **Every new source file must include the MIT license header** (copy from an existing file such as [internal/component.go](../internal/component.go); see [copyright](../copyright)).
 
 ## Configuration
 

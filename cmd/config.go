@@ -505,9 +505,11 @@ func (tui *appContext) buildCredentialsPage() tview.Primitive {
 	secretLabel := ""
 	if tui.config.storageProtocol == "azstorage" {
 		accessLabel = "🔑 Account Name: "
+		//nolint:gosec // G101: UI label text; no credential value is embedded.
 		secretLabel = "🔑 Account Key: "
 	} else {
 		accessLabel = "🔑 Access Key: "
+		//nolint:gosec // G101: UI label text; no credential value is embedded.
 		secretLabel = "🔑 Secret Key: "
 	}
 
@@ -1287,9 +1289,8 @@ func getTextWidth(s string) int {
 	if s == "" {
 		return 0
 	}
-	lines := strings.Split(s, "\n")
 	longest := 0
-	for _, line := range lines {
+	for line := range strings.SplitSeq(s, "\n") {
 		if len(line) > longest {
 			longest = len(line)
 		}
@@ -1303,7 +1304,7 @@ func getTextHeight(s string) int {
 	if s == "" {
 		return 0
 	}
-	return len(strings.Split(s, "\n"))
+	return strings.Count(s, "\n") + 1
 }
 
 // Helper function to get a fallback cache path if the home directory cannot be determined.

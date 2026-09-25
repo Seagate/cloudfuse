@@ -28,19 +28,19 @@ jobs:
           ["linux-fuse3", "linux-fuse2", "linux-fuse3-arm", "linux-fuse2-arm"]
         include:
           - job_name: linux-fuse3
-            os: ubuntu-latest
+            os: ubuntu-22.04
             arch: AMD64
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
-            os: ubuntu-latest
+            os: ubuntu-22.04
             arch: AMD64
             fuselib: libfuse-dev
           - job_name: linux-fuse3-arm
-            os: ubuntu-24.04-arm
+            os: ubuntu-22.04-arm
             arch: ARM64
             fuselib: libfuse3-dev
           - job_name: linux-fuse2-arm
-            os: ubuntu-24.04-arm
+            os: ubuntu-22.04-arm
             arch: ARM64
             fuselib: libfuse-dev
 
@@ -61,6 +61,8 @@ jobs:
 
       azurite:
         image: mcr.microsoft.com/azure-storage/azurite:latest
+        env:
+          AZURITE_SKIP_API_VERSION_CHECK: "true"
         ports:
           - 10000:10000
           - 10001:10001
@@ -68,8 +70,8 @@ jobs:
 
     env:
       cgo: "1"
-      go: "1.26"
-      zig: 0.15.2
+      go: "1.27"
+      zig: 0.16.0
 
       AWS_ENDPOINT: http://localhost:4566
       AWS_REGION: us-east-1
@@ -83,12 +85,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -208,17 +210,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
-      go: "1.26"
+      go: "1.27"
       cgo: "0"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -242,15 +244,15 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: "1.26"
+      go: "1.27"
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
           check-latest: true

@@ -6,6 +6,7 @@ linters:
   enable:
     - errcheck # Errcheck is a program for checking for unchecked errors in go programs.
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid.
+    - gosec # Inspects source code for security problems.
     - govet # Vet examines Go source code and reports suspicious constructs
     - ineffassign # Detects when assignments to existing variables are not used
     - misspell # Finds commonly misspelled English words in comments.
@@ -22,6 +23,12 @@ linters:
         - suite-thelper
     staticcheck:
       checks: ["all", "-ST1003", "-ST1005"]
+    gosec:
+      excludes:
+        - G306 # Don't flag write file permissions
+        - G401 # Allow use of md5 for non-cryptographic purposes
+        - G501 # Allow use of md5 for non-cryptographic purposes
+        - G115 # Integer conversion checks are noisy
 
   exclusions:
     generated: lax
@@ -34,6 +41,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - gosec
 
 issues:
   max-issues-per-linter: 0

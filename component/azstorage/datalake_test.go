@@ -33,7 +33,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"io/fs"
@@ -130,7 +130,11 @@ func (s *datalakeTestSuite) setupTestHelper(configuration string, container stri
 	s.serviceClient = s.az.storage.(*Datalake).Service // Grab the service client to do some validation
 	s.containerClient = s.serviceClient.NewFileSystemClient(s.container)
 	if create {
-		_, _ = s.containerClient.Create(ctx, nil)
+		err := createTestContainerWithRetry(func() error {
+			_, err := s.containerClient.Create(ctx, nil)
+			return err
+		})
+		s.assert.NoError(err, "failed to create test filesystem %q", s.container)
 	}
 }
 

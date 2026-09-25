@@ -1747,6 +1747,12 @@ func testChmod(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
+	if runtime.GOOS == "windows" {
+		// Chmod is a no-op on Windows; it always succeeds without forwarding.
+		err := cfuseFS.Chmod(path, 0775)
+		suite.assert.Equal(0, err)
+		return
+	}
 	mode := fs.FileMode(0775)
 	options := internal.ChmodOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().Chmod(options).Return(nil)
@@ -1759,6 +1765,12 @@ func testChmodNotExists(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
+	if runtime.GOOS == "windows" {
+		// Chmod is a no-op on Windows; it always succeeds without forwarding.
+		err := cfuseFS.Chmod(path, 0775)
+		suite.assert.Equal(0, err)
+		return
+	}
 	mode := fs.FileMode(0775)
 	options := internal.ChmodOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().Chmod(options).Return(syscall.ENOENT)
@@ -1771,6 +1783,12 @@ func testChmodError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
+	if runtime.GOOS == "windows" {
+		// Chmod is a no-op on Windows; it always succeeds without forwarding.
+		err := cfuseFS.Chmod(path, 0775)
+		suite.assert.Equal(0, err)
+		return
+	}
 	mode := fs.FileMode(0775)
 	options := internal.ChmodOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().Chmod(options).Return(errors.New("failed to chmod"))
