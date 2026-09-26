@@ -1,0 +1,36 @@
+config-version: 1.0.0
+
+logging:
+  level: log_warning
+  type: base
+  file-path: /tmp/cloudfuse-tiered.log
+
+components:
+  - libfuse
+  - tiered_storage
+  - attr_cache
+  - s3storage
+
+libfuse:
+  attribute-expiration-sec: 0
+  entry-expiration-sec: 0
+  negative-entry-expiration-sec: 0
+  ignore-open-flags: true
+
+tiered_storage:
+  path: { 1 }
+  max-size-mb: 1
+  high-threshold: 80
+  low-threshold: 60
+
+attr_cache:
+  timeout-sec: 1
+
+s3storage:
+  bucket-name: { S3_BUCKET_NAME }
+  endpoint: { S3_ENDPOINT }
+  key-id: { S3_KEY_ID }
+  region: { S3_REGION }
+  secret-key: { S3_SECRET_KEY }
+  use-path-style: true
+  enable-dir-marker: true
