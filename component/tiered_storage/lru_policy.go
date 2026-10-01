@@ -453,6 +453,7 @@ func (q *lruQueue) evictOne(job uploadJob) {
 	}
 
 	if err := q.uploadandCleanFn(job.name); err != nil {
+		// TODO: more granular exception handling
 		log.Err("lruQueue::evictOne : %s upload failed [%v]", job.name, err)
 		q.requeue(job.name, true)
 		return

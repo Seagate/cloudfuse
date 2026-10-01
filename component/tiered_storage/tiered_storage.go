@@ -924,7 +924,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		c.policy.Enqueue(options.Handle.Path)
 		return err
 	}
-c.policy.Dequeue(options.Handle.Path)
+	c.policy.Dequeue(options.Handle.Path)
 	c.fileMap.Delete(options.Handle.Path)
 	return closeErr
 }
@@ -1059,6 +1059,7 @@ func (c *TieredStorage) renameOpenHandles(
 	if sflock.Count() > 0 {
 		handlemap.GetHandles().Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
+			// TODO: do we have to lock before checking the name?
 			handle.Lock()
 			if handle.Path == srcName {
 				handle.Path = dstName
@@ -1189,7 +1190,7 @@ func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
 		node := value.(*FileNode)
 		node.mode.Store(uint32(options.Mode))
 		if !node.cloudBacked.Load() {
-		node.modeDirty.Store(true)
+			node.modeDirty.Store(true)
 		}
 	}
 	return nil
@@ -1231,7 +1232,7 @@ func (c *TieredStorage) Chown(options internal.ChownOptions) error {
 		node.owner.Store(int64(options.Owner))
 		node.group.Store(int64(options.Group))
 		if !node.cloudBacked.Load() {
-		node.ownerDirty.Store(true)
+			node.ownerDirty.Store(true)
 		}
 	}
 	return nil
