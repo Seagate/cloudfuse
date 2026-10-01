@@ -98,6 +98,8 @@ const (
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
 	partialDownloadSuffix     = ".cloudfuse-partial"
+	// Cache holds user data and is only accessed by this process (CWE-732).
+	cacheDirPerm os.FileMode = 0700
 )
 
 var _ internal.Component = &TieredStorage{}
@@ -163,7 +165,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if c.tmpPath == "" || c.tmpPath == "." {
 		return fmt.Errorf("TieredStorage: path not set in config")
 	}
-	err = os.MkdirAll(c.tmpPath, 0755)
+	err = os.MkdirAll(c.tmpPath, cacheDirPerm)
 
 	if err != nil {
 		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
@@ -433,7 +435,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	if !localExists {
 		return c.NextComponent().RenameDir(options)
 	}
-	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dstPath), cacheDirPerm); err != nil {
 		return err
 	}
 	if err := os.Rename(srcPath, dstPath); err != nil {
@@ -490,7 +492,7 @@ func (c *TieredStorage) createFileUnlocked(
 	if err != nil {
 		return nil, err
 	}
-	err = os.MkdirAll(filepath.Dir(localPath), 0755)
+	err = os.MkdirAll(filepath.Dir(localPath), cacheDirPerm)
 
 	if err != nil {
 		return nil, err
@@ -620,7 +622,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			localCopyNode.cloudBacked.Store(true)
 
 			if options.Flags&os.O_TRUNC != 0 {
-				if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
 					return nil, err
 				}
 				file, err := common.OpenFile(
@@ -690,7 +692,7 @@ func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) 
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(filepath.Dir(localPath), 0755)
+	err = os.MkdirAll(filepath.Dir(localPath), cacheDirPerm)
 	if err != nil {
 		return err
 	}
