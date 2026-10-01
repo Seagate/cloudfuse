@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -667,6 +668,9 @@ func (suite *tieredStorageTestSuite) TestSymlink() {
 
 func (suite *tieredStorageTestSuite) TestChmodLocalFilePersistsOnUpload() {
 	defer suite.cleanupTest()
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Windows only supports the read-only mode bit")
+	}
 
 	const path = "local-chmod"
 	handle, err := suite.tieredStorage.CreateFile(
@@ -691,6 +695,9 @@ func (suite *tieredStorageTestSuite) TestChmodLocalFilePersistsOnUpload() {
 
 func (suite *tieredStorageTestSuite) TestChmodCloudBackedFileUpdatesBothTiers() {
 	defer suite.cleanupTest()
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Windows only supports the read-only mode bit")
+	}
 
 	const path = "cloud-chmod"
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
@@ -717,6 +724,9 @@ func (suite *tieredStorageTestSuite) TestChmodCloudBackedFileUpdatesBothTiers() 
 
 func (suite *tieredStorageTestSuite) TestChmodCloudOnlyFile() {
 	defer suite.cleanupTest()
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Windows only supports the read-only mode bit")
+	}
 
 	const path = "cloud-only-chmod"
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
@@ -884,9 +894,18 @@ func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
 	)
 	suite.Require().NoError(err)
 	handlemap.Add(handle)
-	suite.Require().NoError(suite.tieredStorage.RenameDir(
-		internal.RenameDirOptions{Src: "src", Dst: "dst"},
-	))
+	err = suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
+	if runtime.GOOS == "windows" {
+		// Windows refuses to rename a directory containing open files.
+		suite.Require().Error(err)
+		suite.assert.Equal("src/open", handle.Path)
+		suite.assert.FileExists(filepath.Join(suite.cache_path, "src", "open"))
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+		return
+	}
+	suite.Require().NoError(err)
 	suite.assert.Equal("dst/open", handle.Path)
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
@@ -958,6 +977,9 @@ func (suite *tieredStorageTestSuite) TestRenameFileMissingCloudObjectSucceeds() 
 
 func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureKeepsLocalRename() {
 	defer suite.cleanupTest()
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Windows refuses to rename a directory containing open files")
+	}
 
 	suite.Require().NoError(suite.loopback.CreateDir(
 		internal.CreateDirOptions{Name: "src", Mode: 0755},
