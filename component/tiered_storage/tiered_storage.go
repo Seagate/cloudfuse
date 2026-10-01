@@ -430,12 +430,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		}
 	}()
 
-	cloudErr := c.NextComponent().RenameDir(options)
-	if cloudErr != nil && (!localExists || !errors.Is(cloudErr, os.ErrNotExist)) {
-		return cloudErr
-	}
 	if !localExists {
-		return nil
+		return c.NextComponent().RenameDir(options)
 	}
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 		return err
@@ -444,6 +440,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 
+	moved := make([]*FileNode, 0, len(entries))
 	for _, entry := range entries {
 		value, found := c.fileMap.LoadAndDelete(entry.src)
 		if !found {
@@ -452,6 +449,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		node := value.(*FileNode)
 		node.name = entry.dst
 		c.fileMap.Store(entry.dst, node)
+		moved = append(moved, node)
 
 		c.policy.Rename(entry.src, entry.dst)
 		c.renameOpenHandles(
@@ -461,7 +459,27 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 			c.fileLocks.Get(entry.dst),
 		)
 	}
-	return nil
+
+	cloudErr := c.NextComponent().RenameDir(options)
+	if cloudErr == nil {
+		return nil
+	}
+	// The cloud copies may still be under src, so re-upload under dst.
+	for _, node := range moved {
+		if node.cloudBacked.Load() {
+			node.isDirty.Store(true)
+		}
+	}
+	if errors.Is(cloudErr, os.ErrNotExist) {
+		return nil
+	}
+	log.Err(
+		"TieredStorage::RenameDir : %s -> %s renamed locally but not in cloud [%v]",
+		options.Src,
+		options.Dst,
+		cloudErr,
+	)
+	return cloudErr
 }
 
 // File operations
@@ -546,7 +564,9 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 
 	node := val.(*FileNode)
 	if node.cloudBacked.Load() {
-		if err := c.NextComponent().DeleteFile(options); err != nil {
+		// A failed rename can leave no cloud object under this name.
+		err := c.NextComponent().DeleteFile(options)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
@@ -1015,40 +1035,47 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	defer dflock.Unlock()
 
 	val, exists := c.fileMap.Load(options.Src)
-	if exists {
-		node := val.(*FileNode)
-		// TODO: local should come first
-		if node.cloudBacked.Load() {
-			err := c.NextComponent().RenameFile(options)
-			if err != nil {
-				return err
-			}
-		}
-		srcPath, err := c.localPath(options.Src)
-		if err != nil {
-			return err
-		}
-		dstPath, err := c.localPath(options.Dst)
-		if err != nil {
-			return err
-		}
-		err = os.Rename(srcPath, dstPath)
-		if err != nil {
-			return err
-		}
-		c.fileMap.Delete(options.Src)
-		node.name = options.Dst
-		c.fileMap.Store(options.Dst, node)
-
-		c.policy.Rename(options.Src, options.Dst)
-		c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
-	} else {
-		err := c.NextComponent().RenameFile(options)
-		if err != nil {
-			return err
-		}
+	if !exists {
+		return c.NextComponent().RenameFile(options)
 	}
-	return nil
+
+	node := val.(*FileNode)
+	srcPath, err := c.localPath(options.Src)
+	if err != nil {
+		return err
+	}
+	dstPath, err := c.localPath(options.Dst)
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(srcPath, dstPath); err != nil {
+		return err
+	}
+	c.fileMap.Delete(options.Src)
+	node.name = options.Dst
+	c.fileMap.Store(options.Dst, node)
+	c.policy.Rename(options.Src, options.Dst)
+	c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
+
+	if !node.cloudBacked.Load() {
+		return nil
+	}
+	err = c.NextComponent().RenameFile(options)
+	if err == nil {
+		return nil
+	}
+	// The cloud copy may still be under src, so re-upload under dst.
+	node.isDirty.Store(true)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	log.Err(
+		"TieredStorage::RenameFile : %s -> %s renamed locally but not in cloud [%v]",
+		options.Src,
+		options.Dst,
+		err,
+	)
+	return err
 }
 
 // Both file locks must be held.

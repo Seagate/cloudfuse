@@ -895,6 +895,109 @@ func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
 	suite.assert.True(queued)
 }
 
+func (suite *tieredStorageTestSuite) writeCloudFile(name, data string) {
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: name, Mode: 0644})
+	suite.Require().NoError(err)
+	_, err = suite.loopback.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte(data)},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureKeepsLocalRename() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("src", "data")
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	handlemap.Add(handle)
+	// An existing cloud directory makes the cloud rename fail.
+	blocker := filepath.Join(suite.fake_storage_path, "dst")
+	suite.Require().NoError(os.Mkdir(blocker, 0755))
+
+	err = suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"})
+	suite.Require().Error(err)
+	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst"))
+	suite.assert.Equal("dst", handle.Path)
+	value, found := suite.tieredStorage.fileMap.Load("dst")
+	suite.Require().True(found)
+	suite.assert.True(value.(*FileNode).isDirty.Load())
+
+	suite.Require().NoError(os.Remove(blocker))
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+	data, err := os.ReadFile(filepath.Join(suite.fake_storage_path, "dst"))
+	suite.Require().NoError(err)
+	suite.assert.Equal("data", string(data))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "dst"))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameFileMissingCloudObjectSucceeds() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("src", "data")
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	handlemap.Add(handle)
+	suite.Require().NoError(os.Remove(filepath.Join(suite.fake_storage_path, "src")))
+
+	suite.Require().NoError(
+		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
+	)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dst"))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureKeepsLocalRename() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.loopback.CreateDir(
+		internal.CreateDirOptions{Name: "src", Mode: 0755},
+	))
+	suite.writeCloudFile("src/cloud", "data")
+	cloudHandle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src/cloud", Flags: os.O_RDONLY, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	handlemap.Add(cloudHandle)
+	localHandle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src/local", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: localHandle}),
+	)
+	// An existing cloud directory makes the cloud rename fail.
+	suite.Require().NoError(os.Mkdir(filepath.Join(suite.fake_storage_path, "dst"), 0755))
+
+	err = suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
+	suite.Require().Error(err)
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, "src"))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst", "local"))
+	suite.assert.Equal("dst/cloud", cloudHandle.Path)
+	cloudNode, found := suite.tieredStorage.fileMap.Load("dst/cloud")
+	suite.Require().True(found)
+	suite.assert.True(cloudNode.(*FileNode).isDirty.Load())
+	localNode, found := suite.tieredStorage.fileMap.Load("dst/local")
+	suite.Require().True(found)
+	suite.assert.False(localNode.(*FileNode).cloudBacked.Load())
+
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: cloudHandle}),
+	)
+	data, err := os.ReadFile(filepath.Join(suite.fake_storage_path, "dst", "cloud"))
+	suite.Require().NoError(err)
+	suite.assert.Equal("data", string(data))
+}
+
 //Testing OpenFile
 
 func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
