@@ -804,6 +804,17 @@ func (suite *mountTestSuite) TestCleanUpOnStartFlag() {
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+1)%3]))
 		suite.assert.False(common.IsDirectoryEmpty(cachedirs[(i+2)%3]))
 	}
+
+	tieredPath := filepath.Join(testDir, "tiered")
+	err = os.MkdirAll(tieredPath, 0755)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(tieredPath, "authoritative"), []byte("data"), 0644)
+	suite.assert.NoError(err)
+	config.Set("tiered_storage.path", tieredPath)
+	config.Set("cleanup-on-start", "true")
+	options.Components = []string{"tiered_storage"}
+	suite.assert.NoError(options.tempCacheCleanup())
+	suite.assert.False(common.IsDirectoryEmpty(tieredPath))
 }
 
 // TestValidateMountOptionsInvalidLogLevel tests validation with invalid log level

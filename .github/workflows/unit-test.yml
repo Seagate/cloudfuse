@@ -201,6 +201,81 @@ jobs:
             go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
           fi
 
+      - name: Tiered storage mount smoke test
+        if: matrix.job_name == 'linux-fuse3'
+        env:
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          MOUNT_DIR=/tmp/cloudfuse-tiered-mount
+          TIER_DIR=/tmp/cloudfuse-tiered-data
+          CONFIG=/tmp/cloudfuse-tiered.yaml
+          SOURCE=/tmp/cloudfuse-tiered-source
+          PERSISTENT=/tmp/cloudfuse-tiered-persistent
+          MOUNT_PID=
+
+          cleanup() {
+            if mountpoint -q "$MOUNT_DIR"; then
+              fusermount3 -u "$MOUNT_DIR" -z || true
+            fi
+            if [[ -n "$MOUNT_PID" ]]; then
+              kill "$MOUNT_PID" 2>/dev/null || true
+            fi
+            rm -rf "$MOUNT_DIR" "$TIER_DIR" "$CONFIG" "$SOURCE" "$PERSISTENT"
+          }
+          trap cleanup EXIT
+
+          mkdir -p "$MOUNT_DIR" "$TIER_DIR"
+          ./cloudfuse gen-test-config \
+            --config-file=s3_key_tiered_storage.yaml \
+            --temp-path="$TIER_DIR" \
+            --output-file="$CONFIG"
+
+          mount_tiered() {
+            ./cloudfuse mount "$MOUNT_DIR" --config-file="$CONFIG" --foreground=true &
+            MOUNT_PID=$!
+            for _ in {1..30}; do
+              mountpoint -q "$MOUNT_DIR" && return
+              sleep 1
+            done
+            return 1
+          }
+
+          unmount_tiered() {
+            fusermount3 -u "$MOUNT_DIR"
+            wait "$MOUNT_PID"
+            MOUNT_PID=
+          }
+
+          mount_tiered
+          head -c 900000 /dev/urandom > "$SOURCE"
+          cp "$SOURCE" "$MOUNT_DIR/evicted.bin"
+          for _ in {1..30}; do
+            aws --endpoint-url "$AWS_ENDPOINT" s3api head-object \
+              --bucket "$AWS_BUCKET_NAME" --key evicted.bin >/dev/null 2>&1 && break
+            sleep 1
+          done
+          aws --endpoint-url "$AWS_ENDPOINT" s3api head-object \
+            --bucket "$AWS_BUCKET_NAME" --key evicted.bin >/dev/null
+          test ! -e "$TIER_DIR/evicted.bin"
+          cmp "$SOURCE" "$MOUNT_DIR/evicted.bin"
+          test ! -e "$TIER_DIR/evicted.bin"
+
+          head -c 100000 /dev/urandom > "$PERSISTENT"
+          cp "$PERSISTENT" "$MOUNT_DIR/persistent.bin"
+          test -e "$TIER_DIR/persistent.bin"
+          unmount_tiered
+
+          mount_tiered
+          test -e "$TIER_DIR/persistent.bin"
+          cmp "$PERSISTENT" "$MOUNT_DIR/persistent.bin"
+          rm "$MOUNT_DIR/persistent.bin"
+          unmount_tiered
+
   test:
     name: Build and Test on Windows
     environment: testing

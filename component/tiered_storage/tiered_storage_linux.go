@@ -1,8 +1,9 @@
+//go:build linux
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2026 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2026 Microsoft Corporation. All rights reserved.
+   Copyright © 2026 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,20 +24,42 @@
    SOFTWARE
 */
 
-package cmd
+package tiered_storage
 
 import (
-	_ "github.com/Seagate/cloudfuse/component/attr_cache"
-	_ "github.com/Seagate/cloudfuse/component/azstorage"
-	_ "github.com/Seagate/cloudfuse/component/block_cache"
-	_ "github.com/Seagate/cloudfuse/component/custom"
-	_ "github.com/Seagate/cloudfuse/component/entry_cache"
-	_ "github.com/Seagate/cloudfuse/component/file_cache"
-	_ "github.com/Seagate/cloudfuse/component/libfuse"
-	_ "github.com/Seagate/cloudfuse/component/loopback"
-	_ "github.com/Seagate/cloudfuse/component/s3storage"
-	_ "github.com/Seagate/cloudfuse/component/size_tracker"
-	_ "github.com/Seagate/cloudfuse/component/stream"
-	_ "github.com/Seagate/cloudfuse/component/tiered_storage"
-	_ "github.com/Seagate/cloudfuse/component/xload"
+	"io/fs"
+	"os"
+	"syscall"
+	"time"
+
+	"github.com/Seagate/cloudfuse/internal"
+	"golang.org/x/sys/unix"
 )
+
+func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
+	stat := info.Sys().(*syscall.Stat_t)
+	attrs := &internal.ObjAttr{
+		Path:  path,
+		Name:  info.Name(),
+		Size:  info.Size(),
+		Mode:  info.Mode(),
+		Mtime: time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec),
+		Atime: time.Unix(stat.Atim.Sec, stat.Atim.Nsec),
+		Ctime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec),
+	}
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		attrs.Flags.Set(internal.PropFlagSymlink)
+	} else if info.IsDir() {
+		attrs.Flags.Set(internal.PropFlagIsDir)
+	}
+	return attrs
+}
+
+func (c *TieredStorage) getAvailableSize() (uint64, error) {
+	stat := &unix.Statfs_t{}
+	if err := unix.Statfs(c.tmpPath, stat); err != nil {
+		return 0, err
+	}
+	return stat.Bavail * uint64(stat.Bsize), nil
+}
