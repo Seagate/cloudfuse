@@ -390,8 +390,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 	_, localErr := os.Stat(srcPath)
-	localExists := localErr == nil
-	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+	localExists := !errors.Is(localErr, os.ErrNotExist)
+	if localErr != nil && localExists {
 		return localErr
 	}
 
@@ -453,11 +453,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		node.name = entry.dst
 		c.fileMap.Store(entry.dst, node)
 
-		_, queued := c.policy.nodeMap.Load(entry.src)
-		c.policy.Dequeue(entry.src)
-		if queued {
-			c.policy.Enqueue(entry.dst)
-		}
+		c.policy.Rename(entry.src, entry.dst)
 		c.renameOpenHandles(
 			entry.src,
 			entry.dst,
@@ -924,10 +920,12 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		node.isDirty.Store(false)
 	}
 
-	c.fileMap.Delete(options.Handle.Path)
 	if err := c.purgeLocal(options.Handle.Path); err != nil {
+		c.policy.Enqueue(options.Handle.Path)
 		return err
 	}
+c.policy.Dequeue(options.Handle.Path)
+	c.fileMap.Delete(options.Handle.Path)
 	return closeErr
 }
 
@@ -955,6 +953,7 @@ func (c *TieredStorage) uploadCachedFile(name string) error {
 		return nil
 	}
 	node := value.(*FileNode)
+	node.cloudBacked.Store(true)
 	if node.modeDirty.Load() {
 		err = c.NextComponent().Chmod(internal.ChmodOptions{
 			Name: name,
@@ -987,12 +986,15 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 	if err != nil {
 		return err
 	}
-	c.fileMap.Delete(name)
+	if value, found := c.fileMap.Load(name); found {
+		value.(*FileNode).isDirty.Store(false)
+	}
 	err = c.purgeLocal(name)
 	if err != nil {
 		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
 		return err
 	}
+	c.fileMap.Delete(name)
 	return nil
 }
 
@@ -1015,6 +1017,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	val, exists := c.fileMap.Load(options.Src)
 	if exists {
 		node := val.(*FileNode)
+		// TODO: local should come first
 		if node.cloudBacked.Load() {
 			err := c.NextComponent().RenameFile(options)
 			if err != nil {
@@ -1037,12 +1040,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		node.name = options.Dst
 		c.fileMap.Store(options.Dst, node)
 
-		// Dequeue also cancels an in-flight eviction.
-		_, wasQueued := c.policy.nodeMap.Load(options.Src)
-		c.policy.Dequeue(options.Src)
-		if wasQueued {
-			c.policy.Enqueue(options.Dst)
-		}
+		c.policy.Rename(options.Src, options.Dst)
 		c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 	} else {
 		err := c.NextComponent().RenameFile(options)
@@ -1186,10 +1184,13 @@ func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
 	if err := os.Chmod(localPath, options.Mode); err != nil {
 		return err
 	}
-	if tracked && !value.(*FileNode).cloudBacked.Load() {
+	if tracked {
+		// Keep mode current so a pending retry cannot apply a stale value.
 		node := value.(*FileNode)
 		node.mode.Store(uint32(options.Mode))
+		if !node.cloudBacked.Load() {
 		node.modeDirty.Store(true)
+		}
 	}
 	return nil
 }
@@ -1224,11 +1225,14 @@ func (c *TieredStorage) Chown(options internal.ChownOptions) error {
 			return err
 		}
 	}
-	if tracked && !value.(*FileNode).cloudBacked.Load() {
+	if tracked {
+		// Keep owner current so a pending retry cannot apply a stale value.
 		node := value.(*FileNode)
 		node.owner.Store(int64(options.Owner))
 		node.group.Store(int64(options.Group))
+		if !node.cloudBacked.Load() {
 		node.ownerDirty.Store(true)
+		}
 	}
 	return nil
 }

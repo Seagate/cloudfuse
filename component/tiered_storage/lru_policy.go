@@ -182,6 +182,43 @@ func (q *lruQueue) Dequeue(name string) {
 	}
 }
 
+// Rename moves src's entry to dst, keeping its LRU position. Any dst entry is
+// discarded and in-flight evictions of either name are cancelled.
+func (q *lruQueue) Rename(src, dst string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if val, found := q.nodeMap.LoadAndDelete(dst); found && !val.(*lruNode).evicting {
+		q.extractNode(val.(*lruNode))
+	}
+	val, found := q.nodeMap.LoadAndDelete(src)
+	if !found {
+		return
+	}
+
+	old := val.(*lruNode)
+	node := &lruNode{name: dst}
+	q.nodeMap.Store(dst, node)
+	if old.evicting {
+		q.setTail(node)
+		return
+	}
+
+	// replace the old src node in the linked list
+	node.prev, node.next = old.prev, old.next
+	if old.prev != nil {
+		old.prev.next = node
+	} else {
+		q.head = node
+	}
+	if old.next != nil {
+		old.next.prev = node
+	} else {
+		q.tail = node
+	}
+	old.prev, old.next = nil, nil
+}
+
 // mu must be held
 func (q *lruQueue) setHead(node *lruNode) {
 	node.prev = nil
@@ -399,7 +436,7 @@ func (q *lruQueue) evictOne(job uploadJob) {
 
 	// Dequeue may cancel the job while it waits for a worker.
 	if !q.claimed(job.name) {
-		q.drop(job.name)
+		// any entry now under this name belongs to a newer file.
 		return
 	}
 

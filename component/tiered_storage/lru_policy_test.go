@@ -124,6 +124,42 @@ func (suite *lruPolicyTestSuite) TestDequeue() {
 	suite.assert.Equal("file2", suite.policy.tail.name)
 }
 
+func (suite *lruPolicyTestSuite) TestRenameKeepsPosition() {
+	defer suite.cleanupTest()
+
+	suite.policy.Enqueue("file1")
+	suite.policy.Enqueue("file2")
+	suite.policy.Enqueue("file3")
+	suite.policy.Rename("file2", "file3")
+	suite.policy.Rename("file1", "renamed")
+
+	suite.assert.Equal("file3", suite.policy.head.name)
+	suite.assert.Equal("renamed", suite.policy.tail.name)
+	suite.assert.Equal(suite.policy.tail, suite.policy.head.next)
+	suite.assert.Nil(suite.policy.tail.next)
+	_, found := suite.policy.nodeMap.Load("file1")
+	suite.assert.False(found)
+	_, found = suite.policy.nodeMap.Load("file2")
+	suite.assert.False(found)
+}
+
+func (suite *lruPolicyTestSuite) TestRenameCancelsEviction() {
+	defer suite.cleanupTest()
+
+	suite.policy.Enqueue("file1")
+	suite.policy.Enqueue("file2")
+	suite.policy.mu.Lock()
+	node := suite.policy.tail
+	suite.policy.extractNode(node)
+	node.evicting = true
+	suite.policy.mu.Unlock()
+
+	suite.policy.Rename("file1", "renamed")
+	suite.assert.False(suite.policy.claimed("file1"))
+	suite.assert.False(suite.policy.claimed("renamed"))
+	suite.assert.Equal("renamed", suite.policy.tail.name)
+}
+
 func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default policy generated in SetupTest
