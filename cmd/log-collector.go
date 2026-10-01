@@ -352,8 +352,20 @@ func setupPreZip() (string, string, error) {
 }
 
 func copyFiles(srcPath, dstPath string) error {
+	srcRoot, err := os.OpenRoot(srcPath)
+	if err != nil {
+		return err
+	}
+	defer srcRoot.Close()
+
+	dstRoot, err := os.OpenRoot(dstPath)
+	if err != nil {
+		return err
+	}
+	defer dstRoot.Close()
+
 	var items []os.DirEntry
-	items, err := os.ReadDir(srcPath)
+	items, err = os.ReadDir(srcPath)
 	if err != nil {
 		return err
 	}
@@ -363,18 +375,15 @@ func copyFiles(srcPath, dstPath string) error {
 			continue
 		}
 
-		srcFilePath := filepath.Join(srcPath, item.Name())
-		dstFilePath := filepath.Join(dstPath, item.Name())
-
 		var srcFile *os.File
-		srcFile, err = os.Open(srcFilePath)
+		srcFile, err = srcRoot.Open(item.Name())
 		if err != nil {
 			return err
 		}
 		defer srcFile.Close()
 
 		var dstFile *os.File
-		dstFile, err = os.Create(dstFilePath)
+		dstFile, err = dstRoot.Create(item.Name())
 		if err != nil {
 			return err
 		}
