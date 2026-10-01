@@ -524,14 +524,7 @@ func (c *TieredStorage) CreateFile(
 	flock.Lock()
 	defer flock.Unlock()
 
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return nil, err
-	}
-	_, err = c.getAttrUnlocked(
-		internal.GetAttrOptions{Name: options.Name},
-		localPath,
-	)
+	_, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err == nil {
 		return nil, syscall.EEXIST
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -587,7 +580,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	if err != nil {
 		return nil, err
 	}
-	attrs, attrErr := c.getAttrUnlocked(internal.GetAttrOptions{Name: options.Name}, localPath)
+	attrs, attrErr := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if attrErr != nil && !errors.Is(attrErr, os.ErrNotExist) {
 		return nil, attrErr
 	}
@@ -1143,23 +1136,13 @@ func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 }
 
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
+	// Lock-free: local copies are published by rename and removed only after
+	// upload, so each read sees a complete copy; libfuse orders this against
+	// rename/unlink of the same path.
 	localPath, err := c.localPath(options.Name)
 	if err != nil {
 		return nil, err
 	}
-
-	flock := c.fileLocks.Get(options.Name)
-	flock.RLock()
-	defer flock.RUnlock()
-	return c.getAttrUnlocked(options, localPath)
-}
-
-// getAttrUnlocked merges local and cloud attributes. The object's file lock
-// must already be held.
-func (c *TieredStorage) getAttrUnlocked(
-	options internal.GetAttrOptions,
-	localPath string,
-) (*internal.ObjAttr, error) {
 	info, localErr := os.Stat(localPath)
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return nil, localErr
