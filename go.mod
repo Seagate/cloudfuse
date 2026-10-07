@@ -5,7 +5,7 @@ go 1.27
 toolchain go1.27.1
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.1
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.2
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.6.0
@@ -20,7 +20,7 @@ require (
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/montanaflynn/stats v0.12.7
-	github.com/netresearch/go-cron v0.16.0
+	github.com/netresearch/go-cron v0.16.1
 	github.com/petermattis/goid v0.0.0-20260819104326-d9896a8858b2
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
