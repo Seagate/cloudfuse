@@ -665,6 +665,15 @@ func (suite *utilTestSuite) TestValidatePipeline() {
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "block_cache", "xload", "azstorage"})
 	suite.Error(err)
 
+	err = ValidatePipeline([]string{"libfuse", "file_cache", "tiered_storage", "azstorage"})
+	suite.Error(err)
+
+	err = ValidatePipeline([]string{"libfuse", "block_cache", "tiered_storage", "azstorage"})
+	suite.Error(err)
+
+	err = ValidatePipeline([]string{"libfuse", "xload", "tiered_storage", "azstorage"})
+	suite.Error(err)
+
 	err = ValidatePipeline([]string{"libfuse", "file_cache", "azstorage"})
 	suite.NoError(err)
 
@@ -672,6 +681,9 @@ func (suite *utilTestSuite) TestValidatePipeline() {
 	suite.NoError(err)
 
 	err = ValidatePipeline([]string{"libfuse", "xload", "attr_cache", "azstorage"})
+	suite.NoError(err)
+
+	err = ValidatePipeline([]string{"libfuse", "tiered_storage", "attr_cache", "azstorage"})
 	suite.NoError(err)
 }
 

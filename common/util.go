@@ -618,20 +618,14 @@ func ComponentInPipeline(pipeline []string, component string) bool {
 }
 
 func ValidatePipeline(pipeline []string) error {
-	// file-cache, block-cache and xload are mutually exclusive
-	if ComponentInPipeline(pipeline, "file_cache") &&
-		ComponentInPipeline(pipeline, "block_cache") {
-		return fmt.Errorf("mount: file-cache and block-cache cannot be used together")
+	var selected []string
+	for _, component := range []string{"file_cache", "block_cache", "xload", "tiered_storage"} {
+		if ComponentInPipeline(pipeline, component) {
+			selected = append(selected, component)
+		}
 	}
-
-	if ComponentInPipeline(pipeline, "file_cache") &&
-		ComponentInPipeline(pipeline, "xload") {
-		return fmt.Errorf("mount: file-cache and xload cannot be used together")
-	}
-
-	if ComponentInPipeline(pipeline, "block_cache") &&
-		ComponentInPipeline(pipeline, "xload") {
-		return fmt.Errorf("mount: block-cache and xload cannot be used together")
+	if len(selected) > 1 {
+		return fmt.Errorf("mount: %s cannot be used together", strings.Join(selected, ", "))
 	}
 
 	return nil
