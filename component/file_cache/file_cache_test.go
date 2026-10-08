@@ -2806,7 +2806,11 @@ loopbackfs:
 			for i := 0; time.Now().Before(deadline); i++ {
 				name := fmt.Sprintf("window_flush_%d_%d.txt", w, i%10)
 				handle, err := suite.fileCache.OpenFile(
-					internal.OpenFileOptions{Name: name, Flags: os.O_CREATE | os.O_RDWR, Mode: 0777},
+					internal.OpenFileOptions{
+						Name:  name,
+						Flags: os.O_CREATE | os.O_RDWR,
+						Mode:  0777,
+					},
 				)
 				if !suite.assert.NoError(err) {
 					return

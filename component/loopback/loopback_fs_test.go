@@ -322,6 +322,11 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFileGetAttr() {
 
 // Renaming a file rewrites the path of its open handles while they are being read
 func (suite *LoopbackFSTestSuite) TestRenameFileDuringReadInBuffer() {
+	// Windows does not allow renaming a file while it is open
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
