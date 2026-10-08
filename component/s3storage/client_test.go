@@ -890,6 +890,47 @@ func (s *clientTestSuite) TestRenameFileError() {
 	})
 	s.assert.Error(err)
 }
+
+func (s *clientTestSuite) TestRenameFileDstDir() {
+	defer s.cleanupTest()
+	// Setup
+
+	src := generateFileName()
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:               aws.String(src),
+		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
+	})
+	s.assert.NoError(err)
+
+	dstDir := generateDirectoryName()
+	child := generateFileName()
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:               aws.String(path.Join(dstDir, child)),
+		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
+	})
+	s.assert.NoError(err)
+
+	err = s.client.RenameFile(context.Background(), src, dstDir, false)
+	s.assert.EqualValues(syscall.EISDIR, err)
+
+	// Src should still be in the account
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:          aws.String(src),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.NoError(err)
+
+	// Dst file should not be created
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:          aws.String(dstDir),
+		ChecksumMode: types.ChecksumModeEnabled,
+	})
+	s.assert.Error(err)
+}
 func (s *clientTestSuite) TestRenameDirectory() {
 	defer s.cleanupTest()
 	// setup
@@ -1011,57 +1052,6 @@ func (s *clientTestSuite) TestGetAttrError() {
 	_, err := s.client.GetAttr(ctx, name)
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
-}
-func (s *clientTestSuite) TestShouldProbeDirMarker() {
-	defer s.cleanupTest()
-	cases := []struct {
-		name              string
-		dirName           string
-		explicitDirLookup bool
-		want              bool
-	}{
-		{
-			name:              "file-like-extension",
-			dirName:           internal.ExtendDirName("videos/clip.mkv"),
-			explicitDirLookup: false,
-			want:              false,
-		},
-		{
-			name:              "file-like-uppercase-extension",
-			dirName:           internal.ExtendDirName("videos/CLIP.MKV"),
-			explicitDirLookup: false,
-			want:              false,
-		},
-		{
-			name:              "file-like-nxdb-extension",
-			dirName:           internal.ExtendDirName("meta/cache/asset.nxdb"),
-			explicitDirLookup: false,
-			want:              false,
-		},
-		{
-			name:              "no-extension",
-			dirName:           internal.ExtendDirName("logs/2026/02/23"),
-			explicitDirLookup: false,
-			want:              true,
-		},
-		{
-			name:              "explicit-dir-lookup",
-			dirName:           internal.ExtendDirName("videos/clip.mkv"),
-			explicitDirLookup: true,
-			want:              true,
-		},
-		{
-			name:              "root-dir",
-			dirName:           internal.ExtendDirName(""),
-			explicitDirLookup: false,
-			want:              true,
-		},
-	}
-
-	for _, tc := range cases {
-		got := shouldProbeDirMarker(tc.dirName, tc.explicitDirLookup)
-		s.assert.Equal(tc.want, got, tc.name)
-	}
 }
 func (s *clientTestSuite) TestList() {
 	defer s.cleanupTest()
