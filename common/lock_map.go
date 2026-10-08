@@ -54,6 +54,10 @@ func NewLockMap() *LockMap {
 
 // Get the lock item based on file name, if item does not exists create it
 func (l *LockMap) Get(name string) *LockMapItem {
+	// avoid allocating a new item when one already exists (the common case)
+	if lockIntf, found := l.locks.Load(name); found {
+		return lockIntf.(*LockMapItem)
+	}
 	lockIntf, _ := l.locks.LoadOrStore(name, &LockMapItem{handleCount: 0})
 	item := lockIntf.(*LockMapItem)
 	return item
