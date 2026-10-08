@@ -636,10 +636,22 @@ func (cl *Client) getFileAttr(ctx context.Context, name string) (*internal.ObjAt
 
 func (cl *Client) getDirectoryAttr(ctx context.Context, dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
-	if cl.Config.requireDirMarkers {
-		return cl.getDirMarkerAttr(ctx, dirName)
+	if cl.Config.enableDirMarker {
+		attr, err := cl.getDirMarkerAttr(ctx, dirName)
+		if err == nil {
+			return attr, nil
+		}
+		if err != syscall.ENOENT {
+			return nil, err
+		}
+		// Markers are mandatory, so a missing marker means no directory.
+		if cl.Config.requireDirMarkers {
+			log.Err("Client::getDirectoryAttr : marker not found: %s", dirName)
+			return nil, syscall.ENOENT
+		}
 	}
 
+	// No marker, so fall back to looking for objects under the prefix.
 	objects, _, listErr := cl.List(ctx, dirName, nil, 1)
 	if listErr != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, listErr)
@@ -649,29 +661,22 @@ func (cl *Client) getDirectoryAttr(ctx context.Context, dirName string) (*intern
 		return internal.CreateObjAttrDir(dirName), nil
 	}
 
-	if cl.Config.enableDirMarker {
-		return cl.getDirMarkerAttr(ctx, dirName)
-	}
-
 	log.Err("Client::getDirectoryAttr : not found: %s", dirName)
 	return nil, syscall.ENOENT
 }
 
+// Get attributes for the directory marker object of the given directory.
+// Return ENOENT if the marker does not exist.
 func (cl *Client) getDirMarkerAttr(ctx context.Context, dirName string) (*internal.ObjAttr, error) {
 	headAttr, headErr := cl.headObject(ctx, dirName, false, true)
-	if headErr == nil {
-		return headAttr, nil
-	}
-	if headErr != syscall.ENOENT {
+	if headErr != nil && headErr != syscall.ENOENT {
 		log.Err(
 			"Client::getDirMarkerAttr : HeadObject(%s) failed. Here's why: %v",
 			dirName,
 			headErr,
 		)
-		return nil, headErr
 	}
-	log.Err("Client::getDirMarkerAttr : not found: %s", dirName)
-	return nil, syscall.ENOENT
+	return headAttr, headErr
 }
 
 // Download object data to a file handle.

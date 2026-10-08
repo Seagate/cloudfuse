@@ -65,7 +65,10 @@ var addDirMarkersCmd = &cobra.Command{
 	RunE: runAddDirMarkers,
 }
 
+// runAddDirMarkers loads the s3storage config, builds an S3 client from it, and
+// backfills any missing directory markers under the configured bucket/subdirectory.
 func runAddDirMarkers(_ *cobra.Command, _ []string) error {
+	// Fall back to the default config file if one was not passed in
 	if options.ConfigFile == "" {
 		if _, err := os.Stat(common.DefaultConfigFilePath); err != nil {
 			if os.IsNotExist(err) {
@@ -145,6 +148,8 @@ func runAddDirMarkers(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
+// directoryMarkerS3API is the subset of the S3 client used by the backfill,
+// so tests can substitute a fake.
 type directoryMarkerS3API interface {
 	ListObjectsV2(
 		context.Context,
@@ -158,6 +163,10 @@ type directoryMarkerS3API interface {
 	) (*s3.PutObjectOutput, error)
 }
 
+// backfillDirectoryMarkers lists every object under prefix and creates a
+// zero-byte "dir/" marker object for each implied parent directory that does not
+// already have one. If dryRun is set, no objects are written. onMissingMarker,
+// if not nil, is called with the key of each missing marker.
 func backfillDirectoryMarkers(
 	ctx context.Context,
 	api directoryMarkerS3API,
@@ -172,6 +181,7 @@ func backfillDirectoryMarkers(
 		scanPrefix += "/"
 	}
 
+	// Markers known to exist (or already created) for the current key's ancestors
 	activeMarkers := make(map[string]struct{})
 	var continuationToken *string
 	for {
@@ -193,6 +203,8 @@ func backfillDirectoryMarkers(
 				continue
 			}
 
+			// Since keys are sorted, once a key falls outside a directory we will
+			// never see that directory again, so its marker can be forgotten.
 			for marker := range activeMarkers {
 				if !strings.HasPrefix(key, marker) {
 					delete(activeMarkers, marker)
@@ -202,11 +214,14 @@ func backfillDirectoryMarkers(
 				activeMarkers[key] = struct{}{}
 			}
 
+			// Walk each parent directory of this key ("a/", "a/b/", ...)
+			// and create a marker for any that we have not seen yet.
 			for i := 0; i < len(key); i++ {
 				if key[i] != '/' {
 					continue
 				}
 				marker := key[:i+1]
+				// Skip directories above the configured subdirectory
 				if len(marker) < len(scanPrefix) {
 					continue
 				}

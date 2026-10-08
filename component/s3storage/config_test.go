@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/awnumar/memguard"
 
@@ -159,17 +160,31 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.assert.Equal(types.ChecksumAlgorithm("CRC32C"), s.s3.stConfig.checksumAlgorithm)
 }
 
-func (s *configTestSuite) TestRequireDirMarkersRequiresMarkerSupport() {
+func (s *configTestSuite) TestRequireDirMarkersEnablesMarkerSupport() {
+	defer config.ResetConfig()
 	s.opt.RequireDirMarkers = true
 
+	// enable-dir-marker not set, so require-dir-markers turns it on
 	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
-	s.assert.ErrorIs(err, errInvalidConfigField)
+	s.assert.NoError(err)
+	s.assert.True(s.s3.stConfig.enableDirMarker)
+	s.assert.True(s.s3.stConfig.requireDirMarkers)
 
 	s.opt.EnableDirMarker = true
 	err = ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.True(s.s3.stConfig.enableDirMarker)
 	s.assert.True(s.s3.stConfig.requireDirMarkers)
+}
+
+func (s *configTestSuite) TestRequireDirMarkersConflictsWithExplicitDisable() {
+	defer config.ResetConfig()
+	s.opt.RequireDirMarkers = true
+	s.opt.EnableDirMarker = false
+	config.Set(compName+".enable-dir-marker", "false")
+
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
+	s.assert.ErrorIs(err, errInvalidConfigField)
 }
 
 func (s *configTestSuite) TestInvalidChecksum() {

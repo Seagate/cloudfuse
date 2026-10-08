@@ -94,11 +94,19 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	s3.stConfig.disableUsage = opt.DisableUsage
 	s3.stConfig.enableDirMarker = opt.EnableDirMarker
 	s3.stConfig.requireDirMarkers = opt.RequireDirMarkers
+	// require-dir-markers implies enable-dir-marker. Turn it on automatically,
+	// unless the user explicitly disabled it, which is a real conflict.
 	if opt.RequireDirMarkers && !opt.EnableDirMarker {
-		return fmt.Errorf(
-			"%w: require-dir-markers requires enable-dir-marker to be true",
-			errInvalidConfigField,
+		if config.IsSet(compName + ".enable-dir-marker") {
+			return fmt.Errorf(
+				"%w: require-dir-markers cannot be used with enable-dir-marker set to false",
+				errInvalidConfigField,
+			)
+		}
+		log.Warn(
+			"ParseAndValidateConfig : require-dir-markers is set, so enabling enable-dir-marker",
 		)
+		s3.stConfig.enableDirMarker = true
 	}
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
