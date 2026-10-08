@@ -856,7 +856,7 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 
 	usage, err := common.GetUsage(tobj.disk_cache_path)
 	suite.assert.NoError(err)
-	suite.assert.Less(usage, float64(1.0))
+	suite.assert.Less(usage, float64(_1MB)) // GetUsage returns bytes; an empty dir uses ~4096 bytes
 	suite.assert.False(tobj.blockCache.checkDiskUsage())
 
 	// Default disk size is 50MB

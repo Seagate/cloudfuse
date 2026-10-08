@@ -27,7 +27,7 @@ package s3storage
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
@@ -104,8 +104,7 @@ func parseS3Err(err error, attemptedAction string) error {
 
 	// Any error that comes in should have an APIError somewhere in its tree
 	// Find the API error in the error's tree
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 		// There is an error modeling system, which allows us to match errors by type:
 		//   e.g. *types.NoSuchKey, where types is "github.com/aws/aws-sdk-go-v2/service/s3/types"
 		// but sometimes the same errorCode (e.g. "NoSuchKey") will come up but be wrapped in a smithy.GenericAPIError,
@@ -155,9 +154,9 @@ func parseS3Err(err error, attemptedAction string) error {
 		}
 	}
 
-	var maerr *retry.MaxAttemptsError
-	qeerr := &ratelimit.QuotaExceededError{}
-	if errors.As(err, &maerr) || errors.As(err, qeerr) || errors.Is(err, context.Canceled) ||
+	_, hasMaxAttemptsErr := errors.AsType[*retry.MaxAttemptsError](err)
+	_, hasQuotaErr := errors.AsType[*ratelimit.QuotaExceededError](err)
+	if hasMaxAttemptsErr || hasQuotaErr || errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) {
 		log.Err(
 			"%s : Failed to %s because cloud storage is unreachable",

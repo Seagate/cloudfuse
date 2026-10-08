@@ -423,6 +423,7 @@ func mountAllContainers(
 
 		// Now that we have mount path and config file for this container fire a mount command for this one
 		fmt.Fprintln(out, "Mounting container :", container, "to path", contMountPath)
+		//nolint:gosec // G204: binary path comes from current executable, args are direct argv without shell parsing.
 		cmd := exec.Command(mountAllOpts.cloudfuseBinPath, cliParams...)
 
 		var errb bytes.Buffer

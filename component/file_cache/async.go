@@ -27,6 +27,7 @@ package file_cache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -36,6 +37,12 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/netresearch/go-cron"
+)
+
+// bounds on the backoff between upload cycles that ended in failure
+const (
+	minRetryDelay = time.Second
+	maxRetryDelay = 15 * time.Second
 )
 
 type UploadWindow struct {
@@ -58,7 +65,7 @@ type pendingFlags struct {
 
 func (fc *FileCache) configureScheduler() error {
 	// load from config
-	var rawSchedule []map[string]interface{}
+	var rawSchedule []map[string]any
 	err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
 	if err != nil {
 		return err
@@ -215,15 +222,29 @@ func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 	}
 }
 
+// syncsPendingOps : whether servicePendingOps is running. Queueing an op without it
+// would pin the cached file forever, since eviction skips pending ops.
+func (fc *FileCache) syncsPendingOps() bool {
+	return len(fc.schedule) > 0 || fc.offlineAccess
+}
+
 // persistent background thread function
 func (fc *FileCache) servicePendingOps() {
+	// grows while upload cycles keep failing, resets as soon as one succeeds
+	var retryDelay time.Duration
 	for {
 		select {
 		case <-fc.componentStopping:
 			log.Crit("FileCache::servicePendingOps : Stopping")
-			// TODO: Persist pending ops
 			return
 		case <-fc.startScheduledUploads:
+			if retryDelay > 0 {
+				select {
+				case <-time.After(retryDelay):
+				case <-fc.componentStopping:
+					return
+				}
+			}
 			// check if we're connected
 			// exponential backoff is implemented inside CloudConnected(),
 			//  so we're safe to call it naively every second like this
@@ -235,32 +256,20 @@ func (fc *FileCache) servicePendingOps() {
 				}
 				break
 			}
-			numFilesProcessed := 0
-			// Iterate over pending ops
-			fc.pendingOps.Range(func(key, value interface{}) bool {
-				numFilesProcessed++
-				select {
-				case <-fc.componentStopping:
-					return false
-				case <-fc.startScheduledUploads:
-					path := key.(string)
-					value := value.(pendingFlags)
-					err := fc.updateObject(path, value)
-					if isOffline(err) {
-						return false // connection lost - abort iteration
-					}
-					if err != nil {
-						log.Err("FileCache::servicePendingOps : %s upload failed: %v", path, err)
-					}
-				default:
-					return false // upload window ended
-				}
-				return true // Continue the iteration
-			})
+			numFilesProcessed, err := fc.runPendingOpCycle()
 			log.Info(
 				"FileCache::servicePendingOps : Completed upload cycle, processed %d files",
 				numFilesProcessed,
 			)
+			if err != nil {
+				retryDelay = min(max(2*retryDelay, minRetryDelay), maxRetryDelay)
+				log.Warn(
+					"FileCache::servicePendingOps : Upload cycle failed, retrying in %v",
+					retryDelay,
+				)
+				break
+			}
+			retryDelay = 0
 			if numFilesProcessed == 0 {
 				// we're online but there's nothing to do
 				// wait for a task to be added
@@ -273,8 +282,37 @@ func (fc *FileCache) servicePendingOps() {
 	}
 }
 
+// runPendingOpCycle : sync pending ops with cloud storage until the upload window
+// closes or an operation fails. Returns the number of ops attempted, and the error
+// that ended the cycle, if any.
+func (fc *FileCache) runPendingOpCycle() (int, error) {
+	numFilesProcessed := 0
+	var cycleErr error
+
+	fc.pendingOps.Range(func(key, value any) bool {
+		select {
+		case <-fc.componentStopping:
+			return false
+		case <-fc.startScheduledUploads:
+			name := key.(string)
+			numFilesProcessed++
+			if !fc.updateObject(name, value.(pendingFlags)) {
+				// record the failure so the caller backs off instead of busy-retrying
+				cycleErr = fmt.Errorf("sync failed for %s", name)
+				return false
+			}
+			return true
+		default:
+			return false // upload window ended
+		}
+	})
+
+	return numFilesProcessed, cycleErr
+}
+
 // synchronize pending operation with cloud storage
-func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
+// returns false if we should stop iterating (offline, etc.)
+func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 	log.Trace("FileCache::updateObject : %s", name)
 
 	// lock the file
@@ -285,7 +323,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// don't double upload
 	_, stillPending := fc.pendingOps.Load(name)
 	if !stillPending {
-		return nil
+		return true
 	}
 
 	// look up file (or folder!)
@@ -295,8 +333,10 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
 	if !flags.isDeletion && localErr != nil {
 		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, localErr)
+		// there is no file to upload, so consider the inconsistency resolved
 		fc.pendingOps.Delete(name)
-		return localErr
+		// this file failed, but we can continue with the rest of the pending ops
+		return true
 	}
 	if flags.isDeletion && !localMissing {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
@@ -313,7 +353,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 		if flags.isDeletion && fc.notInCloud(name) {
 			log.Info("FileCache::updateObject : %s skipping cloud deletion (not in cloud)", name)
 			fc.pendingOps.Delete(name)
-			return nil
+			return true
 		}
 		if flags.isDir {
 			// delete folder
@@ -340,14 +380,14 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	// handle errors
 	if cloudErr != nil {
 		log.Err("FileCache::updateObject : %s %s %s failed [%v]", name, objType, op, cloudErr)
-		return cloudErr
+		return false
 	}
 
 	// update state
 	log.Info("FileCache::updateObject : %s sync successful", name)
 	fc.pendingOps.Delete(name)
 
-	return nil
+	return true
 }
 
 // returns true if we *know* that this entity does not exist in cloud storage

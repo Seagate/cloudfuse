@@ -26,7 +26,7 @@
 package azstorage
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
@@ -193,12 +193,11 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: ProxyURL,
-			// We use Dial instead of DialContext as DialContext has been reported to cause slower performance.
-			Dial /*Context*/ : (&net.Dialer{
-				Timeout:   Timeout,
-				KeepAlive: KeepAlive,
-				DualStack: DualStack,
-			}).Dial, /*Context*/
+			DialContext: (&net.Dialer{
+				Timeout:       Timeout,
+				KeepAlive:     KeepAlive,
+				FallbackDelay: fallbackDelay(),
+			}).DialContext,
 			MaxIdleConns:          MaxIdleConns, // No limit
 			MaxIdleConnsPerHost:   MaxIdleConnsPerHost,
 			MaxConnsPerHost:       MaxConnsPerHost,
@@ -212,6 +211,13 @@ func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 			MaxResponseHeaderBytes: MaxResponseHeaderBytes,
 		},
 	}, nil
+}
+
+func fallbackDelay() time.Duration {
+	if DualStack {
+		return 0
+	}
+	return -1
 }
 
 // getCloudConfiguration : returns cloud configuration type on the basis of endpoint
@@ -240,10 +246,9 @@ const (
 // https://github.com/Azure/azure-sdk-for-go/blob/main/sdk/storage/azblob/bloberror/error_codes.go
 // Convert blob storage error to common errors
 func storeBlobErrToErr(err error) uint16 {
-	var respErr *azcore.ResponseError
-	errors.As(err, &respErr)
+	respErr, ok := errors.AsType[*azcore.ResponseError](err)
 
-	if respErr != nil {
+	if ok {
 		switch (bloberror.Code)(respErr.ErrorCode) {
 		case bloberror.BlobAlreadyExists:
 			return ErrFileAlreadyExists
@@ -264,10 +269,9 @@ func storeBlobErrToErr(err error) uint16 {
 
 // Convert datalake storage error to common errors
 func storeDatalakeErrToErr(err error) uint16 {
-	var respErr *azcore.ResponseError
-	errors.As(err, &respErr)
+	respErr, ok := errors.AsType[*azcore.ResponseError](err)
 
-	if respErr != nil {
+	if ok {
 		switch (datalakeerror.StorageErrorCode)(respErr.ErrorCode) {
 		case datalakeerror.PathAlreadyExists:
 			return ErrFileAlreadyExists

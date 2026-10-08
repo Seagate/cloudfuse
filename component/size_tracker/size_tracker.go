@@ -148,6 +148,20 @@ func (st *SizeTracker) Configure(_ bool) error {
 				log.Err("SizeTracker::Configure : Invalid display capacity")
 			}
 		}
+		// allowing displayCapacity to be larger than totalBucketCapacity causes errors
+		if st.displayCapacity > st.totalBucketCapacity {
+			log.Err(
+				"SizeTracker::Configure : display capacity (%d MB) exceeds total bucket capacity (%d MB)",
+				st.displayCapacity/common.MbToBytes,
+				conf.TotalBucketCapacity,
+			)
+			return fmt.Errorf(
+				"SizeTracker: invalid configuration [size_tracker.bucket-capacity-fallback (%d MB)"+
+					" cannot be less than libfuse.display-capacity-mb (%d MB)]",
+				st.displayCapacity/common.MbToBytes,
+				conf.TotalBucketCapacity,
+			)
+		}
 		// calculate server count
 		// round to the nearest whole number
 		st.serverCount = (st.totalBucketCapacity + st.displayCapacity/2) / st.displayCapacity
@@ -408,7 +422,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 		Namemax: 255,
 	}
 
-	log.Debug(
+	log.Info(
 		"SizeTracker::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)",
 		stat.Bfree,
 		stat.Bavail,

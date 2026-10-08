@@ -81,6 +81,22 @@ func (suite *unmountTestSuite) cleanupTest() {
 	resetCLIFlags(*rootCmd)
 }
 
+// waitForMount blocks until path is registered as a mount in /etc/mtab (the
+// same table fusermount3 consults) or the timeout elapses. The mount command
+// daemonizes, so there is a brief window between it returning and the mount
+// appearing in /etc/mtab; unmounting during that window fails with
+// "entry ... not found in /etc/mtab".
+func waitForMount(path string) bool {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if common.IsDirectoryMounted(path) {
+			return true
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return false
+}
+
 // mount failure test where the mount directory does not exist
 func (suite *unmountTestSuite) TestUnmountCmd() {
 	defer suite.cleanupTest()
@@ -102,6 +118,7 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	if err != nil {
 		fmt.Printf("Mount failed with output: %s\n", mountOutput)
 	}
+	suite.assert.True(waitForMount(mountDirectory1), "mount did not register in /etc/mtab")
 
 	unmountOutput, err := executeCommandC(rootCmd, "unmount", mountDirectory1)
 	suite.assert.NoError(err)
@@ -138,6 +155,7 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 			)
 			_, err = cmd.Output()
 			suite.assert.NoError(err)
+			suite.assert.True(waitForMount(mountDirectory6), "mount did not register in /etc/mtab")
 
 			// move into the mount directory to cause busy error on regular unmount
 			err = os.Chdir(mountDirectory6)
@@ -186,6 +204,7 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	)
 	_, err = cmd.Output()
 	suite.assert.NoError(err)
+	suite.assert.True(waitForMount(mountDirectory2), "mount did not register in /etc/mtab")
 
 	err = os.Chdir(mountDirectory2)
 	suite.assert.NoError(err)
@@ -215,6 +234,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 	)
 	_, err = cmd.Output()
 	suite.assert.NoError(err)
+	suite.assert.True(waitForMount(mountDirectory3), "mount did not register in /etc/mtab")
 
 	_, err = executeCommandC(rootCmd, "unmount", mountDirectory3+"*")
 	suite.assert.NoError(err)
@@ -236,6 +256,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 	)
 	_, err = cmd.Output()
 	suite.assert.NoError(err)
+	suite.assert.True(waitForMount(mountDirectory4), "mount did not register in /etc/mtab")
 
 	err = os.Chdir(mountDirectory4)
 	suite.assert.NoError(err)
@@ -270,8 +291,8 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	_, err = cmd.Output()
 	suite.assert.NoError(err)
 
-	// Give the system time to register the mount
-	time.Sleep(100 * time.Millisecond)
+	// Wait for the mount to register before querying/unmounting it
+	suite.assert.True(waitForMount(mountDirectory5), "mount did not register in /etc/mtab")
 
 	lst, _ := unmountCmd.ValidArgsFunction(nil, nil, "")
 	suite.assert.NotEmpty(lst)

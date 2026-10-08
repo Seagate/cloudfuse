@@ -214,9 +214,8 @@ func (bb *BlockBlob) TestPipeline() error {
 			"BlockBlob::TestPipeline : Failed to validate account with given auth %s",
 			err.Error(),
 		)
-		var respErr *azcore.ResponseError
-		errors.As(err, &respErr)
-		if respErr != nil {
+		respErr, ok := errors.AsType[*azcore.ResponseError](err)
+		if ok {
 			if respErr.ErrorCode == "InvalidQueryParameterValue" {
 				// User explicitly mounting FNS account as HNS which is not supported
 				return fmt.Errorf(
@@ -255,9 +254,8 @@ func (bb *BlockBlob) IsAccountADLS() bool {
 		return true
 	}
 
-	var respErr *azcore.ResponseError
-	errors.As(err, &respErr)
-	if respErr != nil {
+	respErr, ok := errors.AsType[*azcore.ResponseError](err)
+	if ok {
 		if respErr.ErrorCode == "InvalidQueryParameterValue" {
 			log.Crit("BlockBlob::IsAccountADLS : Detected FNS account")
 			return false
@@ -1273,13 +1271,13 @@ func (bb *BlockBlob) WriteFromFile(
 	// Compute md5 of this file is requested by user
 	// If file is uploaded in one shot (no blocks created) then server is populating md5 on upload automatically.
 	// hence we take cost of calculating md5 only for files which are bigger in size and which will be converted to blocks.
-	md5sum := []byte{}
+	var md5sum []byte
 	if bb.Config.updateMD5 && stat.Size() >= blockblob.MaxUploadBlobBytes {
 		md5sum, err = common.GetMD5(fi)
 		if err != nil {
 			// Md5 sum generation failed so set nil while uploading
 			log.Warn("BlockBlob::WriteFromFile : Failed to generate md5 of %s", name)
-			md5sum = []byte{0}
+			md5sum = nil
 		}
 	}
 

@@ -257,11 +257,16 @@ func (l *BaseLogger) logDumper(id int, channel <-chan string) {
 	defer l.workerDone.Done()
 
 	for j := range channel {
-		l.logger.Println(j)
+		// write directly so the error is visible. log.Println discards it.
+		n, err := io.WriteString(l.logFileHandle, j+"\n")
+		if err != nil {
+			// don't count bytes we didn't write, or a full disk drives rotation
+			// until every retained log file has been replaced by an empty one
+			continue
+		}
 
-		l.fileConfig.currentLogSize += (uint64)(len(j))
+		l.fileConfig.currentLogSize += uint64(n)
 		if l.fileConfig.currentLogSize > l.fileConfig.LogSize {
-			//fmt.Println("Calling logrotate : ", l.fileConfig.currentLogSize, " : ", l.fileConfig.logSize)
 			_ = l.LogRotate()
 		}
 	}
@@ -310,5 +315,5 @@ func (l *BaseLogger) LogRotate() error {
 	l.logger.SetOutput(l.logFileHandle)
 	l.fileConfig.currentLogSize = 0
 
-	return nil
+	return err
 }

@@ -1,3 +1,5 @@
+//go:build liveapi
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -26,52 +28,42 @@
 package cmd
 
 import (
-	"fmt"
-	"os/exec"
+	"context"
 	"runtime"
+	"testing"
+	"time"
 
-	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
-
-	"github.com/spf13/cobra"
+	"github.com/Seagate/cloudfuse/common"
 )
 
-var healthMonStopAll = &cobra.Command{
-	Use:        "all",
-	Short:      "Stop all health monitor binaries",
-	Long:       "Stop all running cloudfuse health monitor processes.\nUses taskkill on Windows and killall on Linux.",
-	SuggestFor: []string{"al"},
-	Args:       cobra.NoArgs,
-	Example: `  # Stop all health monitors
-  cloudfuse health-monitor stop all`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := stopAll()
-		if err != nil {
-			return fmt.Errorf("failed to stop all health monitor binaries: %w", err)
-		}
-		cmd.Println("Successfully stopped all health monitor binaries.")
-		return nil
-	},
-}
+func TestLiveGitHubReleaseAPI(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-// Attempts to kill all health monitors
-func stopAll() error {
+	originalReleaseAPIBaseURL := releaseAPIBaseURL
+	releaseAPIBaseURL = common.CloudfuseReleaseURL
+	defer func() {
+		releaseAPIBaseURL = originalReleaseAPIBaseURL
+	}()
+
 	if runtime.GOOS == "windows" {
-		cliOut := exec.Command("taskkill", "/IM", "cfusemon.exe", "/F")
-		_, err := cliOut.Output()
-		if err != nil {
-			return err
-		}
-		return nil
+		opt.Package = "zip"
+	} else {
+		opt.Package = "tar"
 	}
-	//nolint:gosec // G204: command and arguments are fixed literals with no external input.
-	cliOut := exec.Command("killall", hmcommon.CfuseMon)
-	_, err := cliOut.Output()
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
-func init() {
-	healthMonStop.AddCommand(healthMonStopAll)
+	releaseInfo, err := getRelease(ctx, "")
+	if err != nil {
+		t.Fatalf("live GitHub release API check failed: %v", err)
+	}
+
+	if releaseInfo == nil {
+		t.Fatal("live GitHub release API returned nil release")
+	}
+	if releaseInfo.Version == "" {
+		t.Fatal("live GitHub release API returned empty version")
+	}
+	if releaseInfo.AssetURL == "" {
+		t.Fatal("live GitHub release API returned empty asset URL")
+	}
 }

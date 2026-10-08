@@ -158,16 +158,18 @@ const DefaultMaxResultsForList int32 = 2
 // https://github.com/Azure/go-autorest/blob/a46566dfcbdc41e736295f94e9f690ceaf50094a/autorest/adal/token.go#L788
 // newServicePrincipalTokenFromMSI : reads them directly from env
 const (
-	EnvAzStorageAccount                  = "AZURE_STORAGE_ACCOUNT"
-	EnvAzStorageAccountType              = "AZURE_STORAGE_ACCOUNT_TYPE"
-	EnvAzStorageAccessKey                = "AZURE_STORAGE_ACCESS_KEY"
-	EnvAzStorageSasToken                 = "AZURE_STORAGE_SAS_TOKEN"
-	EnvAzStorageIdentityClientId         = "AZURE_STORAGE_IDENTITY_CLIENT_ID"
-	EnvAzStorageIdentityResourceId       = "AZURE_STORAGE_IDENTITY_RESOURCE_ID"
-	EnvAzStorageIdentityObjectId         = "AZURE_STORAGE_IDENTITY_OBJECT_ID"
-	EnvAzStorageSpnTenantId              = "AZURE_STORAGE_SPN_TENANT_ID"
-	EnvAzStorageSpnClientId              = "AZURE_STORAGE_SPN_CLIENT_ID"
-	EnvAzStorageSpnClientSecret          = "AZURE_STORAGE_SPN_CLIENT_SECRET"
+	EnvAzStorageAccount            = "AZURE_STORAGE_ACCOUNT"
+	EnvAzStorageAccountType        = "AZURE_STORAGE_ACCOUNT_TYPE"
+	EnvAzStorageAccessKey          = "AZURE_STORAGE_ACCESS_KEY"
+	EnvAzStorageSasToken           = "AZURE_STORAGE_SAS_TOKEN"
+	EnvAzStorageIdentityClientId   = "AZURE_STORAGE_IDENTITY_CLIENT_ID"
+	EnvAzStorageIdentityResourceId = "AZURE_STORAGE_IDENTITY_RESOURCE_ID"
+	EnvAzStorageIdentityObjectId   = "AZURE_STORAGE_IDENTITY_OBJECT_ID"
+	EnvAzStorageSpnTenantId        = "AZURE_STORAGE_SPN_TENANT_ID"
+	EnvAzStorageSpnClientId        = "AZURE_STORAGE_SPN_CLIENT_ID"
+	//nolint:gosec // G101: constant is an environment variable name, not a hardcoded secret value.
+	EnvAzStorageSpnClientSecret = "AZURE_STORAGE_SPN_CLIENT_SECRET"
+	//nolint:gosec // G101: constant is an environment variable name, not a hardcoded secret value.
 	EnvAzStorageSpnOAuthTokenFilePath    = "AZURE_OAUTH_TOKEN_FILE"
 	EnvAzStorageSpnWorkloadIdentityToken = "WORKLOAD_IDENTITY_TOKEN"
 	EnvAzStorageAadEndpoint              = "AZURE_STORAGE_AAD_ENDPOINT"

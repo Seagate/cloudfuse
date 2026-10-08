@@ -30,6 +30,8 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
 	"testing"
@@ -104,6 +106,71 @@ func (suite *rootCmdSuite) cleanupTest() {
 	rootCmd.SetArgs(nil)
 }
 
+func withMockReleaseAPI(t *testing.T, latestVersion string) func() {
+	t.Helper()
+
+	originalReleaseAPIBaseURL := releaseAPIBaseURL
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		linuxFuseAsset := fmt.Sprintf(
+			"cloudfuse_%s_%s_%s_%s.tar.gz",
+			latestVersion,
+			runtime.GOOS,
+			runtime.GOARCH,
+			common.FuseVersion,
+		)
+		windowsZipAsset := fmt.Sprintf(
+			"cloudfuse_%s_%s_%s.zip",
+			latestVersion,
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
+		windowsExeAsset := fmt.Sprintf(
+			"cloudfuse_%s_%s_%s.exe",
+			latestVersion,
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
+
+		assets := mockReleaseAssets(
+			"https://example.invalid",
+			releaseAssetDef{Name: linuxFuseAsset, DownloadPath: "/" + linuxFuseAsset},
+			releaseAssetDef{Name: windowsZipAsset, DownloadPath: "/" + windowsZipAsset},
+			releaseAssetDef{Name: windowsExeAsset, DownloadPath: "/" + windowsExeAsset},
+			releaseAssetDef{
+				Name:         "cloudfuse_checksums_sha256.txt",
+				DownloadPath: "/cloudfuse_checksums_sha256.txt",
+			},
+		)
+
+		switch r.URL.Path {
+		case "/latest":
+			writeMockRelease(w, latestVersion, assets)
+			return
+		case "/tags/v1.8.0":
+			writeMockRelease(w, "1.8.0", assets)
+			return
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+		}
+	}))
+
+	releaseAPIBaseURL = server.URL
+
+	if runtime.GOOS == "windows" {
+		opt.Package = "zip"
+	} else {
+		opt.Package = "tar"
+	}
+
+	return func() {
+		releaseAPIBaseURL = originalReleaseAPIBaseURL
+		server.Close()
+	}
+}
+
 func (suite *rootCmdSuite) TestNoOptions() {
 	defer suite.cleanupTest()
 	out, err := executeCommandC(rootCmd, "")
@@ -131,11 +198,14 @@ func (suite *updateTestSuite) TestGetRelease() {
 		suite.T().Skip("Skipping test on Windows ARM")
 	}
 	defer suite.cleanupTest()
+	restoreReleaseAPI := withMockReleaseAPI(suite.T(), "1.8.0")
+	defer restoreReleaseAPI()
 	ctx := context.Background()
 
 	validVersion := "1.8.0"
 	resultVer, err := getRelease(ctx, validVersion)
-	suite.assert.NoError(err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(resultVer)
 	suite.assert.Equal(validVersion, resultVer.Version)
 
 	// When no version is passed, should get the latest version
@@ -157,6 +227,8 @@ func (suite *rootCmdSuite) TestDetectNewVersionCurrentOlder() {
 		suite.T().Skip("Skipping test on Windows ARM")
 	}
 	defer suite.cleanupTest()
+	restoreReleaseAPI := withMockReleaseAPI(suite.T(), "1.2.3")
+	defer restoreReleaseAPI()
 	common.CloudfuseVersion = getDummyVersion()
 	msg := <-beginDetectNewVersion(ctx)
 	suite.assert.NotEmpty(msg)
@@ -169,6 +241,8 @@ func (suite *rootCmdSuite) TestDetectNewVersionCurrentSame() {
 		suite.T().Skip("Skipping test on Windows ARM")
 	}
 	defer suite.cleanupTest()
+	restoreReleaseAPI := withMockReleaseAPI(suite.T(), common.CloudfuseVersion_())
+	defer restoreReleaseAPI()
 	common.CloudfuseVersion = common.CloudfuseVersion_()
 	msg := <-beginDetectNewVersion(ctx)
 

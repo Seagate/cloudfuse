@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -390,8 +391,8 @@ func (xl *Xload) startComponents() error {
 		return err
 	}
 
-	for i := len(xl.comps) - 1; i >= 0; i-- {
-		xl.comps[i].Start(xl.poolctx)
+	for _, v := range slices.Backward(xl.comps) {
+		v.Start(xl.poolctx)
 	}
 
 	return nil

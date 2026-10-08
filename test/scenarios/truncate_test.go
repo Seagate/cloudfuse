@@ -92,20 +92,11 @@ func TestFileTruncateShrink(t *testing.T) {
 		},
 	}
 
-	// Add the number of test cases to the WaitGroup
-	wg.Add(len(tests))
-
 	// Iterate over the test cases
 	for _, tt := range tests {
-		go func(tt struct {
-			name        string
-			initialSize int
-			finalSize   int
-			truncation  int
-		}) {
-			defer wg.Done()
+		wg.Go(func() {
 			FileTruncate(t, tt.name, tt.initialSize, tt.finalSize, tt.truncation)
-		}(tt)
+		})
 	}
 
 	// Wait for all goroutines to complete
@@ -145,20 +136,11 @@ func TestFileTruncateExpand(t *testing.T) {
 		},
 	}
 
-	// Add the number of test cases to the WaitGroup
-	wg.Add(len(tests))
-
 	// Iterate over the test cases
 	for _, tt := range tests {
-		go func(tt struct {
-			name        string
-			initialSize int
-			finalSize   int
-			truncation  int
-		}) {
-			defer wg.Done()
+		wg.Go(func() {
 			FileTruncate(t, tt.name, tt.initialSize, tt.finalSize, tt.truncation)
-		}(tt)
+		})
 	}
 
 	// Wait for all goroutines to complete
@@ -235,20 +217,11 @@ func TestWriteTruncateClose(t *testing.T) {
 		removeFiles(t, filename)
 	}
 
-	// Add the number of test cases to the WaitGroup
-	wg.Add(len(tests))
-
 	// Iterate over the test cases
 	for _, tt := range tests {
-		go func(tt struct {
-			name       string
-			writeSize  int
-			truncSize  int
-			truncation int
-		}) {
-			defer wg.Done()
+		wg.Go(func() {
 			WriteTruncateClose(t, tt.name, tt.writeSize, tt.truncSize, tt.truncation)
-		}(tt)
+		})
 	}
 
 	// Wait for all goroutines to complete
@@ -336,20 +309,11 @@ func TestWriteTruncateWriteClose(t *testing.T) {
 		removeFiles(t, filename)
 	}
 
-	// Add the number of test cases to the WaitGroup
-	wg.Add(len(tests))
-
 	// Iterate over the test cases
 	for _, tt := range tests {
-		go func(tt struct {
-			name       string
-			writeSize  int
-			truncSize  int
-			truncation int
-		}) {
-			defer wg.Done()
+		wg.Go(func() {
 			WriteTruncateWriteClose(t, tt.name, tt.writeSize, tt.truncSize, tt.truncation)
-		}(tt)
+		})
 	}
 
 	// Wait for all goroutines to complete

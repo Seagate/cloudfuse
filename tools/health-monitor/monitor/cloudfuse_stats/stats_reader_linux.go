@@ -27,7 +27,7 @@ package cloudfuse_stats
 
 import (
 	"bufio"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"os"
 	"time"
