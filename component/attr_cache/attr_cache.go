@@ -62,16 +62,6 @@ type AttrCache struct {
 	cleanupStop    context.CancelFunc
 
 	dirPrefetchThreshold uint32
-	prefetchLock         sync.Mutex
-	prefetchState        map[string]*dirPrefetchState // keyed by directory path
-}
-
-// tracks attribute cache misses in one directory, to decide when to list it
-type dirPrefetchState struct {
-	misses      uint32
-	windowStart time.Time
-	listedAt    time.Time
-	done        chan struct{} // non-nil while a listing is in flight
 }
 
 // Structure defining your config parameters
@@ -85,9 +75,6 @@ type AttrCacheOptions struct {
 	//maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
 
-	// number of misses in one directory that triggers listing the whole directory (0 = disabled)
-	DirPrefetchThreshold uint32 `config:"dir-prefetch-threshold" yaml:"dir-prefetch-threshold,omitempty"`
-
 	// support v1
 	CacheOnList bool `config:"cache-on-list"`
 }
@@ -98,8 +85,10 @@ const compName = "attr_cache"
 // caching more means increased memory usage of the process
 const defaultMaxFiles = 5000000 // 5 million max files overall to be cached
 
-// maximum number of listing pages fetched by one directory prefetch
-const dirPrefetchMaxPages = 10
+// number of cache misses in one directory that triggers listing one page of it
+// 12 Head Objects requests is about 1 ListObjectsV2 cost via the AWS API. So
+// set default to 6 to balance between prefetching and API cost
+const defaultDirPrefetchThreshold = 6
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &AttrCache{}
@@ -199,15 +188,14 @@ func (ac *AttrCache) Configure(_ bool) error {
 		ac.enableSymlinks = conf.EnableSymlinks
 	}
 
-	ac.dirPrefetchThreshold = conf.DirPrefetchThreshold
+	ac.dirPrefetchThreshold = defaultDirPrefetchThreshold
 
 	log.Crit(
-		"AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d, dir-prefetch-threshold %d",
+		"AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
 		ac.cacheTimeout,
 		ac.enableSymlinks,
 		ac.cacheOnList,
 		ac.maxFiles,
-		ac.dirPrefetchThreshold,
 	)
 
 	return nil
@@ -431,100 +419,6 @@ func (ac *AttrCache) cleanupExpiredEntries() {
 		}
 		ac.cacheLock.Unlock()
 	}
-
-	ac.cleanupPrefetchState()
-}
-
-// forget miss counts for directories that have not been touched within the cache timeout
-func (ac *AttrCache) cleanupPrefetchState() {
-	timeout := time.Duration(ac.cacheTimeout) * time.Second
-	ac.prefetchLock.Lock()
-	defer ac.prefetchLock.Unlock()
-	for dirPath, state := range ac.prefetchState {
-		if state.done == nil && time.Since(state.windowStart) >= timeout &&
-			time.Since(state.listedAt) >= timeout {
-			delete(ac.prefetchState, dirPath)
-		}
-	}
-}
-
-// prefetchDir records an attribute cache miss for the parent directory of name.
-// Once one directory accumulates dirPrefetchThreshold misses within the cache timeout,
-// the directory is listed once, which caches the attributes of all its entries, and proves
-// nonexistence of anything else. Returns true when a listing was fetched (or awaited),
-// meaning the cache should be checked again.
-func (ac *AttrCache) prefetchDir(name string) bool {
-	if ac.dirPrefetchThreshold == 0 || !ac.cacheOnList || ac.cacheTimeout == 0 {
-		return false
-	}
-	dirPath := getParentDir(name)
-
-	// only list directories known to exist
-	ac.cacheLock.RLock()
-	dir, found := ac.cache.get(dirPath)
-	isDir := found && dir.exists() && dir.attr.IsDir()
-	ac.cacheLock.RUnlock()
-	if !isDir {
-		return false
-	}
-
-	now := time.Now()
-	timeout := time.Duration(ac.cacheTimeout) * time.Second
-	ac.prefetchLock.Lock()
-	if ac.prefetchState == nil {
-		ac.prefetchState = make(map[string]*dirPrefetchState)
-	}
-	state, found := ac.prefetchState[dirPath]
-	if !found {
-		state = &dirPrefetchState{windowStart: now}
-		ac.prefetchState[dirPath] = state
-	}
-	if done := state.done; done != nil {
-		// coalesce with the listing already in flight
-		ac.prefetchLock.Unlock()
-		<-done
-		return true
-	}
-	if now.Sub(state.listedAt) < timeout {
-		// listed recently, possibly while this request was waiting - check the cache again
-		ac.prefetchLock.Unlock()
-		return true
-	}
-	if now.Sub(state.windowStart) >= timeout {
-		state.misses = 0
-		state.windowStart = now
-	}
-	state.misses++
-	if state.misses < ac.dirPrefetchThreshold {
-		ac.prefetchLock.Unlock()
-		return false
-	}
-	done := make(chan struct{})
-	state.done = done
-	misses := state.misses
-	ac.prefetchLock.Unlock()
-
-	log.Debug("AttrCache::prefetchDir : listing %s after %d misses", dirPath, misses)
-	token := ""
-	for range dirPrefetchMaxPages {
-		var err error
-		_, token, err = ac.StreamDir(internal.StreamDirOptions{Name: dirPath, Token: token})
-		if err != nil {
-			log.Warn("AttrCache::prefetchDir : %s listing failed [%v]", dirPath, err)
-			break
-		}
-		if token == "" {
-			break
-		}
-	}
-
-	ac.prefetchLock.Lock()
-	state.done = nil
-	state.misses = 0
-	state.listedAt = time.Now()
-	ac.prefetchLock.Unlock()
-	close(done)
-	return true
 }
 
 // ------------------------- Methods implemented by this component -------------------------------------------
@@ -1221,8 +1115,9 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 	return err
 }
 
-// lookupAttr returns the cached answer to GetAttr (if any), and whether it is fresh enough to serve
-func (ac *AttrCache) lookupAttr(name string) (*internal.ObjAttr, bool, error) {
+// lookupAttr returns the cached answer to GetAttr (if any), whether it is fresh enough to serve,
+// and the parent directory's cache item (if it is a known existing directory)
+func (ac *AttrCache) lookupAttr(name string) (*internal.ObjAttr, bool, *attrCacheItem, error) {
 	respondFromCache := false
 	var attrFromCache *internal.ObjAttr
 	var errFromCache error
@@ -1256,7 +1151,39 @@ func (ac *AttrCache) lookupAttr(name string) (*internal.ObjAttr, bool, error) {
 			}
 		}
 	}
-	return attrFromCache, respondFromCache, errFromCache
+	dir, found := ac.cache.get(getParentDir(name))
+	if !found || !dir.exists() || !dir.attr.IsDir() {
+		dir = nil
+	}
+	return attrFromCache, respondFromCache, dir, errFromCache
+}
+
+// prefetchDirPage lists the next page of dir, to cache the attributes of its entries
+func (ac *AttrCache) prefetchDirPage(dir *attrCacheItem) {
+	ac.cacheLock.RLock()
+	token, start := dir.prefetchToken, dir.prefetchStart
+	ac.cacheLock.RUnlock()
+	// restart a stale chain, so the oldest listed entries don't outlive the directory's listing
+	if token != "" && time.Since(start) >= time.Duration(ac.cacheTimeout)*time.Second {
+		token = ""
+	}
+	if token == "" {
+		start = time.Now()
+	}
+	log.Debug("AttrCache::prefetchDirPage : %s token=\"%s\"", dir.attr.Path, token)
+	_, next, err := ac.StreamDir(internal.StreamDirOptions{Name: dir.attr.Path, Token: token})
+	ac.cacheLock.Lock()
+	if err == nil {
+		dir.prefetchToken = next
+		dir.prefetchStart = start
+		// the listing is only as fresh as its first page
+		if next == "" && token != "" && dir.listingComplete {
+			dir.cachedAt = start
+		}
+	}
+	ac.cacheLock.Unlock()
+	// hand off to the next winner after the token write
+	dir.prefetchMisses.Store(0)
 }
 
 // GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
@@ -1265,9 +1192,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// log.Trace("AttrCache::GetAttr : %s", options.Name)
 
 	// is the answer in the cache?
-	attrFromCache, respondFromCache, errFromCache := ac.lookupAttr(options.Name)
-	if !respondFromCache && ac.prefetchDir(options.Name) {
-		attrFromCache, respondFromCache, errFromCache = ac.lookupAttr(options.Name)
+	attrFromCache, respondFromCache, dir, errFromCache := ac.lookupAttr(options.Name)
+	if !respondFromCache && dir != nil && ac.dirPrefetchThreshold > 0 && ac.cacheOnList &&
+		ac.cacheTimeout > 0 && dir.prefetchMisses.Add(1) == ac.dirPrefetchThreshold {
+		ac.prefetchDirPage(dir)
+		attrFromCache, respondFromCache, _, errFromCache = ac.lookupAttr(options.Name)
 	}
 	if respondFromCache {
 		return attrFromCache, errFromCache
