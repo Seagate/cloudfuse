@@ -2097,6 +2097,163 @@ func (suite *attrCacheTestSuite) TestChown() {
 	}
 }
 
+func (suite *attrCacheTestSuite) TestDirPrefetchDisabled() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 0
+	suite.addPathToCache("dir/")
+
+	// every miss goes to cloud storage, and the directory is never listed
+	for _, attr := range generateListPathAttr("dir", 10) {
+		suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: attr.Path}).Return(attr, nil)
+		_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: attr.Path})
+		suite.assert.NoError(err)
+	}
+}
+
+func (suite *attrCacheTestSuite) TestDirPrefetchOnMisses() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 3
+	suite.addPathToCache("dir/")
+	listing := generateListPathAttr("dir", 10)
+
+	// misses below the threshold are fetched individually
+	for _, attr := range listing[:2] {
+		suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: attr.Path}).Return(attr, nil)
+		_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: attr.Path})
+		suite.assert.NoError(err)
+	}
+
+	// the third miss lists the directory instead
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir"}).
+		Return(listing, "", nil)
+	for _, attr := range listing[2:] {
+		result, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: attr.Path})
+		suite.assert.NoError(err)
+		suite.assert.Equal(attr.Path, result.Path)
+	}
+
+	// the complete listing proves nonexistence without a cloud request
+	_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: "dir/missing"})
+	suite.assert.ErrorIs(err, syscall.ENOENT)
+}
+
+func (suite *attrCacheTestSuite) TestDirPrefetchConcurrentMisses() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 1
+	suite.addPathToCache("dir/")
+	listing := generateListPathAttr("dir", 50)
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir"}).
+		DoAndReturn(func(internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
+			time.Sleep(50 * time.Millisecond)
+			return listing, "", nil
+		}).
+		Times(1)
+	// misses during the listing go to cloud storage
+	suite.mock.EXPECT().
+		GetAttr(gomock.Any()).
+		DoAndReturn(func(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
+			return getPathAttr(options.Name, defaultSize, fs.FileMode(defaultMode)), nil
+		}).
+		AnyTimes()
+
+	errs := make(chan error, len(listing))
+	for _, attr := range listing {
+		go func() {
+			_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: attr.Path})
+			errs <- err
+		}()
+	}
+	for range listing {
+		suite.assert.NoError(<-errs)
+	}
+}
+
+func (suite *attrCacheTestSuite) TestDirPrefetchMultiPage() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 1
+	suite.addPathToCache("dir/")
+	listing := generateListPathAttr("dir", 10)
+
+	// each trigger fetches one page, resuming from the stored token
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir"}).
+		Return(listing[:5], "page2", nil)
+	result, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: listing[0].Path})
+	suite.assert.NoError(err)
+	suite.assert.Equal(listing[0].Path, result.Path)
+
+	dir, _ := suite.attrCache.cache.get("dir")
+	suite.assert.Equal("page2", dir.prefetchToken)
+	chainStart := dir.prefetchStart
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir", Token: "page2"}).
+		Return(listing[5:], "", nil)
+	result, err = suite.attrCache.GetAttr(internal.GetAttrOptions{Name: listing[7].Path})
+	suite.assert.NoError(err)
+	suite.assert.Equal(listing[7].Path, result.Path)
+
+	// the complete listing proves nonexistence, and is dated from its first page
+	_, err = suite.attrCache.GetAttr(internal.GetAttrOptions{Name: "dir/missing"})
+	suite.assert.ErrorIs(err, syscall.ENOENT)
+	suite.assert.Empty(dir.prefetchToken)
+	suite.assert.True(dir.listingComplete)
+	suite.assert.Equal(chainStart, dir.cachedAt)
+}
+
+func (suite *attrCacheTestSuite) TestDirPrefetchStaleChainRestarts() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 1
+	suite.addPathToCache("dir/")
+	listing := generateListPathAttr("dir", 5)
+	dir, _ := suite.attrCache.cache.get("dir")
+	dir.prefetchToken = "page2"
+	dir.prefetchStart = time.Now().
+		Add(-2 * time.Duration(suite.attrCache.cacheTimeout) * time.Second)
+
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir"}).
+		Return(listing, "", nil)
+	_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: listing[0].Path})
+	suite.assert.NoError(err)
+	suite.assert.Empty(dir.prefetchToken)
+	suite.assert.WithinDuration(time.Now(), dir.prefetchStart, time.Second)
+}
+
+func (suite *attrCacheTestSuite) TestDirPrefetchError() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 1
+	suite.addPathToCache("dir/")
+	attr := getPathAttr("dir/file", defaultSize, fs.FileMode(defaultMode))
+	dir, _ := suite.attrCache.cache.get("dir")
+	dir.prefetchToken = "page2"
+	dir.prefetchStart = time.Now()
+
+	// a failed listing falls back to cloud storage, and keeps the token
+	suite.mock.EXPECT().
+		StreamDir(internal.StreamDirOptions{Name: "dir", Token: "page2"}).
+		Return(nil, "", errors.New("failed to list"))
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: attr.Path}).Return(attr, nil)
+	_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: attr.Path})
+	suite.assert.NoError(err)
+	suite.assert.Equal("page2", dir.prefetchToken)
+	suite.assert.Zero(dir.prefetchMisses.Load())
+}
+
+func (suite *attrCacheTestSuite) TestDirPrefetchSkipsUncachedDirectory() {
+	defer suite.cleanupTest()
+	suite.attrCache.dirPrefetchThreshold = 1
+
+	// the parent directory is not known to exist, so it is not listed
+	attr := getPathAttr("unknown/file", defaultSize, fs.FileMode(defaultMode))
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: attr.Path}).Return(attr, nil)
+	_, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: attr.Path})
+	suite.assert.NoError(err)
+}
+
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestAttrCacheTestSuite(t *testing.T) {
