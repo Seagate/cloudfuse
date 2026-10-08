@@ -2211,7 +2211,8 @@ func (suite *attrCacheTestSuite) TestDirPrefetchStaleChainRestarts() {
 	listing := generateListPathAttr("dir", 5)
 	dir, _ := suite.attrCache.cache.get("dir")
 	dir.prefetchToken = "page2"
-	dir.prefetchStart = time.Now().Add(-2 * time.Duration(suite.attrCache.cacheTimeout) * time.Second)
+	dir.prefetchStart = time.Now().
+		Add(-2 * time.Duration(suite.attrCache.cacheTimeout) * time.Second)
 
 	suite.mock.EXPECT().
 		StreamDir(internal.StreamDirOptions{Name: "dir"}).
