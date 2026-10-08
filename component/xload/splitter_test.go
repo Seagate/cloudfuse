@@ -261,8 +261,10 @@ func (suite *splitterTestSuite) TestSplitterStartStop() {
 
 	time.Sleep(5 * time.Second)
 
-	// stop comoponents
+	// stop components
 	rl.Stop()
+	ds.Stop()
+	rdm.Stop()
 
 	validateMD5(ts.path, remote_path, suite.assert)
 }
@@ -315,8 +317,10 @@ func (suite *splitterTestSuite) TestSplitterConsistency() {
 
 	time.Sleep(5 * time.Second)
 
-	// stop comoponents
+	// stop components
 	rl.Stop()
+	ds.Stop()
+	rdm.Stop()
 
 	validateMD5(ts.path, remote_path, suite.assert)
 }

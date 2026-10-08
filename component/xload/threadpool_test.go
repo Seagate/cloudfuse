@@ -126,8 +126,9 @@ func (suite *threadPoolTestSuite) TestPrioritySchedule() {
 
 	}
 
-	time.Sleep(1 * time.Second)
-	suite.assert.Equal(int32(100), callbackCnt)
+	suite.assert.Eventually(func() bool {
+		return atomic.LoadInt32(&callbackCnt) == 100
+	}, 5*time.Second, 10*time.Millisecond)
 	tp.Stop()
 }
 

@@ -265,7 +265,15 @@ func (value *attrCacheItem) markInCloud(inCloud bool) {
 	}
 }
 
+// cloneAttr replaces the item's attributes with a private copy so they can be modified.
+// Callers may still be reading the previous copy after the cache lock was released.
+func (value *attrCacheItem) cloneAttr() {
+	attr := *value.attr
+	value.attr = &attr
+}
+
 func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
+	value.cloneAttr()
 	value.attr.Mtime = changedAt
 	value.attr.Ctime = changedAt
 	value.attr.Size = size
@@ -276,6 +284,7 @@ func (value *attrCacheItem) touchModifyAndChangeTimes(changedAt time.Time) {
 	if value == nil || !value.exists() {
 		return
 	}
+	value.cloneAttr()
 	value.attr.Mtime = changedAt
 	value.attr.Ctime = changedAt
 	value.cachedAt = changedAt
@@ -287,6 +296,7 @@ func (value *attrCacheItem) setMode(mode os.FileMode) {
 		currentType = mode & os.ModeType
 	}
 	modeBits := mode & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+	value.cloneAttr()
 	value.attr.Mode = currentType | modeBits
 	value.attr.Flags.Clear(internal.PropFlagModeDefault)
 	value.attr.Ctime = time.Now()

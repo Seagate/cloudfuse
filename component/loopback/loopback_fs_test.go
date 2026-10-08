@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -317,6 +318,45 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFileGetAttr() {
 	info, err := os.Stat(filepath.Join(testPath, fileHello))
 	assert.NoError(err, "TestRenameWriteFile: cannot stat file")
 	assert.Equal(int64(5), info.Size())
+}
+
+// Renaming a file rewrites the path of its open handles while they are being read
+func (suite *LoopbackFSTestSuite) TestRenameFileDuringReadInBuffer() {
+	// Windows does not allow renaming a file while it is open
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
+	defer suite.cleanupTest()
+	assert := assert.New(suite.T())
+
+	handle, err := suite.lfs.OpenFile(
+		internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDONLY, Mode: os.FileMode(0644)},
+	)
+	assert.NoError(err)
+
+	renamed := fileLorem + ".renamed"
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for i := range 100 {
+			src, dst := fileLorem, renamed
+			if i%2 == 1 {
+				src, dst = dst, src
+			}
+			assert.NoError(suite.lfs.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst}))
+		}
+	})
+	data := make([]byte, 20)
+	for range 100 {
+		_, err := suite.lfs.ReadInBuffer(
+			&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data},
+		)
+		assert.NoError(err)
+	}
+	wg.Wait()
+
+	err = suite.lfs.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	assert.NoError(err)
 }
 
 func (suite *LoopbackFSTestSuite) TestReadInBuffer() {

@@ -122,6 +122,7 @@ func (fc *FileCache) configureScheduler() error {
 		// add cron callback
 		entryId, err := fc.cronScheduler.AddFunc(window.cronExpr, func() {
 			// Is this a transition from inactive?
+			fc.scheduleLock.Lock()
 			windowCount := fc.activeWindows.Add(1)
 			if windowCount == 1 {
 				// transition to active - open the window
@@ -131,6 +132,7 @@ func (fc *FileCache) configureScheduler() error {
 					window.name,
 				)
 			}
+			fc.scheduleLock.Unlock()
 			log.Info(
 				"FileCache::SchedulerCronFunc : %s (%s) started (numActive=%d)",
 				window.name,
@@ -153,6 +155,7 @@ func (fc *FileCache) configureScheduler() error {
 					return
 				case <-ctx.Done():
 					// Window has completed, update active window count
+					fc.scheduleLock.Lock()
 					windowCount = fc.activeWindows.Add(-1)
 					log.Info(
 						"FileCache::SchedulerCronFunc : %s (%s) ended (numActive=%d)",
@@ -168,6 +171,7 @@ func (fc *FileCache) configureScheduler() error {
 							window.name,
 						)
 					}
+					fc.scheduleLock.Unlock()
 					return
 				}
 			}
@@ -212,6 +216,13 @@ func (fc *FileCache) startScheduler() {
 	fc.cronScheduler.Start()
 }
 
+// uploadWindow returns a channel that is closed while scheduled uploads are allowed
+func (fc *FileCache) uploadWindow() <-chan struct{} {
+	fc.scheduleLock.RLock()
+	defer fc.scheduleLock.RUnlock()
+	return fc.startScheduledUploads
+}
+
 // flock must be locked
 func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 	log.Trace("FileCache::addPendingOp : %s", name)
@@ -237,7 +248,7 @@ func (fc *FileCache) servicePendingOps() {
 		case <-fc.componentStopping:
 			log.Crit("FileCache::servicePendingOps : Stopping")
 			return
-		case <-fc.startScheduledUploads:
+		case <-fc.uploadWindow():
 			if retryDelay > 0 {
 				select {
 				case <-time.After(retryDelay):
@@ -293,7 +304,7 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 		select {
 		case <-fc.componentStopping:
 			return false
-		case <-fc.startScheduledUploads:
+		case <-fc.uploadWindow():
 			name := key.(string)
 			numFilesProcessed++
 			if !fc.updateObject(name, value.(pendingFlags)) {

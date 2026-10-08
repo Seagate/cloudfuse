@@ -124,7 +124,6 @@ func (suite *xloadTestSuite) setupTestHelper(configuration string, startComponen
 }
 
 func (suite *xloadTestSuite) cleanupTest(stopComp bool) {
-	config.ResetConfig()
 	if stopComp {
 		err := suite.loopback.Stop()
 		suite.assert.NoError(err)
@@ -132,6 +131,8 @@ func (suite *xloadTestSuite) cleanupTest(stopComp bool) {
 		err = suite.xload.Stop()
 		suite.assert.NoError(err)
 	}
+	// reset only after the components stop, as their workers read config
+	config.ResetConfig()
 
 	// Delete the temp directories created
 	os.RemoveAll(suite.local_path)

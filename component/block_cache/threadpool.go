@@ -62,6 +62,7 @@ type workItem struct {
 	upload   bool              // Flag marking this is a upload request or not
 	blockId  string            // BlockId of the block
 	ETag     string            // Etag of the file before scheduling.
+	fileSize int64             // Size of the file when this item was scheduled
 }
 
 // Reason for storing Etag in workitem struct:
