@@ -1445,7 +1445,8 @@ func (suite *blockCacheTestSuite) TestZZZZLazyWrite() {
 	suite.assert.True(handle.Dirty())
 
 	_ = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-	time.Sleep(1 * time.Second)
+	// wait for the async close before turning lazy write back off
+	tobj.blockCache.fileCloseOpt.Wait()
 	tobj.blockCache.lazyWrite = false
 
 	// As lazy write is enabled flush shall not upload the file
@@ -3318,6 +3319,121 @@ func (suite *blockCacheTestSuite) TestReadCommittedLastBlocksOverwrite() {
 	_, err = os.Stat(storagePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(h.Size, int64((15*_1MB)+(_1MB/2)))
+}
+
+// An overwrite must wait for an in-flight upload of the same block. The upload worker marks
+// the block Synced before it clears the dirty bit and signals completion, so a writer that
+// trusts Synced alone can have its dirty bit wiped and its data never uploaded.
+func (suite *blockCacheTestSuite) TestOverwriteWaitsForInFlightUpload() {
+	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
+	tobj, err := setupPipeline(cfg)
+	defer tobj.cleanupPipeline()
+	suite.assert.NoError(err)
+
+	path := getTestFileName(suite.T().Name())
+	h, err := tobj.blockCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+
+	_, err = tobj.blockCache.WriteFile(
+		&internal.WriteFileOptions{Handle: h, Offset: 0, Data: dataBuff[:10]},
+	)
+	suite.assert.NoError(err)
+	node, found := h.GetValue("0")
+	suite.assert.True(found)
+	block := node.(*Block)
+
+	// Put the block in the state an upload worker leaves it in just before it finishes:
+	// queued for upload and already marked Synced, but still dirty and not yet signalled.
+	h.Lock()
+	block.Uploading()
+	block.flags.Set(BlockFlagUploading)
+	block.flags.Set(BlockFlagSynced)
+	tobj.blockCache.addToCooked(h, block)
+	h.Unlock()
+
+	done := make(chan error, 1)
+	go func() {
+		_, werr := tobj.blockCache.WriteFile(
+			&internal.WriteFileOptions{Handle: h, Offset: 0, Data: dataBuff[10:30]},
+		)
+		done <- werr
+	}()
+
+	select {
+	case <-done:
+		suite.assert.Fail("overwrite did not wait for the in-flight upload to finish")
+		return
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	// Let the simulated upload worker finish
+	block.NoMoreDirty()
+	block.Ready(BlockStatusUploaded)
+
+	select {
+	case err = <-done:
+		suite.assert.NoError(err)
+	case <-time.After(5 * time.Second):
+		suite.assert.Fail("overwrite never completed")
+	}
+	suite.assert.True(block.IsDirty(), "overwrite lost its dirty bit")
+
+	err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	data, err := os.ReadFile(filepath.Join(tobj.fake_storage_path, path))
+	suite.assert.NoError(err)
+	suite.assert.Equal(dataBuff[10:30], data)
+}
+
+// An upload must stage the block at the size recorded in the block list when it was lined up.
+// If it reads the live handle size instead, a concurrent write that extends the file makes it
+// stage a full block while the block list still records the short size, and the commit then
+// pads it with a filler block, corrupting the file.
+func (suite *blockCacheTestSuite) TestUploadRacingWriteThatExtendsFile() {
+	cfg := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 10"
+	tobj, err := setupPipeline(cfg)
+	defer tobj.cleanupPipeline()
+	suite.assert.NoError(err)
+
+	for i := range 20 {
+		path := fmt.Sprintf("%s_%d", getTestFileName(suite.T().Name()), i)
+		h, err := tobj.blockCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+		suite.assert.NoError(err)
+
+		_, err = tobj.blockCache.WriteFile(
+			&internal.WriteFileOptions{Handle: h, Offset: 0, Data: dataBuff[:10]},
+		)
+		suite.assert.NoError(err)
+
+		h.Lock()
+		err = tobj.blockCache.stageBlocks(h, 1)
+		lst, _ := h.GetValue("blockList")
+		staged := *lst.(map[int64]*blockInfo)[0]
+		h.Unlock()
+		suite.assert.NoError(err)
+
+		// extend the file while block 0 may still be uploading
+		_, err = tobj.blockCache.WriteFile(
+			&internal.WriteFileOptions{Handle: h, Offset: int64(2 * _1MB), Data: dataBuff[:10]},
+		)
+		suite.assert.NoError(err)
+
+		// wait for the upload of block 0, then compare what was staged with what was recorded
+		h.Lock()
+		tobj.blockCache.waitAndFreeUploadedBlocks(h, 1)
+		h.Unlock()
+		stagedPath := filepath.Join(tobj.fake_storage_path, path) + "_" +
+			strings.ReplaceAll(staged.id, "/", "_")
+		fi, err := os.Stat(stagedPath)
+		suite.assert.NoError(err)
+		if err == nil {
+			suite.assert.Equal(int64(staged.size), fi.Size(), "iteration %d", i)
+		}
+
+		err = tobj.blockCache.ReleaseFile(internal.ReleaseFileOptions{Handle: h})
+		suite.assert.NoError(err)
+	}
 }
 
 // In order for 'go test' to run this suite, we need to create

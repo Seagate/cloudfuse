@@ -53,6 +53,8 @@ type StatsManager struct {
 	waitGroup       sync.WaitGroup  // wait group to wait for stats manager thread to finish
 	items           chan *StatsItem // channel to hold the stats items
 	done            chan bool       // channel to indicate if the stats manager has completed or not
+	stop            chan struct{}   // closed by Stop to end the stats exporter thread
+	exporterDone    sync.WaitGroup  // wait group to wait for the stats exporter thread to finish
 	pool            *BlockPool      // Object of block pool
 }
 
@@ -108,6 +110,7 @@ func NewStatsManager(count uint32, isExportEnabled bool, pool *BlockPool) (*Stat
 		fileHandle: fh,
 		items:      make(chan *StatsItem, count*2),
 		done:       make(chan bool, 1),
+		stop:       make(chan struct{}),
 		pool:       pool,
 	}, nil
 }
@@ -124,16 +127,15 @@ func (sm *StatsManager) Start() {
 	_ = sm.writeToJSON([]byte("\n]"), false)
 
 	go sm.statsProcessor()
-	go sm.statsExporter()
+	sm.exporterDone.Go(sm.statsExporter)
 }
 
 // TODO:: xload : the stop method runs on unmount. See if the channels can be closed if the job is 100% complete
 func (sm *StatsManager) Stop() {
 	log.Debug("statsManager::stop : stop stats manager")
-	sm.done <- true // close the stats exporter thread
-	close(
-		sm.done,
-	) // TODO::xload : check if closing the done channel here will lead to closing the stats exporter thread
+	// stop the exporter before closing items, as it is the processor's only internal sender
+	close(sm.stop)
+	sm.exporterDone.Wait()
 	close(sm.items)
 	sm.waitGroup.Wait()
 
@@ -206,6 +208,9 @@ func (sm *StatsManager) statsExporter() {
 		case <-sm.done:
 			ticker.Stop()
 			return
+		case <-sm.stop:
+			ticker.Stop()
+			return
 		case <-ticker.C:
 			sm.AddStats(&StatsItem{
 				Component: STATS_MANAGER,
@@ -268,7 +273,11 @@ func (sm *StatsManager) calculateBandwidth() {
 
 	// TODO:: xload : determine more effective way to decide if the listing has completed and the stats exporter can be terminated
 	if sm.totalFiles == filesProcessed && sm.totalFiles != sm.dirs {
-		sm.done <- true
+		// the exporter may already have been told to finish, so do not block
+		select {
+		case sm.done <- true:
+		default:
+		}
 		return
 	}
 }

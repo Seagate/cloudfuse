@@ -269,9 +269,11 @@ func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 	err := os.Rename(oldPath, newPath)
 	handlemap.GetHandles().Range(func(key, value any) bool {
 		handle := value.(*handlemap.Handle)
+		handle.Lock()
 		if handle.Path == options.Src {
 			handle.Path = options.Dst
 		}
+		handle.Unlock()
 		return true
 	})
 	return err
@@ -298,10 +300,10 @@ func (lfs *LoopbackFS) ReadInBuffer(options *internal.ReadInBufferOptions) (int,
 		options.Handle = handlemap.NewHandle(options.Path)
 		options.Handle.Size = options.Size
 	}
-	log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 	f := options.Handle.GetFileObject()
 
 	if f == nil {
+		log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 		f1, err := os.Open(filepath.Join(lfs.path, options.Handle.Path))
 		if err != nil {
 			return 0, nil
@@ -317,6 +319,7 @@ func (lfs *LoopbackFS) ReadInBuffer(options *internal.ReadInBufferOptions) (int,
 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()
+	log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 
 	n, err := f.ReadAt(options.Data, options.Offset)
 	if err == io.EOF {

@@ -1420,6 +1420,42 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	suite.assert.True(checkItem.exists())
 }
 
+// Attributes returned by GetAttr are read by callers after the cache lock is released,
+// so later cache updates must not modify them in place
+func (suite *attrCacheTestSuite) TestGetAttrResultNotModifiedByCacheUpdates() {
+	defer suite.cleanupTest()
+	path := "a"
+	suite.addPathToCache(path)
+
+	attr, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.NoError(err)
+	before := *attr
+
+	readerDone := make(chan struct{})
+	go func() {
+		defer close(readerDone)
+		for range 1000 {
+			_ = attr.Size
+			_ = attr.Mtime
+			_ = attr.Mode
+		}
+	}()
+
+	truncateOptions := internal.TruncateFileOptions{Name: path, NewSize: 1234}
+	suite.mock.EXPECT().TruncateFile(truncateOptions).Return(nil)
+	suite.assert.NoError(suite.attrCache.TruncateFile(truncateOptions))
+	chmodOptions := internal.ChmodOptions{Name: path, Mode: 0600}
+	suite.mock.EXPECT().Chmod(chmodOptions).Return(nil)
+	suite.assert.NoError(suite.attrCache.Chmod(chmodOptions))
+	<-readerDone
+
+	suite.assert.Equal(before, *attr)
+	updated, err := suite.attrCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(1234, updated.Size)
+	suite.assert.Equal(os.FileMode(0600), updated.Mode.Perm())
+}
+
 // Tests CopyFromFile
 func (suite *attrCacheTestSuite) TestCopyFromFileError() {
 	defer suite.cleanupTest()
