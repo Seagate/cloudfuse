@@ -2,8 +2,8 @@
 
 # URL of blobfuse2 repo
 blobfuse2_repo="https://github.com/Azure/azure-storage-fuse.git"
-tags="tags/blobfuse2-2.5.0"
-year="2025"
+tags="tags/blobfuse2-2.5.4"
+year="2026"
 
 # Create temporary directory to clone into
 tmp_dir=$(mktemp -d)

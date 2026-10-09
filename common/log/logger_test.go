@@ -248,7 +248,7 @@ func (lts *LoggerTestSuite) TestSetCrashOutput() {
 
 	// "base" with a real, writable file -- success path; runtime crash output is updated.
 	resetCrashOutputState()
-	tmp, err := os.CreateTemp("", "blobfuse2-crash-base-*.log")
+	tmp, err := os.CreateTemp("", "cloudfuse-crash-base-*.log")
 	assert.NoError(err)
 	defer os.Remove(tmp.Name())
 	assert.NoError(tmp.Close())
@@ -279,7 +279,7 @@ func (lts *LoggerTestSuite) TestCrashOutputTarget() {
 	assert := assert.New(lts.T())
 
 	// "base" with a real path returns that path.
-	assert.Equal("/tmp/blobfuse2.log", crashOutputTarget("base", "/tmp/blobfuse2.log"))
+	assert.Equal("/tmp/cloudfuse.log", crashOutputTarget("base", "/tmp/cloudfuse.log"))
 
 	// "base" with empty / stdout returns "" (no file to mirror to).
 	assert.Empty(crashOutputTarget("base", ""))
@@ -357,7 +357,7 @@ func (lts *LoggerTestSuite) TestSetupCrashOutputBaseSkipsSighupHandler() {
 	assert := assert.New(lts.T())
 	resetCrashOutputState()
 
-	tmp, err := os.CreateTemp("", "blobfuse2-crash-base-nosighup-*.log")
+	tmp, err := os.CreateTemp("", "cloudfuse-crash-base-nosighup-*.log")
 	assert.NoError(err)
 	defer os.Remove(tmp.Name())
 	assert.NoError(tmp.Close())
@@ -374,7 +374,7 @@ func (lts *LoggerTestSuite) TestSetupCrashOutputRegistersHookAndHandler() {
 	assert := assert.New(lts.T())
 	resetCrashOutputState()
 
-	tmp, err := os.CreateTemp("", "blobfuse2-crash-setup-*.log")
+	tmp, err := os.CreateTemp("", "cloudfuse-crash-setup-*.log")
 	assert.NoError(err)
 	defer os.Remove(tmp.Name())
 	assert.NoError(tmp.Close())

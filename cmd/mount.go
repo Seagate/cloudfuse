@@ -537,7 +537,7 @@ var mountCmd = &cobra.Command{
 		// redirects to the per-mount .trace file). Also re-attaches the fd after in-process rotation and on SIGHUP
 		// from external rotators (logrotate, AKS Blob CSI driver, ...). Captures panics in any goroutine, including
 		// those spawned by libfuse callbacks. Called after the first log.Crit so that in syslog mode rsyslog has
-		// already created /var/log/blobfuse2.log.
+		// already created /var/log/Cloudfuse.log.
 		log.SetupCrashOutput(options.Logging.Type, options.Logging.LogFilePath)
 
 		if directIO {
