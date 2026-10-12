@@ -80,7 +80,13 @@ type AzStorageConfig struct {
 	cpkEncryptionKeySha256 string
 
 	// Blob filters
-	filter *blobfilter.BlobFilter
+	filter       *blobfilter.BlobFilter
+	filterHasTag bool // true when the configured filter references blob tags
+	isHNS        bool // true when the underlying account is ADLS Gen2 (hierarchical namespace)
+
+	// Rate limiting
+	capMbpsRead int64
+	capIOps     int64
 }
 
 type AzStorageConnection struct {

@@ -38,6 +38,7 @@ import (
 	"testing"
 
 	"github.com/awnumar/memguard"
+	"github.com/prometheus/procfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -782,4 +783,37 @@ func (suite *utilTestSuite) TestGetGoroutineIDParallel() {
 	}
 
 	suite.Len(idMap, workers, "expected unique goroutine ids equal to workers")
+}
+
+func (suite *utilTestSuite) TestGetAvailableMemoryBytesFromMeminfoFallback() {
+	availableMemory := uint64(1024)
+	freeMemory := uint64(512)
+
+	actual, err := getAvailableMemoryBytesFromMeminfo(procfs.Meminfo{
+		MemAvailableBytes: &availableMemory,
+		MemFreeBytes:      &freeMemory,
+	})
+	suite.assert.NoError(err)
+	suite.assert.Equal(availableMemory, actual)
+
+	actual, err = getAvailableMemoryBytesFromMeminfo(procfs.Meminfo{
+		MemFreeBytes: &freeMemory,
+	})
+	suite.assert.NoError(err)
+	suite.assert.Equal(freeMemory, actual)
+
+	zeroMemory := uint64(0)
+	actual, err = getAvailableMemoryBytesFromMeminfo(procfs.Meminfo{
+		MemAvailableBytes: &zeroMemory,
+		MemFreeBytes:      &freeMemory,
+	})
+	suite.assert.NoError(err)
+	suite.assert.Equal(freeMemory, actual)
+
+	actual, err = getAvailableMemoryBytesFromMeminfo(procfs.Meminfo{
+		MemAvailableBytes: &zeroMemory,
+		MemFreeBytes:      &zeroMemory,
+	})
+	suite.assert.Error(err)
+	suite.assert.Equal(uint64(0), actual)
 }

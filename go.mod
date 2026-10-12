@@ -22,6 +22,7 @@ require (
 	github.com/montanaflynn/stats v0.12.7
 	github.com/netresearch/go-cron v0.16.1
 	github.com/petermattis/goid v0.0.0-20260819104326-d9896a8858b2
+	github.com/prometheus/procfs v0.22.0
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.42.0
 	github.com/sevlyar/go-daemon v0.1.7
@@ -38,6 +39,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sys v0.48.0
+	golang.org/x/time v0.16.0
 	gopkg.in/ini.v1 v1.67.3
 )
 

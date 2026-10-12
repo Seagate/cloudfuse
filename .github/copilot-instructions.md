@@ -1,6 +1,6 @@
 # Azure Storage Fuse (cloudfuse)
 
-Cloudfuse is a  FUSE filesystem driver that provides virtual filesystem backed by S3 or Azure Blob Storage. It uses libfuse (fuse3) to communicate with the Linux FUSE kernel module and implements filesystem operations using the AWS S3 or Azure Storage REST APIs.
+Cloudfuse is a FUSE filesystem driver that provides virtual filesystem backed by S3 or Azure Blob Storage. It uses libfuse (fuse3) to communicate with the Linux FUSE kernel module and implements filesystem operations using the AWS S3 or Azure Storage REST APIs.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
@@ -11,26 +11,32 @@ Always reference these instructions first and fallback to search or bash command
 **CRITICAL**: All build and test commands include specific timeout warnings. NEVER CANCEL long-running operations.
 
 - Install required dependencies:
+
   ```bash
   sudo apt update
   sudo apt install -y libfuse3-dev fuse3 gcc
   ```
 
 - Install Go 1.27.0+ (already available in most environments; version is pinned in [go.mod](../go.mod)):
+
   ```bash
   go version  # Should show 1.27.0 or higher
   ```
 
 - Build cloudfuse binary:
+
   ```bash
   ./build.sh
   ```
+
   **Timing**: ~30 seconds. NEVER CANCEL. Use timeout 120+ seconds.
 
 - Build health monitor binary:
+
   ```bash
   ./build.sh health
   ```
+
   **Timing**: ~5 seconds. Use timeout 60+ seconds.
 
 - Verify binary functionality:
@@ -42,18 +48,23 @@ Always reference these instructions first and fallback to search or bash command
 ### Testing
 
 - Run unit tests (core components only):
+
   ```bash
   go test -v -timeout=10m ./internal/... ./common/... --tags=unittest,fuse3
   ```
+
   **Timing**: ~2 minutes. NEVER CANCEL. Use timeout 15+ minutes.
 
 - Run full unit tests (some may fail without Azure credentials):
+
   ```bash
   go test -v -timeout=45m ./... --tags=unittest,fuse3
   ```
+
   **WARNING**: Expected network/credential test failures. **Timing**: ~5-10 minutes. NEVER CANCEL. Use timeout 60+ minutes.
 
 - Run linting:
+
   ```bash
   # Install golangci-lint if not available
   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
@@ -61,6 +72,7 @@ Always reference these instructions first and fallback to search or bash command
   # Run linting
   $(go env GOPATH)/bin/golangci-lint run --tests=false --build-tags fuse3 --max-issues-per-linter=0
   ```
+
   **Timing**: ~10 seconds. Use timeout 60+ seconds.
 
 - Check code formatting:
@@ -74,6 +86,7 @@ Always reference these instructions first and fallback to search or bash command
 **ALWAYS test these scenarios after making changes**:
 
 1. **Binary Creation and Basic Commands**:
+
    ```bash
    ./build.sh
    ./cloudfuse --version
@@ -82,6 +95,7 @@ Always reference these instructions first and fallback to search or bash command
    ```
 
 2. **Config Generation**:
+
    ```bash
    mkdir -p /tmp/cloudfuse-test
    ./cloudfuse gen-config --tmp-path=/tmp/cloudfuse-test --o /tmp/cloudfuse-test/config.yaml
@@ -89,6 +103,7 @@ Always reference these instructions first and fallback to search or bash command
    ```
 
 3. **Health Monitor**:
+
    ```bash
    ./build.sh health
    ./cfusemon --help
@@ -197,6 +212,7 @@ $(go env GOPATH)/bin/golangci-lint run --tests=false --build-tags fuse3 --max-is
 ## Key Files to Monitor
 
 When making changes, always check these files for consistency:
+
 - `go.mod` - dependency versions
 - `main.go` - entry point
 - `build.sh` - build configuration

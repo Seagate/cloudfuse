@@ -14,6 +14,10 @@ components:
 
 libfuse:
   network-share: true
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 120
+  negative-entry-expiration-sec: 240
+  kernel-list-cache-expiration-sec: 120
 
 file_cache:
   path: /<PATH>/<TO>/<CACHE_DIR>
@@ -22,6 +26,10 @@ file_cache:
 
 attr_cache:
   timeout-sec: 7200
+  # max-size-mb controls how much memory the attribute cache may use.
+  # Default: auto-tuned to 1% of total RAM, clamped to [64 MB, 1 GB].
+  # Set to 0 or omit to use the auto-tuned value.
+  # max-size-mb: 256
 
 azstorage:
   type: block

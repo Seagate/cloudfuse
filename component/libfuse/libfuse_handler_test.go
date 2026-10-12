@@ -608,6 +608,10 @@ func (suite *libfuseTestSuite) TestRenameSrcGetAttrError() {
 	testRenameSrcGetAttrError(suite)
 }
 
+func (suite *libfuseTestSuite) TestRenameDirEnametoolong() {
+	testRenameDirEnametoolong(suite)
+}
+
 func (suite *libfuseTestSuite) TestSymlink() {
 	testSymlink(suite)
 }

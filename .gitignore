@@ -5,6 +5,9 @@ config*.yaml
 testcnf.yaml
 cloudfuse.log
 cloudfuse.test
+blobfuse2.log
+blobfuse2.log.*
+blobfuse2.test
 azuretest.json
 cloudfuse
 cloudfuse.exe
@@ -43,7 +46,15 @@ component/azstorage/logfile.txt
 logfile.txt
 **/logfile.txt
 **/logfile.txt.*
+# Test trace files
+*/_tmp_*.trace
+_tmp_*.trace
 # Emacs backup and auto-save files
 *~
 \#*\#
 .\#*
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+.agents

@@ -149,6 +149,10 @@ var DefaultWorkDir string
 var DefaultLogFilePath string
 var StatsConfigFilePath string
 
+// SyslogFilePath is where rsyslog routes cloudfuse-tagged messages (see setup/11-cloudfuse.conf).
+// Used as a fallback target for runtime crash dumps when the syslog logger is in use.
+var SyslogFilePath = "/var/log/cloudfuse.log"
+
 var EnableMonitoring = false
 var CfsDisabled = false
 
