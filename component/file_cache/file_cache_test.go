@@ -2399,6 +2399,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferConcurrentSameHandle() {
 		})
 	}
 	wg.Wait()
+	suite.assert.Equal(uint64(1600), handle.OptCnt.Load())
 
 	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -2482,6 +2483,7 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(data), length)
+	suite.assert.Equal(uint64(1), handle.OptCnt.Load())
 	// Check that the local cache updated with data
 	d, _ := os.ReadFile(filepath.Join(suite.cache_path, file))
 	suite.assert.Equal(data, d)

@@ -1907,10 +1907,7 @@ func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, e
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
-	options.Handle.Lock()
-	options.Handle.OptCnt++
-	optCnt := options.Handle.OptCnt
-	options.Handle.Unlock()
+	optCnt := options.Handle.OptCnt.Add(1)
 	if (optCnt % defaultCacheUpdateCount) == 0 {
 		_ = fc.FileUsed(options.Handle.Path)
 	}
@@ -1957,10 +1954,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
-	options.Handle.Lock()
-	options.Handle.OptCnt++
-	optCnt := options.Handle.OptCnt
-	options.Handle.Unlock()
+	optCnt := options.Handle.OptCnt.Add(1)
 	if (optCnt % defaultCacheUpdateCount) == 0 {
 		_ = fc.FileUsed(options.Handle.Path)
 	}

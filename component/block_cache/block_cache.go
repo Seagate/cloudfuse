@@ -846,7 +846,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			}
 		} else {
 			// This is a case of random read so increment the random read count
-			handle.OptCnt++
+			optCnt := handle.OptCnt.Add(1)
 
 			log.Debug(
 				"BlockCache::getBlock : Unable to get block %v=>%s (offset %v, index %v) Random %v",
@@ -854,7 +854,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 				handle.Path,
 				readoffset,
 				index,
-				handle.OptCnt,
+				optCnt,
 			)
 
 			// This block is not present even after prefetch so lets download it now
@@ -908,7 +908,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			block.flags.Clear(BlockFlagDownloading)
 
 			// Download complete and you are first reader of this block
-			if !bc.noPrefetch && handle.OptCnt <= MIN_RANDREAD {
+			if !bc.noPrefetch && handle.OptCnt.Load() <= MIN_RANDREAD {
 				// So far this file has been read sequentially so prefetch more
 				val, _ := handle.GetValue("#")
 				if int64(val.(uint64)*bc.blockSize) < handle.Size {
@@ -976,7 +976,7 @@ func (bc *BlockCache) startPrefetch(handle *handlemap.Handle, index uint64, pref
 	currentCnt := handle.Buffers.Cooked.Len() + handle.Buffers.Cooking.Len()
 	cnt := uint32(0)
 
-	if handle.OptCnt > MIN_RANDREAD {
+	if handle.OptCnt.Load() > MIN_RANDREAD {
 		// This handle has been read randomly and we have reached the threshold to declare a random read case
 
 		if currentCnt > MIN_PREFETCH {
