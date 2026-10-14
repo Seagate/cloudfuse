@@ -19,7 +19,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/go-viper/mapstructure/v2 v2.5.0
-	github.com/montanaflynn/stats v0.12.7
+	github.com/montanaflynn/stats v0.13.0
 	github.com/netresearch/go-cron v0.16.1
 	github.com/petermattis/goid v0.0.0-20260819104326-d9896a8858b2
 	github.com/radovskyb/watcher v1.0.7
@@ -37,7 +37,7 @@ require (
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
-	golang.org/x/sys v0.48.0
+	golang.org/x/sys v0.49.0
 	gopkg.in/ini.v1 v1.67.3
 )
 
