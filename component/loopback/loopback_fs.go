@@ -303,7 +303,6 @@ func (lfs *LoopbackFS) ReadInBuffer(options *internal.ReadInBufferOptions) (int,
 	f := options.Handle.GetFileObject()
 
 	if f == nil {
-		log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 		f1, err := os.Open(filepath.Join(lfs.path, options.Handle.Path))
 		if err != nil {
 			return 0, nil
@@ -319,7 +318,6 @@ func (lfs *LoopbackFS) ReadInBuffer(options *internal.ReadInBufferOptions) (int,
 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()
-	log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 
 	n, err := f.ReadAt(options.Data, options.Offset)
 	if err == io.EOF {
