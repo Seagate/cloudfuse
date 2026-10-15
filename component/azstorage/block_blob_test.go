@@ -356,7 +356,7 @@ func generateContainerName() string {
 
 func createTestContainerWithRetry(create func() error) error {
 	var err error
-	for i := range 5 {
+	for i := 0; i < 5; i++ {
 		err = create()
 		if err == nil {
 			return nil

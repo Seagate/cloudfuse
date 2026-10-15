@@ -482,6 +482,17 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		if !valid {
 			return nil, fmt.Errorf("block size mismatch for %s", options.Name)
 		}
+
+		// Size and block list are fetched separately, so a concurrent write or truncate can make them disagree.
+		if n := len(*blockList); n > 0 && int64(n-1)*int64(bc.blockSize) >= handle.Size {
+			log.Err(
+				"BlockCache::OpenFile : Block list of %s does not match size %v [blocks: %v]",
+				options.Name,
+				handle.Size,
+				n,
+			)
+			return nil, fmt.Errorf("block list does not match size for %s", options.Name)
+		}
 	} else if options.Flags&os.O_WRONLY != 0 {
 		handle.RemoveValue("ETAG")
 	}
@@ -667,16 +678,16 @@ func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
 
 // ReadInBuffer: Read the file into a buffer
 func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
-	if options.Offset >= options.Handle.Size {
-		// EOF reached so early exit
-		return 0, io.EOF
-	}
-
 	// As of now we allow only one operation on a handle at a time
 	// This simplifies the logic of block-cache otherwise we will have to handle
 	// a lot of race conditions and logic becomes complex and sub-performant
 	options.Handle.Lock()
 	defer options.Handle.Unlock()
+
+	if options.Offset >= options.Handle.Size {
+		// EOF reached so early exit
+		return 0, io.EOF
+	}
 
 	// Keep getting next blocks until you read the request amount of data
 	dataRead := int(0)
