@@ -525,14 +525,15 @@ func (p *lruPolicy) setHead(node *lruNode) {
 func (p *lruPolicy) deleteExpiredNodes() {
 	log.Debug("lruPolicy::deleteExpiredNodes : Starts")
 
+	p.Lock()
 	if p.lastMarker.next == nil {
+		p.Unlock()
 		return
 	}
 
 	delItems := make([]*lruNode, 0, p.maxEviction)
 	count := uint32(0)
 
-	p.Lock()
 	node := p.lastMarker.next
 	p.lastMarker.next = nil
 

@@ -48,6 +48,7 @@ func (suite *HandleMapSuite) TestNewHandle() {
 	suite.assert.NotNil(h)
 	suite.assert.Equal(InvalidHandleID, h.ID)
 	suite.assert.Equal("abc", h.Path)
+	suite.assert.Zero(h.OptCnt.Load())
 }
 
 func (suite *HandleMapSuite) TestHandleFlags() {

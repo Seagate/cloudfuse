@@ -126,8 +126,9 @@ func (suite *threadPoolTestSuite) TestPrioritySchedule() {
 		tp.Schedule(i < 20, &workItem{failCnt: 5})
 	}
 
-	time.Sleep(100 * time.Millisecond)
-	suite.assert.Equal(int32(100), callbackCnt)
+	suite.assert.Eventually(func() bool {
+		return atomic.LoadInt32(&callbackCnt) == 100
+	}, 5*time.Second, 10*time.Millisecond)
 	tp.Stop()
 }
 
@@ -158,9 +159,10 @@ func (suite *threadPoolTestSuite) TestPriorityScheduleWithWriter() {
 		tp.Schedule(i < 20, &workItem{failCnt: 5, upload: true, blockId: "test"})
 	}
 
-	time.Sleep(100 * time.Millisecond)
-	suite.assert.Equal(int32(100), callbackWCnt)
-	suite.assert.Equal(int32(0), callbackRCnt)
+	suite.assert.Eventually(func() bool {
+		return atomic.LoadInt32(&callbackWCnt) == 100
+	}, 5*time.Second, 10*time.Millisecond)
+	suite.assert.Equal(int32(0), atomic.LoadInt32(&callbackRCnt))
 	tp.Stop()
 }
 

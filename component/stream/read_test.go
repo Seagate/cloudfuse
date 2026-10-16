@@ -826,8 +826,12 @@ func (suite *streamTestSuite) TestAsyncOpen() {
 			0,
 		)
 		suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
+		// match on the handle itself: comparing the whole options would read the other
+		// goroutine's handle while it is being modified
 		suite.mock.EXPECT().
-			ReadInBuffer(readInBufferOptions).
+			ReadInBuffer(gomock.Cond(func(o *internal.ReadInBufferOptions) bool {
+				return o.Handle == handle && o.Offset == readInBufferOptions.Offset
+			})).
 			Return(int(suite.stream.BlockSize), nil)
 		wg.Add(1)
 		go asyncOpenFile(suite, openFileOptions)
@@ -858,8 +862,12 @@ func (suite *streamTestSuite) TestAsyncClose() {
 			0,
 		)
 		suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
+		// match on the handle itself: comparing the whole options would read the other
+		// goroutine's handle while it is being modified
 		suite.mock.EXPECT().
-			ReadInBuffer(readInBufferOptions).
+			ReadInBuffer(gomock.Cond(func(o *internal.ReadInBufferOptions) bool {
+				return o.Handle == handle && o.Offset == readInBufferOptions.Offset
+			})).
 			Return(int(suite.stream.BlockSize), nil)
 		wg.Add(1)
 		go asyncOpenFile(suite, openFileOptions)
@@ -868,7 +876,11 @@ func (suite *streamTestSuite) TestAsyncClose() {
 
 	for _, handle := range []*handlemap.Handle{handle_1, handle_2} {
 		releaseFileOptions := internal.ReleaseFileOptions{Handle: handle}
-		suite.mock.EXPECT().ReleaseFile(releaseFileOptions).Return(nil)
+		suite.mock.EXPECT().
+			ReleaseFile(gomock.Cond(func(o internal.ReleaseFileOptions) bool {
+				return o.Handle == handle
+			})).
+			Return(nil)
 		wg.Add(1)
 		go asyncCloseFile(suite, releaseFileOptions)
 	}

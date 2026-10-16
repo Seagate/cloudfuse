@@ -85,9 +85,11 @@ type FileCache struct {
 	fileCloseOpt sync.WaitGroup
 
 	componentStopping     chan struct{}
+	pendingOpsWorker      sync.WaitGroup
 	schedule              WeeklySchedule
 	activeWindows         atomic.Int32
-	startScheduledUploads chan struct{}
+	scheduleLock          sync.RWMutex  // guards startScheduledUploads and window open/close transitions
+	startScheduledUploads chan struct{} // closed while uploads are allowed
 	cronScheduler         *cron.Cron
 }
 
@@ -194,7 +196,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	}
 	if fc.syncsPendingOps() {
 		fc.pendingOpAdded = make(chan struct{}, 1)
-		go fc.servicePendingOps()
+		fc.pendingOpsWorker.Go(fc.servicePendingOps)
 	}
 
 	return nil
@@ -206,6 +208,7 @@ func (fc *FileCache) Stop() error {
 
 	// stop async uploads
 	close(fc.componentStopping)
+	fc.pendingOpsWorker.Wait()
 
 	// Stop the cron scheduler and wait for running jobs to complete
 	if fc.cronScheduler != nil {
@@ -1583,12 +1586,13 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 
 	handle.UnixFD = uint64(f.Fd())
+	handle.SetFileObject(f)
+	// libfuse reads the file object directly once the handle is marked Cached, so set it first
 	if !fc.offloadIO {
 		handle.Flags.Set(handlemap.HandleFlagCached)
 	}
 
 	log.Info("FileCache::openFileInternal : file=%s, fd=%d", handle.Path, f.Fd())
-	handle.SetFileObject(f)
 
 	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
 	handle.RemoveValue("openFileOptions")
@@ -1903,10 +1907,8 @@ func (fc *FileCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, e
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
-	options.Handle.Lock()
-	options.Handle.OptCnt++
-	options.Handle.Unlock()
-	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
+	optCnt := options.Handle.OptCnt.Add(1)
+	if (optCnt % defaultCacheUpdateCount) == 0 {
 		_ = fc.FileUsed(options.Handle.Path)
 	}
 
@@ -1952,10 +1954,8 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
-	options.Handle.Lock()
-	options.Handle.OptCnt++
-	options.Handle.Unlock()
-	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
+	optCnt := options.Handle.OptCnt.Add(1)
+	if (optCnt % defaultCacheUpdateCount) == 0 {
 		_ = fc.FileUsed(options.Handle.Path)
 	}
 
@@ -2088,7 +2088,7 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 
 	// decide whether to schedule the upload instead
 	select {
-	case <-fc.startScheduledUploads:
+	case <-fc.uploadWindow():
 		// upload now
 	default:
 		// schedule is inactive - push to pendingOps
