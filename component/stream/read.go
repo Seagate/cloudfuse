@@ -94,7 +94,7 @@ func (r *ReadCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handl
 	}
 	if !r.StreamOnly {
 		handlemap.CreateCacheObject(int64(r.BufferSize), handle)
-		if r.CachedObjects >= r.CachedObjLimit {
+		if atomic.LoadInt32(&r.CachedObjects) >= r.CachedObjLimit {
 			log.Trace(
 				"Stream::OpenFile : file handle limit exceeded - switch handle to stream only mode %s [%v]",
 				options.Name,

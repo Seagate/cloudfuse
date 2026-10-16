@@ -482,6 +482,17 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		if !valid {
 			return nil, fmt.Errorf("block size mismatch for %s", options.Name)
 		}
+
+		// Size and block list are fetched separately, so a concurrent write or truncate can make them disagree.
+		if n := len(*blockList); n > 0 && int64(n-1)*int64(bc.blockSize) >= handle.Size {
+			log.Err(
+				"BlockCache::OpenFile : Block list of %s does not match size %v [blocks: %v]",
+				options.Name,
+				handle.Size,
+				n,
+			)
+			return nil, fmt.Errorf("block list does not match size for %s", options.Name)
+		}
 	} else if options.Flags&os.O_WRONLY != 0 {
 		handle.RemoveValue("ETAG")
 	}
@@ -667,16 +678,16 @@ func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
 
 // ReadInBuffer: Read the file into a buffer
 func (bc *BlockCache) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
-	if options.Offset >= options.Handle.Size {
-		// EOF reached so early exit
-		return 0, io.EOF
-	}
-
 	// As of now we allow only one operation on a handle at a time
 	// This simplifies the logic of block-cache otherwise we will have to handle
 	// a lot of race conditions and logic becomes complex and sub-performant
 	options.Handle.Lock()
 	defer options.Handle.Unlock()
+
+	if options.Offset >= options.Handle.Size {
+		// EOF reached so early exit
+		return 0, io.EOF
+	}
 
 	// Keep getting next blocks until you read the request amount of data
 	dataRead := int(0)
@@ -846,7 +857,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			}
 		} else {
 			// This is a case of random read so increment the random read count
-			handle.OptCnt++
+			optCnt := handle.OptCnt.Add(1)
 
 			log.Debug(
 				"BlockCache::getBlock : Unable to get block %v=>%s (offset %v, index %v) Random %v",
@@ -854,7 +865,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 				handle.Path,
 				readoffset,
 				index,
-				handle.OptCnt,
+				optCnt,
 			)
 
 			// This block is not present even after prefetch so lets download it now
@@ -908,7 +919,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			block.flags.Clear(BlockFlagDownloading)
 
 			// Download complete and you are first reader of this block
-			if !bc.noPrefetch && handle.OptCnt <= MIN_RANDREAD {
+			if !bc.noPrefetch && handle.OptCnt.Load() <= MIN_RANDREAD {
 				// So far this file has been read sequentially so prefetch more
 				val, _ := handle.GetValue("#")
 				if int64(val.(uint64)*bc.blockSize) < handle.Size {
@@ -976,7 +987,7 @@ func (bc *BlockCache) startPrefetch(handle *handlemap.Handle, index uint64, pref
 	currentCnt := handle.Buffers.Cooked.Len() + handle.Buffers.Cooking.Len()
 	cnt := uint32(0)
 
-	if handle.OptCnt > MIN_RANDREAD {
+	if handle.OptCnt.Load() > MIN_RANDREAD {
 		// This handle has been read randomly and we have reached the threshold to declare a random read case
 
 		if currentCnt > MIN_PREFETCH {
@@ -1190,6 +1201,7 @@ func (bc *BlockCache) lineupDownload(handle *handlemap.Handle, block *Block, pre
 		failCnt:  0,
 		upload:   false,
 		ETag:     Etag,
+		fileSize: handle.Size,
 	}
 
 	// Remove this block from free block list and add to in-process list
@@ -1258,12 +1270,12 @@ func (bc *BlockCache) download(item *workItem) {
 				}
 
 				if numberOfBytes != int(bc.blockSize) &&
-					item.block.offset+uint64(numberOfBytes) != uint64(item.handle.Size) {
+					item.block.offset+uint64(numberOfBytes) != uint64(item.fileSize) {
 					log.Err(
 						"BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v",
-						bc.getBlockSize(uint64(item.handle.Size), item.block),
+						bc.getBlockSize(uint64(item.fileSize), item.block),
 						numberOfBytes,
-						item.handle.Size,
+						item.fileSize,
 					)
 					successfulRead = false
 					f.Close()
@@ -1305,8 +1317,7 @@ func (bc *BlockCache) download(item *workItem) {
 	if item.failCnt > MAX_FAIL_CNT {
 		// If we failed to read the data 3 times then just give up
 		log.Err(
-			"BlockCache::download : 3 attempts to download a block have failed %v=>%s (index %v, offset %v)",
-			item.handle.ID,
+			"BlockCache::download : 3 attempts to download a block have failed %s (index %v, offset %v)",
 			item.handle.Path,
 			item.block.id,
 			item.block.offset,
@@ -1319,8 +1330,7 @@ func (bc *BlockCache) download(item *workItem) {
 	if err != nil && err != io.EOF {
 		// Fail to read the data so just reschedule this request
 		log.Err(
-			"BlockCache::download : Failed to read %v=>%s from offset %v [%s]",
-			item.handle.ID,
+			"BlockCache::download : Failed to read %s from offset %v [%s]",
 			item.handle.Path,
 			item.block.id,
 			err.Error(),
@@ -1331,8 +1341,7 @@ func (bc *BlockCache) download(item *workItem) {
 	} else if n == 0 {
 		// No data read so just reschedule this request
 		log.Err(
-			"BlockCache::download : Failed to read %v=>%s from offset %v [0 bytes read]",
-			item.handle.ID,
+			"BlockCache::download : Failed to read %s from offset %v [0 bytes read]",
 			item.handle.Path,
 			item.block.id,
 		)
@@ -1345,8 +1354,7 @@ func (bc *BlockCache) download(item *workItem) {
 	if etag != "" {
 		if item.ETag != "" && item.ETag != etag {
 			log.Err(
-				"BlockCache::download : Blob has changed for %v=>%s (index %v, offset %v)",
-				item.handle.ID,
+				"BlockCache::download : Blob has changed for %s (index %v, offset %v)",
 				item.handle.Path,
 				item.block.id,
 				item.block.offset,
@@ -1600,7 +1608,8 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 		block = node.(*Block)
 
 		// If the block was staged earlier then we are overwriting it here so move it back to cooking queue
-		if block.flags.IsSet(BlockFlagSynced) {
+		// The upload worker sets Synced before it signals completion, so wait for it if it is still uploading
+		if block.flags.IsSet(BlockFlagSynced) && !block.flags.IsSet(BlockFlagUploading) {
 			log.Debug(
 				"BlockCache::getOrCreateBlock : Overwriting back to staged block %v for %v=>%s",
 				block.id,
@@ -1777,6 +1786,7 @@ func (bc *BlockCache) lineupUpload(
 		failCnt:  0,
 		upload:   true,
 		blockId:  id,
+		fileSize: handle.Size,
 	}
 
 	block.Uploading()
@@ -1854,7 +1864,7 @@ func (bc *BlockCache) upload(item *workItem) {
 	flock := bc.fileLocks.Get(fileName)
 	flock.Lock()
 	defer flock.Unlock()
-	blockSize := bc.getBlockSize(uint64(item.handle.Size), item.block)
+	blockSize := bc.getBlockSize(uint64(item.fileSize), item.block)
 	// This block is updated so we need to stage it now
 	err := bc.NextComponent().StageData(internal.StageDataOptions{
 		Name:   item.handle.Path,

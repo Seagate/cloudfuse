@@ -209,6 +209,7 @@ func (suite *lruPolicyTestSuite) TestCacheValid() {
 
 func (suite *lruPolicyTestSuite) TestCachePurge() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default policy generated
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
@@ -354,6 +355,27 @@ func (suite *lruPolicyTestSuite) verifyPolicy(expectedPolicy, actualPolicy *lruP
 		suite.assert.NotNil(actual, "actual list is shorter than expected")
 		suite.assert.NotNil(expected, "actual list is longer than expected")
 	}
+}
+
+// The timeout monitor expires nodes while file operations keep reordering the LRU list
+func (suite *lruPolicyTestSuite) TestCacheValidDuringExpiry() {
+	defer suite.cleanupTest()
+	pathPrefix := filepath.Join(cache_path, "temp")
+	deadline := time.Now().Add(2500 * time.Millisecond)
+	var wg sync.WaitGroup
+	for w := range 4 {
+		wg.Go(func() {
+			for i := w; time.Now().Before(deadline); i++ {
+				suite.policy.CacheValid(pathPrefix + fmt.Sprint(i%2))
+			}
+		})
+	}
+	// run expiry passes the way the timeout monitor does, but much more often
+	for time.Now().Before(deadline) {
+		suite.policy.updateMarker()
+		suite.policy.deleteExpiredNodes()
+	}
+	wg.Wait()
 }
 
 func (suite *lruPolicyTestSuite) TestCreateSnapshotEmpty() {

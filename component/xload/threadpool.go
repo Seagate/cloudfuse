@@ -50,6 +50,10 @@ type ThreadPool struct {
 
 	// Context to cancel the thread pool
 	ctx context.Context
+
+	// Closed by Stop to end the workers and reject new work items.
+	// The item channels are never closed, so a late Schedule can not panic.
+	stop chan struct{}
 }
 
 // NewThreadPool creates a new thread pool
@@ -63,6 +67,7 @@ func NewThreadPool(count uint32, callback func(*WorkItem) (int, error)) *ThreadP
 		callback:      callback,
 		priorityItems: make(chan *WorkItem, count*2),
 		workItems:     make(chan *WorkItem, count*4),
+		stop:          make(chan struct{}),
 	}
 }
 
@@ -81,9 +86,8 @@ func (threadPool *ThreadPool) Start(ctx context.Context) {
 
 // Stop all the workers threads
 func (threadPool *ThreadPool) Stop() {
-	log.Debug("threadPool::Stop : Closing Channels")
-	close(threadPool.priorityItems)
-	close(threadPool.workItems)
+	log.Debug("threadPool::Stop : Stopping workers")
+	close(threadPool.stop)
 	threadPool.waitGroup.Wait()
 	log.Debug("threadPool::Stop : Threads terminated")
 }
@@ -92,22 +96,29 @@ func (threadPool *ThreadPool) Stop() {
 func (threadPool *ThreadPool) Schedule(item *WorkItem) error {
 	// item.Priority specifies the priority of this task.
 	// true means high priority and false means low priority
+	items := threadPool.workItems
+	if item.Priority {
+		items = threadPool.priorityItems
+	}
+
 	select {
 	case <-threadPool.ctx.Done():
-		log.Err(
-			"ThreadPool::Schedule : Thread pool is closed, cannot schedule workitem %s",
-			item.Path,
-		)
-		return fmt.Errorf("thread pool is closed, cannot schedule workitem %s", item.Path)
+	case <-threadPool.stop:
 	default:
-		if item.Priority {
-			threadPool.priorityItems <- item
-		} else {
-			threadPool.workItems <- item
+		// the workers may exit while we wait for queue space, so keep watching for that
+		select {
+		case items <- item:
+			return nil
+		case <-threadPool.ctx.Done():
+		case <-threadPool.stop:
 		}
 	}
 
-	return nil
+	log.Err(
+		"ThreadPool::Schedule : Thread pool is closed, cannot schedule workitem %s",
+		item.Path,
+	)
+	return fmt.Errorf("thread pool is closed, cannot schedule workitem %s", item.Path)
 }
 
 // Do is the core task to be executed by each worker thread
@@ -120,10 +131,9 @@ func (threadPool *ThreadPool) Do(priority bool) {
 			select {
 			case <-threadPool.ctx.Done(): // listen to cancellation signal
 				return
-			case item, ok := <-threadPool.priorityItems:
-				if !ok {
-					return
-				}
+			case <-threadPool.stop:
+				return
+			case item := <-threadPool.priorityItems:
 				threadPool.process(item)
 			}
 		}
@@ -133,15 +143,11 @@ func (threadPool *ThreadPool) Do(priority bool) {
 			select {
 			case <-threadPool.ctx.Done(): // listen to cancellation signal
 				return
-			case item, ok := <-threadPool.priorityItems:
-				if !ok {
-					return
-				}
+			case <-threadPool.stop:
+				return
+			case item := <-threadPool.priorityItems:
 				threadPool.process(item)
-			case item, ok := <-threadPool.workItems:
-				if !ok {
-					return
-				}
+			case item := <-threadPool.workItems:
 				threadPool.process(item)
 			}
 		}
