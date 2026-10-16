@@ -29,6 +29,7 @@ package libfuse
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -48,6 +49,12 @@ func createFuseOptions(
 
 	// Max background thread on the fuse layer for high parallelism
 	options += fmt.Sprintf(",max_background=%d", maxFuseThreads)
+
+	// Without big_writes the kernel splits writes into 4KiB requests (fuse3 always allows large writes).
+	// libfuse2 caps max_write at its 128KiB buffer, so big_writes is all that is needed.
+	if runtime.GOOS == "linux" {
+		options += ",big_writes"
+	}
 
 	if allowOther {
 		options += ",allow_other"

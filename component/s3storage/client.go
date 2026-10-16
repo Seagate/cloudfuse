@@ -1300,7 +1300,7 @@ func (cl *Client) StageAndCommit(
 				Bucket: aws.String(cl.Config.AuthConfig.BucketName),
 				Key:    aws.String(key),
 				CopySource: aws.String(
-					fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key),
+					cl.copySource(key),
 				),
 				CopySourceRange: aws.String(
 					"bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1),
@@ -1309,7 +1309,8 @@ func (cl *Client) StageAndCommit(
 				UploadId:   &uploadID,
 			})
 			if err != nil {
-				return err
+				abortErr := cl.abortMultipartUpload(ctx, key, uploadID)
+				return errors.Join(err, abortErr)
 			}
 
 			eTag = partResp.CopyPartResult.ETag

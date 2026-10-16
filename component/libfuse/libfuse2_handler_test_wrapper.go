@@ -869,6 +869,10 @@ func testCreateFuseOptionsFlags(suite *libfuseTestSuite) {
 	expectedUmask := fmt.Sprintf("umask=%04o", umask)
 	suite.assert.Contains(options, expectedUmask)
 	suite.assert.Contains(options, "kernel_cache")
+	// fuse2 needs big_writes on Linux to get writes larger than 4KiB
+	if runtime.GOOS == "linux" && strings.Contains(options, "max_readahead=") {
+		suite.assert.Contains(options, "big_writes")
+	}
 }
 
 func testCreateFuseOptionsDirectIO(suite *libfuseTestSuite) {

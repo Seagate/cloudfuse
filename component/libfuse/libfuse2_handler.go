@@ -392,7 +392,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// Get attributes
 	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if err != nil {
-		log.Debug("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
+		log.Debug("Libfuse::Getattr : Failed to get attributes of %s [%v]", name, err)
 		return fuseErrnoFromError(err)
 	}
 

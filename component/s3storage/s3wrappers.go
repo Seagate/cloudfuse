@@ -267,11 +267,9 @@ func (cl *Client) copyObject(ctx context.Context, options copyObjectOptions) err
 	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
 
 	copyObjectInput := &s3.CopyObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		CopySource: aws.String(
-			fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, url.PathEscape(sourceKey)),
-		),
-		Key: aws.String(targetKey),
+		Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
+		CopySource: aws.String(cl.copySource(sourceKey)),
+		Key:        aws.String(targetKey),
 	}
 
 	if cl.Config.enableChecksum {
@@ -286,6 +284,13 @@ func (cl *Client) copyObject(ctx context.Context, options copyObjectOptions) err
 	}
 
 	return err
+}
+
+// copySource returns the URL-encoded bucket and key to copy from. url.PathEscape leaves "+" alone,
+// but S3 services can decode it as a space, so it is encoded too.
+func (cl *Client) copySource(key string) string {
+	escapedKey := strings.ReplaceAll(url.PathEscape(key), "+", "%2B")
+	return cl.Config.AuthConfig.BucketName + "/" + escapedKey
 }
 
 func (cl *Client) renameObject(ctx context.Context, options renameObjectOptions) error {
@@ -550,11 +555,9 @@ func createObjAttr(
 	// set flags
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
-	attr.Metadata = make(map[string]*string)
-
 	if isSymLink {
 		attr.Flags.Set(internal.PropFlagSymlink)
-		attr.Metadata[symlinkKey] = new("true")
+		attr.Metadata = map[string]*string{symlinkKey: new("true")}
 	}
 
 	return attr
