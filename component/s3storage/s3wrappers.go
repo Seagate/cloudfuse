@@ -38,6 +38,7 @@ import (
 	"slices"
 	"sort" // to sort List() results
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -50,6 +51,7 @@ import (
 	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"golang.org/x/sync/errgroup"
 )
 
 type getObjectOptions struct {
@@ -84,6 +86,13 @@ type renameObjectOptions struct {
 
 const symlinkStr = ".rclonelink"
 const maxResultsPerListCall = 1000
+
+const (
+	// server-side copies and deletes are cheap for the client, so run more of them than transfers
+	renameConcurrency      = 32
+	maxKeysPerDeleteCall   = 1000
+	deleteBatchConcurrency = 4
+)
 
 // check the connection to the S3 service by calling HeadBucket.
 func (cl *Client) ConnectionOkay(ctx context.Context) error {
@@ -265,13 +274,15 @@ func (cl *Client) copyObject(ctx context.Context, options copyObjectOptions) err
 	// copy the object to its new key
 	sourceKey := cl.getKey(options.source, options.isSymLink, options.isDir)
 	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
+	return cl.copyObjectKey(ctx, sourceKey, targetKey)
+}
 
+// copyObjectKey copies between raw object keys (already prefixed and encoded)
+func (cl *Client) copyObjectKey(ctx context.Context, sourceKey, targetKey string) error {
 	copyObjectInput := &s3.CopyObjectInput{
-		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-		CopySource: aws.String(
-			fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, url.PathEscape(sourceKey)),
-		),
-		Key: aws.String(targetKey),
+		Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
+		CopySource: aws.String(cl.copySource(sourceKey)),
+		Key:        aws.String(targetKey),
 	}
 
 	if cl.Config.enableChecksum {
@@ -286,6 +297,135 @@ func (cl *Client) copyObject(ctx context.Context, options copyObjectOptions) err
 	}
 
 	return err
+}
+
+// forEachKeyPage lists every object key under prefix (recursively) with a flat listing, and calls
+// fn with the keys of each page, so callers never hold more than one page of keys at a time.
+// Listing stops at the first error from the service or from fn.
+func (cl *Client) forEachKeyPage(
+	ctx context.Context,
+	prefix string,
+	fn func(keys []string) error,
+) error {
+	paginator := s3.NewListObjectsV2Paginator(cl.AwsS3Client, &s3.ListObjectsV2Input{
+		Bucket:  aws.String(cl.Config.AuthConfig.BucketName),
+		Prefix:  aws.String(prefix),
+		MaxKeys: aws.Int32(maxResultsPerListCall),
+	})
+	keys := make([]string, 0, maxResultsPerListCall)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return parseS3Err(err, "list objects with prefix "+prefix)
+		}
+		keys = keys[:0]
+		for _, object := range page.Contents {
+			if object.Key != nil {
+				keys = append(keys, *object.Key)
+			}
+		}
+		if err := fn(keys); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deleteKeys removes raw object keys with batched DeleteObjects calls, run concurrently.
+// If the endpoint rejects a batch request, that batch falls back to individual deletes.
+// It returns one error per key that could not be deleted. Once ctx is done, no new requests
+// are started and every remaining key is reported as failed.
+func (cl *Client) deleteKeys(ctx context.Context, keys []string) []error {
+	var mu sync.Mutex
+	var failures []error
+	fail := func(err error) {
+		mu.Lock()
+		failures = append(failures, err)
+		mu.Unlock()
+	}
+	failAll := func(keys []string, err error) {
+		mu.Lock()
+		for _, key := range keys {
+			failures = append(failures, fmt.Errorf("delete object %s: %w", key, err))
+		}
+		mu.Unlock()
+	}
+	batches := errgroup.Group{}
+	batches.SetLimit(deleteBatchConcurrency)
+	for batch := range slices.Chunk(keys, maxKeysPerDeleteCall) {
+		if err := ctx.Err(); err != nil {
+			failAll(batch, err)
+			continue
+		}
+		batches.Go(func() error {
+			if err := cl.deleteObjectsBatch(ctx, batch, fail); err != nil {
+				// a cancelled request is not a sign that batch deletes are unsupported
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					failAll(batch, ctxErr)
+					return nil
+				}
+				log.Warn(
+					"Client::deleteKeys : DeleteObjects failed, deleting %d keys individually: %v",
+					len(batch),
+					err,
+				)
+				singles := errgroup.Group{}
+				singles.SetLimit(renameConcurrency)
+				for _, key := range batch {
+					if ctxErr := ctx.Err(); ctxErr != nil {
+						failAll([]string{key}, ctxErr)
+						continue
+					}
+					singles.Go(func() error {
+						_, err := cl.AwsS3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+							Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+							Key:    aws.String(key),
+						})
+						if err != nil {
+							fail(parseS3Err(err, "delete object "+key))
+						}
+						return nil
+					})
+				}
+				_ = singles.Wait()
+			}
+			return nil
+		})
+	}
+	_ = batches.Wait()
+	return failures
+}
+
+// deleteObjectsBatch deletes up to maxKeysPerDeleteCall keys in one request.
+// Per-key failures are reported through fail; a request-level failure is returned.
+func (cl *Client) deleteObjectsBatch(ctx context.Context, keys []string, fail func(error)) error {
+	objects := make([]types.ObjectIdentifier, len(keys))
+	for i, key := range keys {
+		objects[i] = types.ObjectIdentifier{Key: aws.String(key)}
+	}
+	output, err := cl.AwsS3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: aws.String(cl.Config.AuthConfig.BucketName),
+		Delete: &types.Delete{Objects: objects, Quiet: aws.Bool(true)},
+	})
+	if err != nil {
+		return parseS3Err(err, "delete objects")
+	}
+	for _, objErr := range output.Errors {
+		fail(fmt.Errorf(
+			"delete object %s: %s %s",
+			aws.ToString(objErr.Key),
+			aws.ToString(objErr.Code),
+			aws.ToString(objErr.Message),
+		))
+	}
+	return nil
+}
+
+// copySource returns the URL-encoded bucket and key to copy from. url.PathEscape leaves "+" alone,
+// but S3 services can decode it as a space, so it is encoded too.
+func (cl *Client) copySource(key string) string {
+	escapedKey := strings.ReplaceAll(url.PathEscape(key), "+", "%2B")
+	return cl.Config.AuthConfig.BucketName + "/" + escapedKey
 }
 
 func (cl *Client) renameObject(ctx context.Context, options renameObjectOptions) error {

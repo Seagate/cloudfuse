@@ -59,6 +59,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	smithyHttp "github.com/aws/smithy-go/transport/http"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -523,74 +524,160 @@ func (cl *Client) directoryExistsForTarget(ctx context.Context, name string) (bo
 	return false, err
 }
 
-// RenameDirectory : Rename the directory
+// RenameDirectory : Rename the directory and everything under it.
+// Objects under the source prefix are found with a flat listing. Each page of keys is copied with
+// bounded concurrency and then removed from the source in a batch, so memory use is bounded by one
+// listing page (plus the set of directory names already in the target).
 func (cl *Client) RenameDirectory(ctx context.Context, source string, target string) error {
 	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
 
-	// TODO: should this fail when the target directory exists?
-	// current behavior merges into the target directory
-	// best to check and see what the azstorage code does
+	srcPrefix := cl.getKey(source, false, true)
+	dstPrefix := cl.getKey(target, false, true)
+	if srcPrefix == dstPrefix {
+		return nil
+	}
+	// the source listing would pick up objects just copied into the target, and the deletes
+	// could remove them
+	if strings.HasPrefix(dstPrefix, srcPrefix) {
+		log.Err(
+			"Client::RenameDirectory : Cannot move %s into its own subdirectory %s",
+			source,
+			target,
+		)
+		return syscall.EINVAL
+	}
 
-	// first we need a list of all the object's we'll be moving
-	// make sure to pass source with a trailing forward slash
-
-	done := false
-	var marker *string
-
-	for !done {
-		sourceObjects, marker, err := cl.List(ctx, internal.ExtendDirName(source), marker, 0)
-		if err != nil {
-			log.Err(
-				"Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v",
-				source,
-				err,
-			)
-			return err
-		}
-		// it's better not to return an error when we don't find any matching objects (see note in DeleteDirectory)
-		for _, srcObject := range sourceObjects {
-			srcPath := srcObject.Path
-			dstPath := strings.Replace(srcPath, source, target, 1)
-			if srcObject.IsDir() {
-				err = cl.RenameDirectory(ctx, srcPath, dstPath)
-			} else {
-				err = cl.RenameFile(
-					ctx,
-					srcPath,
-					dstPath,
-					srcObject.IsSymlink(),
-				) //use sourceObjects to pass along symLink bool
-			}
-			if err != nil {
-				log.Err(
-					"Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v",
-					srcPath,
-					dstPath,
-					err,
-				)
-			}
-		}
-		if marker == nil {
-			done = true
-
-			// Rename the current directory
-			if cl.Config.enableDirMarker {
-				err := cl.renameObject(
-					ctx,
-					renameObjectOptions{source: source, target: target, isDir: true},
-				)
-				if err != nil {
-					log.Err(
-						"Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v",
-						source,
-						target,
-						err,
-					)
+	// A file cannot be moved onto an existing directory, so find the target's directories up front
+	// (one listing instead of a directory check per file). The current behavior merges into the target.
+	dstDirs := make(map[string]struct{})
+	err := cl.forEachKeyPage(ctx, dstPrefix, func(keys []string) error {
+		for _, key := range keys {
+			rel := strings.TrimPrefix(key, dstPrefix)
+			for i := range len(rel) {
+				if rel[i] == '/' {
+					dstDirs[rel[:i]] = struct{}{}
 				}
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		log.Err(
+			"Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v",
+			target,
+			err,
+		)
+		return err
+	}
+
+	var failures renameFailures
+	total := 0
+	err = cl.forEachKeyPage(ctx, srcPrefix, func(srcKeys []string) error {
+		total += len(srcKeys)
+		cl.renamePage(ctx, srcKeys, srcPrefix, dstPrefix, target, dstDirs, &failures)
+		return ctx.Err()
+	})
+	if err != nil {
+		log.Err(
+			"Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v",
+			source,
+			err,
+		)
+		// after cancellation the per-key failures have already been recorded
+		if failures.err() == nil {
+			failures.add(err)
+		}
+	}
+
+	if err := failures.err(); err != nil {
+		return fmt.Errorf(
+			"rename %s -> %s: %d of %d objects failed: %w",
+			source,
+			target,
+			failures.count,
+			total,
+			err,
+		)
 	}
 	return nil
+}
+
+// renamePage copies one listing page of source keys to the target concurrently, then deletes
+// the sources that were copied. Failures are recorded in failures.
+func (cl *Client) renamePage(
+	ctx context.Context,
+	srcKeys []string,
+	srcPrefix, dstPrefix, target string,
+	dstDirs map[string]struct{},
+	failures *renameFailures,
+) {
+	copied := make([]bool, len(srcKeys))
+	copyGroup := errgroup.Group{}
+	copyGroup.SetLimit(renameConcurrency)
+	for i, srcKey := range srcKeys {
+		if err := ctx.Err(); err != nil {
+			failures.add(err)
+			continue
+		}
+		rel := strings.TrimPrefix(srcKey, srcPrefix)
+		if !strings.HasSuffix(rel, "/") && rel != "" {
+			fileName := rel
+			if !cl.Config.disableSymlink {
+				fileName = strings.TrimSuffix(fileName, symlinkStr)
+			}
+			if _, isDir := dstDirs[fileName]; isDir {
+				log.Err(
+					"Client::RenameDirectory : %s/%s is a directory in the target",
+					target,
+					fileName,
+				)
+				failures.add(syscall.EISDIR)
+				continue
+			}
+		}
+		copyGroup.Go(func() error {
+			if err := cl.copyObjectKey(ctx, srcKey, dstPrefix+rel); err != nil {
+				log.Err("Client::RenameDirectory : Failed to copy %s. Here's why: %v", srcKey, err)
+				failures.add(err)
+				return nil
+			}
+			copied[i] = true
+			return nil
+		})
+	}
+	_ = copyGroup.Wait()
+
+	toDelete := make([]string, 0, len(srcKeys))
+	for i, srcKey := range srcKeys {
+		if copied[i] {
+			toDelete = append(toDelete, srcKey)
+		}
+	}
+	for _, err := range cl.deleteKeys(ctx, toDelete) {
+		failures.add(err)
+	}
+}
+
+// renameFailures collects errors from concurrent workers, keeping the first one
+type renameFailures struct {
+	mu    sync.Mutex
+	first error
+	count int
+}
+
+func (f *renameFailures) add(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.first == nil {
+		f.first = err
+	}
+	f.count++
+}
+
+func (f *renameFailures) err() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.first
 }
 
 // GetAttr : Get attributes for a given file or folder.

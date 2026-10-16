@@ -36,6 +36,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -54,6 +55,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/sync/errgroup"
 )
 
 type clientTestSuite struct {
@@ -962,6 +964,129 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	})
 	s.assert.NoError(err)
 }
+
+// putObjects uploads each key with its own name as the body
+func (s *clientTestSuite) putObjects(keys ...string) {
+	group := errgroup.Group{}
+	group.SetLimit(32)
+	for _, key := range keys {
+		group.Go(func() error {
+			_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+				Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
+				Key:               aws.String(key),
+				Body:              strings.NewReader(key),
+				ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
+			})
+			return err
+		})
+	}
+	s.Require().NoError(group.Wait())
+}
+
+// listKeys returns every object key under prefix, sorted
+func (s *clientTestSuite) listKeys(prefix string) []string {
+	keys := []string{}
+	paginator := s3.NewListObjectsV2Paginator(s.awsS3Client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.client.Config.AuthConfig.BucketName),
+		Prefix: aws.String(prefix),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.Background())
+		s.Require().NoError(err)
+		for _, object := range page.Contents {
+			keys = append(keys, aws.ToString(object.Key))
+		}
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+func (s *clientTestSuite) TestRenameDirectoryMovesTree() {
+	defer s.cleanupTest()
+	base := generateDirectoryName()
+	defer func() { _ = s.client.DeleteDirectory(ctx, base) }()
+	s.putObjects(
+		base+"/src/", base+"/src/a", base+"/src/sub/", base+"/src/sub/b",
+		base+"/src/sub/deep/c", base+"/src/link"+symlinkStr, base+"/src/plus+name",
+		base+"/srcother/keep", base+"/other/keep",
+	)
+
+	err := s.client.RenameDirectory(ctx, base+"/src", base+"/dst")
+	s.Require().NoError(err)
+
+	s.assert.Equal([]string{
+		base + "/dst/", base + "/dst/a", base + "/dst/link" + symlinkStr, base + "/dst/plus+name",
+		base + "/dst/sub/", base + "/dst/sub/b", base + "/dst/sub/deep/c", base + "/other/keep",
+		base + "/srcother/keep",
+	}, s.listKeys(base+"/"))
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.AuthConfig.BucketName),
+		Key:    aws.String(base + "/dst/sub/deep/c"),
+	})
+	s.Require().NoError(err)
+	defer result.Body.Close()
+	data, err := io.ReadAll(result.Body)
+	s.Require().NoError(err)
+	s.assert.Equal(base+"/src/sub/deep/c", string(data), "content not preserved")
+}
+
+func (s *clientTestSuite) TestRenameDirectoryEmptyIsNoop() {
+	defer s.cleanupTest()
+	base := generateDirectoryName()
+
+	err := s.client.RenameDirectory(ctx, base+"/missing", base+"/dst")
+	s.assert.NoError(err)
+	s.assert.Empty(s.listKeys(base + "/"))
+}
+
+func (s *clientTestSuite) TestRenameDirectoryLargeDirectory() {
+	defer s.cleanupTest()
+	base := generateDirectoryName()
+	defer func() { _ = s.client.DeleteDirectory(ctx, base) }()
+	// more than one listing page and one DeleteObjects batch
+	const files = maxKeysPerDeleteCall + 5
+	keys := make([]string, files)
+	for i := range files {
+		keys[i] = fmt.Sprintf("%s/src/f%05d", base, i)
+	}
+	s.putObjects(keys...)
+
+	err := s.client.RenameDirectory(ctx, base+"/src", base+"/dst")
+	s.Require().NoError(err)
+
+	s.assert.Empty(s.listKeys(base + "/src/"))
+	s.assert.Len(s.listKeys(base+"/dst/"), files)
+}
+
+func (s *clientTestSuite) TestRenameDirectoryFileOntoTargetDirectoryKeepsSource() {
+	defer s.cleanupTest()
+	base := generateDirectoryName()
+	defer func() { _ = s.client.DeleteDirectory(ctx, base) }()
+	s.putObjects(base+"/src/x", base+"/src/y", base+"/dst/x/inner")
+
+	err := s.client.RenameDirectory(ctx, base+"/src", base+"/dst")
+	s.Require().ErrorIs(err, syscall.EISDIR)
+
+	s.assert.Equal(
+		[]string{base + "/dst/x/inner", base + "/dst/y", base + "/src/x"},
+		s.listKeys(base+"/"),
+	)
+}
+
+func (s *clientTestSuite) TestRenameDirectoryCancelledKeepsSource() {
+	defer s.cleanupTest()
+	base := generateDirectoryName()
+	defer func() { _ = s.client.DeleteDirectory(ctx, base) }()
+	s.putObjects(base+"/src/a", base+"/src/b")
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := s.client.RenameDirectory(cancelled, base+"/src", base+"/dst")
+	s.Require().Error(err)
+
+	s.assert.Equal([]string{base + "/src/a", base + "/src/b"}, s.listKeys(base+"/"))
+}
+
 func (s *clientTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	// setup
