@@ -59,6 +59,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	smithyHttp "github.com/aws/smithy-go/transport/http"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -1197,171 +1198,68 @@ func (cl *Client) StageAndCommit(
 		}
 	}
 
-	//struct for starting a multipart upload
 	key := cl.getKey(name, false, false)
-
-	//send command to start copy and get the upload id as it is needed later
-	var uploadID string
-	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
-		Key:         aws.String(key),
-		ContentType: aws.String(getContentType(key)),
-	}
-
-	if cl.Config.enableChecksum {
-		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
-	}
-
-	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
+	uploadID, err := cl.createMultipartUpload(ctx, key)
 	if err != nil {
 		log.Err(
 			"Client::StageAndCommit : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
-		return err
+		return parseS3Err(err, fmt.Sprintf("CreateMultipartUpload(%s)", name))
 	}
-	if createOutput != nil {
-		if createOutput.UploadId != nil {
-			uploadID = *createOutput.UploadId
+
+	// Each part is handled by one goroutine, which owns its block exclusively
+	parts := make([]types.CompletedPart, len(bol.BlockList))
+	err = cl.forEachPart(ctx, len(bol.BlockList), func(ctx context.Context, i int) error {
+		blk := bol.BlockList[i]
+		partNumber := int32(i + 1)
+		data := blk.Data
+		if blk.Truncated() {
+			data = make([]byte, blk.EndIndex-blk.StartIndex)
 		}
+		var part types.CompletedPart
+		var err error
+		if blk.Dirty() || len(data) > 0 {
+			// This block has data that is not yet in the bucket
+			part, err = cl.uploadPart(ctx, key, uploadID, partNumber, data)
+		} else {
+			// This block is already in the bucket, so copy it server side
+			part, err = cl.uploadPartCopy(
+				ctx,
+				key,
+				uploadID,
+				partNumber,
+				blk.StartIndex,
+				blk.EndIndex,
+			)
+		}
+		if err != nil {
+			return fmt.Errorf("upload part %d of %s: %w", partNumber, name, err)
+		}
+		parts[i] = part
+		return nil
+	})
+	if err == nil {
+		err = cl.completeMultipartUpload(ctx, key, uploadID, parts)
 	}
-	if uploadID == "" {
+	if err != nil {
 		log.Err(
-			"Client::StageAndCommit : No upload id found in start upload request for %s. Here's why: %v",
+			"Client::StageAndCommit: Aborting multipart upload %s for %s due to error: %v",
+			uploadID,
 			name,
 			err,
 		)
-		return err
+		// abortMultipartUpload logs its own failures; the upload error is what the caller needs
+		_ = cl.abortMultipartUpload(context.WithoutCancel(ctx), key, uploadID)
+		return parseS3Err(err, fmt.Sprintf("StageAndCommit(%s)", name))
 	}
 
-	var partNumber int32 = 1
-	parts := make([]types.CompletedPart, 0)
-	var data []byte
-
+	// Only mark blocks clean once the object is committed, so a failed flush can be retried
 	for _, blk := range bol.BlockList {
-		if blk.Truncated() {
-			data = make([]byte, blk.EndIndex-blk.StartIndex)
-			blk.Flags.Clear(common.TruncatedBlock)
-		} else {
-			data = blk.Data
-		}
-
-		var err error
-		var eTag *string
-		var checksumCRC32 *string
-		var checksumCRC32C *string
-		var checksumSHA256 *string
-		var checksumSHA1 *string
-		if blk.Dirty() || len(data) > 0 {
-			// This block has data that is not yet in the bucket
-			uploadPartInput := &s3.UploadPartInput{
-				Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
-				Key:        aws.String(key),
-				PartNumber: &partNumber,
-				UploadId:   &uploadID,
-				Body:       bytes.NewReader(data),
-			}
-
-			if cl.Config.enableChecksum {
-				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
-			}
-
-			var partResp *s3.UploadPartOutput
-			partResp, err = cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
-			if err != nil {
-				return err
-			}
-
-			eTag = partResp.ETag
-			blk.Flags.Clear(common.DirtyBlock)
-
-			// Collect the checksums
-			// It is easier to just collect all checksums and then upload them together
-			// as ones that are not used will just be nil and an object can only ever
-			// have one valid checksum
-			checksumCRC32 = partResp.ChecksumCRC32
-			checksumCRC32C = partResp.ChecksumCRC32C
-			checksumSHA1 = partResp.ChecksumSHA1
-			checksumSHA256 = partResp.ChecksumSHA256
-		} else {
-			// This block is already in the bucket, so we need to copy this part
-			var partResp *s3.UploadPartCopyOutput
-			partResp, err = cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
-				Bucket: aws.String(cl.Config.AuthConfig.BucketName),
-				Key:    aws.String(key),
-				CopySource: aws.String(
-					fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key),
-				),
-				CopySourceRange: aws.String(
-					"bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1),
-				),
-				PartNumber: &partNumber,
-				UploadId:   &uploadID,
-			})
-			if err != nil {
-				return err
-			}
-
-			eTag = partResp.CopyPartResult.ETag
-
-			// Collect the checksums
-			// It is easier to just collect all checksums and then upload them together
-			// as ones that are not used will just be nil and an object can only ever
-			// have one valid checksum
-			checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
-			checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
-			checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
-			checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
-		}
-
-		if err != nil {
-			log.Info(
-				"Client::StageAndCommit : Attempting to abort upload due to error: %s",
-				err.Error(),
-			)
-			abortErr := cl.abortMultipartUpload(ctx, key, uploadID)
-			return errors.Join(err, abortErr)
-		}
-
-		// copy etag and part number to verify later
-		if eTag != nil {
-			partNum := partNumber
-			etag := strings.Trim(*eTag, "\"")
-			cPart := types.CompletedPart{
-				ETag:       &etag,
-				PartNumber: &partNum,
-			}
-			if cl.Config.enableChecksum {
-				cPart.ChecksumCRC32 = checksumCRC32
-				cPart.ChecksumCRC32C = checksumCRC32C
-				cPart.ChecksumSHA1 = checksumSHA1
-				cPart.ChecksumSHA256 = checksumSHA256
-			}
-			parts = append(parts, cPart)
-		}
-
-		partNumber++
+		blk.Flags.Clear(common.TruncatedBlock)
+		blk.Flags.Clear(common.DirtyBlock)
 	}
-
-	// complete the upload
-	_, err = cl.AwsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
-		Key:      aws.String(key),
-		UploadId: &uploadID,
-		MultipartUpload: &types.CompletedMultipartUpload{
-			Parts: parts,
-		},
-	})
-	if err != nil {
-		log.Info(
-			"Client::StageAndCommit : Attempting to abort upload due to error: %s",
-			err.Error(),
-		)
-		abortErr := cl.abortMultipartUpload(ctx, key, uploadID)
-		return errors.Join(err, abortErr)
-	}
-
 	return nil
 }
 
@@ -1516,175 +1414,226 @@ func (cl *Client) GetCommittedBlockList(
 }
 
 // CommitBlocks : Initiates and completes an S3 multipart upload using locally cached blocks.
+// Parts are uploaded concurrently, bounded by the configured concurrency.
 func (cl *Client) CommitBlocks(ctx context.Context, name string, blockList []string) error {
 	log.Trace("Client::CommitBlocks: name %s, %d blocks", name, len(blockList))
 
 	//struct for starting a multipart upload
 	key := cl.getKey(name, false, false)
 
-	// Retrieve cached blocks for this file
+	// Collect the staged data for each block while holding the lock, so StageBlock can't race with us
 	cl.stagedBlocksMutex.RLock()
-	cachedFileBlocks, fileExists := cl.stagedBlocks[name]
-	if !fileExists || len(cachedFileBlocks) == 0 {
-		cl.stagedBlocksMutex.RUnlock()
-		if len(blockList) == 0 {
-			log.Info(
-				"Client::CommitBlocks: No blocks staged and blockList empty for %s. Creating empty file.",
+	cachedFileBlocks := cl.stagedBlocks[name]
+	partData := make([][]byte, len(blockList))
+	var validateErr error
+	for i, blockID := range blockList {
+		blockData, blockExists := cachedFileBlocks[blockID]
+		if !blockExists {
+			validateErr = fmt.Errorf(
+				"block ID %s from blockList not found in cache for %s",
+				blockID,
 				name,
 			)
-			return cl.putObject(
-				ctx,
-				putObjectOptions{name: name, objectData: bytes.NewReader([]byte{}), size: 0},
-			)
+			break
 		}
-		log.Err(
-			"Client::CommitBlocks: No blocks found in cache for %s, but blockList is not empty.",
-			name,
-		)
-		return fmt.Errorf("no blocks found in cache for %s", name)
+		if len(blockData) < MinPartSize && i < len(blockList)-1 {
+			validateErr = fmt.Errorf(
+				"cached block ID %s for %s is too small (%d bytes) and not the last part",
+				blockID,
+				name,
+				len(blockData),
+			)
+			break
+		}
+		partData[i] = blockData
 	}
 	cl.stagedBlocksMutex.RUnlock()
 
-	var uploadID string
-	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
-		Key:         aws.String(key),
-		ContentType: aws.String(getContentType(key)),
+	if len(blockList) == 0 {
+		log.Info(
+			"Client::CommitBlocks: blockList empty for %s. Creating empty file.",
+			name,
+		)
+		cl.cleanupStagedBlocks(name)
+		return cl.putObject(
+			ctx,
+			putObjectOptions{name: name, objectData: bytes.NewReader([]byte{}), size: 0},
+		)
+	}
+	// Validate before starting the upload, so a bad block list never commits a partial object
+	if validateErr != nil {
+		log.Err("Client::CommitBlocks: %v", validateErr)
+		cl.cleanupStagedBlocks(name)
+		return validateErr
 	}
 
-	if cl.Config.enableChecksum {
-		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
-	}
-
-	createOutput, err := cl.AwsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
+	uploadID, err := cl.createMultipartUpload(ctx, key)
 	if err != nil {
 		log.Err(
 			"Client::CommitBlocks : Failed to create multipart upload for %s. Here's why: %v",
 			name,
 			err,
 		)
-		return err
-	}
-	if createOutput != nil {
-		if createOutput.UploadId != nil {
-			uploadID = *createOutput.UploadId
-		}
-	}
-	if uploadID == "" {
-		log.Err(
-			"Client::CommitBlocks : No upload id found in start upload request for %s. Here's why: %v",
-			name,
-			err,
-		)
-		return err
+		return parseS3Err(err, fmt.Sprintf("CreateMultipartUpload(%s)", name))
 	}
 
-	// Upload Parts
-	completedParts := make([]types.CompletedPart, 0, len(blockList))
-	var currentPartNumber int32 = 1
-	var uploadErr error
-
-	for i, blockID := range blockList {
-		blockData, blockExists := cachedFileBlocks[blockID]
-		if !blockExists {
-			uploadErr = fmt.Errorf(
-				"block ID %s from blockList not found in cache for %s",
-				blockID,
-				name,
-			)
-			log.Err("Client::CommitBlocks: %v", uploadErr)
-			break
-		}
-
-		partSize := len(blockData)
-		isLastPart := (i == len(blockList)-1)
-
-		if partSize < DefaultPartSize && !isLastPart {
-			log.Err(
-				"Client::CommitBlocks: cached block ID %s for %s is too small (%d bytes) and not the last part: %v",
-				blockID,
-				name,
-				partSize,
-				uploadErr,
-			)
-			break
-		}
-
-		uploadPartInput := &s3.UploadPartInput{
-			Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
-			Key:        aws.String(key),
-			UploadId:   aws.String(uploadID),
-			PartNumber: &currentPartNumber,
-			Body:       bytes.NewReader(blockData),
-		}
-		if cl.Config.enableChecksum {
-			uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
-		}
-
-		partResp, err := cl.AwsS3Client.UploadPart(ctx, uploadPartInput)
+	completedParts := make([]types.CompletedPart, len(partData))
+	uploadErr := cl.forEachPart(ctx, len(partData), func(ctx context.Context, i int) error {
+		part, err := cl.uploadPart(ctx, key, uploadID, int32(i+1), partData[i])
 		if err != nil {
-			log.Err("Client::CommitBlocks : failed to upload part: %v", uploadErr)
-			break
+			return fmt.Errorf("upload part %d of %s: %w", i+1, name, err)
 		}
-
-		cleanETag := strings.Trim(*partResp.ETag, "\"")
-		partNum := currentPartNumber
-		cPart := types.CompletedPart{
-			ETag:       aws.String(cleanETag),
-			PartNumber: &partNum,
-		}
-		// Collect the checksums
-		// It is easier to just collect all checksums and then upload them together
-		// as ones that are not used will just be nil and an object can only ever
-		// have one valid checksum
-		if cl.Config.enableChecksum {
-			cPart.ChecksumCRC32 = partResp.ChecksumCRC32
-			cPart.ChecksumCRC32C = partResp.ChecksumCRC32C
-			cPart.ChecksumSHA1 = partResp.ChecksumSHA1
-			cPart.ChecksumSHA256 = partResp.ChecksumSHA256
-		}
-		completedParts = append(completedParts, cPart)
-		currentPartNumber++
+		completedParts[i] = part
+		return nil
+	})
+	if uploadErr == nil {
+		uploadErr = cl.completeMultipartUpload(ctx, key, uploadID, completedParts)
 	}
-
-	// Complete or Abort Multipart Upload
+	cl.cleanupStagedBlocks(name)
 	if uploadErr != nil {
-		log.Info(
+		log.Err(
 			"Client::CommitBlocks: Aborting multipart upload %s for %s due to error: %v",
 			uploadID,
 			name,
 			uploadErr,
 		)
-		_ = cl.abortMultipartUpload(ctx, key, uploadID) // Attempt to clean up S3
-		cl.cleanupStagedBlocks(name)
-		return uploadErr
+		_ = cl.abortMultipartUpload(context.WithoutCancel(ctx), key, uploadID)
+		return parseS3Err(uploadErr, fmt.Sprintf("CommitBlocks(%s)", name))
 	}
-
-	completeInput := &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(cl.Config.AuthConfig.BucketName),
-		Key:      aws.String(key),
-		UploadId: aws.String(uploadID),
-		MultipartUpload: &types.CompletedMultipartUpload{
-			Parts: completedParts,
-		},
-	}
-
-	_, err = cl.AwsS3Client.CompleteMultipartUpload(ctx, completeInput)
-	if err != nil {
-		log.Err(
-			"Client::CommitBlocks : Failed to complete multipart upload %s for %s: %v",
-			uploadID,
-			name,
-			err,
-		)
-		_ = cl.abortMultipartUpload(ctx, key, uploadID)
-		cl.cleanupStagedBlocks(name)
-		return parseS3Err(err, fmt.Sprintf("CompleteMultipartUpload(%s)", name))
-	}
-
-	cl.cleanupStagedBlocks(name)
 
 	return nil
+}
+
+// forEachPart runs fn for part indexes [0, n) with at most cl.Config.concurrency running at once.
+// After the first error, no new parts are started and the context passed to fn is cancelled.
+func (cl *Client) forEachPart(
+	ctx context.Context,
+	n int,
+	fn func(ctx context.Context, i int) error,
+) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(max(1, cl.Config.concurrency))
+	for i := range n {
+		if groupCtx.Err() != nil {
+			break
+		}
+		group.Go(func() error { return fn(groupCtx, i) })
+	}
+	return group.Wait()
+}
+
+func (cl *Client) createMultipartUpload(ctx context.Context, key string) (string, error) {
+	input := &s3.CreateMultipartUploadInput{
+		Bucket:      aws.String(cl.Config.AuthConfig.BucketName),
+		Key:         aws.String(key),
+		ContentType: aws.String(getContentType(key)),
+	}
+	if cl.Config.enableChecksum {
+		input.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+	output, err := cl.AwsS3Client.CreateMultipartUpload(ctx, input)
+	if err != nil {
+		return "", err
+	}
+	if output == nil || output.UploadId == nil || *output.UploadId == "" {
+		return "", fmt.Errorf("no upload id returned for %s", key)
+	}
+	return *output.UploadId, nil
+}
+
+// uploadPart uploads one part and returns the completed part entry needed to commit it
+func (cl *Client) uploadPart(
+	ctx context.Context,
+	key, uploadID string,
+	partNumber int32,
+	data []byte,
+) (types.CompletedPart, error) {
+	input := &s3.UploadPartInput{
+		Bucket:     aws.String(cl.Config.AuthConfig.BucketName),
+		Key:        aws.String(key),
+		UploadId:   aws.String(uploadID),
+		PartNumber: aws.Int32(partNumber),
+		Body:       bytes.NewReader(data),
+	}
+	if cl.Config.enableChecksum {
+		input.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+	resp, err := cl.AwsS3Client.UploadPart(ctx, input)
+	if err != nil {
+		return types.CompletedPart{}, err
+	}
+	if resp.ETag == nil {
+		return types.CompletedPart{}, fmt.Errorf(
+			"no ETag returned for part %d of %s",
+			partNumber,
+			key,
+		)
+	}
+	part := types.CompletedPart{
+		ETag:       aws.String(strings.Trim(*resp.ETag, "\"")),
+		PartNumber: aws.Int32(partNumber),
+	}
+	// an object can only ever have one valid checksum, so unused ones are just nil
+	if cl.Config.enableChecksum {
+		part.ChecksumCRC32 = resp.ChecksumCRC32
+		part.ChecksumCRC32C = resp.ChecksumCRC32C
+		part.ChecksumSHA1 = resp.ChecksumSHA1
+		part.ChecksumSHA256 = resp.ChecksumSHA256
+	}
+	return part, nil
+}
+
+// uploadPartCopy copies a byte range of the existing object into a part, server side
+func (cl *Client) uploadPartCopy(
+	ctx context.Context,
+	key, uploadID string,
+	partNumber int32,
+	start, end int64,
+) (types.CompletedPart, error) {
+	resp, err := cl.AwsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
+		Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
+		Key:             aws.String(key),
+		CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.AuthConfig.BucketName, key)),
+		CopySourceRange: aws.String(fmt.Sprintf("bytes=%d-%d", start, end-1)),
+		PartNumber:      aws.Int32(partNumber),
+		UploadId:        aws.String(uploadID),
+	})
+	if err != nil {
+		return types.CompletedPart{}, err
+	}
+	if resp.CopyPartResult == nil || resp.CopyPartResult.ETag == nil {
+		return types.CompletedPart{}, fmt.Errorf(
+			"no ETag returned for copied part %d of %s",
+			partNumber,
+			key,
+		)
+	}
+	result := resp.CopyPartResult
+	part := types.CompletedPart{
+		ETag:       aws.String(strings.Trim(*result.ETag, "\"")),
+		PartNumber: aws.Int32(partNumber),
+	}
+	if cl.Config.enableChecksum {
+		part.ChecksumCRC32 = result.ChecksumCRC32
+		part.ChecksumCRC32C = result.ChecksumCRC32C
+		part.ChecksumSHA1 = result.ChecksumSHA1
+		part.ChecksumSHA256 = result.ChecksumSHA256
+	}
+	return part, nil
+}
+
+func (cl *Client) completeMultipartUpload(
+	ctx context.Context,
+	key, uploadID string,
+	parts []types.CompletedPart,
+) error {
+	_, err := cl.AwsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:          aws.String(cl.Config.AuthConfig.BucketName),
+		Key:             aws.String(key),
+		UploadId:        aws.String(uploadID),
+		MultipartUpload: &types.CompletedMultipartUpload{Parts: parts},
+	})
+	return err
 }
 
 func (cl *Client) StageBlock(name string, data []byte, id string) error {

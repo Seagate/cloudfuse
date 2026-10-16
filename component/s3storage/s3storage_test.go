@@ -3727,6 +3727,155 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	s.assert.Equal(emptyData, output[fileSize+2*blockSizeBytes:fileSize+3*blockSizeBytes])
 }
 
+// setupParallelUploadTest configures 5MB parts with the given upload concurrency
+func (s *s3StorageTestSuite) setupParallelUploadTest(concurrency int) {
+	storageTestConfigurationParameters.PartSizeMb = 5
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	config += fmt.Sprintf("  concurrency: %d\n", concurrency)
+	s.setupTestHelper(config, s.bucket, true)
+}
+
+// stageBlocks stages one block per size, each filled with a distinct byte, and returns the block
+// IDs and the object content they should commit to.
+func (s *s3StorageTestSuite) stageBlocks(name string, sizes ...int) ([]string, []byte) {
+	ids := make([]string, len(sizes))
+	var want []byte
+	for i, size := range sizes {
+		ids[i] = fmt.Sprintf("b%02d", i)
+		data := bytes.Repeat([]byte{byte('a' + i)}, size)
+		want = append(want, data...)
+		err := s.s3Storage.StageData(internal.StageDataOptions{Name: name, Data: data, Id: ids[i]})
+		s.Require().NoError(err)
+	}
+	return ids, want
+}
+
+func (s *s3StorageTestSuite) TestCommitDataParallelPreservesOrder() {
+	defer s.cleanupTest()
+	s.setupParallelUploadTest(4)
+	name := generateFileName()
+	part := int(MinPartSize)
+	ids, want := s.stageBlocks(name, part, part, part, part, part, part, 17)
+
+	err := s.s3Storage.CommitData(internal.CommitDataOptions{Name: name, List: ids})
+	s.Require().NoError(err)
+
+	client := s.s3Storage.Storage.(*Client)
+	output, err := client.ReadBuffer(ctx, name, 0, int64(len(want)), false)
+	s.Require().NoError(err)
+	s.assert.Equal(want, output)
+	client.stagedBlocksMutex.RLock()
+	defer client.stagedBlocksMutex.RUnlock()
+	s.assert.NotContains(client.stagedBlocks, name, "staged blocks were not released")
+}
+
+func (s *s3StorageTestSuite) TestCommitDataRejectsSmallInteriorBlock() {
+	defer s.cleanupTest()
+	s.setupParallelUploadTest(4)
+	name := generateFileName()
+	ids, _ := s.stageBlocks(name, int(MinPartSize), 1024, int(MinPartSize))
+
+	err := s.s3Storage.CommitData(internal.CommitDataOptions{Name: name, List: ids})
+	s.Require().ErrorContains(err, "too small")
+
+	// no partial object should have been committed
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (s *s3StorageTestSuite) TestCommitDataMissingBlock() {
+	defer s.cleanupTest()
+	s.setupParallelUploadTest(4)
+	name := generateFileName()
+	ids, _ := s.stageBlocks(name, int(MinPartSize))
+
+	err := s.s3Storage.CommitData(
+		internal.CommitDataOptions{Name: name, List: append(ids, "missing")},
+	)
+	s.Require().ErrorContains(err, "not found")
+
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (s *s3StorageTestSuite) TestFlushFileParallelMixesCopyAndUpload() {
+	defer s.cleanupTest()
+	s.setupParallelUploadTest(4)
+	name := generateFileName()
+	part := int(MinPartSize)
+	original := append(bytes.Repeat([]byte{'o'}, 4*part), []byte("tail")...)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(
+		ctx,
+		bytes.NewReader(original),
+		int64(len(original)),
+		key,
+		5,
+	)
+	s.Require().NoError(err)
+
+	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
+	s.Require().NoError(err)
+	bol, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	s.Require().NoError(err)
+	s.Require().Len(bol.BlockList, 5)
+	handlemap.CreateCacheObject(int64(len(original)), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.Size = int64(len(original))
+
+	// rewrite block 2 and leave the others to be copied server side
+	newData := bytes.Repeat([]byte{'n'}, part)
+	bol.BlockList[2].Data = newData
+	bol.BlockList[2].Flags.Set(common.DirtyBlock)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.Require().NoError(err)
+
+	want := append([]byte(nil), original...)
+	copy(want[2*part:], newData)
+	output, err := s.s3Storage.Storage.(*Client).ReadBuffer(ctx, name, 0, int64(len(want)), false)
+	s.Require().NoError(err)
+	s.assert.Equal(want, output)
+	for _, blk := range bol.BlockList {
+		s.assert.False(blk.Dirty(), "block left dirty after commit")
+	}
+}
+
+func (s *s3StorageTestSuite) TestFlushFileFailureKeepsBlocksDirty() {
+	defer s.cleanupTest()
+	s.setupParallelUploadTest(4)
+	name := generateFileName()
+	part := int(MinPartSize)
+	original := bytes.Repeat([]byte{'o'}, part)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(original), int64(len(original)), key, 5)
+	s.Require().NoError(err)
+
+	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
+	s.Require().NoError(err)
+	bol, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	s.Require().NoError(err)
+	handlemap.CreateCacheObject(int64(2*part), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.Size = int64(2 * part)
+
+	// the dirty block uploads fine, but the clean block's copy range is past the end of the
+	// object, so its part fails and the upload is aborted
+	bol.BlockList[0].Data = bytes.Repeat([]byte{'n'}, part)
+	bol.BlockList[0].Flags.Set(common.DirtyBlock)
+	missing := &common.Block{StartIndex: int64(part), EndIndex: int64(2 * part)}
+	bol.BlockList = append(bol.BlockList, missing)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.Require().Error(err)
+
+	s.assert.True(bol.BlockList[0].Dirty(), "block marked clean after a failed flush")
+	output, err := s.s3Storage.Storage.(*Client).ReadBuffer(ctx, name, 0, int64(part), false)
+	s.Require().NoError(err)
+	s.assert.Equal(original, output, "object changed despite a failed flush")
+}
+
 func (s *s3StorageTestSuite) TestUpdateConfig() {
 	defer s.cleanupTest()
 
