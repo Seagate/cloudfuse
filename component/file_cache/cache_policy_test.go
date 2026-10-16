@@ -28,7 +28,6 @@ package file_cache
 import (
 	"fmt"
 	"io/fs"
-	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,13 +35,11 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type cachePolicyTestSuite struct {
 	suite.Suite
-	assert *assert.Assertions
 }
 
 func (suite *cachePolicyTestSuite) SetupTest() {
@@ -50,72 +47,39 @@ func (suite *cachePolicyTestSuite) SetupTest() {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
-	suite.assert = assert.New(suite.T())
-	err = os.Mkdir(cache_path, fs.FileMode(0777))
-	suite.assert.NoError(err)
-}
-
-func (suite *cachePolicyTestSuite) cleanupTest() {
-	err := os.RemoveAll(cache_path)
-	if err != nil {
-		fmt.Printf(
-			"cachePolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
-			cache_path,
-			err,
-		)
-	}
-}
-
-func (suite *cachePolicyTestSuite) TestGetUsage() {
-	defer suite.cleanupTest()
-	f, _ := os.Create(filepath.Join(cache_path, "test"))
-	data := make([]byte, 1024*1024)
-	_, err := f.Write(data)
-	suite.assert.NoError(err)
-	result, _ := common.GetUsage(cache_path)
-	suite.assert.InEpsilon(float64(1*MB), math.Floor(result), 1)
-	f.Close()
-}
-
-// GetUsage returns apparent file size in bytes (excluding directory metadata)
-func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
-	defer suite.cleanupTest()
-	f, _ := os.Create(filepath.Join(cache_path, "test"))
-	data := make([]byte, 4097)
-	_, err := f.Write(data)
-	suite.assert.NoError(err)
-	f.Close()
-	result, err := common.GetUsage(cache_path)
-	suite.assert.NoError(err)
-
-	suite.assert.InEpsilon(float64(4097), result, 1)
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
-	defer suite.cleanupTest()
-	data := make([]byte, 1024*1024)
-
-	f, _ := os.Create(filepath.Join(cache_path, "test"))
-	_, err := f.Write(data)
-	suite.assert.NoError(err)
-	result := getUsagePercentage(cache_path, 4)
-	// since the value might defer a little distro to distro
-	suite.assert.GreaterOrEqual(result, float64(24))
-	suite.assert.LessOrEqual(result, float64(30))
-	f.Close()
-
-	result = getUsagePercentage("/", 0)
-	// since the value might defer a little distro to distro
-	suite.assert.GreaterOrEqual(result, float64(0))
-	suite.assert.LessOrEqual(result, float64(90))
+	tests := []struct {
+		name      string
+		usedBytes float64
+		maxSizeMB float64
+		want      float64
+	}{
+		{"empty cache", 0, 4, 0},
+		{"quarter full", float64(MB), 4, 25},
+		{"above capacity", 5 * float64(MB), 4, 125},
+		{"zero max size", float64(MB), 0, 0},
+		{"negative max size", float64(MB), -1, 0},
+	}
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.Equal(tt.want, getUsagePercentage(tt.usedBytes, tt.maxSizeMB))
+		})
+	}
 }
 
 func (suite *cachePolicyTestSuite) TestDeleteFile() {
-	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
-	result := deleteFile(f.Name() + "not_exist")
-	suite.assert.NoError(result)
-	f.Close()
+	path := filepath.Join(suite.T().TempDir(), "cached")
+	suite.Require().NoError(os.WriteFile(path, []byte("data"), 0o644))
+
+	suite.Require().NoError(deleteFile(path))
+	_, err := os.Stat(path)
+	suite.ErrorIs(err, fs.ErrNotExist)
+}
+
+func (suite *cachePolicyTestSuite) TestDeleteFileMissing() {
+	suite.NoError(deleteFile(filepath.Join(suite.T().TempDir(), "missing")))
 }
 
 func TestCachePolicyTestSuite(t *testing.T) {

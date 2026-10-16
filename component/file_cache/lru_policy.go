@@ -75,8 +75,11 @@ type lruPolicy struct {
 	// Channel to check for file eviction based on file-cache timeout
 	cacheTimeoutMonitor <-chan time.Time
 
-	// DU utility was found on the path or not
-	duPresent bool
+	// Channel to periodically rebuild tracked usage from the cache directory
+	usageReconcileMonitor <-chan time.Time
+
+	// Tickers backing the monitor channels, stopped on shutdown
+	tickers []*time.Ticker
 }
 
 type pendingOpSnapshot struct {
@@ -97,6 +100,8 @@ type lruPolicySnapshot struct {
 const (
 	// Check for disk usage in below number of minutes
 	DiskUsageCheckInterval = 1
+	// Walk the cache directory to correct tracked usage drift this often
+	usageReconcileInterval = 10 * time.Minute
 	// Cache snapshot relative filepath
 	snapshotPath = ".fileCacheSnapshot.gob"
 )
@@ -113,7 +118,9 @@ func NewLRUPolicy(cfg cachePolicyConfig) cachePolicy {
 		lastMarker: &lruNode{
 			name: "##",
 		},
-		duPresent: false,
+	}
+	if obj.usage == nil {
+		obj.usage = newUsageTracker()
 	}
 	obj.currMarker.usage.Store(-1)
 	obj.lastMarker.usage.Store(-1)
@@ -139,21 +146,19 @@ func (p *lruPolicy) StartPolicy() error {
 	p.closeSignalValidate = make(chan int)
 	p.validateChan = make(chan string, 10000)
 
-	_, err = common.GetUsage(p.tmpPath)
-	if err == nil {
-		p.duPresent = true
-	} else {
-		log.Err("lruPolicy::StartPolicy : 'du' command not found, disabling disk usage checks")
+	usage, err := p.usage.reconcile(p.tmpPath)
+	if err != nil {
+		log.Err("lruPolicy::StartPolicy : failed to measure cache usage [%v]", err)
 	}
+	log.Info("lruPolicy::StartPolicy : cache usage at start %d bytes", usage)
 
-	if p.duPresent {
-		p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
-	}
+	p.diskUsageMonitor = p.newTicker(time.Duration(DiskUsageCheckInterval * time.Minute))
+	p.usageReconcileMonitor = p.newTicker(usageReconcileInterval)
 
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
 	// start the timeout monitor
-	p.cacheTimeoutMonitor = time.Tick(time.Duration(p.cacheTimeout) * time.Second)
+	p.cacheTimeoutMonitor = p.newTicker(time.Duration(p.cacheTimeout) * time.Second)
 
 	p.wg.Add(2)
 	go p.clearCache()
@@ -163,12 +168,26 @@ func (p *lruPolicy) StartPolicy() error {
 
 }
 
+// newTicker returns a channel that fires every d, or a nil channel that never fires if d <= 0 (like time.Tick)
+func (p *lruPolicy) newTicker(d time.Duration) <-chan time.Time {
+	if d <= 0 {
+		return nil
+	}
+	t := time.NewTicker(d)
+	p.tickers = append(p.tickers, t)
+	return t.C
+}
+
 func (p *lruPolicy) ShutdownPolicy() error {
 	log.Trace("lruPolicy::ShutdownPolicy")
 	p.closeSignal <- 1
 	p.closeSignalValidate <- 1
 	// wait for all go-routines to stop.
 	p.wg.Wait()
+	for _, t := range p.tickers {
+		t.Stop()
+	}
+	p.tickers = nil
 	return p.createSnapshot().writeToFile(p.tmpPath)
 }
 
@@ -350,6 +369,8 @@ func (p *lruPolicy) CachePurge(name string) {
 	err := deleteFile(name)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::CachePurge : failed to delete local file %s. Here's why: %v", name, err)
+	} else {
+		p.usage.remove(name)
 	}
 }
 
@@ -430,10 +451,15 @@ func (p *lruPolicy) clearCache() {
 			p.printNodes()
 			p.deleteExpiredNodes()
 
+		case <-p.usageReconcileMonitor:
+			if _, err := p.usage.reconcile(p.tmpPath); err != nil {
+				log.Err("lruPolicy::ClearCache : failed to reconcile cache usage [%v]", err)
+			}
+
 		case <-p.diskUsageMonitor:
 			// File cache timeout has not occurred so just monitor the cache usage
 			cleanupCount := 0
-			pUsage := getUsagePercentage(p.tmpPath, p.maxSizeMB)
+			pUsage := getUsagePercentage(float64(p.usage.bytes()), p.maxSizeMB)
 			if pUsage > p.highThreshold {
 				continueDeletion := true
 				for continueDeletion {
@@ -448,7 +474,7 @@ func (p *lruPolicy) clearCache() {
 					p.printNodes()
 					p.deleteExpiredNodes()
 
-					pUsage := getUsagePercentage(p.tmpPath, p.maxSizeMB)
+					pUsage := getUsagePercentage(float64(p.usage.bytes()), p.maxSizeMB)
 					if pUsage < p.lowThreshold || cleanupCount >= 3 {
 						log.Info(
 							"lruPolicy::ClearCache : Threshold stabilized %f > %f",
@@ -627,11 +653,14 @@ func (p *lruPolicy) deleteItem(name string) {
 	_, err := os.Stat(name)
 	if err != nil && os.IsNotExist(err) {
 		// file was already deleted - this is normal
+		p.usage.remove(name)
 		return
 	}
 	err = deleteFile(name)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
+	} else {
+		p.usage.remove(name)
 	}
 
 	// File was deleted so try clearing its parent directory

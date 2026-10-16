@@ -80,6 +80,7 @@ type FileCache struct {
 	refreshSec        uint32
 	hardLimit         bool
 	diskHighWaterMark float64
+	usage             *usageTracker // sizes of cached files, keyed by local path
 
 	lazyWrite    bool
 	fileCloseOpt sync.WaitGroup
@@ -373,6 +374,9 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.defaultPermission = common.DefaultFilePermissionBits
 	}
 
+	if fc.usage == nil {
+		fc.usage = newUsageTracker()
+	}
 	cacheConfig := fc.GetPolicyConfig(conf)
 	fc.policy = NewLRUPolicy(cacheConfig)
 	if fc.policy == nil {
@@ -469,6 +473,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 		pendingOps:    &fc.pendingOps,
+		usage:         fc.usage,
 	}
 
 	return cacheConfig
@@ -495,7 +500,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 		log.Err("FileCache::StatFs : Not responding to StatFs because max cache size is zero")
 		return nil, false, nil
 	}
-	usage, _ := common.GetUsage(fc.tmpPath)
+	usage := float64(fc.usage.bytes())
 	available := maxCacheSize - usage
 
 	// how much space is available on the underlying file system?
@@ -1305,6 +1310,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		)
 		return nil, err
 	}
+	fc.usage.set(localPath, 0)
 	// The user might change permissions WHILE creating the file therefore we need to account for that
 	if runtime.GOOS != "windows" && options.Mode != common.DefaultFilePermissionBits {
 		fc.missedChmodList.LoadOrStore(options.Name, true)
@@ -1514,9 +1520,17 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 				err = os.Remove(localPath)
 				if err != nil {
 					log.Err("FileCache::openFileInternal : %s delete failed [%v]", localPath, err)
+				} else {
+					fc.usage.remove(localPath)
 				}
 				return dlErr
 			}
+		}
+
+		if info, statErr := downloadHandle.Stat(); statErr == nil {
+			fc.usage.set(localPath, info.Size())
+		} else {
+			log.Err("FileCache::openFileInternal : %s stat failed [%v]", localPath, statErr)
 		}
 
 		// Update the last download time of this file
@@ -1583,6 +1597,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	inf, err := f.Stat()
 	if err == nil {
 		handle.Size = inf.Size()
+		fc.usage.set(localPath, inf.Size())
 	}
 
 	handle.UnixFD = uint64(f.Fd())
@@ -1669,21 +1684,20 @@ func (fc *FileCache) exceedsHardLimit(newSize int64, name string, requestType st
 		return false
 	}
 	// how much is being added?
-	existingSize := int64(0)
-	if info, statErr := os.Stat(filepath.Join(fc.tmpPath, name)); statErr == nil {
-		existingSize = info.Size()
+	localPath := filepath.Join(fc.tmpPath, name)
+	existingSize, tracked := fc.usage.size(localPath)
+	if !tracked {
+		if info, statErr := os.Stat(localPath); statErr == nil {
+			existingSize = info.Size()
+		}
 	}
-	additionalSpace := newSize - existingSize
+	additionalSpace := fc.usage.diskSize(newSize) - fc.usage.diskSize(existingSize)
 	// don't check usage needlessly
 	if additionalSpace <= 0 {
 		return false
 	}
-	// get current total cache size
-	currSize, err := common.GetUsage(fc.tmpPath)
-	if err != nil {
-		log.Err("FileCache::exceedsHardLimit : failed to get current cache size [%v]", err)
-		return false
-	}
+	// current total cache size, tracked in memory
+	currSize := float64(fc.usage.bytes())
 	// check if we are running out of space
 	// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
 	if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
@@ -1972,6 +1986,14 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
 		fc.setHandleDirty(options.Handle)
+		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
+		if options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend) {
+			if info, statErr := f.Stat(); statErr == nil {
+				fc.usage.set(localPath, info.Size())
+			}
+		} else {
+			fc.usage.grow(localPath, options.Offset+int64(bytesWritten))
+		}
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
@@ -2370,6 +2392,11 @@ func (fc *FileCache) renameLocalFile(
 			localSrcPath,
 			localDstPath,
 		)
+		if !fc.usage.rename(localSrcPath, localDstPath) {
+			if info, statErr := os.Stat(localDstPath); statErr == nil && info.Mode().IsRegular() {
+				fc.usage.set(localDstPath, info.Size())
+			}
+		}
 		fc.policy.CacheValid(localDstPath)
 
 	case isNotExist(err):
@@ -2511,6 +2538,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			)
 			return err
 		}
+		fc.usage.set(filepath.Join(fc.tmpPath, options.Name), options.NewSize)
 
 		fc.setHandleDirty(options.Handle)
 
@@ -2545,6 +2573,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			); err == nil {
 				info, localErr = f.Stat()
 				f.Close()
+				fc.usage.set(localPath, 0)
 				offlineOkay = true
 			} else {
 				log.Err(
@@ -2577,7 +2606,9 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 					err,
 				)
 				return err
-			} else if offlineOkay {
+			}
+			fc.usage.set(localPath, options.NewSize)
+			if offlineOkay {
 				fc.addPendingOp(options.Name, pendingFlags{})
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 			}
