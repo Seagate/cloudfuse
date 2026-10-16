@@ -33,7 +33,7 @@ import (
 
 // Lock item for each file
 type LockMapItem struct {
-	handleCount  uint32
+	handleCount  atomic.Uint32
 	dirtyCount   atomic.Uint32
 	mtx          sync.RWMutex
 	downloadTime time.Time
@@ -58,7 +58,7 @@ func (l *LockMap) Get(name string) *LockMapItem {
 	if lockIntf, found := l.locks.Load(name); found {
 		return lockIntf.(*LockMapItem)
 	}
-	lockIntf, _ := l.locks.LoadOrStore(name, &LockMapItem{handleCount: 0})
+	lockIntf, _ := l.locks.LoadOrStore(name, &LockMapItem{})
 	item := lockIntf.(*LockMapItem)
 	return item
 }
@@ -79,6 +79,10 @@ func (l *LockMapItem) Unlock() {
 	l.mtx.Unlock()
 }
 
+func (l *LockMapItem) TryLock() bool {
+	return l.mtx.TryLock()
+}
+
 func (l *LockMapItem) RLock() {
 	l.mtx.RLock()
 }
@@ -90,17 +94,25 @@ func (l *LockMapItem) RUnlock() {
 
 // Increment the handle count
 func (l *LockMapItem) Inc() {
-	l.handleCount++
+	l.handleCount.Add(1)
 }
 
 // Decrement the handle count
 func (l *LockMapItem) Dec() {
-	l.handleCount--
+	for {
+		current := l.handleCount.Load()
+		if current == 0 {
+			return
+		}
+		if l.handleCount.CompareAndSwap(current, current-1) {
+			return
+		}
+	}
 }
 
 // Get the current handle count
 func (l *LockMapItem) Count() uint32 {
-	return l.handleCount
+	return l.handleCount.Load()
 }
 
 // Increment dirty-handle count.

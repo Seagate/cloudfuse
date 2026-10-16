@@ -1,0 +1,28 @@
+# Refer to setup/baseConfig.yaml for all configuration parameters.
+
+config-version: 1.0.0
+
+logging:
+  type: syslog
+  level: log_warning
+
+components:
+  - libfuse
+  - tiered_storage
+  - attr_cache
+  - s3storage
+
+tiered_storage:
+  path: /<PATH>/<TO>/<LOCAL_STORAGE>
+  max-size-mb: 102400
+
+attr_cache:
+  timeout-sec: 120
+
+s3storage:
+  bucket-name: <ACCOUNT_NAME>
+  key-id: <ACCOUNT_ACCESS_KEY>
+  secret-key: <ACCOUNT_SECRET_KEY>
+  endpoint: https://s3.us-east-1.lyvecloud.seagate.com
+  region: us-east-1
+  enable-dir-marker: true
