@@ -10,12 +10,12 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.2
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.7.0
 	github.com/awnumar/memguard v0.23.0
-	github.com/aws/aws-sdk-go-v2 v1.47.1
-	github.com/aws/aws-sdk-go-v2/config v1.33.7
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.7
-	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.4.14
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.1
-	github.com/aws/smithy-go v1.28.4
+	github.com/aws/aws-sdk-go-v2 v1.47.3
+	github.com/aws/aws-sdk-go-v2/config v1.33.9
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
+	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.4.16
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
+	github.com/aws/smithy-go v1.28.5
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/go-viper/mapstructure/v2 v2.5.0
@@ -47,19 +47,19 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.8.0 // indirect
 	github.com/apache/arrow-go/v18 v18.7.0 // indirect
 	github.com/awnumar/memcall v0.5.0 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.10.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.38.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.51.2 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.22 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.3 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.6 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.6 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.21 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.7 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.10.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.38.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
