@@ -3360,8 +3360,9 @@ func (suite *blockCacheTestSuite) TestOverwriteWaitsForInFlightUpload() {
 	}()
 
 	select {
-	case <-done:
+	case werr := <-done:
 		suite.assert.Fail("overwrite did not wait for the in-flight upload to finish")
+		suite.assert.NoError(werr)
 		return
 	case <-time.After(200 * time.Millisecond):
 	}
