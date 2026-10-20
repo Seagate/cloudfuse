@@ -1,5 +1,24 @@
 # Cloudfuse Changelog #
 
+## **2.4.0** ##
+
+October 20th 2026
+This version is based on [blobfuse2 2.5.3](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.3) (upstream).
+
+### Features ###
+
+- [#973](https://github.com/Seagate/cloudfuse/pull/973) Improve S3 directory listing: add `require-dir-markers` option and `add-dir-markers` command
+- [#1060](https://github.com/Seagate/cloudfuse/pull/1060) Attr_cache now performs read ahead of attributes when reading directories to reduce the number of calls to the cloud
+- [#1061](https://github.com/Seagate/cloudfuse/pull/1061) Improved file cache performance
+
+### Bug Fixes ###
+
+- [#1077](https://github.com/Seagate/cloudfuse/pull/1077) Fix race conditions in file cache and block cache
+
+### Security ###
+
+- [#1096](https://github.com/Seagate/cloudfuse/pull/1096) Update Go toolchain to 1.27.3 to fix security vulnerabilities
+
 ## **2.3.3** ##
 
 September 14th 2026
