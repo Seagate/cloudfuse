@@ -2,7 +2,7 @@ module github.com/Seagate/cloudfuse
 
 go 1.27
 
-toolchain go1.27.1
+toolchain go1.27.3
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
