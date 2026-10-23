@@ -1833,40 +1833,17 @@ func (fc *FileCache) releaseFileInternal(
 	// if file has not been interactively read or written to by end user, then there is no cached file to close.
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
+	var err error
 	if !noCachedHandle {
 		// update the cache policy
 		_ = fc.FileUsed(options.Handle.Path)
-		// sync
-		if options.Handle.Dirty() {
-			// flush the local file
-			err := fc.flushFileLocal(options.Handle)
-			if err != nil {
-				return err
-			}
-			// upload
-			// flock is already locked
-			flushOptions := internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}
-			err = fc.flushFileCloud(flushOptions)
-			if err != nil {
-				return err
-			}
-		}
-		// close
-		f := options.Handle.GetFileObject()
-		if f == nil {
-			log.Err("FileCache::releaseFileInternal : %s missing fd in handle", options.Handle.Path)
-			return syscall.EBADF
-		}
-		err := f.Close()
-		if err != nil {
-			log.Err(
-				"FileCache::releaseFileInternal : %s (%d) close failed [%v]",
-				options.Handle.Path,
-				int(f.Fd()),
-				err,
-			)
-			return err
-		}
+		// upload (flock is already locked)
+		flushOptions := internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}
+		err = fc.flushFileCloud(flushOptions)
+		// clears the flag if the upload failed, since the handle is going away
+		fc.clearHandleDirty(options.Handle)
+		// close the local file
+		err = errors.Join(err, options.Handle.GetFileObject().Close())
 	}
 
 	flock.Dec()
@@ -1876,7 +1853,7 @@ func (fc *FileCache) releaseFileInternal(
 		flock.LazyOpen = false
 	}
 
-	return nil
+	return err
 }
 
 // ReadInBuffer: Read the local file into a buffer

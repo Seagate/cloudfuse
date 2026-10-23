@@ -216,19 +216,18 @@ func (rw *ReadWriteFilenameCache) RenameFile(options internal.RenameFileOptions)
 func (rw *ReadWriteFilenameCache) ReleaseFile(options internal.ReleaseFileOptions) error {
 	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 	// try to flush again to make sure it's cleaned up
-	err := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
-	if err != nil {
+	flushErr := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
+	if flushErr != nil {
 		log.Err(
 			"Stream::ReleaseFile : error flushing file %s [%s]",
 			options.Handle.Path,
-			err.Error(),
+			flushErr.Error(),
 		)
-		return err
 	}
 	if !rw.StreamOnly {
 		rw.purge(options.Handle.Path, true)
 	}
-	err = rw.NextComponent().ReleaseFile(options)
+	err := rw.NextComponent().ReleaseFile(options)
 	if err != nil {
 		log.Err(
 			"Stream::ReleaseFile : error releasing file %s [%s]",
@@ -236,7 +235,7 @@ func (rw *ReadWriteFilenameCache) ReleaseFile(options internal.ReleaseFileOption
 			err.Error(),
 		)
 	}
-	return err
+	return errors.Join(flushErr, err)
 }
 
 func (rw *ReadWriteFilenameCache) FlushFile(options internal.FlushFileOptions) error {
