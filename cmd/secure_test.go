@@ -270,7 +270,6 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
 	passphrase := "12312312312312312312312312312312"
-	fmt.Println(passphrase)
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -318,7 +317,6 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt2() {
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
 	passphrase := "hvHlJUKlmZql3gLAcP6Ho41Js5rm8zUAKnwGb1lIffg="
-	fmt.Println(passphrase)
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())

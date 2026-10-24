@@ -982,3 +982,36 @@ func TestMountCommand(t *testing.T) {
 
 	suite.Run(t, new(mountTestSuite))
 }
+
+func TestRedactPassphraseArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args string
+		want string
+	}{
+		{
+			name: "long flag with separate value",
+			args: "--passphrase " + "secret",
+			want: "--passphrase " + "<redacted>",
+		},
+		{
+			name: "long flag with equals value",
+			args: "cloudfuse mount " + "--passphrase=secret",
+			want: "cloudfuse mount " + "--passphrase=<redacted>",
+		},
+		{
+			name: "shorthand forms",
+			args: "cloudfuse mount " + "-p secret -p=another -pthird",
+			want: "cloudfuse mount " + "-p <redacted> -p=<redacted> -p<redacted>",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := strings.Fields(test.args)
+			original := append([]string(nil), args...)
+			assert.Equal(t, strings.Fields(test.want), redactPassphraseArgs(args))
+			assert.Equal(t, original, args)
+		})
+	}
+}

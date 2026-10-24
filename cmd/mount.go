@@ -522,7 +522,7 @@ var mountCmd = &cobra.Command{
 			common.CloudfuseVersion,
 			common.GetCurrentDistro(),
 		)
-		log.Info("Mount Command: %s", os.Args)
+		log.Info("Mount Command: %s", redactPassphraseArgs(os.Args))
 		log.Crit("Logging level set to : %s", logLevel.String())
 		log.Crit("Log options: %+v", options.Logging)
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
@@ -678,6 +678,27 @@ func ignoreFuseOptions(opt string) bool {
 		}
 	}
 	return false
+}
+
+func redactPassphraseArgs(args []string) []string {
+	redacted := slices.Clone(args)
+	for i := 0; i < len(redacted); i++ {
+		arg := redacted[i]
+		switch {
+		case arg == "--passphrase" || arg == "-p":
+			if i+1 < len(redacted) {
+				redacted[i+1] = "<redacted>"
+				i++
+			}
+		case strings.HasPrefix(arg, "--passphrase="):
+			redacted[i] = "--passphrase=<redacted>"
+		case strings.HasPrefix(arg, "-p="):
+			redacted[i] = "-p=<redacted>"
+		case strings.HasPrefix(arg, "-p") && len(arg) > 2:
+			redacted[i] = "-p<redacted>"
+		}
+	}
+	return redacted
 }
 
 func parseUmaskOption(raw string) (uint32, error) {
