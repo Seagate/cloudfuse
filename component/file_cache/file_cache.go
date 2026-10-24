@@ -221,6 +221,15 @@ func (fc *FileCache) Stop() error {
 		fc.fileCloseOpt.Wait()
 	}
 
+	// handles still open at shutdown are never released, so queue their unsynced data
+	handlemap.GetHandles().Range(func(_, value any) bool {
+		if handle := value.(*handlemap.Handle); handle.Dirty() {
+			log.Warn("FileCache::Stop : %s open at shutdown, queued for upload", handle.Path)
+			fc.addPendingOp(handle.Path, pendingFlags{})
+		}
+		return true
+	})
+
 	_ = fc.policy.ShutdownPolicy()
 	if !fc.allowNonEmpty {
 		_ = common.TempCacheCleanup(fc.tmpPath)

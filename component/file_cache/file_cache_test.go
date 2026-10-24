@@ -2996,6 +2996,33 @@ func (suite *fileCacheTestSuite) TestStopWaitsForPendingOpUpload() {
 	suite.setupTestHelper(configContent)
 }
 
+func (suite *fileCacheTestSuite) TestStopQueuesOpenDirtyHandles() {
+	defer suite.cleanupTest()
+
+	name := "open_at_shutdown.txt"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: name, Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("unsynced data")},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+	handlemap.Add(handle)
+	defer handlemap.Delete(handle.ID)
+	defer handle.GetFileObject().Close()
+
+	suite.assert.NoError(suite.fileCache.Stop())
+	_, pending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.True(pending, "dirty handle open at shutdown should be queued for upload")
+
+	// give the deferred cleanup a running file cache to stop
+	suite.setupTestHelper(fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	))
+}
+
 func (suite *fileCacheTestSuite) TestNoScheduleAlwaysOn() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
