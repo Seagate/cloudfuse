@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -233,12 +234,6 @@ func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 	}
 }
 
-// syncsPendingOps : whether servicePendingOps is running. Queueing an op without it
-// would pin the cached file forever, since eviction skips pending ops.
-func (fc *FileCache) syncsPendingOps() bool {
-	return len(fc.schedule) > 0 || fc.offlineAccess
-}
-
 // persistent background thread function
 func (fc *FileCache) servicePendingOps() {
 	// grows while upload cycles keep failing, resets as soon as one succeeds
@@ -307,12 +302,10 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 		case <-fc.uploadWindow():
 			name := key.(string)
 			numFilesProcessed++
-			if !fc.updateObject(name, value.(pendingFlags)) {
-				// record the failure so the caller backs off instead of busy-retrying
-				cycleErr = fmt.Errorf("sync failed for %s", name)
-				return false
-			}
-			return true
+			err := fc.updateObject(name, value.(pendingFlags))
+			// record the failure so the caller backs off instead of busy-retrying
+			cycleErr = errors.Join(cycleErr, err)
+			return err == nil
 		default:
 			return false // upload window ended
 		}
@@ -322,8 +315,8 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 }
 
 // synchronize pending operation with cloud storage
-// returns false if we should stop iterating (offline, etc.)
-func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
+// returns the cloud error if the op stays pending
+func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 	log.Trace("FileCache::updateObject : %s", name)
 
 	// lock the file
@@ -334,7 +327,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 	// don't double upload
 	_, stillPending := fc.pendingOps.Load(name)
 	if !stillPending {
-		return true
+		return nil
 	}
 
 	// look up file (or folder!)
@@ -347,7 +340,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 		// there is no file to upload, so consider the inconsistency resolved
 		fc.pendingOps.Delete(name)
 		// this file failed, but we can continue with the rest of the pending ops
-		return true
+		return nil
 	}
 	if flags.isDeletion && !localMissing {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
@@ -364,7 +357,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 		if flags.isDeletion && fc.notInCloud(name) {
 			log.Info("FileCache::updateObject : %s skipping cloud deletion (not in cloud)", name)
 			fc.pendingOps.Delete(name)
-			return true
+			return nil
 		}
 		if flags.isDir {
 			// delete folder
@@ -376,29 +369,45 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 			options := internal.DeleteFileOptions{Name: name}
 			cloudErr = fc.NextComponent().DeleteFile(options)
 		}
+		// ignore ENOENT
+		if isNotExist(cloudErr) {
+			cloudErr = nil
+		}
 	} else {
 		op = "creation/update"
 		if info.IsDir() {
 			// upload folder
 			options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
 			cloudErr = fc.NextComponent().CreateDir(options)
+			// ignore EEXIST
+			if errors.Is(cloudErr, os.ErrExist) {
+				cloudErr = nil
+			}
 		} else {
 			// upload file
 			objType = "file"
 			cloudErr = fc.uploadFile(name)
+			if errors.Is(cloudErr, syscall.ENAMETOOLONG) {
+				// the key is too long for the backend, so retrying can never succeed
+				log.Err("FileCache::updateObject : %s key too long, abandoning upload", name)
+				fc.pendingOps.Delete(name)
+				return nil
+			}
 		}
 	}
+
 	// handle errors
 	if cloudErr != nil {
-		log.Err("FileCache::updateObject : %s %s %s failed [%v]", name, objType, op, cloudErr)
-		return false
+		err := fmt.Errorf("%s %s %s failed [%w]", name, objType, op, cloudErr)
+		log.Err("FileCache::updateObject : %v", err)
+		return err
 	}
 
 	// update state
 	log.Info("FileCache::updateObject : %s sync successful", name)
 	fc.pendingOps.Delete(name)
 
-	return true
+	return nil
 }
 
 // returns true if we *know* that this entity does not exist in cloud storage

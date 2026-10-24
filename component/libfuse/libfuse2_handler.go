@@ -887,6 +887,11 @@ func fuseErrnoFromError(err error) int {
 		return -fuse.EACCES
 	case errors.Is(err, fs.ErrExist):
 		return -fuse.EEXIST
+	// os.File methods return fs.ErrInvalid on a nil receiver and fs.ErrClosed after Close
+	case errors.Is(err, syscall.EBADF),
+		errors.Is(err, fs.ErrInvalid),
+		errors.Is(err, fs.ErrClosed):
+		return -fuse.EBADF
 	default:
 		return -fuse.EIO
 	}
@@ -1005,7 +1010,6 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 			handle.ID,
 			err.Error(),
 		)
-		return fuseErrnoFromError(err)
 	}
 
 	handlemap.Delete(handle.ID)
@@ -1013,7 +1017,7 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	// decrement open file handles count
 	libfuseStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
 
-	return 0
+	return fuseErrnoFromError(err)
 }
 
 // Unlink deletes a file.
