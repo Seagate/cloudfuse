@@ -1838,7 +1838,8 @@ func (fc *FileCache) releaseFileInternal(
 		// upload (flock is already locked)
 		flushOptions := internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}
 		err = fc.flushFileCloud(flushOptions)
-		if err != nil {
+		// the host owns capacity, so ENOSPC isn't retried behind its back
+		if err != nil && !errors.Is(err, syscall.ENOSPC) {
 			// the handle can't carry the retry past close, so the queue must (this also blocks eviction)
 			log.Warn(
 				"FileCache::releaseFileInternal : %s upload queued for retry",

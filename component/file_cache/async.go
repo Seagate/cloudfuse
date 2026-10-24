@@ -305,22 +305,13 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 			err := fc.updateObject(name, value.(pendingFlags))
 			// record the failure so the caller backs off instead of busy-retrying
 			cycleErr = errors.Join(cycleErr, err)
-			return continueOnError(err)
+			return err == nil
 		default:
 			return false // upload window ended
 		}
 	})
 
 	return numFilesProcessed, cycleErr
-}
-
-// continueOnError : whether err only affects one object, so the rest of the queue can still sync
-func continueOnError(err error) bool {
-	return err == nil ||
-		// ENOSPC won't be returned on deletions which could be queued
-		errors.Is(err, syscall.ENOSPC) ||
-		// s3storage KeyTooLongError: permanent for this key only
-		errors.Is(err, syscall.ENAMETOOLONG)
 }
 
 // synchronize pending operation with cloud storage
@@ -396,6 +387,12 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
 			// upload file
 			objType = "file"
 			cloudErr = fc.uploadFile(name)
+			if errors.Is(cloudErr, syscall.ENAMETOOLONG) {
+				// the key is too long for the backend, so retrying can never succeed
+				log.Err("FileCache::updateObject : %s key too long, abandoning upload", name)
+				fc.pendingOps.Delete(name)
+				return nil
+			}
 		}
 	}
 
