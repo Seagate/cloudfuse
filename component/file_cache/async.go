@@ -302,7 +302,6 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 		case <-fc.uploadWindow():
 			name := key.(string)
 			numFilesProcessed++
-			cycleErr = errors.Join(cycleErr)
 			err := fc.updateObject(name, value.(pendingFlags))
 			// record the failure so the caller backs off instead of busy-retrying
 			cycleErr = errors.Join(cycleErr, err)
