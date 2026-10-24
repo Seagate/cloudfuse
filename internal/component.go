@@ -135,6 +135,8 @@ type Component interface {
 
 	FileUsed(name string) error
 	StatFs() (*common.Statfs_t, bool, error)
+	// HasCapacity reports whether size more bytes fit; size 0 asks whether any space remains.
+	HasCapacity(size uint64) bool
 
 	GetCommittedBlockList(string) (*CommittedBlockList, error)
 	StageData(StageDataOptions) error

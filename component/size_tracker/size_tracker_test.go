@@ -426,6 +426,55 @@ func (suite *sizeTrackerTestSuite) TestWriteFileHardLimitExceedsByOne() {
 	suite.assert.NoError(err)
 }
 
+func (suite *sizeTrackerTestSuite) TestHasCapacity() {
+	defer suite.cleanupTest()
+	// no hard limit configured
+	suite.sizeTracker.mountSize.Add(MB)
+	suite.assert.True(suite.sizeTracker.HasCapacity(0))
+	suite.assert.True(suite.sizeTracker.HasCapacity(MB))
+
+	suite.sizeTracker.hardLimitEnabled = true
+	suite.sizeTracker.totalBucketCapacity = 2 * MB
+	suite.assert.True(suite.sizeTracker.HasCapacity(0))
+	suite.assert.True(suite.sizeTracker.HasCapacity(MB))
+	suite.assert.False(suite.sizeTracker.HasCapacity(MB + 1))
+
+	suite.sizeTracker.mountSize.Add(MB)
+	suite.assert.False(suite.sizeTracker.HasCapacity(0), "full tracker must reject creates")
+	suite.assert.False(suite.sizeTracker.HasCapacity(1))
+
+	suite.sizeTracker.mountSize.Add(-1)
+	suite.assert.True(suite.sizeTracker.HasCapacity(0))
+	suite.assert.True(suite.sizeTracker.HasCapacity(1))
+	suite.assert.False(suite.sizeTracker.HasCapacity(2))
+}
+
+func (suite *sizeTrackerTestSuite) TestHasCapacityAfterRejection() {
+	defer suite.cleanupTest()
+	suite.sizeTracker.hardLimitEnabled = true
+	suite.sizeTracker.totalBucketCapacity = 2 * MB
+	suite.sizeTracker.mountSize.Add(MB + MB/2)
+
+	// stalled below capacity: flushes bigger than the remainder are all rejected
+	suite.assert.True(suite.sizeTracker.HasCapacity(0))
+	suite.assert.ErrorIs(suite.sizeTracker.checkCapacityDelta(2*MB), syscall.ENOSPC)
+	suite.assert.ErrorIs(suite.sizeTracker.checkCapacityDelta(MB), syscall.ENOSPC)
+	suite.assert.ErrorIs(suite.sizeTracker.checkCapacityDelta(2*MB), syscall.ENOSPC)
+	suite.assert.EqualValues(MB, suite.sizeTracker.rejectedGrowth.Load(), "keeps the smallest")
+	suite.assert.False(suite.sizeTracker.HasCapacity(0))
+	suite.assert.False(suite.sizeTracker.HasCapacity(1))
+
+	// any freed space clears the state, even if the rejection still wouldn't fit
+	suite.sizeTracker.addSize(-1)
+	suite.assert.Zero(suite.sizeTracker.rejectedGrowth.Load())
+	suite.assert.True(suite.sizeTracker.HasCapacity(0))
+
+	// growth doesn't clear it
+	suite.assert.ErrorIs(suite.sizeTracker.checkCapacityDelta(MB), syscall.ENOSPC)
+	suite.sizeTracker.addSize(1)
+	suite.assert.False(suite.sizeTracker.HasCapacity(0))
+}
+
 func (suite *sizeTrackerTestSuite) TestTruncateFileHardLimitExactCapacity() {
 	suite.cleanupTest()
 

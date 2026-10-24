@@ -1236,6 +1236,10 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	log.Trace("FileCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 	var offline bool
 
+	if !fc.NextComponent().HasCapacity(0) {
+		return nil, syscall.ENOSPC
+	}
+
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -1933,6 +1937,10 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 	newSize := options.Offset + int64(len(options.Data))
 	if fc.exceedsHardLimit(newSize, options.Handle.Path, "WriteFile") {
+		return 0, syscall.ENOSPC
+	}
+	// len(Data) bounds the growth without a stat; flush does the exact check
+	if !fc.NextComponent().HasCapacity(uint64(len(options.Data))) {
 		return 0, syscall.ENOSPC
 	}
 

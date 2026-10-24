@@ -147,6 +147,7 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 		suite.fileCache = newTestFileCache(suite.mock)
 		// always simulate being offline
 		suite.mock.EXPECT().CloudConnected().AnyTimes().Return(false)
+		suite.mock.EXPECT().HasCapacity(gomock.Any()).AnyTimes().Return(true)
 	} else {
 		suite.loopback = newLoopbackFS()
 		suite.fileCache = newTestFileCache(suite.loopback)
@@ -172,6 +173,7 @@ func (suite *fileCacheTestSuite) setupMockWithConnection(configuration string) *
 	connected := &atomic.Bool{}
 	connected.Store(true)
 	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(connected.Load)
+	suite.mock.EXPECT().HasCapacity(gomock.Any()).AnyTimes().Return(true)
 	suite.assert.NoError(suite.fileCache.Start(context.Background()))
 	return connected
 }
@@ -2087,6 +2089,46 @@ func (suite *fileCacheTestSuite) TestReleaseFileEnospcNotQueued() {
 	suite.assert.ErrorIs(handle.GetFileObject().Close(), os.ErrClosed)
 }
 
+func (suite *fileCacheTestSuite) TestCreateAndWriteNoCapacity() {
+	suite.cleanupTest()
+	suite.assert = assert.New(suite.T())
+	err := config.ReadConfigFromReader(strings.NewReader(
+		fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true", suite.cache_path),
+	))
+	suite.assert.NoError(err)
+	suite.mockCtrl = gomock.NewController(suite.T())
+	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.fileCache = newTestFileCache(suite.mock)
+	suite.useMock = true
+	suite.mock.EXPECT().CloudConnected().AnyTimes().Return(true)
+	var capacity atomic.Bool
+	capacity.Store(true)
+	suite.mock.EXPECT().HasCapacity(gomock.Any()).AnyTimes().DoAndReturn(
+		func(int64) bool { return capacity.Load() },
+	)
+	suite.assert.NoError(suite.fileCache.Start(context.Background()))
+	defer suite.cleanupTest()
+
+	name := "no-capacity"
+	handle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: name, Mode: common.DefaultFilePermissionBits},
+	)
+	suite.assert.NoError(err)
+
+	capacity.Store(false)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("data")},
+	)
+	suite.assert.ErrorIs(err, syscall.ENOSPC)
+	blocked := "no-capacity-create"
+	_, err = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: blocked, Mode: 0777})
+	suite.assert.ErrorIs(err, syscall.ENOSPC)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, blocked))
+
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(nil)
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+}
+
 func (suite *fileCacheTestSuite) TestSyncFileUploadFailureNotQueued() {
 	// enable mock component, with offline access disabled
 	suite.cleanupTest()
@@ -2144,6 +2186,7 @@ func (suite *fileCacheTestSuite) TestOfflineToConnected() {
 	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(func() bool {
 		return connected.Load()
 	})
+	suite.mock.EXPECT().HasCapacity(gomock.Any()).AnyTimes().Return(true)
 
 	err = suite.fileCache.Start(context.Background())
 	suite.assert.NoError(err)
@@ -2215,6 +2258,7 @@ func (suite *fileCacheTestSuite) TestConnectedToOffline() {
 	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(func() bool {
 		return connected.Load()
 	})
+	suite.mock.EXPECT().HasCapacity(gomock.Any()).AnyTimes().Return(true)
 
 	err = suite.fileCache.Start(context.Background())
 	suite.assert.NoError(err)

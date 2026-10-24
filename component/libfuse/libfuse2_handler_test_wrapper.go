@@ -357,6 +357,8 @@ func testFuseErrnoFromError(suite *libfuseTestSuite) {
 		{err: fs.ErrExist, expected: -fuse.EEXIST},
 		{err: os.ErrExist, expected: -fuse.EEXIST},
 		{err: syscall.EBADF, expected: -fuse.EBADF},
+		{err: syscall.ENOSPC, expected: -fuse.ENOSPC},
+		{err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), expected: -fuse.ENOSPC},
 		{err: os.ErrInvalid, expected: -fuse.EBADF},
 		{err: (*os.File)(nil).Close(), expected: -fuse.EBADF},
 		{err: &fs.PathError{Op: "close", Err: os.ErrClosed}, expected: -fuse.EBADF},

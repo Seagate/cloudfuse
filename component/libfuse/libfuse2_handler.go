@@ -873,6 +873,8 @@ func fuseErrnoFromError(err error) int {
 		return -fuse.EBUSY
 	case errors.Is(err, syscall.EROFS):
 		return -fuse.EROFS
+	case errors.Is(err, syscall.ENOSPC):
+		return -fuse.ENOSPC
 	case errors.Is(err, syscall.ETXTBSY):
 		return -fuse.ETXTBSY
 	case errors.Is(err, syscall.ENOSYS):

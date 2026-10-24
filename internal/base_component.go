@@ -293,6 +293,13 @@ func (base *BaseComponent) StatFs() (*common.Statfs_t, bool, error) {
 	return nil, false, nil
 }
 
+func (base *BaseComponent) HasCapacity(size uint64) bool {
+	if base.next != nil {
+		return base.next.HasCapacity(size)
+	}
+	return true
+}
+
 func (base *BaseComponent) GetCommittedBlockList(name string) (*CommittedBlockList, error) {
 	if base.next != nil {
 		return base.next.GetCommittedBlockList(name)

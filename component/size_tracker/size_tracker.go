@@ -28,6 +28,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -50,6 +51,8 @@ type SizeTracker struct {
 	bucketUsage         uint64
 	statSizeOffset      uint64
 	hardLimitEnabled    bool
+	// smallest rejected growth that still doesn't fit; 0 if none
+	rejectedGrowth atomic.Uint64
 }
 
 type EvictionMode int
@@ -222,7 +225,7 @@ func (st *SizeTracker) CreateFile(options internal.CreateFileOptions) (*handlema
 
 	// File already exists but create succeeded so remove old file size
 	if err == nil && getAttrErr == nil {
-		st.mountSize.Add(-attr.Size)
+		st.addSize(-attr.Size)
 	}
 
 	return handle, err
@@ -235,7 +238,7 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 	err := st.NextComponent().DeleteFile(options)
 
 	if err == nil && getAttrErr == nil {
-		st.mountSize.Add(-attr.Size)
+		st.addSize(-attr.Size)
 	}
 
 	return err
@@ -249,7 +252,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 
 	// If dst already exists and rename succeeds, remove overwritten dst size
 	if dstErr == nil && err == nil {
-		st.mountSize.Add(-dstAttr.Size)
+		st.addSize(-dstAttr.Size)
 	}
 
 	return err
@@ -260,14 +263,44 @@ func (st *SizeTracker) checkCapacityDelta(delta int64) error {
 		return nil
 	}
 	current := st.mountSize.GetSize()
-	if current >= st.totalBucketCapacity {
-		return syscall.ENOSPC
+	if current < st.totalBucketCapacity && uint64(delta) <= st.totalBucketCapacity-current {
+		return nil
 	}
-	remaining := st.totalBucketCapacity - current
-	if uint64(delta) > remaining {
-		return syscall.ENOSPC
+	// keep the smallest rejection
+	for {
+		prev := st.rejectedGrowth.Load()
+		if prev != 0 && prev <= uint64(delta) {
+			break
+		}
+		if st.rejectedGrowth.CompareAndSwap(prev, uint64(delta)) {
+			break
+		}
 	}
-	return nil
+	return syscall.ENOSPC
+}
+
+// addSize updates the tracked size; any freed space clears pending rejections.
+func (st *SizeTracker) addSize(delta int64) {
+	st.mountSize.Add(delta)
+	if delta < 0 {
+		st.rejectedGrowth.Store(0)
+	}
+}
+
+// HasCapacity is on the write path; keep it lock- and I/O-free.
+func (st *SizeTracker) HasCapacity(size uint64) bool {
+	if st.hardLimitEnabled && st.totalBucketCapacity != 0 {
+		current := st.mountSize.GetSize()
+		if current >= st.totalBucketCapacity {
+			return false
+		}
+		// flushes are rejected before mountSize reaches capacity, so treat recent rejections as full
+		need := max(size, st.rejectedGrowth.Load())
+		if need > st.totalBucketCapacity-current {
+			return false
+		}
+	}
+	return st.NextComponent().HasCapacity(size)
 }
 
 func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error) {
@@ -294,7 +327,7 @@ func (st *SizeTracker) WriteFile(options *internal.WriteFileOptions) (int, error
 		return bytesWritten, err
 	}
 	// File already exists and WriteFile succeeded subtract difference in file size
-	st.mountSize.Add(diff)
+	st.addSize(diff)
 
 	return bytesWritten, nil
 }
@@ -323,7 +356,7 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	}
 
 	// subtract difference in file size
-	st.mountSize.Add(options.NewSize - origSize)
+	st.addSize(options.NewSize - origSize)
 	return nil
 }
 
@@ -347,7 +380,7 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 		return err
 	}
 	if statErr == nil {
-		st.mountSize.Add(fileInfo.Size() - origSize)
+		st.addSize(fileInfo.Size() - origSize)
 	}
 	return nil
 }
@@ -485,7 +518,7 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 		)
 	}
 
-	st.mountSize.Add(newSize - origSize)
+	st.addSize(newSize - origSize)
 
 	return nil
 }
@@ -504,7 +537,7 @@ func (st *SizeTracker) CreateLink(options internal.CreateLinkOptions) error {
 	}
 
 	newSize := int64(len(options.Target))
-	st.mountSize.Add(newSize - origSize)
+	st.addSize(newSize - origSize)
 
 	return nil
 }

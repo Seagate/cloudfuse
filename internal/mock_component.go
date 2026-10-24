@@ -324,6 +324,20 @@ func (mr *MockComponentMockRecorder) GetFileBlockOffsets(arg0 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFileBlockOffsets", reflect.TypeOf((*MockComponent)(nil).GetFileBlockOffsets), arg0)
 }
 
+// HasCapacity mocks base method.
+func (m *MockComponent) HasCapacity(arg0 uint64) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasCapacity", arg0)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasCapacity indicates an expected call of HasCapacity.
+func (mr *MockComponentMockRecorder) HasCapacity(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasCapacity", reflect.TypeOf((*MockComponent)(nil).HasCapacity), arg0)
+}
+
 // IsDirEmpty mocks base method.
 func (m *MockComponent) IsDirEmpty(arg0 IsDirEmptyOptions) bool {
 	m.ctrl.T.Helper()
