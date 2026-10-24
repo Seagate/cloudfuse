@@ -68,7 +68,7 @@ type FileCache struct {
 	policyTrace     bool
 	missedChmodList sync.Map      // uses object name (common.JoinUnixFilepath)
 	pendingOps      sync.Map      // uses object name (common.JoinUnixFilepath)
-	pendingOpAdded  chan struct{} // signals when an offline operation is queued
+	pendingOpAdded  chan struct{} // signals when a pending operation is queued
 	mountPath       string        // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
@@ -194,10 +194,8 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	} else {
 		close(fc.startScheduledUploads)
 	}
-	if fc.syncsPendingOps() {
-		fc.pendingOpAdded = make(chan struct{}, 1)
-		fc.pendingOpsWorker.Go(fc.servicePendingOps)
-	}
+	fc.pendingOpAdded = make(chan struct{}, 1)
+	fc.pendingOpsWorker.Go(fc.servicePendingOps)
 
 	return nil
 }
@@ -1840,6 +1838,14 @@ func (fc *FileCache) releaseFileInternal(
 		// upload (flock is already locked)
 		flushOptions := internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}
 		err = fc.flushFileCloud(flushOptions)
+		if err != nil {
+			// the handle can't carry the retry past close, so the queue must (this also blocks eviction)
+			log.Warn(
+				"FileCache::releaseFileInternal : %s upload queued for retry",
+				options.Handle.Path,
+			)
+			fc.addPendingOp(options.Handle.Path, pendingFlags{})
+		}
 		// clears the flag if the upload failed, since the handle is going away
 		fc.clearHandleDirty(options.Handle)
 		// close the local file
@@ -2082,18 +2088,11 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 	case err == nil:
 		fc.clearHandleDirty(options.Handle)
 		fc.pendingOps.Delete(options.Handle.Path)
-	case errors.Is(err, syscall.ENOSPC):
-		log.Err("FileCache::flushFileCloud : %s upload failed [%v]", options.Handle.Path, err)
 	case isOffline(err) && fc.offlineAccess:
 		log.Warn("FileCache::flushFileCloud : %s upload delayed (offline)", options.Handle.Path)
 		// add file to upload queue
 		fc.addPendingOp(options.Handle.Path, pendingFlags{})
 		err = nil
-	case fc.syncsPendingOps():
-		log.Err("FileCache::flushFileCloud : %s upload failed [%v]", options.Handle.Path, err)
-		// queue for retry, which also protects the cached data from eviction.
-		// the error is still returned - the caller must not assume the data is safe
-		fc.addPendingOp(options.Handle.Path, pendingFlags{})
 	default:
 		log.Err("FileCache::flushFileCloud : %s upload failed [%v]", options.Handle.Path, err)
 	}
