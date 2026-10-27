@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -233,12 +234,6 @@ func (fc *FileCache) addPendingOp(name string, value pendingFlags) {
 	}
 }
 
-// syncsPendingOps : whether servicePendingOps is running. Queueing an op without it
-// would pin the cached file forever, since eviction skips pending ops.
-func (fc *FileCache) syncsPendingOps() bool {
-	return len(fc.schedule) > 0 || fc.offlineAccess
-}
-
 // persistent background thread function
 func (fc *FileCache) servicePendingOps() {
 	// grows while upload cycles keep failing, resets as soon as one succeeds
@@ -296,10 +291,7 @@ func (fc *FileCache) servicePendingOps() {
 // runPendingOpCycle : sync pending ops with cloud storage until the upload window
 // closes or an operation fails. Returns the number of ops attempted, and the error
 // that ended the cycle, if any.
-func (fc *FileCache) runPendingOpCycle() (int, error) {
-	numFilesProcessed := 0
-	var cycleErr error
-
+func (fc *FileCache) runPendingOpCycle() (numFilesProcessed int, err error) {
 	fc.pendingOps.Range(func(key, value any) bool {
 		select {
 		case <-fc.componentStopping:
@@ -307,24 +299,25 @@ func (fc *FileCache) runPendingOpCycle() (int, error) {
 		case <-fc.uploadWindow():
 			name := key.(string)
 			numFilesProcessed++
-			if !fc.updateObject(name, value.(pendingFlags)) {
-				// record the failure so the caller backs off instead of busy-retrying
-				cycleErr = fmt.Errorf("sync failed for %s", name)
-				return false
-			}
-			return true
+			err = fc.updateObject(name, value.(pendingFlags))
+			return err == nil
 		default:
 			return false // upload window ended
 		}
 	})
 
-	return numFilesProcessed, cycleErr
+	return numFilesProcessed, err
 }
 
 // synchronize pending operation with cloud storage
-// returns false if we should stop iterating (offline, etc.)
-func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
-	log.Trace("FileCache::updateObject : %s", name)
+// returns the cloud error *if and only if* the op stays pending
+func (fc *FileCache) updateObject(name string, flags pendingFlags) error {
+	log.Trace(
+		"FileCache::updateObject : %s, isDir=%t, isDeletion=%t",
+		name,
+		flags.isDir,
+		flags.isDeletion,
+	)
 
 	// lock the file
 	flock := fc.fileLocks.Get(name)
@@ -334,7 +327,7 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 	// don't double upload
 	_, stillPending := fc.pendingOps.Load(name)
 	if !stillPending {
-		return true
+		return nil
 	}
 
 	// look up file (or folder!)
@@ -343,11 +336,16 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 	localMissing := os.IsNotExist(localErr)
 	// in case of inconsistency, local state takes precedence (except to prevent incorrect deletions)
 	if !flags.isDeletion && localErr != nil {
-		log.Err("FileCache::updateObject : %s stat failed. Here's why: %v", name, localErr)
-		// there is no file to upload, so consider the inconsistency resolved
-		fc.pendingOps.Delete(name)
-		// this file failed, but we can continue with the rest of the pending ops
-		return true
+		if localMissing {
+			log.Err("FileCache::updateObject : %s not found. Pending operation dropped.", localPath)
+			fc.pendingOps.Delete(name)
+			// do not interrupt other pending operations
+			return nil
+		} else {
+			// other errors (EIO, EACCESS, out of resources, etc.)
+			log.Err("FileCache::updateObject : %s %v", name, localErr)
+			return localErr
+		}
 	}
 	if flags.isDeletion && !localMissing {
 		log.Err("FileCache::updateObject : %s exists. Ignoring deletion flag!", name)
@@ -357,48 +355,62 @@ func (fc *FileCache) updateObject(name string, flags pendingFlags) bool {
 	}
 
 	// update cloud
-	op := "deletion"
-	objType := "directory"
+	var op, objType string
 	var cloudErr error
 	if localMissing {
+		op = "deletion"
 		if flags.isDeletion && fc.notInCloud(name) {
+			// nothing to do
 			log.Info("FileCache::updateObject : %s skipping cloud deletion (not in cloud)", name)
-			fc.pendingOps.Delete(name)
-			return true
-		}
-		if flags.isDir {
-			// delete folder
+		} else if flags.isDir {
+			objType = "directory"
 			options := internal.DeleteDirOptions{Name: name}
 			cloudErr = fc.NextComponent().DeleteDir(options)
 		} else {
-			// delete file
 			objType = "file"
 			options := internal.DeleteFileOptions{Name: name}
 			cloudErr = fc.NextComponent().DeleteFile(options)
 		}
+		// ignore ENOENT
+		if isNotExist(cloudErr) {
+			log.Debug("FileCache::updateObject : %s does not exist in cloud", name)
+			cloudErr = nil
+		}
 	} else {
 		op = "creation/update"
 		if info.IsDir() {
-			// upload folder
+			objType = "directory"
 			options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
 			cloudErr = fc.NextComponent().CreateDir(options)
 		} else {
-			// upload file
 			objType = "file"
 			cloudErr = fc.uploadFile(name)
 		}
+		// ignore EEXIST
+		if errors.Is(cloudErr, os.ErrExist) {
+			log.Debug("FileCache::updateObject : %s already exists in cloud", name)
+			cloudErr = nil
+		}
 	}
-	// handle errors
+
+	// drop any ops that will never succeed
+	if errors.Is(cloudErr, syscall.ENAMETOOLONG) {
+		// the key is too long for the backend, so retrying can never succeed
+		log.Err("FileCache::updateObject : %s key too long, abandoning upload", name)
+		fc.pendingOps.Delete(name)
+		// do not interrupt other pending operations
+		return nil
+	}
+
+	// any remaining errors should interrupt all pending operations and delay retries
 	if cloudErr != nil {
-		log.Err("FileCache::updateObject : %s %s %s failed [%v]", name, objType, op, cloudErr)
-		return false
+		err := fmt.Errorf("%s %s %s failed [%w]", name, objType, op, cloudErr)
+		log.Err("FileCache::updateObject : %v", err)
+		return err
 	}
 
-	// update state
-	log.Info("FileCache::updateObject : %s sync successful", name)
 	fc.pendingOps.Delete(name)
-
-	return true
+	return nil
 }
 
 // returns true if we *know* that this entity does not exist in cloud storage

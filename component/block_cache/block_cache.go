@@ -621,21 +621,21 @@ func (bc *BlockCache) releaseFileInternal(options internal.ReleaseFileOptions) e
 
 	defer bc.fileCloseOpt.Done()
 
+	var err error
 	if options.Handle.Dirty() {
 		log.Info(
 			"BlockCache::CloseFile : name=%s, handle=%d dirty. Flushing the file.",
 			options.Handle.Path,
 			options.Handle.ID,
 		)
-		err := bc.FlushFile(
+		err = bc.FlushFile(
 			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
-		) //nolint
+		)
 		if err != nil {
 			log.Err(
 				"BlockCache::ReleaseFileInternal : failed to flush file %s",
 				options.Handle.Path,
 			)
-			return err
 		}
 	}
 
@@ -669,7 +669,7 @@ func (bc *BlockCache) releaseFileInternal(options internal.ReleaseFileOptions) e
 	}
 	options.Handle.Buffers.Cooked = nil
 
-	return nil
+	return err
 }
 
 func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
