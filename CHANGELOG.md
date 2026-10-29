@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **2.4.1** ##
+
+October 28th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#1098](https://github.com/Seagate/cloudfuse/pull/1098) Fix handle leak on failed upload and improve error handling
+
 ## **2.4.0** ##
 
 October 20th 2026

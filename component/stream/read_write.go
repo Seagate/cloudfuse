@@ -271,34 +271,12 @@ func (rw *ReadWriteCache) FlushFile(options internal.FlushFileOptions) error {
 func (rw *ReadWriteCache) ReleaseFile(options internal.ReleaseFileOptions) error {
 	log.Trace("Stream::ReleaseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 	// try to flush again to make sure it's cleaned up
-	err := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
-	if err != nil {
-		log.Err(
-			"Stream::ReleaseFile : error flushing file %s [%s]",
-			options.Handle.Path,
-			err.Error(),
-		)
-		return err
-	}
+	flushErr := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 	if !rw.StreamOnly && !options.Handle.CacheObj.StreamOnly {
-		err = rw.purge(options.Handle, -1)
-		if err != nil {
-			log.Err(
-				"Stream::ReleaseFile : error purging file %s [%s]",
-				options.Handle.Path,
-				err.Error(),
-			)
-		}
+		// TODO: if the flush failed, this discards dirty blocks and the unflushed data is lost
+		rw.purge(options.Handle, -1)
 	}
-	err = rw.NextComponent().ReleaseFile(options)
-	if err != nil {
-		log.Err(
-			"Stream::ReleaseFile : error releasing file %s [%s]",
-			options.Handle.Path,
-			err.Error(),
-		)
-	}
-	return err
+	return errors.Join(flushErr, rw.NextComponent().ReleaseFile(options))
 }
 
 func (rw *ReadWriteCache) DeleteFile(options internal.DeleteFileOptions) error {
@@ -396,15 +374,7 @@ func (rw *ReadWriteCache) Stop() error {
 		handleMap.Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
 			if handle.CacheObj != nil && !handle.CacheObj.StreamOnly {
-				err := rw.purge(handle, -1)
-				if err != nil {
-					log.Err(
-						"Stream::Stop : failed to purge handle cache %s [%s]",
-						handle.Path,
-						err.Error(),
-					)
-					return false
-				}
+				rw.purge(handle, -1)
 			}
 			return true
 		})
@@ -417,7 +387,7 @@ func (rw *ReadWriteCache) GetAttr(options internal.GetAttrOptions) (*internal.Ob
 	return rw.NextComponent().GetAttr(options)
 }
 
-func (rw *ReadWriteCache) purge(handle *handlemap.Handle, size int64) error {
+func (rw *ReadWriteCache) purge(handle *handlemap.Handle, size int64) {
 	handle.CacheObj.Lock()
 	defer handle.CacheObj.Unlock()
 	handle.CacheObj.Purge()
@@ -427,7 +397,6 @@ func (rw *ReadWriteCache) purge(handle *handlemap.Handle, size int64) error {
 	}
 	handle.CacheObj.StreamOnly = true
 	atomic.AddInt32(&rw.CachedObjects, -1)
-	return nil
 }
 
 func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {

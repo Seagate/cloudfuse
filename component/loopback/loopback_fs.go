@@ -33,7 +33,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -252,14 +251,9 @@ func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Ha
 func (lfs *LoopbackFS) ReleaseFile(options internal.ReleaseFileOptions) error {
 	log.Trace("LoopbackFS::ReleaseFile : name=%s", options.Handle.Path)
 
-	f := options.Handle.GetFileObject()
-	if f == nil {
-		log.Err("LoopbackFS::ReleaseFile : error [file not available]")
-		return syscall.EBADF
-	}
-
 	handlemap.Delete(options.Handle.ID)
-	return f.Close()
+
+	return options.Handle.GetFileObject().Close()
 }
 
 func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
