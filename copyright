@@ -1,9 +1,12 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Source: https://github.com/Seagate/cloudfuse
+Comment: The cloudfuse binaries are statically linked with third-party Go
+ modules and the Go standard library. Their copyright and license notices are
+ in /usr/share/doc/cloudfuse/NOTICE.
 
 Files: *
-Copyright: 2023-2024, Seagate Technology LLC and/or its Affiliates
-           2020-2024, Microsoft Corporation.
+Copyright: 2023-2026, Seagate Technology LLC and/or its Affiliates
+           2020-2026, Microsoft Corporation.
 License: Expat
 
 Files: common/open_file_windows.go

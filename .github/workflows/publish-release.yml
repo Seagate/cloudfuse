@@ -139,6 +139,10 @@ jobs:
       - name: Set up Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
+      # Syft is used by GoReleaser to generate SBOMs
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+
       - name: Set Version
         id: get_version
         run: echo "VERSION=${REF_NAME#v}" >> $GITHUB_OUTPUT
@@ -181,6 +185,8 @@ jobs:
           path: gh-pages
           persist-credentials: true
 
+      # The repositories only provide the FUSE 3 build. Both builds share the same
+      # package name and version, so adding the FUSE 2 build would conflict.
       - name: Download .deb and .rpm packages from release
         env:
           GH_REPO: ${{ github.repository }}
@@ -188,8 +194,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           mkdir ./packages
-          gh release download "$TAG" --repo "$GH_REPO" --dir ./packages -p "*.deb"
-          gh release download "$TAG" --repo "$GH_REPO" --dir ./packages -p "*.rpm"
+          gh release download "$TAG" --repo "$GH_REPO" --dir ./packages -p "cloudfuse_fuse3_*.deb"
+          gh release download "$TAG" --repo "$GH_REPO" --dir ./packages -p "cloudfuse_fuse3_*.rpm"
 
       - name: Import GPG key
         id: import_gpg

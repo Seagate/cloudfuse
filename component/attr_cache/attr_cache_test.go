@@ -44,6 +44,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/mockcomponent"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -55,7 +56,7 @@ type attrCacheTestSuite struct {
 	assert    *assert.Assertions
 	attrCache *AttrCache
 	mockCtrl  *gomock.Controller
-	mock      *internal.MockComponent
+	mock      *mockcomponent.MockComponent
 }
 
 var emptyConfig = ""
@@ -294,7 +295,7 @@ func (suite *attrCacheTestSuite) setupTestHelper(config string) {
 	suite.assert = assert.New(suite.T())
 
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.attrCache = newTestAttrCache(suite.mock, config)
 	_ = suite.attrCache.Start(context.Background())
 }

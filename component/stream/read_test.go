@@ -41,6 +41,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/mockcomponent"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -52,7 +53,7 @@ type streamTestSuite struct {
 	assert   *assert.Assertions
 	stream   *Stream
 	mockCtrl *gomock.Controller
-	mock     *internal.MockComponent
+	mock     *mockcomponent.MockComponent
 }
 
 var wg = sync.WaitGroup{}
@@ -80,7 +81,7 @@ func (suite *streamTestSuite) setupTestHelper(config string, ro bool) {
 	var err error
 	suite.assert = assert.New(suite.T())
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.stream, err = newTestStream(suite.mock, config, ro)
 	suite.assert.NoError(err)
 	_ = suite.stream.Start(context.Background())

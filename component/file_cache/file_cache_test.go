@@ -52,6 +52,7 @@ import (
 	"github.com/Seagate/cloudfuse/component/loopback"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/mockcomponent"
 	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
@@ -69,7 +70,7 @@ type fileCacheTestSuite struct {
 	fake_storage_path string // uses os.Separator (filepath.Join)
 	useMock           bool
 	mockCtrl          *gomock.Controller
-	mock              *internal.MockComponent
+	mock              *mockcomponent.MockComponent
 }
 
 func newLoopbackFS() internal.Component {
@@ -143,7 +144,7 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert.NoError(err)
 	if suite.useMock {
 		suite.mockCtrl = gomock.NewController(suite.T())
-		suite.mock = internal.NewMockComponent(suite.mockCtrl)
+		suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 		suite.fileCache = newTestFileCache(suite.mock)
 		// always simulate being offline
 		suite.mock.EXPECT().CloudConnected().AnyTimes().Return(false)
@@ -166,7 +167,7 @@ func (suite *fileCacheTestSuite) setupMockWithConnection(configuration string) *
 	err := config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.assert.NoError(err)
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.fileCache = newTestFileCache(suite.mock)
 	suite.useMock = true
 	connected := &atomic.Bool{}
@@ -2135,7 +2136,7 @@ func (suite *fileCacheTestSuite) TestOfflineToConnected() {
 	err := config.ReadConfigFromReader(strings.NewReader(defaultConfig))
 	suite.assert.NoError(err)
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.fileCache = newTestFileCache(suite.mock)
 	suite.useMock = true
 
@@ -2206,7 +2207,7 @@ func (suite *fileCacheTestSuite) TestConnectedToOffline() {
 	err := config.ReadConfigFromReader(strings.NewReader(defaultConfig))
 	suite.assert.NoError(err)
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.fileCache = newTestFileCache(suite.mock)
 	suite.useMock = true
 

@@ -1,2 +1,8 @@
 debug: false
 package-name: "Cloudfuse"
+owner: "Seagate Technology <cloudfuse@seagate.com>"
+# Required for a valid Debian changelog in the .deb packages
+deb:
+  distribution:
+    - stable
+  urgency: medium

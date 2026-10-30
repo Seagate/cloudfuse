@@ -1,17 +1,49 @@
 #!/bin/bash
 
-#==============================================================================
-#title           : notices_fix.sh
-#description     : Using go.sum file generates third-party notices for the project
-#author		     : Vikas Bhansali (vibhansa@microsoft.com)
-#date            : 02-Oct-2021
-#usage		     : sh notices_fix.sh
-#==============================================================================
+# The dependency list is computed with 'go list -deps' over every binary and
+# platform built by .goreleaser.yaml, so only code that is actually shipped is
+# listed. License and NOTICE files are read from the Go module cache at the
+# exact version recorded in go.sum, so the output is reproducible and matches
+# what is compiled in.
+#
+# If a license cannot be resolved, a warning is printed and the existing
+# section from the current NOTICE file (if any) is kept.
 
+export LC_ALL=C
 
-# File to hold dependency list from go.sum file
-dependency_list="./dependencies.lst"
 output_file="./NOTICE"
+
+# WinFsp is not a Go module, but its installer is bundled with the Windows
+# installer, so its license is included as well. Keep in sync with
+# build/windows_installer_build.iss.
+winfsp_tag="v2.1"
+
+# Targets built by .goreleaser.yaml as "GOOS GOARCH CGO_ENABLED TAGS PACKAGE"
+build_targets=(
+    "linux amd64 1 fuse3 ."
+    "linux amd64 1 - ."
+    "linux arm64 1 fuse3 ."
+    "linux arm64 1 - ."
+    "linux amd64 0 - ./tools/health-monitor"
+    "linux arm64 0 - ./tools/health-monitor"
+    "windows amd64 0 - ."
+    "windows amd64 0 - ./tools/windows-startup"
+    "windows amd64 0 - ./tools/windows-service"
+    "windows amd64 0 - ./tools/health-monitor"
+)
+
+work_dir=$(mktemp -d)
+trap 'rm -rf "$work_dir"' EXIT
+
+new_notice="$work_dir/NOTICE"
+old_notice="$work_dir/NOTICE.old"
+if [ -e $output_file ]; then
+    tr -d '\r' < $output_file > "$old_notice"
+else
+    touch "$old_notice"
+fi
+
+warnings=0
 
 # Function to create header for notices file
 function dump_header
@@ -32,12 +64,12 @@ function dump_header
     not the third party, licenses to you under this agreement. Notices, if any, for the
     third party programs are included for your information only.
     ---------------------------------------------------------------------------------------
-    " > $output_file
+    " > "$new_notice"
 }
 
 function dump_footer
 {
-    echo -ne "--------------------- END OF THIRD PARTY NOTICE --------------------------------\n" >> $output_file
+    echo -ne "--------------------- END OF THIRD PARTY NOTICE --------------------------------\n" >> "$new_notice"
 }
 
 function append_lic_to_notice
@@ -50,266 +82,117 @@ function append_lic_to_notice
         echo -e ">>>" "$1"
         echo -e "=============================================================================="
         echo
-        cat lic.tmp
-    } >> $output_file
+        tr -d '\r' < "$work_dir/lic.tmp"
+    } >> "$new_notice"
 
-    rm -rf lic.tmp
+    rm -f "$work_dir/lic.tmp"
 }
 
-# Function to download the file and add it to Notice file with formatting
-function download_and_dump
+# Copy the section for a dependency from the existing NOTICE file, used when its
+# license can no longer be resolved
+function keep_old_section
 {
-    #echo "Downloading lic for $1 from $2"
-    # Cleanup old tmp file
-    rm -rf lic.tmp
+    # Section body runs from the "====" line after ">>> name" to the next "****" line
+    awk -v name="$1" '
+        /^>>> / { found = ($2 == name); in_header = found; next }
+        in_header { if (/^=+$/) in_header = 0; next }
+        /^\*{20,}$/ || /END OF THIRD PARTY NOTICE/ { found = 0 }
+        found { print }
+    ' "$old_notice" | sed -e '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "$work_dir/lic.tmp"
 
-    if wget -q -O lic.tmp "$2"
-    then
+    if [ -s "$work_dir/lic.tmp" ]; then
+        echo "WARNING: could not resolve license for $1, keeping existing section"
         append_lic_to_notice "$1"
-        return 0
+    else
+        echo "WARNING: could not resolve license for $1 and no existing section found"
+        rm -f "$work_dir/lic.tmp"
+    fi
+    warnings=1
+}
+
+# Append the license and NOTICE files in a directory to lic.tmp, labelling each
+# file with the given prefix when it is not the main module license
+function collect_files
+{
+    local dir=$1
+    local prefix=$2
+    local pattern file
+
+    # License files first, then any upstream NOTICE files (Apache-2.0 section 4(d))
+    for pattern in '^(licen[cs]e|copying)' '^notice'; do
+        while IFS= read -r file; do
+            [ -s "$work_dir/lic.tmp" ] && printf '\n' >> "$work_dir/lic.tmp"
+            if [[ $pattern == '^notice' ]] || [ -n "$prefix" ]; then
+                printf -- '------------------------------ %s ------------------------------\n\n' "$prefix$file" >> "$work_dir/lic.tmp"
+            fi
+            cat "$dir/$file" >> "$work_dir/lic.tmp"
+        done < <(find "$dir" -maxdepth 1 -type f -printf '%f\n' | grep -iE "$pattern" | sort)
+    done
+}
+
+# Add the license and NOTICE files of a module, including those in compiled
+# packages below the module root (e.g. vendored third-party code)
+function dump_module
+{
+    local name=$1
+    local dir=$2
+    local pkg_dir
+
+    rm -f "$work_dir/lic.tmp"
+    if [ -n "$dir" ] && [ -d "$dir" ]; then
+        collect_files "$dir" ""
+        while read -r _ pkg_dir; do
+            [ "$pkg_dir" != "$dir" ] && collect_files "$pkg_dir" "${pkg_dir#"$dir"/}/"
+        done < <(awk -v name="$name" '$1 == name' "$work_dir/pkg_dirs.lst")
     fi
 
-    return 1
-}
-
-function try_differ_names()
-{
-    # Try lic file without any extension
-    if ! download_and_dump "$1" "$2"
-    then
-        # Try with .txt extension
-        if ! download_and_dump "$line" "$lic_path".txt
-            then
-            # Try with .md extension
-            download_and_dump "$line" "$lic_path".md
-        fi
+    if [ -s "$work_dir/lic.tmp" ]; then
+        append_lic_to_notice "$name"
+    else
+        keep_old_section "$name"
     fi
-
-    return $?
 }
 
-function download_notice
-{
-    line=$1
-
-    case $line in
-    *go-autorest/*)
-        # There are multiple entries with this for each of its subfolder so download only once
-        if [[ $autorest_done -eq 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/Azure/go-autorest/master/LICENSE"
-
-            if ! download_and_dump "github.com/Azure/go-autorest/autorest" $lic_path
-            then
-                # This might need manual intervention
-                echo "Failed to get LICENSE from : AutoRest"
-            else
-                autorest_done=1
-            fi
-        fi
-        echo -ne "." ;;
-
-    github.com*)
-        # Try standard lic path first to get the info with 'master' branch
-        # Define an array of possible license paths
-        license_paths=(
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" --complement -f1)/master/LICENSE"
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/master/LICENSE"
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" --complement -f1)/main/LICENSE"
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/main/LICENSE"
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" --complement -f1)/master/COPYING"
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/master/License"
-            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/main/License"
-        )
-
-        # Iterate over each license path and try to find the license
-        license_found=false
-        for lic_path in "${license_paths[@]}"; do
-            if try_differ_names "$line" "$lic_path"; then
-                license_found=true
-                break
-            fi
-        done
-
-        # If no license was found, print a failure message
-        if ! $license_found; then
-            echo "Failed to get LICENSE from: $line"
-        fi
-
-        echo -ne "." ;;
-
-    *etcd.io/etcd*)
-        # There are multiple entries with this for each of its subfolder so download only once
-        if [[ $etcd_done -eq 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/etcd-io/etcd/main/LICENSE"
-
-            if ! download_and_dump "go.etcd.io/etcd" $lic_path
-            then
-                # This might need manual intervention
-                echo "Failed to get LICENSE from : etcd.id"
-            else
-                etcd_done=1
-            fi
-        fi
-        echo -ne "." ;;
-
-
-    *golang.org/x* | *rsc.io/* | *cloud.google.com/* | *google.golang.org/* | *go.uber.org/* | *go.opencensus.io* | *go.opentelemetry.io/*)
-        #echo ">>> " $line
-        # Get the contents of this package
-        if ! wget -q -O lic.tmp "https://pkg.go.dev/$line?tab=licenses"
-        then
-            # This might need manual intervention
-            echo "Failed to get LICENSE from : $line"
-        else
-            # This will be html output so filter only license content
-            sed -n '/License-contents/,/\/pre\>/p' lic.tmp > lic1.tmp
-            head -1 lic1.tmp | grep "Copyright" | cut -d ">" -f 2 > lic.tmp
-            sed '1d;$d' lic1.tmp >> lic.tmp
-
-            # now dump it to our notice file
-            append_lic_to_notice "$line"
-        fi
-        echo -ne "." ;;
-
-    *gopkg.in/ini.v1*)
-        if ! wget -q -O lic.tmp "https://raw.githubusercontent.com/go-ini/ini/v1.63.2/LICENSE"
-        then
-            # This might need manual intervention
-            echo "Failed to get LICENSE from : $line"
-        else
-            append_lic_to_notice "$line"
-        fi
-
-        echo -ne "." ;;
-
-    *gopkg.in/*)
-        #https://raw.githubusercontent.com/go-yaml/yaml/v3/LICENSE
-        pkg=$(echo "$line" | cut -d "/" -f 2 | cut -d "." -f 1)
-        ver=$(echo "$line" | cut -d "/" -f 2 | cut -d "." -f 2)
-        if ! wget -q -O lic.tmp "https://raw.githubusercontent.com/go-$pkg/$pkg/$ver/LICENSE"
-        then
-            # This might need manual intervention
-            echo "Failed to get LICENSE from : $line"
-        else
-            append_lic_to_notice "$line"
-        fi
-
-        echo -ne "." ;;
-
-    *dmitri.shuralyov.com*)
-        #dmitri.shuralyov.com/gpu/mtl
-        # Get the contents of this package
-        if ! wget -q -O lic.tmp "https://$line\$file/LICENSE"
-        then
-            # This might need manual intervention
-            echo "Failed to get LICENSE from : $line"
-        else
-            append_lic_to_notice "$line"
-        fi
-        echo -ne "." ;;
-
-    *honnef.co/go/tools*)
-        # Get the contents of this package
-        if ! wget -q -O lic.tmp "https://raw.githubusercontent.com/dominikh/go-tools/master/LICENSE"
-        then
-            # This might need manual intervention
-            echo "Failed to get LICENSE from : $line"
-        else
-            append_lic_to_notice "$line"
-        fi
-        echo -ne "." ;;
-
-    *)
-        echo "Others: " "$line";;
-    esac
-}
-
-function generate_notices
-{
-    ret=0
-    while IFS= read -r line; do
-        case $line in
-        *go-autorest/*)
-            if grep -q ">>> github.com/Azure/go-autorest/autorest" $output_file
-            then
-                echo -ne "."
-            else
-               #echo "Missing $line in old file"
-               download_notice "$line"
-               ret=1
-            fi
-            echo -ne "." ;;
-
-        *etcd.io/etcd*)
-            if grep -q ">>> go.etcd.io/etcd" $output_file
-            then
-                echo -ne "."
-            else
-               #echo "Missing $line in old file"
-               download_notice "$line"
-               ret=1
-            fi
-            echo -ne "." ;;
-
-        *)
-            if grep -q ">>> $line" $output_file
-            then
-                echo -ne "."
-            else
-                #echo "Missing $line in old file"
-                download_notice "$line"
-                ret=1
-            fi
-            echo -ne "." ;;
-        esac
-    done < $dependency_list
-
-    return $ret
-}
-
-# Create temp directory for working on this
-rm -rf ./notice_tmp
-mkdir ./notice_tmp/
-chmod 777 ./notice_tmp/
-cd ./notice_tmp/ || exit
-
-
-# From go.sum file create unique list of dependencies we have
 echo "Searching for dependencies"
-< ../go.sum cut -d " " -f 1 | sort -u > $dependency_list
+for target in "${build_targets[@]}"; do
+    read -r goos goarch cgo tags pkg <<< "$target"
+    [ "$tags" = "-" ] && tags=""
+    if ! GOOS=$goos GOARCH=$goarch CGO_ENABLED=$cgo go list -deps -tags="$tags" \
+        -f '{{with .Module}}{{.Path}} {{with .Replace}}{{.Dir}}{{else}}{{.Dir}}{{end}} {{$.Dir}}{{end}}' \
+        "$pkg" >> "$work_dir/deps.lst"; then
+        echo "WARNING: go list failed for $target"
+        warnings=1
+    fi
+done
 
-echo "github.com/winfsp/winfsp" >> $dependency_list
+main_module=$(go list -m)
+grep -v "^$main_module " "$work_dir/deps.lst" | sort -u > "$work_dir/deps_all.lst"
+# "module module_dir" for each module, and "module package_dir" for each package
+cut -d " " -f 1,2 "$work_dir/deps_all.lst" | sort -u > "$work_dir/deps_sorted.lst"
+cut -d " " -f 1,3 "$work_dir/deps_all.lst" | sort -u > "$work_dir/pkg_dirs.lst"
 
 echo "Populating Notices"
-# Check if notice.txt file exists or not
-if [ -e ../$output_file ]
-then
-    # file is already there so copy that to temp folder
-    # Ignore the file footer while making this copy
-    echo "File exists check for new dependencies only"
-    head -n -1 ../$output_file > $output_file
+dump_header
+
+while read -r name dir; do
+    dump_module "$name" "$dir"
+done < "$work_dir/deps_sorted.lst"
+
+# The Go standard library and runtime are statically linked into every binary
+dump_module "github.com/golang/go" "$(go env GOROOT)"
+
+if curl -sfL -o "$work_dir/lic.tmp" "https://raw.githubusercontent.com/winfsp/winfsp/$winfsp_tag/License.txt"; then
+    append_lic_to_notice "github.com/winfsp/winfsp"
 else
-    # Main code to call the respective methods
-    echo "File does not exists, start from scratch"
-    dump_header
+    keep_old_section "github.com/winfsp/winfsp"
 fi
 
-# Generate notices in a temp file now
-generate_notices
-
-# Generate footer for the file
 dump_footer
 
-echo "Comparing missing dependencies"
-# Compare the input list and notice file for final consolidation
-grep ">>>" $output_file | cut -d " " -f 2 > notice.lst
-diff $dependency_list notice.lst | grep -v "go-autorest" | grep -v "go.etcd.io"
+cp "$new_notice" $output_file
 
-# Delete the temp directory
-cp $output_file ../NOTICE
-cd - || exit
-rm -rf ./notice_tmp/
-
-echo "NOTICE updated..."
+if [ $warnings -ne 0 ]; then
+    echo "NOTICE updated with warnings, review the messages above"
+else
+    echo "NOTICE updated..."
+fi

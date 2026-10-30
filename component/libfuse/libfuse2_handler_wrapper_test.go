@@ -39,6 +39,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/mockcomponent"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -52,7 +53,7 @@ type libfuseTestSuite struct {
 	libfuse  *Libfuse
 	cgofuse  *CgofuseFS
 	mockCtrl *gomock.Controller
-	mock     *internal.MockComponent
+	mock     *mockcomponent.MockComponent
 }
 
 // Open and create call returns this kind of object
@@ -88,7 +89,7 @@ func (suite *libfuseTestSuite) setupTestHelper(config string) {
 	suite.assert = assert.New(suite.T())
 
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.libfuse = newTestLibfuse(suite.mock, config)
 	suite.cgofuse = &CgofuseFS{}
 	cfuseFS = suite.cgofuse

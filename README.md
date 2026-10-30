@@ -78,13 +78,14 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
    ```bash
    sudo apt-get update
    sudo apt-get install -y curl gpg
-   curl -fsSL https://seagate.github.io/cloudfuse/public.key | sudo gpg --dearmor -o /usr/share/keyrings/cloudfuse-archive-keyring.gpg
+   sudo install -d -m 0755 /etc/apt/keyrings
+   curl -fsSL https://seagate.github.io/cloudfuse/public.key | sudo gpg --dearmor -o /etc/apt/keyrings/cloudfuse-archive-keyring.gpg
    ```
 
 2. **Add the repository to your APT sources:**
 
    ```bash
-   echo "deb [signed-by=/usr/share/keyrings/cloudfuse-archive-keyring.gpg] https://seagate.github.io/cloudfuse stable main" | sudo tee /etc/apt/sources.list.d/cloudfuse.list > /dev/null
+   echo "deb [signed-by=/etc/apt/keyrings/cloudfuse-archive-keyring.gpg] https://seagate.github.io/cloudfuse stable main" | sudo tee /etc/apt/sources.list.d/cloudfuse.list > /dev/null
    ```
 
 3. **Install `cloudfuse`:**
@@ -114,7 +115,8 @@ Download the .rpm file from our latest release [here](https://github.com/Seagate
    name=cloudfuse Repository
    baseurl=https://seagate.github.io/cloudfuse/rpm-repo/
    enabled=1
-   gpgcheck=1
+   gpgcheck=0
+   repo_gpgcheck=1
    gpgkey=https://seagate.github.io/cloudfuse/public.key
    EOF
    ```

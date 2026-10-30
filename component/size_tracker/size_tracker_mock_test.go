@@ -35,6 +35,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/mockcomponent"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -46,7 +47,7 @@ type sizeTrackerMockTestSuite struct {
 	assert      *assert.Assertions
 	sizeTracker *SizeTracker
 	mockCtrl    *gomock.Controller
-	mock        *internal.MockComponent
+	mock        *mockcomponent.MockComponent
 }
 
 func newTestSizeTrackerMock(next internal.Component, configuration string) *SizeTracker {
@@ -74,7 +75,7 @@ func (suite *sizeTrackerMockTestSuite) setupTestHelper(config string) {
 	suite.assert = assert.New(suite.T())
 
 	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.mock = mockcomponent.NewMockComponent(suite.mockCtrl)
 	suite.sizeTracker = newTestSizeTrackerMock(suite.mock, config)
 	_ = suite.sizeTracker.Start(context.Background())
 }

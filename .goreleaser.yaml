@@ -257,6 +257,10 @@ archives:
       - src: sample_configs/*
         dst: ./samples/
 
+# Generate an SPDX SBOM for each archive (requires syft)
+sboms:
+  - artifacts: archive
+
 release:
   extra_files:
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
@@ -278,6 +282,7 @@ nfpms:
       on your computer to the cloud even if they're not cloud-aware.
     license: MIT
     changelog: "changelog.yml"
+    mtime: "{{ .CommitDate }}"
     formats:
       - deb
       - rpm
@@ -290,16 +295,29 @@ nfpms:
         dst: /usr/bin/cfusemon
         file_info:
           mode: 0755
-      - src: NOTICE
-        dst: /usr/share/doc/cloudfuse/NOTICE
-        file_info:
-          mode: 0644
-      - src: LICENSE
-        dst: /usr/share/doc/cloudfuse/LICENSE
-        file_info:
-          mode: 0644
+      # Debian keeps license information in the machine-readable copyright
+      # file, and third-party notices alongside it
       - src: copyright
         dst: /usr/share/doc/cloudfuse/copyright
+        packager: deb
+        file_info:
+          mode: 0644
+      - src: NOTICE
+        dst: /usr/share/doc/cloudfuse/NOTICE
+        packager: deb
+        file_info:
+          mode: 0644
+      # RPM marks license files as %license under /usr/share/licenses
+      - src: LICENSE
+        dst: /usr/share/licenses/cloudfuse/LICENSE
+        type: license
+        packager: rpm
+        file_info:
+          mode: 0644
+      - src: NOTICE
+        dst: /usr/share/licenses/cloudfuse/NOTICE
+        type: license
+        packager: rpm
         file_info:
           mode: 0644
       - src: setup/baseConfig.yaml
@@ -356,6 +374,7 @@ nfpms:
       on your computer to the cloud even if they're not cloud-aware.
     license: MIT
     changelog: "changelog.yml"
+    mtime: "{{ .CommitDate }}"
     formats:
       - deb
       - rpm
@@ -368,16 +387,29 @@ nfpms:
         dst: /usr/bin/cfusemon
         file_info:
           mode: 0755
-      - src: NOTICE
-        dst: /usr/share/doc/cloudfuse/NOTICE
-        file_info:
-          mode: 0644
-      - src: LICENSE
-        dst: /usr/share/doc/cloudfuse/LICENSE
-        file_info:
-          mode: 0644
+      # Debian keeps license information in the machine-readable copyright
+      # file, and third-party notices alongside it
       - src: copyright
         dst: /usr/share/doc/cloudfuse/copyright
+        packager: deb
+        file_info:
+          mode: 0644
+      - src: NOTICE
+        dst: /usr/share/doc/cloudfuse/NOTICE
+        packager: deb
+        file_info:
+          mode: 0644
+      # RPM marks license files as %license under /usr/share/licenses
+      - src: LICENSE
+        dst: /usr/share/licenses/cloudfuse/LICENSE
+        type: license
+        packager: rpm
+        file_info:
+          mode: 0644
+      - src: NOTICE
+        dst: /usr/share/licenses/cloudfuse/NOTICE
+        type: license
+        packager: rpm
         file_info:
           mode: 0644
       - src: setup/baseConfig.yaml
