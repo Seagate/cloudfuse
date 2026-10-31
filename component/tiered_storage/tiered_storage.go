@@ -435,6 +435,17 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	if !localExists {
 		return c.NextComponent().RenameDir(options)
 	}
+
+	cloudErr := c.NextComponent().RenameDir(options)
+	if cloudErr != nil && !errors.Is(cloudErr, os.ErrNotExist) {
+		log.Err(
+			"TieredStorage::RenameDir : %s -> %s cloud rename failed; skipping local rename to avoid mixed state [%v]",
+			options.Src,
+			options.Dst,
+			cloudErr,
+		)
+		return cloudErr
+	}
 	if err := os.MkdirAll(filepath.Dir(dstPath), cacheDirPerm); err != nil {
 		return err
 	}
@@ -442,7 +453,6 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 
-	moved := make([]*FileNode, 0, len(entries))
 	for _, entry := range entries {
 		value, found := c.fileMap.LoadAndDelete(entry.src)
 		if !found {
@@ -451,7 +461,6 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		node := value.(*FileNode)
 		node.name = entry.dst
 		c.fileMap.Store(entry.dst, node)
-		moved = append(moved, node)
 
 		c.policy.Rename(entry.src, entry.dst)
 		c.renameOpenHandles(
@@ -461,27 +470,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 			c.fileLocks.Get(entry.dst),
 		)
 	}
-
-	cloudErr := c.NextComponent().RenameDir(options)
-	if cloudErr == nil {
-		return nil
-	}
-	// The cloud copies may still be under src, so re-upload under dst.
-	for _, node := range moved {
-		if node.cloudBacked.Load() {
-			node.isDirty.Store(true)
-		}
-	}
-	if errors.Is(cloudErr, os.ErrNotExist) {
-		return nil
-	}
-	log.Err(
-		"TieredStorage::RenameDir : %s -> %s renamed locally but not in cloud [%v]",
-		options.Src,
-		options.Dst,
-		cloudErr,
-	)
-	return cloudErr
+	return nil
 }
 
 // File operations
