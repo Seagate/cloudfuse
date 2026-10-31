@@ -975,7 +975,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileMissingCloudObjectSucceeds() 
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dst"))
 }
 
-func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureKeepsLocalRename() {
+func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureSkipsLocalRename() {
 	defer suite.cleanupTest()
 	if runtime.GOOS == "windows" {
 		suite.T().Skip("Windows refuses to rename a directory containing open files")
@@ -997,27 +997,37 @@ func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureKeepsLocalRename()
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: localHandle}),
 	)
-	// An existing cloud directory makes the cloud rename fail.
+	// A non-empty cloud directory makes the cloud rename fail.
 	suite.Require().NoError(os.Mkdir(filepath.Join(suite.fake_storage_path, "dst"), 0755))
+	suite.Require().NoError(os.WriteFile(
+		filepath.Join(suite.fake_storage_path, "dst", "existing"),
+		[]byte("existing"),
+		0644,
+	))
 
 	err = suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
 	suite.Require().Error(err)
-	suite.assert.NoDirExists(filepath.Join(suite.cache_path, "src"))
-	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst", "local"))
-	suite.assert.Equal("dst/cloud", cloudHandle.Path)
-	cloudNode, found := suite.tieredStorage.fileMap.Load("dst/cloud")
+	suite.assert.DirExists(filepath.Join(suite.cache_path, "src"))
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, "dst"))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "dst", "local"))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, "src", "local"))
+	suite.assert.Equal("src/cloud", cloudHandle.Path)
+	_, found := suite.tieredStorage.fileMap.Load("src/cloud")
 	suite.Require().True(found)
-	suite.assert.True(cloudNode.(*FileNode).isDirty.Load())
-	localNode, found := suite.tieredStorage.fileMap.Load("dst/local")
+	_, found = suite.tieredStorage.fileMap.Load("src/local")
 	suite.Require().True(found)
-	suite.assert.False(localNode.(*FileNode).cloudBacked.Load())
+	_, found = suite.tieredStorage.fileMap.Load("dst/cloud")
+	suite.assert.False(found)
+	_, found = suite.tieredStorage.fileMap.Load("dst/local")
+	suite.assert.False(found)
 
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: cloudHandle}),
 	)
-	data, err := os.ReadFile(filepath.Join(suite.fake_storage_path, "dst", "cloud"))
+	data, err := os.ReadFile(filepath.Join(suite.fake_storage_path, "src", "cloud"))
 	suite.Require().NoError(err)
 	suite.assert.Equal("data", string(data))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, "dst", "cloud"))
 }
 
 //Testing OpenFile
