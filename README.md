@@ -305,7 +305,7 @@ This command should then print out "Verified OK" is the checksum file is valid. 
 ### Health Monitor
 
 Cloudfuse also supports a health monitor.
-The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
+The health monitor allows customers to gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
 Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
 
 ## Offline Access (New)
@@ -325,7 +325,7 @@ See `sample_configs/sampleTieredStorageConfigS3.yaml` and `setup/baseConfig.yaml
 ### Expanding Existing Local Storage Using Tiered Storage
 
 When using `tiered_storage` to add cloud capacity to an existing local storage location, please ensure all access is done through the Cloudfuse mount path / virtual drive. The `tiered_storage` `path` and all its existing contents will become *internal* local storage. Accessing the `tiered_storage` `path` directly may have unpredictable results.
-For example, if you want expand the capacity of your existing local drive, `D:`, you could change that local drive's letter to `E:` first, then set `tiered_storage` `path` to `E:` and mount cloudfuse to `D:`. Then any existing applications or workflows that normally use `D:` would continue as normal, now pointed at the cloudfuse mount location.
+For example, if you want to expand the capacity of your existing local drive, `D:`, you could change that local drive's letter to `E:` first, then set `tiered_storage` `path` to `E:` and mount cloudfuse to `D:`. Then any existing applications or workflows that normally use `D:` would continue as normal, now pointed at the cloudfuse mount location.
 
 **Cloudfuse may upload and delete local files under `path` as part of normal overflow eviction, so anything still reading or writing there directly can lose data or see missing files.**
 
