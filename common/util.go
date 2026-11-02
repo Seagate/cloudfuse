@@ -619,7 +619,13 @@ func ComponentInPipeline(pipeline []string, component string) bool {
 
 func ValidatePipeline(pipeline []string) error {
 	var selected []string
-	for _, component := range []string{"file_cache", "block_cache", "xload", "tiered_storage"} {
+	for _, component := range []string{
+		"file_cache",
+		"block_cache",
+		"xload",
+		"stream",
+		"tiered_storage",
+	} {
 		if ComponentInPipeline(pipeline, component) {
 			selected = append(selected, component)
 		}
