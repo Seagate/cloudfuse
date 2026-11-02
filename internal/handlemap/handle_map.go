@@ -73,7 +73,7 @@ type Handle struct {
 	Size     int64    // Size of the file being handled here
 	Mtime    time.Time
 	UnixFD   uint64          // Unix FD created by create/open syscall
-	OptCnt   uint64          // Number of operations done on this file
+	OptCnt   atomic.Uint64   // Number of operations done on this file
 	Flags    common.BitMap64 // Various states of the file
 	Path     string          // Always holds path relative to mount dir, same as object name (uses common.JoinUnixFilepath)
 	values   map[string]any  // Map to hold other info if application wants to store
@@ -85,7 +85,6 @@ func NewHandle(path string) *Handle {
 		Path:     path,
 		Size:     0,
 		Flags:    0,
-		OptCnt:   0,
 		values:   make(map[string]any),
 		CacheObj: nil,
 		FObj:     nil,

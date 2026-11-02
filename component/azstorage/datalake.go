@@ -29,7 +29,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -384,7 +383,7 @@ func (dl *Datalake) RenameFile(
 ) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
-	fileClient := dl.getFileClientPathEscape(source)
+	fileClient := dl.getFileClient(source)
 
 	renameResponse, err := fileClient.Rename(
 		ctx,
@@ -416,7 +415,7 @@ func (dl *Datalake) RenameFile(
 func (dl *Datalake) RenameDirectory(ctx context.Context, source string, target string) error {
 	log.Trace("Datalake::RenameDirectory : %s -> %s", source, target)
 
-	directoryClient := dl.getDirectoryClientPathEscape(source)
+	directoryClient := dl.getDirectoryClient(source)
 	_, err := directoryClient.Rename(
 		ctx,
 		dl.getFormattedPath(target),
@@ -764,21 +763,9 @@ func (dl *Datalake) getDirectoryClient(name string) *directory.Client {
 	return dl.Filesystem.NewDirectoryClient(dl.getFormattedPath(name))
 }
 
-// getDirectoryClientPathEscape returns a new directory url that is properly escaped. On Windows this will also convert
-// special characters.
-func (dl *Datalake) getDirectoryClientPathEscape(name string) *directory.Client {
-	return dl.Filesystem.NewDirectoryClient(url.PathEscape(dl.getFormattedPath(name)))
-}
-
 // getFileClient returns a new file client. On Windows this will also convert special characters.
 func (dl *Datalake) getFileClient(name string) *file.Client {
 	return dl.Filesystem.NewFileClient(dl.getFormattedPath(name))
-}
-
-// getFileClientPathEscape returns a new root directory url that is properly escaped. On Windows this will also convert
-// special characters.
-func (dl *Datalake) getFileClientPathEscape(name string) *file.Client {
-	return dl.Filesystem.NewFileClient(url.PathEscape(dl.getFormattedPath(name)))
 }
 
 // getFormattedPath takes a file name and converts special characters to the original ASCII

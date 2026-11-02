@@ -27,6 +27,7 @@ package attr_cache
 
 import (
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -60,6 +61,9 @@ type attrCacheItem struct {
 	parent    *attrCacheItem
 
 	listingComplete bool
+	prefetchMisses  atomic.Uint32 // misses since the last prefetch
+	prefetchToken   string        // next page to prefetch
+	prefetchStart   time.Time     // when the current token chain began
 }
 
 // all cache entries are organized into this structure

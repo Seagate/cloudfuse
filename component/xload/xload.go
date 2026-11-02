@@ -517,7 +517,7 @@ func (xl *Xload) ReleaseFile(options internal.ReleaseFileOptions) error {
 	defer flock.Unlock()
 
 	flock.Dec()
-	return nil
+	return options.Handle.GetFileObject().Close()
 }
 
 // ------------------------- Factory -------------------------------------------

@@ -40,6 +40,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -158,6 +160,22 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 
 }
 
+// setupMockWithConnection : mock-backed file cache whose cloud connection the test controls
+func (suite *fileCacheTestSuite) setupMockWithConnection(configuration string) *atomic.Bool {
+	suite.assert = assert.New(suite.T())
+	err := config.ReadConfigFromReader(strings.NewReader(configuration))
+	suite.assert.NoError(err)
+	suite.mockCtrl = gomock.NewController(suite.T())
+	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	suite.fileCache = newTestFileCache(suite.mock)
+	suite.useMock = true
+	connected := &atomic.Bool{}
+	connected.Store(true)
+	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(connected.Load)
+	suite.assert.NoError(suite.fileCache.Start(context.Background()))
+	return connected
+}
+
 func (suite *fileCacheTestSuite) cleanupTest() {
 	err := suite.fileCache.Stop()
 	if err != nil {
@@ -248,6 +266,7 @@ func (suite *fileCacheTestSuite) TestConfig() {
 }
 
 func (suite *fileCacheTestSuite) TestNegativeCacheSize() {
+	defer suite.cleanupTest()
 	var cacheSize float64 = -100
 
 	configStr := fmt.Sprintf(
@@ -270,6 +289,7 @@ func (suite *fileCacheTestSuite) TestNegativeCacheSize() {
 
 func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	// Setup
 	config := fmt.Sprintf("file_cache:\n  path: %s\n", suite.cache_path)
 	suite.setupTestHelper(
@@ -1540,6 +1560,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInDir() {
 
 func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	// Configure to create empty files so we create the file in cloud storage
 	createEmptyFile := true
 	config := fmt.Sprintf(
@@ -1566,6 +1587,7 @@ func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 
 func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	// Configure to create empty files so we create the file in cloud storage
 	createEmptyFile := true
 	config := fmt.Sprintf(
@@ -1598,6 +1620,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 
 func (suite *fileCacheTestSuite) TestChmodNonexistentCreateEmptyFile() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	// Set flag high to test bugfix
 	createEmptyFile := true
 	config := fmt.Sprintf(
@@ -2004,6 +2027,103 @@ func (suite *fileCacheTestSuite) TestReleaseFileOffline() {
 	suite.assert.True(pending, "dirty file should be queued for upload when released offline")
 }
 
+func (suite *fileCacheTestSuite) TestReleaseFileUploadFailureQueued() {
+	suite.cleanupTest()
+	connected := suite.setupMockWithConnection(fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  block-offline-access: true",
+		suite.cache_path,
+	))
+	defer suite.cleanupTest()
+
+	name := "release-upload-failure"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: name, Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("unsynced data")},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+
+	// keep the pending-op worker from retrying the upload
+	connected.Store(false)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(syscall.EIO)
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.ErrorIs(err, syscall.EIO)
+
+	_, pending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.True(pending, "failed upload on close should be queued for retry")
+	flock := suite.fileCache.fileLocks.Get(name)
+	suite.assert.Zero(flock.Count())
+	suite.assert.Zero(flock.DirtyCount())
+	suite.assert.ErrorIs(handle.GetFileObject().Close(), os.ErrClosed)
+}
+
+func (suite *fileCacheTestSuite) TestReleaseFileEnospcNotQueued() {
+	suite.cleanupTest()
+	connected := suite.setupMockWithConnection(
+		fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true", suite.cache_path),
+	)
+	defer suite.cleanupTest()
+
+	name := "release-enospc"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: name, Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("unsynced data")},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+
+	connected.Store(false)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(syscall.ENOSPC)
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.ErrorIs(err, syscall.ENOSPC)
+
+	_, pending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.False(pending, "ENOSPC on close should be returned, not retried")
+	flock := suite.fileCache.fileLocks.Get(name)
+	suite.assert.Zero(flock.Count())
+	suite.assert.Zero(flock.DirtyCount())
+	suite.assert.ErrorIs(handle.GetFileObject().Close(), os.ErrClosed)
+}
+
+func (suite *fileCacheTestSuite) TestSyncFileUploadFailureNotQueued() {
+	// enable mock component, with offline access disabled
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  block-offline-access: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "sync-upload-failure"
+	f, err := os.OpenFile(
+		filepath.Join(suite.cache_path, name),
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC,
+		0777,
+	)
+	suite.assert.NoError(err)
+	defer f.Close()
+	_, err = f.Write([]byte("unsynced data"))
+	suite.assert.NoError(err)
+
+	handle := handlemap.NewHandle(name)
+	handle.SetFileObject(f)
+	suite.fileCache.setHandleDirty(handle)
+
+	suite.mock.EXPECT().SyncFile(gomock.Any()).Return(nil)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
+
+	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle})
+	suite.assert.Error(err)
+
+	_, pending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.False(pending, "fsync failure should not queue a retry while the handle is open")
+	suite.assert.True(handle.Dirty(), "handle should stay dirty so close retries the upload")
+}
+
 func (suite *fileCacheTestSuite) TestOfflineToConnected() {
 	// Set up mock manually so CloudConnected can change during the test
 	suite.cleanupTest()
@@ -2019,9 +2139,10 @@ func (suite *fileCacheTestSuite) TestOfflineToConnected() {
 	suite.fileCache = newTestFileCache(suite.mock)
 	suite.useMock = true
 
-	connected := false
+	var connected atomic.Bool
+	connected.Store(false)
 	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(func() bool {
-		return connected
+		return connected.Load()
 	})
 
 	err = suite.fileCache.Start(context.Background())
@@ -2051,7 +2172,7 @@ func (suite *fileCacheTestSuite) TestOfflineToConnected() {
 	suite.assert.NotNil(handle)
 
 	// Simulate connection restored
-	connected = true
+	connected.Store(true)
 
 	// Write to the file (now connected, but write is purely local)
 	newData := []byte("written after reconnect")
@@ -2089,9 +2210,10 @@ func (suite *fileCacheTestSuite) TestConnectedToOffline() {
 	suite.fileCache = newTestFileCache(suite.mock)
 	suite.useMock = true
 
-	connected := true
+	var connected atomic.Bool
+	connected.Store(true)
 	suite.mock.EXPECT().CloudConnected().AnyTimes().DoAndReturn(func() bool {
-		return connected
+		return connected.Load()
 	})
 
 	err = suite.fileCache.Start(context.Background())
@@ -2147,7 +2269,7 @@ func (suite *fileCacheTestSuite) TestConnectedToOffline() {
 	suite.assert.FileExists(openLocalPath)
 
 	// Simulate connection drop
-	connected = false
+	connected.Store(false)
 
 	// Access the lazy-open file: should fail (data unavailable offline)
 	buf := make([]byte, 10)
@@ -2365,6 +2487,87 @@ func (suite *fileCacheTestSuite) TestReadInBuffer() {
 	suite.assert.Equal(len(data), length)
 }
 
+func (suite *fileCacheTestSuite) TestReadInBufferConcurrentSameHandle() {
+	defer suite.cleanupTest()
+	file := "file_concurrent_read"
+	data := []byte("test data")
+	err := os.WriteFile(filepath.Join(suite.fake_storage_path, file), data, 0777)
+	suite.assert.NoError(err)
+	handle, err := suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: file, Flags: os.O_RDONLY, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			output := make([]byte, len(data))
+			for range 200 {
+				n, err := suite.fileCache.ReadInBuffer(
+					&internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output},
+				)
+				suite.assert.NoError(err)
+				suite.assert.Equal(len(data), n)
+			}
+		})
+	}
+	wg.Wait()
+	suite.assert.Equal(uint64(1600), handle.OptCnt.Load())
+
+	err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+// The first reads of a lazily opened file race with the open that downloads it. Like libfuse,
+// readers use the file object directly once the handle is marked Cached.
+func (suite *fileCacheTestSuite) TestConcurrentFirstReadsOfLazyOpenedFile() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
+	configContent := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: false\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
+	suite.setupTestHelper(configContent)
+
+	data := []byte("lazily opened data")
+	for i := range 50 {
+		name := fmt.Sprintf("lazy_open_%d.txt", i)
+		err := os.WriteFile(filepath.Join(suite.fake_storage_path, name), data, 0777)
+		suite.assert.NoError(err)
+		handle, err := suite.fileCache.OpenFile(
+			internal.OpenFileOptions{Name: name, Flags: os.O_RDONLY, Mode: 0777},
+		)
+		suite.assert.NoError(err)
+		suite.assert.False(handle.Cached())
+
+		// readers that find the handle marked Cached read its file object directly
+		var wg sync.WaitGroup
+		for range 3 {
+			wg.Go(func() {
+				for !handle.Cached() {
+					runtime.Gosched()
+				}
+				buf := make([]byte, len(data))
+				n, err := handle.FObj.ReadAt(buf, 0)
+				suite.assert.NoError(err)
+				suite.assert.Equal(len(data), n)
+			})
+		}
+		// the first read through file cache completes the lazy open
+		buf := make([]byte, len(data))
+		n, err := suite.fileCache.ReadInBuffer(
+			&internal.ReadInBufferOptions{Handle: handle, Data: buf},
+		)
+		suite.assert.NoError(err)
+		suite.assert.Equal(len(data), n)
+		wg.Wait()
+
+		err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+		suite.assert.NoError(err)
+	}
+}
+
 func (suite *fileCacheTestSuite) TestReadInBufferErrorBadFd() {
 	defer suite.cleanupTest()
 	// Setup
@@ -2393,6 +2596,7 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(data), length)
+	suite.assert.Equal(uint64(1), handle.OptCnt.Load())
 	// Check that the local cache updated with data
 	d, _ := os.ReadFile(filepath.Join(suite.cache_path, file))
 	suite.assert.Equal(data, d)
@@ -2549,6 +2753,7 @@ func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 
 func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	// Schedule 3 seconds in the future to allow setup and file creation time
 	now := time.Now()
@@ -2614,6 +2819,7 @@ loopbackfs:
 
 func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	// Schedule for 3 seconds in the future to allow setup time
 	now := time.Now()
@@ -2688,8 +2894,111 @@ loopbackfs:
 	suite.assert.True(scheduled, "File should be scheduled when scheduler is OFF")
 }
 
+// Back-to-back upload windows open and close while files are being flushed
+func (suite *fileCacheTestSuite) TestScheduleWindowTransitionsDuringFlush() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "EverySecond"
+      cron: "* * * * * *"
+      duration: "1s"
+
+loopbackfs:
+  path: %s`,
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
+	suite.setupTestHelper(configContent)
+
+	deadline := time.Now().Add(3500 * time.Millisecond)
+	var wg sync.WaitGroup
+	for w := range 4 {
+		wg.Go(func() {
+			for i := 0; time.Now().Before(deadline); i++ {
+				name := fmt.Sprintf("window_flush_%d_%d.txt", w, i%10)
+				handle, err := suite.fileCache.OpenFile(
+					internal.OpenFileOptions{
+						Name:  name,
+						Flags: os.O_CREATE | os.O_RDWR,
+						Mode:  0777,
+					},
+				)
+				if !suite.assert.NoError(err) {
+					return
+				}
+				_, err = suite.fileCache.WriteFile(
+					&internal.WriteFileOptions{Handle: handle, Data: []byte("data")},
+				)
+				suite.assert.NoError(err)
+				err = suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+				suite.assert.NoError(err)
+				time.Sleep(5 * time.Millisecond)
+			}
+		})
+	}
+	wg.Wait()
+}
+
+// slowUploadComponent delays uploads so a test can stop the file cache mid-upload
+type slowUploadComponent struct {
+	internal.Component
+	started  chan struct{}
+	finished atomic.Bool
+}
+
+func (c *slowUploadComponent) CopyFromFile(options internal.CopyFromFileOptions) error {
+	close(c.started)
+	time.Sleep(500 * time.Millisecond)
+	err := c.Component.CopyFromFile(options)
+	c.finished.Store(true)
+	return err
+}
+
+// Stop must wait for the pending-op worker, so an upload is not still running
+// while the cache directory is cleaned up and the process shuts down
+func (suite *fileCacheTestSuite) TestStopWaitsForPendingOpUpload() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
+	configContent := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
+	err := config.ReadConfigFromReader(strings.NewReader(configContent))
+	suite.assert.NoError(err)
+	suite.loopback = newLoopbackFS()
+	slow := &slowUploadComponent{Component: suite.loopback, started: make(chan struct{})}
+	suite.fileCache = newTestFileCache(slow)
+	suite.assert.NoError(suite.loopback.Start(context.Background()))
+	suite.assert.NoError(suite.fileCache.Start(context.Background()))
+
+	name := "pending_upload.txt"
+	err = os.WriteFile(filepath.Join(suite.cache_path, name), []byte("data"), 0777)
+	suite.assert.NoError(err)
+	flock := suite.fileCache.fileLocks.Get(name)
+	flock.Lock()
+	suite.fileCache.addPendingOp(name, pendingFlags{})
+	flock.Unlock()
+
+	select {
+	case <-slow.started:
+	case <-time.After(5 * time.Second):
+		suite.assert.Fail("pending upload never started")
+	}
+	suite.assert.NoError(suite.fileCache.Stop())
+	suite.assert.True(slow.finished.Load(), "Stop returned while an upload was still running")
+
+	// give the deferred cleanup a running file cache to stop
+	suite.setupTestHelper(configContent)
+}
+
 func (suite *fileCacheTestSuite) TestNoScheduleAlwaysOn() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	configContent := fmt.Sprintf(`file_cache:
   path: %s
@@ -2730,6 +3039,7 @@ loopbackfs:
 
 func (suite *fileCacheTestSuite) TestRenamePendingOp() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	now := time.Now()
 	second := (now.Second() + 30) % 60
@@ -2797,6 +3107,7 @@ loopbackfs:
 
 func (suite *fileCacheTestSuite) TestDeleteScheduledFile() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	now := time.Now()
 	second := (now.Second() + 30) % 60
@@ -2907,8 +3218,8 @@ func (suite *fileCacheTestSuite) TestUpdateObjectOfflineErrorKeepsPending() {
 	suite.fileCache.addPendingOp(name, pendingFlags{})
 	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})
 
-	success := suite.fileCache.updateObject(name, pendingFlags{})
-	suite.assert.False(success)
+	err = suite.fileCache.updateObject(name, pendingFlags{})
+	suite.assert.Error(err)
 
 	_, stillPending := suite.fileCache.pendingOps.Load(name)
 	suite.assert.True(
@@ -2933,11 +3244,69 @@ func (suite *fileCacheTestSuite) TestUpdateObjectDeletionMissingLocalFile() {
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: name}).Return(nil, nil)
 	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: name}).Return(nil)
 
-	success := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
-	suite.assert.True(success)
+	err := suite.fileCache.updateObject(name, pendingFlags{isDeletion: true})
+	suite.assert.NoError(err)
 
 	_, stillPending := suite.fileCache.pendingOps.Load(name)
 	suite.assert.False(stillPending, "delete should be synced and removed from pendingOps")
+}
+
+func (suite *fileCacheTestSuite) TestUpdateObjectDeletionAlreadyGone() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	fileName := "async-delete-gone-file"
+	suite.fileCache.addPendingOp(fileName, pendingFlags{isDeletion: true})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: fileName}).Return(nil, nil)
+	suite.mock.EXPECT().
+		DeleteFile(internal.DeleteFileOptions{Name: fileName}).
+		Return(syscall.ENOENT)
+
+	dirName := "async-delete-gone-dir"
+	suite.fileCache.addPendingOp(dirName, pendingFlags{isDir: true, isDeletion: true})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: dirName}).Return(nil, nil)
+	suite.mock.EXPECT().
+		DeleteDir(internal.DeleteDirOptions{Name: dirName}).
+		Return(syscall.ENOENT)
+
+	for _, name := range []string{fileName, dirName} {
+		flags, _ := suite.fileCache.pendingOps.Load(name)
+		err := suite.fileCache.updateObject(name, flags.(pendingFlags))
+		suite.assert.NoError(err, name)
+		_, stillPending := suite.fileCache.pendingOps.Load(name)
+		suite.assert.False(stillPending, "%s: already deleted, so op should clear", name)
+	}
+}
+
+func (suite *fileCacheTestSuite) TestUpdateObjectCreateDirAlreadyExists() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "async-create-existing-dir"
+	err := os.MkdirAll(filepath.Join(suite.cache_path, name), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.addPendingOp(name, pendingFlags{isDir: true})
+	suite.mock.EXPECT().CreateDir(gomock.Any()).Return(os.ErrExist)
+
+	err = suite.fileCache.updateObject(name, pendingFlags{isDir: true})
+	suite.assert.NoError(err)
+
+	_, stillPending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.False(stillPending, "existing directory should clear the op")
 }
 
 func (suite *fileCacheTestSuite) TestServicePendingOpsOfflineKeepsPending() {
@@ -2984,8 +3353,33 @@ func (suite *fileCacheTestSuite) TestServicePendingOpsProcessesPendingOnline() {
 	suite.assert.False(pending, "pending op should be processed by async uploader when online")
 }
 
+func (suite *fileCacheTestSuite) TestRunPendingOpCycleReportsFailure() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	name := "cycle-upload-failure"
+	err := os.WriteFile(filepath.Join(suite.cache_path, name), []byte("data"), 0777)
+	suite.assert.NoError(err)
+	suite.fileCache.addPendingOp(name, pendingFlags{})
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(syscall.ENOSPC)
+
+	_, err = suite.fileCache.runPendingOpCycle()
+	suite.assert.ErrorIs(err, syscall.ENOSPC, "failures must be reported so the worker backs off")
+
+	_, pending := suite.fileCache.pendingOps.Load(name)
+	suite.assert.True(pending)
+}
+
 func (suite *fileCacheTestSuite) TestCreateEmptyFileEqualTrue() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	now := time.Now()
 	second := (now.Second() + 30) % 60
@@ -3036,6 +3430,7 @@ loopbackfs:
 
 func (suite *fileCacheTestSuite) TestReadWriteLocalFile() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	now := time.Now()
 	second := (now.Second() + 30) % 60
@@ -3113,7 +3508,10 @@ loopbackfs:
 }
 
 func (suite *fileCacheTestSuite) TestInvalidCronExpression() {
-	defer suite.cleanupTest()
+	// no file cache is started by this test, so only the default one needs to be stopped
+	suite.cleanupTest() // teardown the default file cache generated
+	defer os.RemoveAll(suite.cache_path)
+	defer os.RemoveAll(suite.fake_storage_path)
 
 	// Set up a configuration with an invalid cron expression
 	configContent := fmt.Sprintf(`file_cache:
@@ -3140,6 +3538,7 @@ loopbackfs:
 
 func (suite *fileCacheTestSuite) TestOverlappingSchedules() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	now := time.Now()
 	// Create two schedules that will run in close succession (2 seconds apart)
@@ -4066,6 +4465,7 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	configuration := fmt.Sprintf(
 		"file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path,
@@ -4115,6 +4515,7 @@ func (suite *fileCacheTestSuite) TestZZZZLazyWrite() {
 
 func (suite *fileCacheTestSuite) TestStatFS() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	cacheTimeout := 5
 	maxSizeMb := 2
 	config := fmt.Sprintf(
@@ -4152,6 +4553,7 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 
 func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	// Configure to create empty files so we create the file in cloud storage
 	config := fmt.Sprintf(
 		"file_cache:\n  path: %s\n  offload-io: true\n  refresh-sec: 1\n\nloopbackfs:\n  path: %s",
@@ -4215,6 +4617,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 
 func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 	// Configure to create empty files so we create the file in cloud storage
 	config := fmt.Sprintf(
 		"file_cache:\n  path: %s\n  offload-io: true\n  hard-limit: true\n  max-size-mb: 2\n\nloopbackfs:\n  path: %s",
@@ -4326,6 +4729,7 @@ func (suite *fileCacheTestSuite) TestHandleDataChange() {
 // are allowed be to deleted but non empty are not
 func (suite *fileCacheTestSuite) TestDeleteDirectory() {
 	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
 
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: 1000\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, suite.fake_storage_path)

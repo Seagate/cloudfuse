@@ -193,7 +193,7 @@ func (rl *remoteLister) Process(item *WorkItem) (int, error) {
 				// TODO:: xload : check how many threads can we spawn
 				go func(name string) {
 					localPath := filepath.Join(rl.path, name)
-					err = rl.mkdir(localPath)
+					err := rl.mkdir(localPath)
 					// TODO:: xload : handle error
 					if err != nil {
 						log.Err(
@@ -204,7 +204,7 @@ func (rl *remoteLister) Process(item *WorkItem) (int, error) {
 					}
 
 					// push the directory to input pool for its listing
-					err := rl.Schedule(&WorkItem{
+					err = rl.Schedule(&WorkItem{
 						CompName: rl.GetName(),
 						Path:     name,
 					})

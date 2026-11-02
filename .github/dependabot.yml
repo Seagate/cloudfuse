@@ -18,6 +18,9 @@ updates:
       azure-sdk:
         patterns:
           - github.com/Azure/*
+      golang-x:
+        patterns:
+          - golang.org/x/*
   - package-ecosystem: "github-actions"
     # Workflow files stored in the default location of `.github/workflows`. (You don't need to specify `/.github/workflows` for `directory`. You can use `directory: "/"`.)
     directory: "/"
@@ -25,6 +28,22 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    groups:
+      codeql-action:
+        patterns:
+          - github/codeql-action*
+      github-actions-core:
+        patterns:
+          - actions/*
+      osv-scanner:
+        patterns:
+          - google/osv-scanner-action*
+      trivy-action:
+        patterns:
+          - aquasecurity/trivy-action
+      setup-zig:
+        patterns:
+          - mlugg/setup-zig
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:
