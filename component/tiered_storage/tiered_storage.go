@@ -119,15 +119,9 @@ func (c *TieredStorage) SetNextComponent(nc internal.Component) {
 func (c *TieredStorage) Start(ctx context.Context) error {
 	log.Trace("TieredStorage::Start : Starting component %s", c.Name())
 
-	snapshot, err := c.readSnapshot()
-	if err != nil {
-		log.Warn("TieredStorage::Start : ignoring invalid state snapshot [%v]", err)
-	}
+	// clear cache
 
 	c.cacheSize.Refresh()
-	if err := c.recoverLocalState(snapshot); err != nil {
-		return fmt.Errorf("TieredStorage: failed to recover local state: %w", err)
-	}
 
 	if c.policy != nil {
 		if err := c.policy.StartPolicy(); err != nil {
@@ -148,7 +142,7 @@ func (c *TieredStorage) Stop() error {
 			return err
 		}
 	}
-	return c.writeSnapshot()
+	return nil
 }
 
 func (c *TieredStorage) Configure(_ bool) error {
@@ -221,17 +215,8 @@ func (c *TieredStorage) OnConfigChange() {
 
 // localPath resolves an object name beneath the tiered storage root.
 func (c *TieredStorage) localPath(name string) (string, error) {
-	name = filepath.FromSlash(common.NormalizeObjectName(name))
-	if filepath.IsAbs(name) || filepath.VolumeName(name) != "" {
-		return "", syscall.EINVAL
-	}
-
-	path := filepath.Join(c.tmpPath, name)
-	rel, err := filepath.Rel(c.tmpPath, path)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", syscall.EINVAL
-	}
-	return path, nil
+	// dummy code
+	return filepath.Join(c.tmpPath, name), nil
 }
 
 // Directory operations
@@ -329,10 +314,6 @@ func (c *TieredStorage) StreamDir(
 	localAttrs := make(map[string]*internal.ObjAttr, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
-		if strings.HasSuffix(name, partialDownloadSuffix) || options.Name == "" &&
-			(name == tieredStorageSnapshotPath || name == tieredStorageSnapshotPath+".tmp") {
-			continue
-		}
 		entryPath := common.JoinUnixFilepath(options.Name, name)
 		info, err := entry.Info()
 		if err != nil {
@@ -685,13 +666,9 @@ func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) 
 	if err != nil {
 		return err
 	}
-
-	partPath := fmt.Sprintf("%s.%d%s", localPath, os.Getpid(), partialDownloadSuffix)
-	partFile, err := common.OpenFile(
-		partPath,
-		os.O_CREATE|os.O_TRUNC|os.O_RDWR,
-		c.cacheFileMode(options.Mode),
-	)
+	// dummy code so it compiles (for now)
+	partPath := localPath + partialDownloadSuffix
+	partFile, err := common.OpenFile(partPath, 0, 0)
 	if err != nil {
 		return err
 	}

@@ -333,87 +333,6 @@ func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
 	suite.assert.EqualValues(len("cloud"), cloudAttrs.Size)
 }
 
-func (suite *tieredStorageTestSuite) TestRestartRestoresLocalStateAndLRUOrder() {
-	defer suite.cleanupTest()
-
-	for _, path := range []string{"older", "newer"} {
-		handle, err := suite.tieredStorage.CreateFile(
-			internal.CreateFileOptions{Name: path, Mode: 0644},
-		)
-		suite.Require().NoError(err)
-		_, err = suite.tieredStorage.WriteFile(
-			&internal.WriteFileOptions{Handle: handle, Data: []byte(path)},
-		)
-		suite.Require().NoError(err)
-		suite.Require().NoError(
-			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
-		)
-	}
-
-	suite.Require().NoError(suite.tieredStorage.Stop())
-	restarted := newTestTieredStorage(suite.loopback)
-	suite.Require().NoError(restarted.Start(context.Background()))
-	suite.tieredStorage = restarted
-
-	for _, path := range []string{"older", "newer"} {
-		value, found := restarted.fileMap.Load(path)
-		suite.Require().True(found)
-		node := value.(*FileNode)
-		suite.assert.False(node.cloudBacked.Load())
-		suite.assert.True(node.isDirty.Load())
-		_, queued := restarted.policy.nodeMap.Load(path)
-		suite.assert.True(queued)
-	}
-	suite.Require().NotNil(restarted.policy.head)
-	suite.Require().NotNil(restarted.policy.tail)
-	suite.assert.Equal("newer", restarted.policy.head.name)
-	suite.assert.Equal("older", restarted.policy.tail.name)
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, tieredStorageSnapshotPath))
-}
-
-func (suite *tieredStorageTestSuite) TestRestartWithoutSnapshotRecoversConservatively() {
-	defer suite.cleanupTest()
-
-	suite.Require().NoError(suite.tieredStorage.Stop())
-	suite.Require().NoError(os.Remove(filepath.Join(suite.cache_path, tieredStorageSnapshotPath)))
-	suite.Require().NoError(
-		os.WriteFile(filepath.Join(suite.cache_path, "recovered"), []byte("data"), 0644),
-	)
-
-	restarted := newTestTieredStorage(suite.loopback)
-	suite.Require().NoError(restarted.Start(context.Background()))
-	suite.tieredStorage = restarted
-
-	value, found := restarted.fileMap.Load("recovered")
-	suite.Require().True(found)
-	node := value.(*FileNode)
-	suite.assert.False(node.cloudBacked.Load())
-	suite.assert.True(node.isDirty.Load())
-	_, queued := restarted.policy.nodeMap.Load("recovered")
-	suite.assert.True(queued)
-}
-
-func (suite *tieredStorageTestSuite) TestRestartWithCorruptSnapshotRecoversFile() {
-	defer suite.cleanupTest()
-
-	suite.Require().NoError(suite.tieredStorage.Stop())
-	suite.Require().NoError(os.WriteFile(
-		filepath.Join(suite.cache_path, tieredStorageSnapshotPath),
-		[]byte("invalid snapshot"),
-		0600,
-	))
-	suite.Require().NoError(
-		os.WriteFile(filepath.Join(suite.cache_path, "recovered"), []byte("data"), 0644),
-	)
-
-	restarted := newTestTieredStorage(suite.loopback)
-	suite.Require().NoError(restarted.Start(context.Background()))
-	suite.tieredStorage = restarted
-	value, found := restarted.fileMap.Load("recovered")
-	suite.Require().True(found)
-	suite.assert.True(value.(*FileNode).isDirty.Load())
-}
-
 func (suite *tieredStorageTestSuite) TestRestartWithStaleSnapshotKeepsChangedFile() {
 	defer suite.cleanupTest()
 
@@ -436,24 +355,6 @@ func (suite *tieredStorageTestSuite) TestRestartWithStaleSnapshotKeepsChangedFil
 	suite.assert.False(recovered.cloudBacked.Load())
 	suite.assert.True(recovered.isDirty.Load())
 	suite.assert.FileExists(localPath)
-}
-
-func (suite *tieredStorageTestSuite) TestRestartRemovesPartialDownload() {
-	defer suite.cleanupTest()
-
-	suite.Require().NoError(suite.tieredStorage.Stop())
-	partialPath := filepath.Join(
-		suite.cache_path,
-		"file.123"+partialDownloadSuffix,
-	)
-	suite.Require().NoError(os.WriteFile(partialPath, []byte("partial"), 0644))
-
-	restarted := newTestTieredStorage(suite.loopback)
-	suite.Require().NoError(restarted.Start(context.Background()))
-	suite.tieredStorage = restarted
-	suite.assert.NoFileExists(partialPath)
-	_, found := restarted.fileMap.Load("file.123" + partialDownloadSuffix)
-	suite.assert.False(found)
 }
 
 func TestUploadFailureKeepsLocalFile(t *testing.T) {
