@@ -54,26 +54,36 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ matrix.go }}
-          check-latest: true
+      - parallel:
+          - name: Install Go
+            uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+            with:
+              go-version: ${{ matrix.go }}
+
+          - name: Install libfuse
+            env:
+              FUSELIB: ${{ matrix.fuselib }}
+            run: |-
+              sudo apt-get install fuse3 ${FUSELIB} -y
+
+          - name: Install Zig
+            uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+            with:
+              version: ${{ env.zig }}
+              cache-key: coverage-${{ env.zig }}-${{ matrix.job_name }}
+
+      - name: Install Proxy
+        id: proxy-install
+        background: true
+        run: |-
+          sudo apt-get update --fix-missing -y
+          sudo apt remove mitmproxy -y
+          sudo apt-get install python3-setuptools -y
+          sudo apt install python3-pip -y
+          sudo pip3 install mitmproxy --ignore-installed blinker
+
       - name: Go Version
         run: go version
-
-      - name: Install libfuse
-        env:
-          FUSELIB: ${{ matrix.fuselib }}
-        run: |-
-          sudo apt-get install fuse3 ${FUSELIB} -y
-
-      - name: Install Zig
-        if: runner.os == 'Linux'
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
-        with:
-          version: ${{ env.zig }}
-          cache-key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
 
       - name: Create Directory Structure
         env:
@@ -957,13 +967,11 @@ jobs:
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cfusemon_stop_all.cov health-monitor stop all
           ./cloudfuse.test unmount all
 
-      - name: Install & Start Proxy
+      - name: Wait for proxy install
+        wait: proxy-install
+
+      - name: Start Proxy
         run: |-
-          sudo apt-get update --fix-missing -y
-          sudo apt remove mitmproxy -y
-          sudo apt-get install python3-setuptools -y
-          sudo apt install python3-pip -y
-          sudo pip3 install mitmproxy --ignore-installed blinker
           mitmdump -w proxy_logs.txt &
 
       - name: Configure Proxy
@@ -1092,6 +1100,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      # WinFsp creates MOUNT_DIR only once mounted, so readiness checks use `[ -d ]`.
       MOUNT_READY_TIMEOUT: 60
 
     # Skip for dependabot updates
@@ -1105,12 +1114,11 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
+        id: go
+        background: true
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
-          check-latest: true
-      - name: Go Version
-        run: go version
 
       # From rclone github repo under MIT license
       # https://github.com/rclone/rclone/blob/master/.github/workflows/build.yml
@@ -1124,6 +1132,12 @@ jobs:
           # can be used on Windows as on macOS and Linux
           $path = (get-command mingw32-make.exe).Path
           Copy-Item -Path $path -Destination (Join-Path (Split-Path -Path $path) 'make.exe')
+
+      - name: Wait for Go
+        wait: go
+
+      - name: Go Version
+        run: go version
 
       - name: Create Directory Structure
         shell: bash
@@ -1246,7 +1260,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1294,7 +1308,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1349,7 +1363,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1403,7 +1417,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1452,7 +1466,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1512,7 +1526,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1559,7 +1573,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1612,7 +1626,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1672,7 +1686,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1791,7 +1805,7 @@ jobs:
         run: |-
           set +x
           { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_foreg.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true & } || exit 1
-          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until ls "${MOUNT_DIR}" >/dev/null 2>&1; do sleep 1; done'
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until [ -d "${MOUNT_DIR}" ]; do sleep 1; done'
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_remount.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true && exit 1 || true
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           kill $pid
@@ -1841,7 +1855,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_foreg_2.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true & } || exit 1
-          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until ls "${MOUNT_DIR}" >/dev/null 2>&1; do sleep 1; done'
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until [ -d "${MOUNT_DIR}" ]; do sleep 1; done'
           echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> ${cloudfuse_CFG}
           sed -i 's/timeout:.*/timeout: 300/' ${cloudfuse_CFG}
           sleep 2
@@ -1897,7 +1911,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1937,7 +1951,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -2001,6 +2015,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
+      - name: Install dependency
+        id: dependencies
+        background: true
+        env:
+          FUSE_LIB: ${{ matrix.fuselib }}
+          FUSE_LIB2: ${{ matrix.fuselib2 }}
+        run: |-
+          sudo apt-get install ${FUSE_LIB} ${FUSE_LIB2}
+
       - name: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -2010,35 +2033,32 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
-          check-latest: true
 
       - name: Go Version
         run: go version
 
-      - name: Install dependency
-        env:
-          FUSE_LIB: ${{ matrix.fuselib }}
-          FUSE_LIB2: ${{ matrix.fuselib2 }}
-        run: |-
-          sudo apt-get install ${FUSE_LIB} ${FUSE_LIB2}
+      - name: Wait for dependencies
+        wait: dependencies
 
-      - name: Cleanup Blob Storage
-        run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
-        env:
-          STORAGE_ACCOUNT_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          STORAGE_ACCOUNT_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+      # Each cleanup targets a different storage account/bucket, so they are independent.
+      - parallel:
+          - name: Cleanup Blob Storage
+            run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
+            env:
+              STORAGE_ACCOUNT_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+              STORAGE_ACCOUNT_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
 
-      - name: Cleanup Datalake Storage
-        run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
-        env:
-          STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
+          - name: Cleanup Datalake Storage
+            run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
+            env:
+              STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
+              STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
 
-      - name: Cleanup S3 Storage
-        run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
-        env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-          AWS_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+          - name: Cleanup S3 Storage
+            run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
+            env:
+              AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+              AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+              AWS_REGION: "${{ secrets.S3TEST_REGION }}"
+              S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+              S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"

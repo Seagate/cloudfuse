@@ -41,7 +41,6 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
-          check-latest: true
 
       - name: Restore fuzz corpus
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -77,24 +76,24 @@ jobs:
           echo "Validating fuzz test seed corpus..."
           go test -run='^Fuzz' -tags=unittest ./common/
 
-      - name: Run fuzz tests
-        if: env.FUZZ_TIME != '0'
-        run: |
-          echo "Running fuzz tests for $FUZZ_TIME per target..."
+      - parallel:
+          # Encryption fuzz tests (security-critical)
+          - name: Fuzz FuzzEncryptDecryptRoundTrip
+            if: env.FUZZ_TIME != '0'
+            run: go test -run='^$' -fuzz=FuzzEncryptDecryptRoundTrip -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
 
-          # Run encryption fuzz tests (security-critical)
-          echo "=== FuzzEncryptDecryptRoundTrip ==="
-          go test -run='^$' -fuzz=FuzzEncryptDecryptRoundTrip -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+          - name: Fuzz FuzzDecryptMalformed
+            if: env.FUZZ_TIME != '0'
+            run: go test -run='^$' -fuzz=FuzzDecryptMalformed -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
 
-          echo "=== FuzzDecryptMalformed ==="
-          go test -run='^$' -fuzz=FuzzDecryptMalformed -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+          # Path fuzz tests
+          - name: Fuzz FuzzNormalizeObjectName
+            if: env.FUZZ_TIME != '0'
+            run: go test -run='^$' -fuzz=FuzzNormalizeObjectName -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
 
-          # Run path fuzz tests
-          echo "=== FuzzNormalizeObjectName ==="
-          go test -run='^$' -fuzz=FuzzNormalizeObjectName -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
-
-          echo "=== FuzzJoinUnixFilepath ==="
-          go test -run='^$' -fuzz=FuzzJoinUnixFilepath -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
+          - name: Fuzz FuzzJoinUnixFilepath
+            if: env.FUZZ_TIME != '0'
+            run: go test -run='^$' -fuzz=FuzzJoinUnixFilepath -fuzztime="$FUZZ_TIME" -tags=unittest ./common/
 
       - name: Save fuzz corpus
         if: always() && github.event_name != 'pull_request'

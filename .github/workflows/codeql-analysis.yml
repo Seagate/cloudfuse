@@ -34,6 +34,9 @@ jobs:
         exclude:
           - os: windows-latest
             language: actions
+          # Python analysis needs no build, so the Linux run already covers it.
+          - os: windows-latest
+            language: python
         # CodeQL supports [ 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'swift' ]
         # Use only 'java-kotlin' to analyze code written in Java, Kotlin or both
         # Use only 'javascript-typescript' to analyze code written in JavaScript, TypeScript or both
@@ -54,22 +57,20 @@ jobs:
         with:
           persist-credentials: false
 
-      # Install latest version of Go. Codeql runs on an older version of go
+      # Started before CodeQL init so apt is not traced, and overlaps Go setup and init.
+      - name: Install libfuse
+        id: libfuse
+        if: matrix.language == 'go' && matrix.os == 'ubuntu-latest'
+        background: true
+        run: |-
+          sudo apt-get update
+          sudo apt-get install fuse libfuse-dev -y
+
       - name: Install Go
         if: matrix.language == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27"
-          check-latest: true
-
-      - name: Cache Go build cache
-        if: matrix.language == 'go' && runner.os == 'Linux'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/go-build
-          key: ${{ runner.os }}-codeql-go-build-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-codeql-go-build-
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
@@ -95,11 +96,8 @@ jobs:
       #    and modify them (or add more) to build your code if your project
       #    uses a compiled language
 
-      - name: Install libfuse
-        if: matrix.language == 'go' && matrix.os == 'ubuntu-latest'
-        run: |-
-          sudo apt-get update
-          sudo apt-get install fuse libfuse-dev -y
+      - name: Wait for libfuse
+        wait-all:
 
       - name: Build go binary
         if: matrix.language == 'go'

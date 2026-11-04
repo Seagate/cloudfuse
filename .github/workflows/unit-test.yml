@@ -16,7 +16,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux-unit-test:
@@ -69,7 +69,7 @@ jobs:
           - 10002:10002
 
     env:
-      cgo: "1"
+      CGO_ENABLED: "1"
       go: "1.27"
       zig: 0.16.0
 
@@ -89,35 +89,29 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ env.go }}
-          check-latest: true
+      - parallel:
+          - name: Install Go
+            uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+            with:
+              go-version: ${{ env.go }}
 
-      - name: Install Zig
-        if: runner.os == 'Linux'
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
-        with:
-          version: ${{ env.zig }}
-          cache-key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
+          - name: Install Zig
+            uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+            with:
+              version: ${{ env.zig }}
+              cache-key: zig-${{ env.zig }}-${{ matrix.job_name }}
 
-      - name: Set CGO
-        env:
-          ENV_CGO: ${{ env.cgo }}
-        shell: bash
-        run: |
-          if [[ "${ENV_CGO}" != "" ]]; then echo 'CGO_ENABLED=${ENV_CGO}' >> $GITHUB_ENV ; fi
-
-      - name: Install libfuse on Linux
-        shell: bash
-        env:
-          FUSELIB: ${{ matrix.fuselib }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config fuse3 "$FUSELIB"
+          - name: Install libfuse on Linux
+            shell: bash
+            env:
+              FUSELIB: ${{ matrix.fuselib }}
+            run: |
+              sudo apt-get update
+              sudo apt-get install -y pkg-config fuse3 "$FUSELIB"
 
       - name: Build
+        id: build
+        background: true
         env:
           JOB_NAME: ${{ matrix.job_name }}
         run: |
@@ -173,6 +167,9 @@ jobs:
           aws --endpoint-url "${AWS_ENDPOINT}" s3 mb s3://test || true
           aws --endpoint-url "${AWS_ENDPOINT}" s3 ls
 
+      - name: Wait for build
+        wait: build
+
       - name: Run unit tests
         env:
           JOB_NAME: ${{ matrix.job_name }}
@@ -211,7 +208,7 @@ jobs:
     timeout-minutes: 15
     env:
       go: "1.27"
-      cgo: "0"
+      CGO_ENABLED: "0"
 
     steps:
       - name: Checkout code
@@ -223,14 +220,11 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
-          check-latest: true
 
-      - name: Set CGO
-        shell: bash
-        run: |
-          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
-
+      # Windows unit tests do not execute the built binaries, so build them alongside the tests.
       - name: Build
+        id: build
+        background: true
         shell: bash
         run: |
           ./build.sh
@@ -239,6 +233,9 @@ jobs:
         env:
           GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: go test -v -timeout=1h ./... --tags=unittest,authtest
+
+      - name: Wait for build
+        wait: build
 
   lint:
     name: Lint
@@ -251,33 +248,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ env.go }}
-          check-latest: true
-      - run: go version
-
-      - name: Set CGO
-        shell: bash
-        env:
-          CGO: ${{ env.cgo }}
-        run: |
-          if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
-
-      - name: Install libfuse on Linux
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: latest
-          args: --timeout=5m
-
       - name: Notice file check
+        id: notice
+        background: true
         run: |
           ./scripts/notices_fix.sh
           result=$(git diff NOTICE | wc -l)
@@ -287,3 +260,26 @@ jobs:
           else
             echo "Notices are up to date."
           fi
+
+      - parallel:
+          - name: Install Go
+            uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+            with:
+              go-version: ${{ env.go }}
+
+          - name: Install libfuse on Linux
+            shell: bash
+            run: |
+              sudo apt-get update
+              sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev
+
+      - run: go version
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Wait for notice check
+        wait: notice
