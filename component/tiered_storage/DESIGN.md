@@ -144,8 +144,9 @@ Writing to and creating local files does not require connectivity.
 3. Else if `cache/x` exists (another handle has it open): open it.
 4. Else (cloud-owned, closed):
    - With `O_TRUNC`: create an empty `local/x`. The file is now local-owned.
-   - Otherwise: reserve space, download directly into `cache/x`. On failure,
-     delete `cache/x` and return the error.
+   - Otherwise: download directly into `cache/x`. On failure (including
+     `ENOSPC` from the local filesystem), delete `cache/x` and return the
+     error.
 5. Increment the open count and return a handle.
 
 ### WriteFile / TruncateFile
@@ -153,7 +154,8 @@ Writing to and creating local files does not require connectivity.
 1. If the handle's file is in `cache/`, take the file lock and promote: rename
    `cache/x` → `local/x`, then enqueue it in the LRU. Open handles remain valid
    (see [Windows semantics](#windows-semantics)).
-2. Reserve space for growth, then write/truncate.
+2. Write/truncate the local file. There is no size pre-check. If the local
+   filesystem returns `ENOSPC`, return it to the caller.
 
 Promotion happens before the write is acknowledged, so an acknowledged write is
 always in `local/` and survives a crash.
@@ -291,8 +293,16 @@ behavior of allowing the rename.
 
 ## Eviction
 
-The LRU policy triggers when usage exceeds `high-threshold` and evicts until
-usage is below `low-threshold`, or immediately when `reserveSpace` needs room.
+Eviction is always asynchronous. It runs only in the background LRU policy,
+which triggers when usage exceeds `high-threshold` and evicts until usage is
+below `low-threshold`. File operations never evict, and never wait for eviction.
+
+Rationale: synchronous eviction makes a write wait on cloud uploads, holds the
+writer's file lock across network calls, and adds a second eviction entry point
+with its own locking and target calculation. Letting writes fail with the
+local filesystem's `ENOSPC` is simpler and predictable. Users size
+`max-size-mb` and the thresholds so the background policy keeps headroom for
+their write rate.
 
 For each candidate, with its file lock held:
 
@@ -308,17 +318,27 @@ exist in the cloud namespace.
 
 ## Capacity accounting
 
-- `reserveSpace` is called before downloads and before writes/truncates that
-  grow a file. It triggers synchronous eviction if needed, and returns `ENOSPC`
-  if nothing can be evicted.
-- Usage is tracked incrementally and periodically reconciled by measuring
-  `<tiered_root>`, which includes both `local/` and `cache/`.
+- There is no space reservation. Writes, truncates, and downloads proceed
+  without checking size. `max-size-mb` is not a hard limit; it is only the
+  basis for `high-threshold` and `low-threshold`. Usage can temporarily exceed
+  it while background eviction catches up.
+- The only hard limit is the free space of the local filesystem. When it is
+  full, the filesystem's `ENOSPC` is passed up the call stack unchanged. This
+  can happen even though older files could have been evicted. This is a known
+  limitation, documented with the thresholds in `setup/baseConfig.yaml` and
+  `setup/advancedConfig.yaml`. The application may retry once background
+  eviction has freed space.
+- Usage is tracked incrementally after each write, truncate, download, and
+  delete, and periodically reconciled by measuring `<tiered_root>`, which
+  includes both `local/` and `cache/`. Only the eviction policy reads it.
 
 ## Locking
 
 - Per-object file locks serialize open, release, promotion, delete, rename, and
   eviction for that object.
-- Lock order: file lock(s), then `evictMu`, then the LRU queue mutex. Never take
+- `evictMu` serializes eviction passes. Only the background policy takes it;
+  file operations never do, and never block on eviction.
+- Lock order: `evictMu`, then file lock(s), then the LRU queue mutex. Never take
   a file lock while holding the LRU queue mutex.
 - Multi-object operations take file locks in lexical order.
 - `GetAttr` and `StreamDir` do not take file locks. They rely on atomic renames
@@ -380,6 +400,9 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
 - `RenameDir` collects affected names after taking locks.
 - Eviction skips open files, keeps files on upload failure, and deletes them on
   success.
+- Writes and downloads are not size-checked: usage may exceed `max-size-mb`,
+  and an `ENOSPC` from the local filesystem is returned to the caller
+  unchanged (for downloads, after deleting the partial `cache/x`).
 - Windows: renaming a directory containing a file opened via `common.OpenFile`
   fails cleanly, before any change, and is reported as `EBUSY`.
 - Windows: promotion and delete of open files succeed with handles remaining
@@ -391,7 +414,20 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
 - Partial-download suffix and the interim `.cloudfuse-downloads` staging
   directory.
 - `replaceFile`.
+- Synchronous eviction and space reservation (`EvictNow`, `reserveSpace`, and
+  their call sites in `OpenFile`, `WriteFile`, and `TruncateFile`).
 - `FileNode` flags: `cloudBacked`, `isDirty`, `modeDirty`, `ownerDirty`, and
   cached `mode`/`owner`/`group`.
 - Name filtering of internal files in `StreamDir` and reserved-name checks in
   `localPath`.
+
+## Backlog - do not implement
+
+Ideas deferred to keep the current design simple. They are recorded here so
+they are not lost. Do not implement any of them until they are moved into the
+design above.
+
+- **Hard limit.** An option (like `file_cache`'s `hard-limit`) that enforces
+  `max-size-mb`. Writes, truncates, and downloads that would exceed it fail
+  with `ENOSPC` before touching the local filesystem, instead of relying on the
+  filesystem running out of space.
