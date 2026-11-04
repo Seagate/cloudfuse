@@ -90,14 +90,14 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
 
       - name: Install Zig
         if: runner.os == 'Linux'
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        uses: mlugg/setup-zig@v2.2.1
         with:
           version: ${{ env.zig }}
           cache-key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
@@ -252,7 +252,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
-            uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ env.go }}
           check-latest: true
