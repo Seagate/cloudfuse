@@ -32,10 +32,29 @@ jobs:
       go: "1.27"
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      - parallel:
+          - name: Checkout code
+            uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            with:
+              persist-credentials: false
+
+          - name: Set fuzz duration
+            id: fuzz-config
+            env:
+              INPUT_FUZZ_TIME: ${{ github.event.inputs.fuzz_time }}
+              EVENT_NAME: ${{ github.event_name }}
+              REF: ${{ github.ref }}
+            run: |
+              if [ -n "$INPUT_FUZZ_TIME" ]; then
+                echo "FUZZ_TIME=$INPUT_FUZZ_TIME" >> $GITHUB_ENV
+              elif [ "$EVENT_NAME" = "schedule" ]; then
+                echo "FUZZ_TIME=2m" >> $GITHUB_ENV
+              elif [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+                echo "FUZZ_TIME=30s" >> $GITHUB_ENV
+              else
+                # For PRs, just validate seed corpus (no extended fuzzing)
+                echo "FUZZ_TIME=0" >> $GITHUB_ENV
+              fi
 
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -51,24 +70,6 @@ jobs:
           key: fuzz-corpus-${{ runner.os }}-${{ hashFiles('**/*_fuzz_test.go') }}
           restore-keys: |
             fuzz-corpus-${{ runner.os }}-
-
-      - name: Set fuzz duration
-        id: fuzz-config
-        env:
-          INPUT_FUZZ_TIME: ${{ github.event.inputs.fuzz_time }}
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-        run: |
-          if [ -n "$INPUT_FUZZ_TIME" ]; then
-            echo "FUZZ_TIME=$INPUT_FUZZ_TIME" >> $GITHUB_ENV
-          elif [ "$EVENT_NAME" = "schedule" ]; then
-            echo "FUZZ_TIME=2m" >> $GITHUB_ENV
-          elif [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
-            echo "FUZZ_TIME=30s" >> $GITHUB_ENV
-          else
-            # For PRs, just validate seed corpus (no extended fuzzing)
-            echo "FUZZ_TIME=0" >> $GITHUB_ENV
-          fi
 
       - name: Validate seed corpus (PRs only)
         if: env.FUZZ_TIME == '0'

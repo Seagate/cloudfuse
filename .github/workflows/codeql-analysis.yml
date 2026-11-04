@@ -52,19 +52,20 @@ jobs:
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Started before CodeQL init so apt is not traced, and overlaps Go setup and init.
       - name: Install libfuse
         id: libfuse
         if: matrix.language == 'go' && matrix.os == 'ubuntu-latest'
         background: true
         run: |-
-          sudo apt-get update
-          sudo apt-get install fuse libfuse-dev -y
+          sudo apt-get install fuse libfuse-dev -y || {
+            sudo apt-get update
+            sudo apt-get install fuse libfuse-dev -y
+          }
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Go
         if: matrix.language == 'go'
