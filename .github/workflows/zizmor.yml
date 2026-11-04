@@ -18,13 +18,14 @@ jobs:
     permissions:
       security-events: write # Needed to upload the analysis results
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
+      - parallel:
+          - name: Checkout repository
+            uses: actions/checkout@v7.0.1
+            with:
+              persist-credentials: false
 
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v10.3.2
+          - name: Install the latest version of uv
+            uses: astral-sh/setup-uv@v10.3.2
 
       - name: Run zizmor 🌈
         run: uvx zizmor --pedantic --format sarif . > results.sarif

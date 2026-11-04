@@ -8,7 +8,6 @@ workflows:
         - 'actions/setup-go@v7.0.0'
         - 'mlugg/setup-zig@v2.2.1'
     '.github/workflows/codeql-analysis.yml':
-        - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-go@v7.0.0'
         - 'github/codeql-action@v4.39.1'

@@ -49,52 +49,132 @@ jobs:
 
     timeout-minutes: 60
     steps:
-      - name: checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install Go
-        uses: actions/setup-go@v7.0.0
-        with:
-          go-version: ${{ matrix.go }}
-          check-latest: true
-      - name: Go Version
-        run: go version
-
       - name: Install libfuse
+        id: libfuse
+        background: true
         env:
           FUSELIB: ${{ matrix.fuselib }}
         run: |-
           sudo apt-get install fuse3 ${FUSELIB} -y
 
       - name: Install Zig
-        if: runner.os == 'Linux'
+        id: zig
+        background: true
         uses: mlugg/setup-zig@v2.2.1
         with:
           version: ${{ env.zig }}
-          cache-key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
+          cache-key: coverage-${{ env.zig }}-${{ matrix.job_name }}
 
-      - name: Create Directory Structure
-        env:
-          MOUNT_DIR: ${{ env.MOUNT_DIR }}
-          TEMP_DIR: ${{ env.TEMP_DIR }}
+      - parallel:
+          - name: checkout
+            uses: actions/checkout@v7.0.1
+            with:
+              persist-credentials: false
+
+          - name: Create Directory Structure
+            env:
+              MOUNT_DIR: ${{ env.MOUNT_DIR }}
+              TEMP_DIR: ${{ env.TEMP_DIR }}
+            run: |-
+              sudo mkdir -p ${MOUNT_DIR}
+              sudo chown -R `whoami` ${MOUNT_DIR}
+              chmod 777 ${MOUNT_DIR}
+              sudo mkdir -p ${TEMP_DIR}
+              sudo chown -R `whoami` ${TEMP_DIR}
+              chmod 777 ${TEMP_DIR}
+
+              echo "--- Debug: After Create Directory Structure ---"
+              echo "MOUNT_DIR is: ${MOUNT_DIR}"
+              echo "Listing MOUNT_DIR:"
+              ls -ld ${MOUNT_DIR} || echo "MOUNT_DIR not found after creation step"
+              echo "TEMP_DIR is: ${TEMP_DIR}"
+              echo "Listing TEMP_DIR:"
+              ls -ld ${TEMP_DIR} || echo "TEMP_DIR not found after creation step"
+              echo "---------------------------------------------"
+
+          - name: Create Azure Configuration File
+            env:
+              AZTEST_BLOCK_ACC_NAME: ${{ secrets.AZTEST_BLOCK_ACC_NAME }}
+              AZTEST_ADLS_ACC_NAME: ${{ secrets.AZTEST_ADLS_ACC_NAME }}
+              CONTAINER_NAME: ${{ matrix.containerName }}
+              AZTEST_BLOCK_KEY: ${{ secrets.AZTEST_BLOCK_KEY }}
+              AZTEST_ADLS_KEY: ${{ secrets.AZTEST_ADLS_KEY }}
+              AZTEST_BLOCK_SAS: ${{ secrets.AZTEST_BLOCK_SAS }}
+              AZTEST_BLOCK_CONT_SAS_UBN_18: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}
+              AZTEST_BLOCK_CONT_SAS_UBN_20: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}
+              AZTEST_ADLS_SAS: ${{ secrets.AZTEST_ADLS_SAS }}
+              AZTEST_APP_ID: ${{ secrets.AZTEST_APP_ID }}
+              AZTEST_RES_ID: ${{ secrets.AZTEST_RES_ID }}
+              AZTEST_OBJ_ID: ${{ secrets.AZTEST_OBJ_ID }}
+              AZTEST_CLIENT: ${{ secrets.AZTEST_CLIENT }}
+              AZTEST_TENANT: ${{ secrets.AZTEST_TENANT }}
+              AZTEST_SECRET: ${{ secrets.AZTEST_SECRET }}
+            run: |-
+              cnfFile=$HOME/azuretest.json
+              echo $cnfFile
+              touch $cnfFile
+              echo "{" > $cnfFile
+              echo "\"block-acct\"": "\"${AZTEST_BLOCK_ACC_NAME}\"", >> $cnfFile
+              echo "\"adls-acct\"": "\"${AZTEST_ADLS_ACC_NAME}\"", >> $cnfFile
+              echo "\"block-cont\"": "\"${CONTAINER_NAME}\"", >> $cnfFile
+              echo "\"adls-cont\"": "\"${CONTAINER_NAME}\"", >> $cnfFile
+              echo "\"block-key\"": "\"${AZTEST_BLOCK_KEY}\"", >> $cnfFile
+              echo "\"adls-key\"": "\"${AZTEST_ADLS_KEY}\"", >> $cnfFile
+              echo "\"block-sas\"": "\"${AZTEST_BLOCK_SAS}\"", >> $cnfFile
+              echo "\"block-cont-sas-ubn-18\"": "\"${AZTEST_BLOCK_CONT_SAS_UBN_18}\"", >> $cnfFile
+              echo "\"block-cont-sas-ubn-20\"": "\"${AZTEST_BLOCK_CONT_SAS_UBN_20}\"", >> $cnfFile
+              echo "\"adls-sas\"": "\"${AZTEST_ADLS_SAS}\"", >> $cnfFile
+              echo "\"msi-appid\"": "\"${AZTEST_APP_ID}\"", >> $cnfFile
+              echo "\"msi-resid\"": "\"${AZTEST_RES_ID}\"", >> $cnfFile
+              echo "\"msi-objid\"": "\"${AZTEST_OBJ_ID}\"", >> $cnfFile
+              echo "\"spn-client\"": "\"${AZTEST_CLIENT}\"", >> $cnfFile
+              echo "\"spn-tenant\"": "\"${AZTEST_TENANT}\"", >> $cnfFile
+              echo "\"spn-secret\"": "\"${AZTEST_SECRET}\"", >> $cnfFile
+              echo "\"skip-msi\"": "true", >> $cnfFile
+              echo "\"skip-azcli\"": "true", >> $cnfFile
+              echo "\"proxy-address\"": "\"\"" >> $cnfFile
+              echo "}" >> $cnfFile
+
+          - name: Create S3 Configuration File
+            env:
+              S3TEST_BUCKET_NAME: ${{ secrets.S3TEST_BUCKET_NAME }}
+              S3TEST_ACCESS_KEY: ${{ secrets.S3TEST_ACCESS_KEY }}
+              S3TEST_SECRET_KEY: ${{ secrets.S3TEST_SECRET_KEY }}
+              S3TEST_ENDPOINT: ${{ secrets.S3TEST_ENDPOINT }}
+              S3TEST_REGION: ${{ secrets.S3TEST_REGION }}
+            run: |-
+              cnfFile=$HOME/s3test.json
+              echo $cnfFile
+              touch $cnfFile
+              echo "{" > $cnfFile
+              echo "\"bucket-name\"": "\"${S3TEST_BUCKET_NAME}\"", >> $cnfFile
+              echo "\"access-key\"": "\"${S3TEST_ACCESS_KEY}\"", >> $cnfFile
+              echo "\"secret-key\"": "\"${S3TEST_SECRET_KEY}\"", >> $cnfFile
+              echo "\"endpoint\"": "\"${S3TEST_ENDPOINT}\"", >> $cnfFile
+              echo "\"region\"": "\"${S3TEST_REGION}\"" >> $cnfFile
+              echo "}" >> $cnfFile
+
+      - name: Install Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Go Version
+        run: go version
+
+      # The proxy install also uses apt, so it can only start once libfuse releases the apt lock.
+      - name: Wait for build tools
+        wait: [libfuse, zig]
+
+      - name: Install Proxy
+        id: proxy-install
+        background: true
         run: |-
-          sudo mkdir -p ${MOUNT_DIR}
-          sudo chown -R `whoami` ${MOUNT_DIR}
-          chmod 777 ${MOUNT_DIR}
-          sudo mkdir -p ${TEMP_DIR}
-          sudo chown -R `whoami` ${TEMP_DIR}
-          chmod 777 ${TEMP_DIR}
-
-          echo "--- Debug: After Create Directory Structure ---"
-          echo "MOUNT_DIR is: ${MOUNT_DIR}"
-          echo "Listing MOUNT_DIR:"
-          ls -ld ${MOUNT_DIR} || echo "MOUNT_DIR not found after creation step"
-          echo "TEMP_DIR is: ${TEMP_DIR}"
-          echo "Listing TEMP_DIR:"
-          ls -ld ${TEMP_DIR} || echo "TEMP_DIR not found after creation step"
-          echo "---------------------------------------------"
+          sudo apt-get update --fix-missing -y
+          sudo apt remove mitmproxy -y
+          sudo apt-get install python3-setuptools -y
+          sudo apt install python3-pip -y
+          sudo pip3 install mitmproxy --ignore-installed blinker
 
       - name: Build
         env:
@@ -105,68 +185,6 @@ jobs:
           else
             ./build.sh
           fi
-
-      - name: Create Azure Configuration File
-        env:
-          AZTEST_BLOCK_ACC_NAME: ${{ secrets.AZTEST_BLOCK_ACC_NAME }}
-          AZTEST_ADLS_ACC_NAME: ${{ secrets.AZTEST_ADLS_ACC_NAME }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
-          AZTEST_BLOCK_KEY: ${{ secrets.AZTEST_BLOCK_KEY }}
-          AZTEST_ADLS_KEY: ${{ secrets.AZTEST_ADLS_KEY }}
-          AZTEST_BLOCK_SAS: ${{ secrets.AZTEST_BLOCK_SAS }}
-          AZTEST_BLOCK_CONT_SAS_UBN_18: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}
-          AZTEST_BLOCK_CONT_SAS_UBN_20: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}
-          AZTEST_ADLS_SAS: ${{ secrets.AZTEST_ADLS_SAS }}
-          AZTEST_APP_ID: ${{ secrets.AZTEST_APP_ID }}
-          AZTEST_RES_ID: ${{ secrets.AZTEST_RES_ID }}
-          AZTEST_OBJ_ID: ${{ secrets.AZTEST_OBJ_ID }}
-          AZTEST_CLIENT: ${{ secrets.AZTEST_CLIENT }}
-          AZTEST_TENANT: ${{ secrets.AZTEST_TENANT }}
-          AZTEST_SECRET: ${{ secrets.AZTEST_SECRET }}
-        run: |-
-          cnfFile=$HOME/azuretest.json
-          echo $cnfFile
-          touch $cnfFile
-          echo "{" > $cnfFile
-          echo "\"block-acct\"": "\"${AZTEST_BLOCK_ACC_NAME}\"", >> $cnfFile
-          echo "\"adls-acct\"": "\"${AZTEST_ADLS_ACC_NAME}\"", >> $cnfFile
-          echo "\"block-cont\"": "\"${CONTAINER_NAME}\"", >> $cnfFile
-          echo "\"adls-cont\"": "\"${CONTAINER_NAME}\"", >> $cnfFile
-          echo "\"block-key\"": "\"${AZTEST_BLOCK_KEY}\"", >> $cnfFile
-          echo "\"adls-key\"": "\"${AZTEST_ADLS_KEY}\"", >> $cnfFile
-          echo "\"block-sas\"": "\"${AZTEST_BLOCK_SAS}\"", >> $cnfFile
-          echo "\"block-cont-sas-ubn-18\"": "\"${AZTEST_BLOCK_CONT_SAS_UBN_18}\"", >> $cnfFile
-          echo "\"block-cont-sas-ubn-20\"": "\"${AZTEST_BLOCK_CONT_SAS_UBN_20}\"", >> $cnfFile
-          echo "\"adls-sas\"": "\"${AZTEST_ADLS_SAS}\"", >> $cnfFile
-          echo "\"msi-appid\"": "\"${AZTEST_APP_ID}\"", >> $cnfFile
-          echo "\"msi-resid\"": "\"${AZTEST_RES_ID}\"", >> $cnfFile
-          echo "\"msi-objid\"": "\"${AZTEST_OBJ_ID}\"", >> $cnfFile
-          echo "\"spn-client\"": "\"${AZTEST_CLIENT}\"", >> $cnfFile
-          echo "\"spn-tenant\"": "\"${AZTEST_TENANT}\"", >> $cnfFile
-          echo "\"spn-secret\"": "\"${AZTEST_SECRET}\"", >> $cnfFile
-          echo "\"skip-msi\"": "true", >> $cnfFile
-          echo "\"skip-azcli\"": "true", >> $cnfFile
-          echo "\"proxy-address\"": "\"\"" >> $cnfFile
-          echo "}" >> $cnfFile
-
-      - name: Create S3 Configuration File
-        env:
-          S3TEST_BUCKET_NAME: ${{ secrets.S3TEST_BUCKET_NAME }}
-          S3TEST_ACCESS_KEY: ${{ secrets.S3TEST_ACCESS_KEY }}
-          S3TEST_SECRET_KEY: ${{ secrets.S3TEST_SECRET_KEY }}
-          S3TEST_ENDPOINT: ${{ secrets.S3TEST_ENDPOINT }}
-          S3TEST_REGION: ${{ secrets.S3TEST_REGION }}
-        run: |-
-          cnfFile=$HOME/s3test.json
-          echo $cnfFile
-          touch $cnfFile
-          echo "{" > $cnfFile
-          echo "\"bucket-name\"": "\"${S3TEST_BUCKET_NAME}\"", >> $cnfFile
-          echo "\"access-key\"": "\"${S3TEST_ACCESS_KEY}\"", >> $cnfFile
-          echo "\"secret-key\"": "\"${S3TEST_SECRET_KEY}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${S3TEST_ENDPOINT}\"", >> $cnfFile
-          echo "\"region\"": "\"${S3TEST_REGION}\"" >> $cnfFile
-          echo "}" >> $cnfFile
 
       - name: UT Code Coverage
         shell: bash
@@ -957,13 +975,11 @@ jobs:
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cfusemon_stop_all.cov health-monitor stop all
           ./cloudfuse.test unmount all
 
-      - name: Install & Start Proxy
+      - name: Wait for proxy install
+        wait: proxy-install
+
+      - name: Start Proxy
         run: |-
-          sudo apt-get update --fix-missing -y
-          sudo apt remove mitmproxy -y
-          sudo apt-get install python3-setuptools -y
-          sudo apt install python3-pip -y
-          sudo pip3 install mitmproxy --ignore-installed blinker
           mitmdump -w proxy_logs.txt &
 
       - name: Configure Proxy
@@ -1092,6 +1108,7 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      # WinFsp creates MOUNT_DIR only once mounted, so readiness checks use `[ -d ]`.
       MOUNT_READY_TIMEOUT: 60
 
     # Skip for dependabot updates
@@ -1099,22 +1116,11 @@ jobs:
 
     timeout-minutes: 60
     steps:
-      - name: checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install Go
-        uses: actions/setup-go@v7.0.0
-        with:
-          go-version: ${{ matrix.go }}
-          check-latest: true
-      - name: Go Version
-        run: go version
-
       # From rclone github repo under MIT license
       # https://github.com/rclone/rclone/blob/master/.github/workflows/build.yml
       - name: Install Libraries on Windows
+        id: libraries
+        background: true
         shell: powershell
         run: |
           $ProgressPreference = 'SilentlyContinue'
@@ -1125,86 +1131,103 @@ jobs:
           $path = (get-command mingw32-make.exe).Path
           Copy-Item -Path $path -Destination (Join-Path (Split-Path -Path $path) 'make.exe')
 
-      - name: Create Directory Structure
-        shell: bash
-        env:
-          TEMP_DIR: ${{ env.TEMP_DIR }}
-        run: |-
-          mkdir -p ${TEMP_DIR}
-          chown -R `whoami` ${TEMP_DIR}
-          chmod 777 ${TEMP_DIR}
+      - parallel:
+          - name: checkout
+            uses: actions/checkout@v7.0.1
+            with:
+              persist-credentials: false
+
+          - name: Create Directory Structure
+            shell: bash
+            env:
+              TEMP_DIR: ${{ env.TEMP_DIR }}
+            run: |-
+              mkdir -p ${TEMP_DIR}
+              chown -R `whoami` ${TEMP_DIR}
+              chmod 777 ${TEMP_DIR}
+
+          - name: Create Azure Configuration File on Windows
+            env:
+              AZTEST_BLOCK_ACC_NAME: ${{ secrets.AZTEST_BLOCK_ACC_NAME }}
+              AZTEST_ADLS_ACC_NAME: ${{ secrets.AZTEST_ADLS_ACC_NAME }}
+              CONTAINER_NAME: ${{ matrix.containerName }}
+              AZTEST_BLOCK_KEY: ${{ secrets.AZTEST_BLOCK_KEY }}
+              AZTEST_ADLS_KEY: ${{ secrets.AZTEST_ADLS_KEY }}
+              AZTEST_BLOCK_SAS: ${{ secrets.AZTEST_BLOCK_SAS }}
+              AZTEST_BLOCK_CONT_SAS_UBN_18: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}
+              AZTEST_BLOCK_CONT_SAS_UBN_20: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}
+              AZTEST_ADLS_SAS: ${{ secrets.AZTEST_ADLS_SAS }}
+              AZTEST_APP_ID: ${{ secrets.AZTEST_APP_ID }}
+              AZTEST_RES_ID: ${{ secrets.AZTEST_RES_ID }}
+              AZTEST_OBJ_ID: ${{ secrets.AZTEST_OBJ_ID }}
+              AZTEST_CLIENT: ${{ secrets.AZTEST_CLIENT }}
+              AZTEST_TENANT: ${{ secrets.AZTEST_TENANT }}
+              AZTEST_SECRET: ${{ secrets.AZTEST_SECRET }}
+            run: |-
+              $cnfFile="~\azuretest.json"
+              Write-Host $cnfFile
+              $content = @"
+              {
+                "block-acct": "$env:AZTEST_BLOCK_ACC_NAME",
+                "adls-acct": "$env:AZTEST_ADLS_ACC_NAME",
+                "block-cont": "$env:CONTAINER_NAME",
+                "adls-cont": "$env:CONTAINER_NAME",
+                "block-key": "$env:AZTEST_BLOCK_KEY",
+                "adls-key": "$env:AZTEST_ADLS_KEY",
+                "block-sas": "$env:AZTEST_BLOCK_SAS",
+                "block-cont-sas-ubn-18": "$env:AZTEST_BLOCK_CONT_SAS_UBN_18",
+                "block-cont-sas-ubn-20": "$env:AZTEST_BLOCK_CONT_SAS_UBN_20",
+                "adls-sas": "$env:AZTEST_ADLS_SAS",
+                "msi-appid": "$env:AZTEST_APP_ID",
+                "msi-resid": "$env:AZTEST_RES_ID",
+                "msi-objid": "$env:AZTEST_OBJ_ID",
+                "spn-client": "$env:AZTEST_CLIENT",
+                "spn-tenant": "$env:AZTEST_TENANT",
+                "spn-secret": "$env:AZTEST_SECRET",
+                "skip-msi": true,
+                "skip-azcli": true,
+                "proxy-address": ""
+              }
+              "@
+              $content | Out-File -FilePath $cnfFile -Encoding Ascii
+            shell: powershell
+
+          - name: Create S3 Configuration File on Windows
+            env: # Added
+              S3TEST_BUCKET_NAME: ${{ secrets.S3TEST_BUCKET_NAME }}
+              S3TEST_ACCESS_KEY: ${{ secrets.S3TEST_ACCESS_KEY }}
+              S3TEST_SECRET_KEY: ${{ secrets.S3TEST_SECRET_KEY }}
+              S3TEST_ENDPOINT: ${{ secrets.S3TEST_ENDPOINT }}
+              S3TEST_REGION: ${{ secrets.S3TEST_REGION }}
+            run: |-
+              $cnfFile="~\s3test.json"
+              Write-Host $cnfFile
+              $content = @"
+              {
+                "bucket-name": "$env:S3TEST_BUCKET_NAME",
+                "access-key": "$env:S3TEST_ACCESS_KEY",
+                "secret-key": "$env:S3TEST_SECRET_KEY",
+                "endpoint": "$env:S3TEST_ENDPOINT",
+                "region": "$env:S3TEST_REGION"
+              }
+              "@
+              $content | Out-File -FilePath $cnfFile -Encoding Ascii
+            shell: powershell
+
+      - name: Install Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Wait for libraries
+        wait: libraries
+
+      - name: Go Version
+        run: go version
 
       - name: Build
         run: |
           ./build.sh
-
-      - name: Create Azure Configuration File on Windows
-        env:
-          AZTEST_BLOCK_ACC_NAME: ${{ secrets.AZTEST_BLOCK_ACC_NAME }}
-          AZTEST_ADLS_ACC_NAME: ${{ secrets.AZTEST_ADLS_ACC_NAME }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
-          AZTEST_BLOCK_KEY: ${{ secrets.AZTEST_BLOCK_KEY }}
-          AZTEST_ADLS_KEY: ${{ secrets.AZTEST_ADLS_KEY }}
-          AZTEST_BLOCK_SAS: ${{ secrets.AZTEST_BLOCK_SAS }}
-          AZTEST_BLOCK_CONT_SAS_UBN_18: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}
-          AZTEST_BLOCK_CONT_SAS_UBN_20: ${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}
-          AZTEST_ADLS_SAS: ${{ secrets.AZTEST_ADLS_SAS }}
-          AZTEST_APP_ID: ${{ secrets.AZTEST_APP_ID }}
-          AZTEST_RES_ID: ${{ secrets.AZTEST_RES_ID }}
-          AZTEST_OBJ_ID: ${{ secrets.AZTEST_OBJ_ID }}
-          AZTEST_CLIENT: ${{ secrets.AZTEST_CLIENT }}
-          AZTEST_TENANT: ${{ secrets.AZTEST_TENANT }}
-          AZTEST_SECRET: ${{ secrets.AZTEST_SECRET }}
-        run: |-
-          $cnfFile="~\azuretest.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "block-acct": "$env:AZTEST_BLOCK_ACC_NAME",
-            "adls-acct": "$env:AZTEST_ADLS_ACC_NAME",
-            "block-cont": "$env:CONTAINER_NAME",
-            "adls-cont": "$env:CONTAINER_NAME",
-            "block-key": "$env:AZTEST_BLOCK_KEY",
-            "adls-key": "$env:AZTEST_ADLS_KEY",
-            "block-sas": "$env:AZTEST_BLOCK_SAS",
-            "block-cont-sas-ubn-18": "$env:AZTEST_BLOCK_CONT_SAS_UBN_18",
-            "block-cont-sas-ubn-20": "$env:AZTEST_BLOCK_CONT_SAS_UBN_20",
-            "adls-sas": "$env:AZTEST_ADLS_SAS",
-            "msi-appid": "$env:AZTEST_APP_ID",
-            "msi-resid": "$env:AZTEST_RES_ID",
-            "msi-objid": "$env:AZTEST_OBJ_ID",
-            "spn-client": "$env:AZTEST_CLIENT",
-            "spn-tenant": "$env:AZTEST_TENANT",
-            "spn-secret": "$env:AZTEST_SECRET",
-            "skip-msi": true,
-            "skip-azcli": true,
-            "proxy-address": ""
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
-
-      - name: Create S3 Configuration File on Windows
-        env: # Added
-          S3TEST_BUCKET_NAME: ${{ secrets.S3TEST_BUCKET_NAME }}
-          S3TEST_ACCESS_KEY: ${{ secrets.S3TEST_ACCESS_KEY }}
-          S3TEST_SECRET_KEY: ${{ secrets.S3TEST_SECRET_KEY }}
-          S3TEST_ENDPOINT: ${{ secrets.S3TEST_ENDPOINT }}
-          S3TEST_REGION: ${{ secrets.S3TEST_REGION }}
-        run: |-
-          $cnfFile="~\s3test.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "bucket-name": "$env:S3TEST_BUCKET_NAME",
-            "access-key": "$env:S3TEST_ACCESS_KEY",
-            "secret-key": "$env:S3TEST_SECRET_KEY",
-            "endpoint": "$env:S3TEST_ENDPOINT",
-            "region": "$env:S3TEST_REGION"
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
 
       - name: UT Code Coverage
         shell: bash
@@ -1246,7 +1269,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1294,7 +1317,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1349,7 +1372,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1403,7 +1426,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1452,7 +1475,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1512,7 +1535,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1559,7 +1582,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1612,7 +1635,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1672,7 +1695,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1791,7 +1814,7 @@ jobs:
         run: |-
           set +x
           { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_foreg.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true & } || exit 1
-          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until ls "${MOUNT_DIR}" >/dev/null 2>&1; do sleep 1; done'
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until [ -d "${MOUNT_DIR}" ]; do sleep 1; done'
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_remount.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true && exit 1 || true
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           kill $pid
@@ -1841,7 +1864,7 @@ jobs:
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_foreg_2.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true & } || exit 1
-          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until ls "${MOUNT_DIR}" >/dev/null 2>&1; do sleep 1; done'
+          timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until [ -d "${MOUNT_DIR}" ]; do sleep 1; done'
           echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> ${cloudfuse_CFG}
           sed -i 's/timeout:.*/timeout: 300/' ${cloudfuse_CFG}
           sleep 2
@@ -1897,7 +1920,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1937,7 +1960,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
+            if [ -d "${MOUNT_DIR}" ]; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1995,8 +2018,6 @@ jobs:
           - job_name: linux
             os: ubuntu-latest
             containerName: "test-cnt-ubn"
-            fuselib: libfuse3-dev
-            fuselib2: fuse3
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -2010,35 +2031,32 @@ jobs:
         uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ matrix.go }}
-          check-latest: true
 
       - name: Go Version
         run: go version
 
-      - name: Install dependency
-        env:
-          FUSE_LIB: ${{ matrix.fuselib }}
-          FUSE_LIB2: ${{ matrix.fuselib2 }}
-        run: |-
-          sudo apt-get install ${FUSE_LIB} ${FUSE_LIB2}
+      - name: Build cleanup tests
+        run: go test -c -o ./cleanup-bin/ ./test/accoutcleanup ./test/s3cleanup
 
-      - name: Cleanup Blob Storage
-        run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
-        env:
-          STORAGE_ACCOUNT_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-          STORAGE_ACCOUNT_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
+      # Each cleanup targets a different storage account/bucket, so they are independent.
+      - parallel:
+          - name: Cleanup Blob Storage
+            run: ./cleanup-bin/accoutcleanup.test -test.timeout 120m -test.v
+            env:
+              STORAGE_ACCOUNT_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
+              STORAGE_ACCOUNT_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
 
-      - name: Cleanup Datalake Storage
-        run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
-        env:
-          STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-          STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
+          - name: Cleanup Datalake Storage
+            run: ./cleanup-bin/accoutcleanup.test -test.timeout 120m -test.v
+            env:
+              STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
+              STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
 
-      - name: Cleanup S3 Storage
-        run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
-        env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-          AWS_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+          - name: Cleanup S3 Storage
+            run: ./cleanup-bin/s3cleanup.test -test.timeout 120m -test.v
+            env:
+              AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+              AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+              AWS_REGION: "${{ secrets.S3TEST_REGION }}"
+              S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+              S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
