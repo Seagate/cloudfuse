@@ -737,6 +737,34 @@ func (suite *tieredStorageTestSuite) TestWritePromotesCachedFile() {
 	}
 }
 
+func (suite *tieredStorageTestSuite) TestPromoteNeverOverwritesLocalFile() {
+	defer suite.cleanupTest()
+
+	const path = "both-trees"
+	suite.writeCloudFile(path, "old cloud")
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR},
+	)
+	suite.Require().NoError(err)
+	// Simulate a failed cleanup that left a stray cache/ copy beside local/x.
+	suite.Require().NoError(os.WriteFile(suite.localFile(path), []byte("authoritative"), 0644))
+
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("X")},
+	)
+	suite.Require().NoError(err)
+
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	data, err := os.ReadFile(suite.localFile(path))
+	suite.Require().NoError(err)
+	suite.assert.Equal("authoritative", string(data))
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+	suite.assert.FileExists(suite.localFile(path))
+	suite.assert.Contains(lruOrder(suite.tieredStorage.policy), path)
+}
+
 func (suite *tieredStorageTestSuite) TestTruncatePromotesCachedFile() {
 	defer suite.cleanupTest()
 
@@ -1502,9 +1530,11 @@ func (suite *tieredStorageTestSuite) TestRenameFileReplacesCopyInOtherTree() {
 	suite.Require().NoError(
 		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
 	)
-	suite.assert.NoFileExists(suite.localFile("dst"))
-	suite.assert.FileExists(suite.cacheFile("dst"))
-	suite.assert.NotContains(lruOrder(suite.tieredStorage.policy), "dst")
+	// The cached copy replaced local/dst in place, so dst is in one tree.
+	suite.assert.NoFileExists(suite.cacheFile("dst"))
+	data, err := os.ReadFile(suite.localFile("dst"))
+	suite.Require().NoError(err)
+	suite.assert.Equal("cloud src", string(data))
 	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: "dst"})
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(len("cloud src"), attrs.Size)

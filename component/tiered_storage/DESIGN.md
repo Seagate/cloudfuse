@@ -179,6 +179,9 @@ Writing to and creating local files does not require connectivity.
 Promotion happens before the write is acknowledged, so an acknowledged write is
 always in `local/` and survives a crash.
 
+Promotion never replaces an existing `local/x`. If both exist, `cache/x` is a
+stray left by a failed cleanup, so it is deleted instead.
+
 ### FlushFile / SyncFile
 
 Sync the local file. No upload.
@@ -229,7 +232,9 @@ local copy is gone.
 3. Fail early if the destination exists and replacing it is not permitted
    (`local/dst` is a directory).
 4. If the source is in `local/` or `cache/`: `MkdirAll` the destination parent
-   and rename the local file.
+   and rename the local file. If the source is in `cache/` and `local/dst`
+   exists, rename it over `local/dst`, so the replacement is atomic. The file
+   becomes local-owned, which costs at most a redundant upload.
 5. Rename in the cloud.
    - `ENOENT` is acceptable if the source was in `local/` (never uploaded).
    - On any other failure, rename the local file back and return the error. If

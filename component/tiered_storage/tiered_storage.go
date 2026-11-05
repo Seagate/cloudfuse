@@ -722,6 +722,16 @@ func (c *TieredStorage) promote(name string) error {
 	} else if err != nil {
 		return err
 	}
+	if _, err := os.Stat(localPath); err == nil {
+		// local/x is authoritative, so cache/x is a stray left by a failed
+		// cleanup. Its handles refer to a replaced file; never let it win.
+		if err := c.removeFile(cachePath); err != nil {
+			log.Warn("TieredStorage::promote : failed to remove stray cached %s [%v]", name, err)
+		}
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
 		return err
 	}
@@ -1127,7 +1137,8 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		if err := c.removeFile(cachePath); err != nil {
 			log.Warn("TieredStorage::ReleaseFile : failed to remove cached %s [%v]", name, err)
 		}
-	} else if _, err := os.Stat(localPath); err == nil {
+	}
+	if _, err := os.Stat(localPath); err == nil {
 		c.policy.Enqueue(name)
 		if _, stale := c.cloudStale.Load(name); stale && c.evictOnClose {
 			c.policy.EvictOnClose(name, func() bool {
@@ -1251,6 +1262,12 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	} else if _, err := os.Stat(srcCache); err == nil {
 		from, to = srcCache, dstCache
+		// Replace an authoritative local/dst atomically, rather than leaving it
+		// for cleanup. The copy then becomes local-owned; at worst that costs
+		// a redundant upload.
+		if _, err := os.Stat(dstLocal); err == nil {
+			to = dstLocal
+		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
