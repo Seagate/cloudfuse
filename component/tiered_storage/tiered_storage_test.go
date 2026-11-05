@@ -1751,17 +1751,8 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	)
 	suite.assert.NoError(openErr)
 
-	// Verify it was now downloaded to the local tiered storage cache + in map
-	suite.assert.FileExists(suite.localFile(path))
-	// suite.tieredStorage.mu.Lock()
-	// node, exists := suite.tieredStorage.fileMap[path]
-	// suite.tieredStorage.mu.Unlock()
-
-	val, exists := suite.tieredStorage.fileMap.Load(path)
-	node := val.(*FileNode)
-
-	suite.assert.True(node.cloudBacked.Load(), "File should be marked as cloud-backed")
-	suite.assert.True(exists, "File should be tracked in the fileMap")
+	// Verify it was now downloaded to the local tiered storage cache
+	suite.assert.FileExists(suite.cacheFile(path))
 
 	//1. Write to handle
 	testData := "test data"
@@ -1802,14 +1793,8 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	suite.assert.False(handle2.Dirty())
 	suite.assert.False(handle.Dirty())
 
-	// suite.tieredStorage.mu.Lock()
-	// node, _ = suite.tieredStorage.fileMap[path]
-	// suite.tieredStorage.mu.Unlock()
-
-	val, _ = suite.tieredStorage.fileMap.Load(path)
-	node = val.(*FileNode)
-
-	suite.assert.True(node.isDirty.Load(), "File should be marked as dirty")
+	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	suite.assert.True(stale, "File should be marked as cloudStale")
 
 	//4. Release the read should upload to cloud
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle2})

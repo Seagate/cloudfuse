@@ -37,7 +37,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -61,8 +60,6 @@ type TieredStorage struct {
 	// it for reading.
 	dirRenameMu sync.RWMutex
 
-	fileMap sync.Map // uses object name (common.JoinUnixFilepath)
-
 	policy *lruQueue
 
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
@@ -74,19 +71,6 @@ type TieredStorage struct {
 
 	cacheSize    *cacheSizeTracker
 	maxCacheSize float64
-}
-
-// FileNode fields are atomic except name, which requires the file lock.
-type FileNode struct {
-	name        string
-	size        atomic.Int64
-	cloudBacked atomic.Bool
-	isDirty     atomic.Bool
-	mode        atomic.Uint32
-	modeDirty   atomic.Bool
-	owner       atomic.Int64
-	group       atomic.Int64
-	ownerDirty  atomic.Bool
 }
 
 type TieredStorageOptions struct {
@@ -978,16 +962,6 @@ func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
 	return nil
 }
 
-// purgeLocal removes an object's local copy and updates the usage counter.
-// The object's file lock must be held.
-func (c *TieredStorage) purgeLocal(name string) error {
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
-	return c.removeFile(localPath)
-}
-
 // removeFile deletes a file under the tiered root and updates the usage
 // counter.
 func (c *TieredStorage) removeFile(path string) error {
@@ -1184,7 +1158,11 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 	if err := c.uploadLocal(name); err != nil {
 		return err
 	}
-	if err := c.purgeLocal(name); err != nil {
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
+	if err := c.removeFile(localPath); err != nil {
 		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
 		return err
 	}
@@ -1492,8 +1470,13 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 	return nil
 }
 
+// FileUsed refreshes a local-owned file's LRU position.
 func (c *TieredStorage) FileUsed(name string) error {
-	if _, found := c.fileMap.Load(name); found {
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(localPath); err == nil {
 		c.policy.Enqueue(name)
 	}
 	return nil
