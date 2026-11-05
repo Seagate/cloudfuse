@@ -420,7 +420,11 @@ func (suite *tieredStorageTestSuite) TestStartRecoversLocalFilesByMtime() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
-	files := map[string]time.Duration{"newest": 0, "dir/oldest": -2 * time.Hour, "middle": -time.Hour}
+	files := map[string]time.Duration{
+		"newest":     0,
+		"dir/oldest": -2 * time.Hour,
+		"middle":     -time.Hour,
+	}
 	for name, age := range files {
 		path := suite.localFile(name)
 		suite.Require().NoError(os.MkdirAll(filepath.Dir(path), 0700))
@@ -487,7 +491,11 @@ func TestCheckCloudReachable(t *testing.T) {
 		{name: "connected", connected: true},
 		{name: "offline, not in cloud", getAttr: syscall.ENOENT},
 		{name: "offline, in cloud", wantErr: true},
-		{name: "offline, unknown", getAttr: common.NewNoCachedDataError(syscall.ENOENT), wantErr: true},
+		{
+			name:    "offline, unknown",
+			getAttr: common.NewNoCachedDataError(syscall.ENOENT),
+			wantErr: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -584,12 +592,16 @@ func (suite *tieredStorageTestSuite) TestOpenFileSharesCacheCopy() {
 	const path = "shared-cache"
 	suite.writeCloudFile(path, "cloud data")
 
-	first, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
+	first, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 	// Make a second download detectable.
 	suite.writeCloudFile(path, "changed in cloud")
 
-	second, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
+	second, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 	suite.assert.True(second.Cached())
 	buffer := make([]byte, len("cloud data"))
@@ -730,7 +742,9 @@ func (suite *tieredStorageTestSuite) TestTruncatePromotesCachedFile() {
 
 	const path = "truncate-promote"
 	suite.writeCloudFile(path, "cloud data")
-	handle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR},
+	)
 	suite.Require().NoError(err)
 
 	suite.Require().NoError(suite.tieredStorage.TruncateFile(
@@ -753,7 +767,9 @@ func (suite *tieredStorageTestSuite) TestOpenTruncPromotesOpenCachedFile() {
 
 	const path = "trunc-open-cached"
 	suite.writeCloudFile(path, "cloud data")
-	reader, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
+	reader, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 
 	writer, err := suite.tieredStorage.OpenFile(
@@ -800,7 +816,10 @@ func (suite *tieredStorageTestSuite) TestWriteIsNotLimitedByMaxSize() {
 	n, err := suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.Require().NoError(err)
 	suite.assert.Equal(len(data), n)
-	suite.assert.Greater(float64(suite.tieredStorage.cacheSize.Used()), suite.tieredStorage.maxCacheSize)
+	suite.assert.Greater(
+		float64(suite.tieredStorage.cacheSize.Used()),
+		suite.tieredStorage.maxCacheSize,
+	)
 
 	suite.Require().NoError(suite.tieredStorage.TruncateFile(internal.TruncateFileOptions{
 		Name: "big", Handle: handle, NewSize: int64(3 * suite.tieredStorage.maxCacheSize),
@@ -1024,7 +1043,8 @@ func (suite *tieredStorageTestSuite) TestCreateAndDeleteLocalDirectory() {
 func (suite *tieredStorageTestSuite) TestCreateDirUnderCloudOnlyParent() {
 	defer suite.cleanupTest()
 
-	suite.Require().NoError(suite.loopback.CreateDir(internal.CreateDirOptions{Name: "parent", Mode: 0755}))
+	suite.Require().
+		NoError(suite.loopback.CreateDir(internal.CreateDirOptions{Name: "parent", Mode: 0755}))
 	suite.Require().NoError(
 		suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "parent/child", Mode: 0755}),
 	)
@@ -1037,9 +1057,13 @@ func (suite *tieredStorageTestSuite) TestStreamDirSkipsCacheAndPrefersLocal() {
 
 	suite.writeCloudFile("cached", "cloud data")
 	suite.writeCloudFile("promoted", "cloud data")
-	cached, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY})
+	cached, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
-	promoted, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "promoted", Flags: os.O_RDWR})
+	promoted, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "promoted", Flags: os.O_RDWR},
+	)
 	suite.Require().NoError(err)
 	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{
 		Handle: promoted, Offset: 10, Data: []byte(" and more"),
@@ -1194,7 +1218,9 @@ func (suite *tieredStorageTestSuite) TestRenameDirMovesCacheCopiesAndState() {
 
 	suite.writeCloudFile("src/cached", "cloud")
 	suite.writeCloudFile("src/sub/promoted", "cloud")
-	cached, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "src/cached", Flags: os.O_RDONLY})
+	cached, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src/cached", Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 	handlemap.Add(cached)
 	promoted, err := suite.tieredStorage.OpenFile(
@@ -1202,10 +1228,13 @@ func (suite *tieredStorageTestSuite) TestRenameDirMovesCacheCopiesAndState() {
 	)
 	suite.Require().NoError(err)
 	handlemap.Add(promoted)
-	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: promoted, Data: []byte("L")})
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: promoted, Data: []byte("L")},
+	)
 	suite.Require().NoError(err)
 
-	suite.Require().NoError(suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"}))
+	suite.Require().
+		NoError(suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"}))
 
 	suite.assert.FileExists(suite.cacheFile("dst/cached"))
 	suite.assert.FileExists(suite.localFile("dst/sub/promoted"))
@@ -1230,8 +1259,10 @@ func (suite *tieredStorageTestSuite) TestRenameDirMovesCacheCopiesAndState() {
 func (suite *tieredStorageTestSuite) TestRenameDirRefusesExistingLocalDestination() {
 	defer suite.cleanupTest()
 
-	suite.Require().NoError(suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "src", Mode: 0755}))
-	suite.Require().NoError(suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "dst", Mode: 0755}))
+	suite.Require().
+		NoError(suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "src", Mode: 0755}))
+	suite.Require().
+		NoError(suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "dst", Mode: 0755}))
 
 	err := suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
 	suite.assert.ErrorIs(err, syscall.EEXIST)
@@ -1298,7 +1329,9 @@ func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureRevertsLocalRenam
 	)
 	suite.Require().NoError(err)
 	// Not added to the handlemap: loopback renames handles even when it fails.
-	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: []byte("D")})
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("D")},
+	)
 	suite.Require().NoError(err)
 	// An existing cloud directory makes the cloud rename fail.
 	suite.Require().NoError(os.Mkdir(filepath.Join(suite.fake_storage_path, "dst"), 0755))
@@ -1325,7 +1358,9 @@ func (suite *tieredStorageTestSuite) TestRenameFileMovesStateWithFile() {
 	)
 	suite.Require().NoError(err)
 	handlemap.Add(handle)
-	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: []byte("D")})
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("D")},
+	)
 	suite.Require().NoError(err)
 	// Loopback, unlike object storage, needs the parent to exist.
 	suite.Require().NoError(os.Mkdir(filepath.Join(suite.fake_storage_path, "dir"), 0755))
@@ -1372,7 +1407,9 @@ func (suite *tieredStorageTestSuite) TestRenameOpenCachedFile() {
 func (suite *tieredStorageTestSuite) TestRenameFileNeverUploadedSucceeds() {
 	defer suite.cleanupTest()
 
-	handle, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: "src", Mode: 0644})
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src", Mode: 0644},
+	)
 	suite.Require().NoError(err)
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
@@ -1390,12 +1427,16 @@ func (suite *tieredStorageTestSuite) TestRenameFileReplacesCopyInOtherTree() {
 
 	// dst is local-owned; src is a cloud file that is open in cache/.
 	suite.writeCloudFile("src", "cloud src")
-	dstHandle, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: "dst", Mode: 0644})
+	dstHandle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "dst", Mode: 0644},
+	)
 	suite.Require().NoError(err)
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: dstHandle}),
 	)
-	srcHandle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY})
+	srcHandle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 	handlemap.Add(srcHandle)
 
@@ -1665,10 +1706,12 @@ func (suite *tieredStorageTestSuite) TestReleaseDeletesCachedCopy() {
 	used := suite.tieredStorage.cacheSize.Used()
 
 	// The copy stays while any handle is open.
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: first}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: first}))
 	suite.assert.FileExists(suite.cacheFile(path))
 
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: second}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: second}))
 	suite.assert.NoFileExists(suite.cacheFile(path))
 	suite.assert.NoFileExists(suite.localFile(path))
 	suite.assert.NotContains(lruOrder(suite.tieredStorage.policy), path)
@@ -1684,7 +1727,9 @@ func (suite *tieredStorageTestSuite) waitEvictOnClose() {
 // through tiered storage, leaving it local-owned and cloudStale.
 func (suite *tieredStorageTestSuite) promoteCloudFile(path, data string) *handlemap.Handle {
 	suite.writeCloudFile(path, data)
-	handle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR},
+	)
 	suite.Require().NoError(err)
 	_, err = suite.tieredStorage.WriteFile(
 		&internal.WriteFileOptions{Handle: handle, Data: []byte("LOCAL")},
@@ -1698,7 +1743,8 @@ func (suite *tieredStorageTestSuite) TestReleasePromotedFileEvictsIt() {
 	const path = "release-promoted"
 	handle := suite.promoteCloudFile(path, "cloud data")
 
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 	suite.waitEvictOnClose()
 
 	cloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, path))
@@ -1716,7 +1762,8 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseDisabledKeepsFileLocal() {
 	const path = "keep-promoted"
 	handle := suite.promoteCloudFile(path, "cloud data")
 
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 	suite.waitEvictOnClose()
 
 	suite.assert.FileExists(suite.localFile(path))
@@ -1728,12 +1775,17 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseDisabledKeepsFileLocal() {
 
 func (suite *tieredStorageTestSuite) TestEvictOnCloseSkipsLocallyCreatedFile() {
 	defer suite.cleanupTest()
-	handle, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: "new", Mode: 0644})
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "new", Mode: 0644},
+	)
 	suite.Require().NoError(err)
-	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: []byte("new")})
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("new")},
+	)
 	suite.Require().NoError(err)
 
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 	suite.waitEvictOnClose()
 
 	suite.assert.FileExists(suite.localFile("new"))
@@ -1747,15 +1799,19 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseSkipsReopenedFile() {
 
 	// Hold eviction back until the file is open again.
 	suite.tieredStorage.policy.evictMu.Lock()
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
-	handle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 	suite.tieredStorage.policy.evictMu.Unlock()
 	suite.waitEvictOnClose()
 	suite.assert.FileExists(suite.localFile(path))
 
 	// The next close evicts it.
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 	suite.waitEvictOnClose()
 	suite.assert.NoFileExists(suite.localFile(path))
 }
@@ -1769,7 +1825,8 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseUploadFailureKeepsFile() {
 	suite.Require().NoError(os.Remove(cloudPath))
 	suite.Require().NoError(os.MkdirAll(filepath.Join(cloudPath, "blocker"), 0755))
 
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 	suite.waitEvictOnClose()
 
 	suite.assert.FileExists(suite.localFile(path))
@@ -2177,16 +2234,23 @@ func (suite *tieredStorageTestSuite) TestDeleteFileOpenCachedAndPromoted() {
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("cached", "cloud")
-	cached, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY})
+	cached, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY},
+	)
 	suite.Require().NoError(err)
 	suite.writeCloudFile("promoted", "cloud")
-	promoted, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "promoted", Flags: os.O_RDWR})
+	promoted, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "promoted", Flags: os.O_RDWR},
+	)
 	suite.Require().NoError(err)
-	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: promoted, Data: []byte("L")})
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: promoted, Data: []byte("L")},
+	)
 	suite.Require().NoError(err)
 
 	for _, name := range []string{"cached", "promoted"} {
-		suite.Require().NoError(suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: name}))
+		suite.Require().
+			NoError(suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: name}))
 		suite.assert.NoFileExists(suite.cacheFile(name))
 		suite.assert.NoFileExists(suite.localFile(name))
 		suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, name))
@@ -2197,7 +2261,9 @@ func (suite *tieredStorageTestSuite) TestDeleteFileOpenCachedAndPromoted() {
 
 	// Handles stay usable after delete.
 	buffer := make([]byte, 5)
-	_, err = suite.tieredStorage.ReadInBuffer(&internal.ReadInBufferOptions{Handle: cached, Data: buffer})
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: cached, Data: buffer},
+	)
 	suite.Require().NoError(err)
 	suite.assert.Equal("cloud", string(buffer))
 	for _, handle := range []*handlemap.Handle{cached, promoted} {

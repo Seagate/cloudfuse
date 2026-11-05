@@ -439,7 +439,8 @@ func (c *TieredStorage) StreamDir(
 		if err != nil {
 			return nil, "", err
 		}
-		localAttrs[name] = newTieredStorageObjAttr(common.JoinUnixFilepath(options.Name, name), info)
+		entryName := common.JoinUnixFilepath(options.Name, name)
+		localAttrs[name] = newTieredStorageObjAttr(entryName, info)
 	}
 
 	listed := make(map[string]struct{}, len(attrs))
@@ -576,7 +577,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 
 	// A directory that exists only locally may be unknown to the cloud.
 	cloudErr := c.NextComponent().RenameDir(options)
-	if cloudErr != nil && !(srcLocalExists && errors.Is(cloudErr, os.ErrNotExist)) {
+	neverUploaded := srcLocalExists && errors.Is(cloudErr, os.ErrNotExist)
+	if cloudErr != nil && !neverUploaded {
 		log.Err(
 			"TieredStorage::RenameDir : %s -> %s cloud rename failed [%v]",
 			options.Src,
@@ -666,7 +668,11 @@ func (c *TieredStorage) createEmptyLocal(name string, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
 		return err
 	}
-	file, err := common.OpenFile(localPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, c.cacheFileMode(mode))
+	file, err := common.OpenFile(
+		localPath,
+		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
+		c.cacheFileMode(mode),
+	)
 	if err != nil {
 		return err
 	}
@@ -825,7 +831,11 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 		if err == nil {
 			found = true
 		} else if !errors.Is(err, os.ErrNotExist) {
-			log.Err("TieredStorage::DeleteFile : %s deleted in cloud, but not locally [%v]", options.Name, err)
+			log.Err(
+				"TieredStorage::DeleteFile : %s deleted in cloud, but not locally [%v]",
+				options.Name,
+				err,
+			)
 			return err
 		}
 	}
@@ -940,7 +950,11 @@ func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
 		return err
 	}
 	// The mode matters if the file is later promoted to local/.
-	file, err := common.OpenFile(cachePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, c.cacheFileMode(mode))
+	file, err := common.OpenFile(
+		cachePath,
+		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
+		c.cacheFileMode(mode),
+	)
 	if err != nil {
 		return err
 	}
@@ -1431,7 +1445,11 @@ func (c *TieredStorage) changeAttr(
 	}
 	if _, err := os.Stat(cachePath); err == nil {
 		if err := changeLocal(cachePath); err != nil {
-			log.Warn("TieredStorage::changeAttr : %s changed in cloud, but not in cache [%v]", name, err)
+			log.Warn(
+				"TieredStorage::changeAttr : %s changed in cloud, but not in cache [%v]",
+				name,
+				err,
+			)
 		}
 	}
 	return nil
