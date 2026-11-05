@@ -119,7 +119,10 @@ file when needed.
 
 ## Shutdown
 
-Stop the eviction policy and wait for in-flight uploads. Leave `local/` in place.
+Stop the eviction policy and wait for in-flight uploads, including
+evict-on-close goroutines (tracked with a `sync.WaitGroup`). Evict-on-close
+goroutines that have not started uploading exit without doing anything. Leave
+`local/` in place.
 Nothing is persisted. `cache/` contents are discarded on next start.
 
 ## Cloud connectivity rule
@@ -190,8 +193,8 @@ repeatedly while open are uploaded at most once per close.
 2. If other handles remain open, return.
 3. If the file is in `cache/`: delete it.
 4. If the file is in `local/`: enqueue it in the LRU. If `cloudStale` is set
-   and `evict-on-close` is enabled, queue it for
-   [evict on close](#evict-on-close). Do not upload here.
+   and `evict-on-close` is enabled, start an
+   [evict on close](#evict-on-close) goroutine.
 
 ### ReadInBuffer
 
@@ -347,19 +350,22 @@ happen for a frequently used file. This is controlled by
 `tiered_storage.evict-on-close` (default `true`). It only affects files with
 `cloudStale` set.
 
-- `ReleaseFile` adds the path to a deduplicated evict-on-close queue. It never
-  uploads inline.
-- The eviction policy goroutine drains the queue, between threshold-driven
-  eviction passes and under `evictMu`.
-- For each queued path, with its file lock held:
-  1. Skip it if the file is no longer in `local/`, or if `cloudStale` is no
-     longer set. If the file was reopened before the queue reached it, the
-     eviction steps below skip it because it has open handles, and its next
-     close queues it again.
-  2. Run the [eviction](#eviction) steps for that file.
-  3. On upload failure: log the error and drop the entry. The file stays
-     local-owned with `cloudStale` set. It is retried at its next close or by
-     normal eviction. There is no retry loop.
+`ReleaseFile` starts a goroutine for the path and returns. It never uploads
+inline. The goroutine:
+
+1. Takes `evictMu`, then the file lock (the normal lock order).
+2. Returns if the component is shutting down, the file is no longer in
+   `local/`, or `cloudStale` is no longer set. A file that was reopened is
+   skipped by the eviction steps, because it has open handles. Its next close
+   will start another goroutine.
+3. Runs the [eviction](#eviction) steps for that file.
+4. On upload failure: logs the error and returns. The file stays local-owned
+   with `cloudStale` set. It is retried at its next close or by normal
+   eviction. There is no retry loop.
+
+No queue or deduplication is needed. Extra goroutines for the same file find
+nothing to do after step 2. Holding `evictMu` means only one eviction upload
+runs at a time, whether it was started by a close or by a threshold pass.
 - No connectivity pre-check is made. If the cloud is disconnected, the upload
   fails and the file stays local.
 
@@ -389,9 +395,9 @@ reopen, as unmodified cloud files already are.
 
 - Per-object file locks serialize open, release, promotion, delete, rename, and
   eviction for that object.
-- `evictMu` serializes all eviction, including evict on close. Only the
-  background policy takes it; file operations never do, and never block on
-  eviction.
+- `evictMu` serializes all eviction: threshold passes and evict-on-close
+  goroutines. File operations never take it, and never block on eviction.
+  `ReleaseFile` starts an evict-on-close goroutine but does not wait for it.
 - `cloudStale` is only read or changed with the file lock held.
 - Lock order: `evictMu`, then file lock(s), then the LRU queue mutex. Never take
   a file lock while holding the LRU queue mutex.
