@@ -63,6 +63,10 @@ type TieredStorage struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
 
+	// cloudStale holds names of local-owned files whose cloud copy is known to
+	// be outdated. Each entry is only read or changed under its file lock.
+	cloudStale sync.Map // object name -> struct{}
+
 	cacheSize    *cacheSizeTracker
 	maxCacheSize float64
 }

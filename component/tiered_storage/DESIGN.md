@@ -92,9 +92,10 @@ Consequences:
 - **Per-object file locks** (`common.LockMap`), with open-handle counts.
 - **LRU queue** of local-owned files, used for eviction.
 - **Cache size tracker**, covering both `local/` and `cache/`.
-- **`cloudStale` flag** for each local-owned file, stored alongside its
-  open-handle count. It means a cloud copy is known to exist and to be
-  outdated, so the file should be [evicted on close](#evict-on-close).
+- **`cloudStale` set** of local-owned files, keyed by object name. Each entry
+  is guarded by that file's lock. Membership means a cloud copy is known to
+  exist and to be outdated, so the file should be
+  [evicted on close](#evict-on-close).
   - Set on promotion (`cache/x` → `local/x`) and on an `O_TRUNC` open of a
     cloud-owned file. Both of these already hold the file lock, and the cloud
     copy is known to exist at that moment, so no network call is needed.
