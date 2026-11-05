@@ -724,29 +724,43 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	val, exists := c.fileMap.Load(options.Name)
-	if !exists {
-		err := c.NextComponent().DeleteFile(options)
-		if errors.Is(err, os.ErrNotExist) {
-			return syscall.ENOENT
-		}
+	localPath, err := c.localPath(options.Name)
+	if err != nil {
+		return err
+	}
+	cachePath, err := c.cachePath(options.Name)
+	if err != nil {
+		return err
+	}
+	if err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
 
-	node := val.(*FileNode)
-	if node.cloudBacked.Load() {
-		// A failed rename can leave no cloud object under this name.
-		err := c.NextComponent().DeleteFile(options)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+	// Delete in the cloud first, so a stale cloud copy cannot resurface once
+	// the local copy is gone. A local-owned file may never have been uploaded.
+	cloudErr := c.NextComponent().DeleteFile(options)
+	if cloudErr != nil && !errors.Is(cloudErr, os.ErrNotExist) {
+		return cloudErr
+	}
+	found := cloudErr == nil
+
+	// Open handles stay valid after the file is removed.
+	for _, path := range []string{localPath, cachePath} {
+		err := c.removeFile(path)
+		if err == nil {
+			found = true
+		} else if !errors.Is(err, os.ErrNotExist) {
+			log.Err("TieredStorage::DeleteFile : %s deleted in cloud, but not locally [%v]", options.Name, err)
 			return err
 		}
 	}
-
-	// Cancel eviction before deleting state to prevent a stale upload.
 	c.policy.Dequeue(options.Name)
-	c.fileMap.Delete(options.Name)
+	c.cloudStale.Delete(options.Name)
 
-	return c.purgeLocal(options.Name)
+	if !found {
+		return syscall.ENOENT
+	}
+	return nil
 }
 
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {

@@ -1860,6 +1860,58 @@ func (suite *tieredStorageTestSuite) TestDeleteFileLocal() {
 
 }
 
+func (suite *tieredStorageTestSuite) TestDeleteFileOpenCachedAndPromoted() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("cached", "cloud")
+	cached, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY})
+	suite.Require().NoError(err)
+	suite.writeCloudFile("promoted", "cloud")
+	promoted, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "promoted", Flags: os.O_RDWR})
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: promoted, Data: []byte("L")})
+	suite.Require().NoError(err)
+
+	for _, name := range []string{"cached", "promoted"} {
+		suite.Require().NoError(suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: name}))
+		suite.assert.NoFileExists(suite.cacheFile(name))
+		suite.assert.NoFileExists(suite.localFile(name))
+		suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, name))
+	}
+	suite.assert.NotContains(lruOrder(suite.tieredStorage.policy), "promoted")
+	_, stale := suite.tieredStorage.cloudStale.Load("promoted")
+	suite.assert.False(stale)
+
+	// Handles stay usable after delete.
+	buffer := make([]byte, 5)
+	_, err = suite.tieredStorage.ReadInBuffer(&internal.ReadInBufferOptions{Handle: cached, Data: buffer})
+	suite.Require().NoError(err)
+	suite.assert.Equal("cloud", string(buffer))
+	for _, handle := range []*handlemap.Handle{cached, promoted} {
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+}
+
+func TestDeleteFileOfflineChangesNothing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	root := t.TempDir()
+	localPath := filepath.Join(root, localDirName, "file")
+	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
+	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
+
+	storage := &TieredStorage{tmpPath: root, fileLocks: common.NewLockMap()}
+	storage.SetNextComponent(next)
+	next.EXPECT().CloudConnected().Return(false)
+	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)
+
+	err := storage.DeleteFile(internal.DeleteFileOptions{Name: "file"})
+	assert.ErrorIs(t, err, &common.CloudUnreachableError{})
+	assert.FileExists(t, localPath)
+}
+
 func (suite *tieredStorageTestSuite) TestDeleteFileNotExists() {
 	defer suite.cleanupTest()
 	// Setup
