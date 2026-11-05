@@ -61,7 +61,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 	suite.assert.NoError(err)
 
 	suite.setupTestHelper(lruQueueConfig{
-		cachePath:    cache_path,
+		localRoot:    cache_path,
 		maxCacheSize: 1 * common.MbToBytes,
 		threshold:    0.8,
 		targetRatio:  0.6,
@@ -168,7 +168,7 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	size := newCacheSizeTracker(cachePath, time.Hour)
 	var uploaded atomic.Int32
 	suite.setupTestHelper(lruQueueConfig{
-		cachePath:    cachePath,
+		localRoot:    cachePath,
 		maxCacheSize: common.MbToBytes,
 		threshold:    0.8,
 		targetRatio:  0.6,

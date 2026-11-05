@@ -169,8 +169,19 @@ func (suite *tieredStorageTestSuite) cleanupTest() {
 	suite.assert.NoError(err)
 }
 
+// localFile returns where the component keeps a local-owned file.
+func (suite *tieredStorageTestSuite) localFile(name string) string {
+	return filepath.Join(suite.cache_path, localDirName, filepath.FromSlash(name))
+}
+
+// cacheFile returns where the component keeps an open cloud-owned file.
+func (suite *tieredStorageTestSuite) cacheFile(name string) string {
+	return filepath.Join(suite.cache_path, cacheDirName, filepath.FromSlash(name))
+}
+
 func TestLocalPath(t *testing.T) {
-	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "cache")}
+	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "root")}
+	localRoot := filepath.Join(storage.tmpPath, localDirName)
 	absoluteName, err := filepath.Abs("file")
 	require.NoError(t, err)
 
@@ -179,12 +190,18 @@ func TestLocalPath(t *testing.T) {
 		expected string
 		valid    bool
 	}{
-		{name: "", expected: storage.tmpPath, valid: true},
-		{name: "dir/file", expected: filepath.Join(storage.tmpPath, "dir", "file"), valid: true},
-		{name: `dir\file`, expected: filepath.Join(storage.tmpPath, "dir", "file"), valid: true},
+		{name: "", expected: localRoot, valid: true},
+		{name: "dir/file", expected: filepath.Join(localRoot, "dir", "file"), valid: true},
 		{name: "../file", valid: false},
 		{name: "dir/../../file", valid: false},
 		{name: absoluteName, valid: false},
+	}
+	if runtime.GOOS == "windows" {
+		tests = append(tests, struct {
+			name     string
+			expected string
+			valid    bool
+		}{name: `dir\file`, expected: filepath.Join(localRoot, "dir", "file"), valid: true})
 	}
 
 	for _, test := range tests {
@@ -198,6 +215,17 @@ func TestLocalPath(t *testing.T) {
 			assert.ErrorIs(t, err, syscall.EINVAL)
 		})
 	}
+}
+
+func TestCachePath(t *testing.T) {
+	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "root")}
+
+	path, err := storage.cachePath("dir/file")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(storage.tmpPath, cacheDirName, "dir", "file"), path)
+
+	_, err = storage.cachePath("../file")
+	assert.ErrorIs(t, err, syscall.EINVAL)
 }
 
 func TestTieredStoragePolicyConfig(t *testing.T) {
@@ -296,7 +324,7 @@ func (suite *tieredStorageTestSuite) TestGetAttrCloudOnly() {
 	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(len("cloud data"), attrs.Size)
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.NoFileExists(suite.localFile(path))
 }
 
 func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
@@ -337,7 +365,7 @@ func (suite *tieredStorageTestSuite) TestRestartWithStaleSnapshotKeepsChangedFil
 	defer suite.cleanupTest()
 
 	const path = "changed"
-	localPath := filepath.Join(suite.cache_path, path)
+	localPath := suite.localFile(path)
 	suite.Require().NoError(os.WriteFile(localPath, []byte("old"), 0644))
 	node := &FileNode{name: path}
 	node.size.Store(3)
@@ -361,7 +389,8 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	next := internal.NewMockComponent(ctrl)
 	cachePath := t.TempDir()
-	localPath := filepath.Join(cachePath, "file")
+	localPath := filepath.Join(cachePath, localDirName, "file")
+	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
 
 	storage := &TieredStorage{
@@ -434,7 +463,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileTruncatesCloudObjectWithoutDown
 	})
 	suite.Require().NoError(err)
 	suite.assert.True(handle.Dirty())
-	info, err := os.Stat(filepath.Join(suite.cache_path, path))
+	info, err := os.Stat(suite.localFile(path))
 	suite.Require().NoError(err)
 	suite.assert.Zero(info.Size())
 	suite.Require().NoError(
@@ -515,7 +544,7 @@ func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
 	attrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(4, attrs.Size)
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.NoFileExists(suite.localFile(path))
 }
 
 func (suite *tieredStorageTestSuite) TestTruncateInvalidSize() {
@@ -564,7 +593,7 @@ func (suite *tieredStorageTestSuite) TestSymlink() {
 	)
 	suite.Require().NoError(err)
 	suite.assert.Equal("target", target)
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "link"))
+	suite.assert.NoFileExists(suite.localFile("link"))
 }
 
 func (suite *tieredStorageTestSuite) TestChmodLocalFilePersistsOnUpload() {
@@ -612,7 +641,7 @@ func (suite *tieredStorageTestSuite) TestChmodCloudBackedFileUpdatesBothTiers() 
 	suite.Require().NoError(suite.tieredStorage.Chmod(
 		internal.ChmodOptions{Name: path, Mode: 0600},
 	))
-	localInfo, err := os.Stat(filepath.Join(suite.cache_path, path))
+	localInfo, err := os.Stat(suite.localFile(path))
 	suite.Require().NoError(err)
 	cloudInfo, err := os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.Require().NoError(err)
@@ -745,8 +774,8 @@ func (suite *tieredStorageTestSuite) TestRenameLocalOnlyDirectory() {
 	suite.Require().NoError(suite.tieredStorage.RenameDir(
 		internal.RenameDirOptions{Src: "src", Dst: "dst"},
 	))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "src", "file"))
-	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst", "file"))
+	suite.assert.NoFileExists(suite.localFile("src/file"))
+	suite.assert.FileExists(suite.localFile("dst/file"))
 	_, oldFound := suite.tieredStorage.fileMap.Load("src/file")
 	_, newFound := suite.tieredStorage.fileMap.Load("dst/file")
 	suite.assert.False(oldFound)
@@ -781,9 +810,9 @@ func (suite *tieredStorageTestSuite) TestRenameMixedDirectory() {
 	suite.Require().NoError(suite.tieredStorage.RenameDir(
 		internal.RenameDirOptions{Src: "src", Dst: "dst"},
 	))
-	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst", "local"))
+	suite.assert.FileExists(suite.localFile("dst/local"))
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dst", "cloud"))
-	suite.assert.NoDirExists(filepath.Join(suite.cache_path, "src"))
+	suite.assert.NoDirExists(suite.localFile("src"))
 	suite.assert.NoDirExists(filepath.Join(suite.fake_storage_path, "src"))
 }
 
@@ -800,7 +829,7 @@ func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
 		// Windows refuses to rename a directory containing open files.
 		suite.Require().Error(err)
 		suite.assert.Equal("src/open", handle.Path)
-		suite.assert.FileExists(filepath.Join(suite.cache_path, "src", "open"))
+		suite.assert.FileExists(suite.localFile("src/open"))
 		suite.Require().NoError(
 			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 		)
@@ -840,7 +869,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureKeepsLocalRename(
 
 	err = suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"})
 	suite.Require().Error(err)
-	suite.assert.FileExists(filepath.Join(suite.cache_path, "dst"))
+	suite.assert.FileExists(suite.localFile("dst"))
 	suite.assert.Equal("dst", handle.Path)
 	value, found := suite.tieredStorage.fileMap.Load("dst")
 	suite.Require().True(found)
@@ -853,7 +882,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureKeepsLocalRename(
 	data, err := os.ReadFile(filepath.Join(suite.fake_storage_path, "dst"))
 	suite.Require().NoError(err)
 	suite.assert.Equal("data", string(data))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "dst"))
+	suite.assert.NoFileExists(suite.localFile("dst"))
 }
 
 func (suite *tieredStorageTestSuite) TestRenameFileMissingCloudObjectSucceeds() {
@@ -908,10 +937,10 @@ func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureSkipsLocalRename()
 
 	err = suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
 	suite.Require().Error(err)
-	suite.assert.DirExists(filepath.Join(suite.cache_path, "src"))
-	suite.assert.NoDirExists(filepath.Join(suite.cache_path, "dst"))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, "dst", "local"))
-	suite.assert.FileExists(filepath.Join(suite.cache_path, "src", "local"))
+	suite.assert.DirExists(suite.localFile("src"))
+	suite.assert.NoDirExists(suite.localFile("dst"))
+	suite.assert.NoFileExists(suite.localFile("dst/local"))
+	suite.assert.FileExists(suite.localFile("src/local"))
 	suite.assert.Equal("src/cloud", cloudHandle.Path)
 	_, found := suite.tieredStorage.fileMap.Load("src/cloud")
 	suite.Require().True(found)
@@ -960,7 +989,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 	suite.assert.Equal(path, handle.Path)
 
 	// Verify it was now downloaded to the local tiered storage cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileInCache() {
@@ -983,7 +1012,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileInCache() {
 	suite.assert.False(handle.Dirty())
 
 	// File should exist in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileOCreate() {
@@ -996,7 +1025,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileOCreate() {
 	suite.assert.Equal(path, handle.Path)
 	suite.assert.True(handle.Dirty())
 	// File should exist in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 
 }
 
@@ -1022,10 +1051,10 @@ func (suite *tieredStorageTestSuite) TestOpenFileOCreateExistsLocal() {
 	suite.assert.False(handle.Dirty())
 
 	// File should exist in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 
 	//Make sure data didn't get modified
-	d, err := os.ReadFile(filepath.Join(suite.cache_path, path))
+	d, err := os.ReadFile(suite.localFile(path))
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, d)
 
@@ -1058,7 +1087,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileOCreateExistsCloud() {
 	suite.assert.Equal(path, handle.Path)
 
 	// Verify it was now downloaded to the local tiered storage cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 }
 
 //Testing WriteFile
@@ -1079,7 +1108,7 @@ func (suite *tieredStorageTestSuite) TestWriteFile() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(data), length)
 	// Check that the local cache updated with data
-	d, _ := os.ReadFile(filepath.Join(suite.cache_path, path))
+	d, _ := os.ReadFile(suite.localFile(path))
 	suite.assert.Equal(data, d)
 	suite.assert.True(handle.Dirty())
 }
@@ -1110,7 +1139,7 @@ func (suite *tieredStorageTestSuite) TestCreateFile() {
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
 	// Path should be added to the file cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
@@ -1136,7 +1165,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudNoDirtyFile() {
 	suite.assert.NoError(openErr)
 
 	// Verify it was now downloaded to the local tiered storage cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 
 	//As of now, the file would be cloudbacked and exist in map
 	// suite.tieredStorage.mu.Lock()
@@ -1152,7 +1181,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudNoDirtyFile() {
 	//File should be "cloudBacked" and not dirty so on release the file should be deleted from local and the handle clean
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(suite.localFile(path))
 	suite.assert.True(os.IsNotExist(err), "File should be deleted from cache after release")
 
 }
@@ -1183,7 +1212,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 	suite.assert.NoError(openErr)
 
 	// Verify it was now downloaded to the local tiered storage cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 
 	_, err = suite.tieredStorage.WriteFile(
 		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
@@ -1207,7 +1236,7 @@ func (suite *tieredStorageTestSuite) TestReleaseCloudDirtyFile() {
 	//File should be "cloudBacked" and dirty so on release the file should be deleted from local and the handle clean
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(suite.localFile(path))
 	suite.assert.True(os.IsNotExist(err), "File should be deleted from cache after release")
 
 	//Must check that file by its data is actually in the cloud
@@ -1305,7 +1334,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	suite.assert.NoError(openErr)
 
 	// Verify it was now downloaded to the local tiered storage cache + in map
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 	// suite.tieredStorage.mu.Lock()
 	// node, exists := suite.tieredStorage.fileMap[path]
 	// suite.tieredStorage.mu.Unlock()
@@ -1348,7 +1377,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	//3. Release The write handle, should still be in local with a dirty handle
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(suite.localFile(path))
 	suite.assert.False(os.IsNotExist(err), "File should not be uploaded")
 
 	//check still dirty
@@ -1367,7 +1396,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	//4. Release the read should upload to cloud
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(suite.localFile(path))
 	suite.assert.True(os.IsNotExist(err), "File should be deleted from cache after release")
 
 	//5. Check data
@@ -1409,7 +1438,7 @@ func (suite *tieredStorageTestSuite) TestReleaseLocalToLRUQueue() {
 	suite.assert.Equal(path, handle.Path)
 	suite.assert.True(handle.Dirty())
 	// File should exist in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(suite.localFile(path))
 
 	val, exists := suite.tieredStorage.fileMap.Load(path)
 	node := val.(*FileNode)
@@ -1587,8 +1616,8 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.True(exists4)
 
 	// 4c. Only the oldest file should be uploaded and removed locally.
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path1))
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path2))
+	suite.assert.NoFileExists(suite.localFile(path1))
+	suite.assert.FileExists(suite.localFile(path2))
 
 	// 5. The evicted file must now exist in the cloud.
 	_, err = suite.tieredStorage.NextComponent().GetAttr(
@@ -1640,7 +1669,7 @@ func (suite *tieredStorageTestSuite) TestDeleteFileCloud() {
 	suite.assert.NoError(err)
 
 	// Path should not be in file cache
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, file))
+	suite.assert.NoFileExists(suite.localFile(file))
 
 	//file should not exist in cloud
 	_, err = suite.tieredStorage.NextComponent().GetAttr(
@@ -1664,7 +1693,7 @@ func (suite *tieredStorageTestSuite) TestDeleteFileLocal() {
 	suite.assert.NoError(err)
 
 	// Path should not be in file cache
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, file))
+	suite.assert.NoFileExists(suite.localFile(file))
 
 }
 
@@ -1695,7 +1724,7 @@ func (suite *tieredStorageTestSuite) TestFlushFile() {
 	suite.assert.NoError(err)
 
 	//Verify Data is still on the disk
-	d, _ := os.ReadFile(filepath.Join(suite.cache_path, file))
+	d, _ := os.ReadFile(suite.localFile(file))
 	suite.assert.Equal(data, d)
 	//Check that handle is still dirty
 	suite.assert.True(handle.Dirty())

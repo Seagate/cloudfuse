@@ -42,7 +42,11 @@ func TestChownLocalFilePersistsOnUpload(t *testing.T) {
 	next := internal.NewMockComponent(ctrl)
 	path := "local-chown"
 	cachePath := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(cachePath, path), []byte("data"), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Join(cachePath, localDirName), 0700))
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(cachePath, localDirName, path), []byte("data"), 0644),
+	)
 
 	storage := &TieredStorage{
 		tmpPath:   cachePath,

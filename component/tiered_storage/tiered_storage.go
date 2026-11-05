@@ -98,6 +98,9 @@ const (
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
 	partialDownloadSuffix     = ".cloudfuse-partial"
+	// The tiered root holds exactly these two trees. A file is in at most one.
+	localDirName = "local"
+	cacheDirName = "cache"
 	// Cache holds user data and is only accessed by this process (CWE-732).
 	cacheDirPerm os.FileMode = 0700
 )
@@ -195,7 +198,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
 
 	c.policy = newLRUQueue(lruQueueConfig{
-		cachePath:        c.tmpPath,
+		localRoot:        filepath.Join(c.tmpPath, localDirName),
 		maxCacheSize:     c.maxCacheSize,
 		fileLocks:        c.fileLocks,
 		size:             c.cacheSize,
@@ -213,10 +216,25 @@ func (c *TieredStorage) Configure(_ bool) error {
 func (c *TieredStorage) OnConfigChange() {
 }
 
-// localPath resolves an object name beneath the tiered storage root.
+// localPath resolves an object name beneath local/, which holds local-owned files.
 func (c *TieredStorage) localPath(name string) (string, error) {
-	// dummy code
-	return filepath.Join(c.tmpPath, name), nil
+	return c.treePath(localDirName, name)
+}
+
+// cachePath resolves an object name beneath cache/, which holds disposable
+// copies of open cloud-owned files.
+func (c *TieredStorage) cachePath(name string) (string, error) {
+	return c.treePath(cacheDirName, name)
+}
+
+// treePath resolves an object name beneath one of the tiered root's trees.
+// An empty name resolves to the tree itself.
+func (c *TieredStorage) treePath(tree, name string) (string, error) {
+	osName := filepath.FromSlash(name)
+	if osName != "" && !filepath.IsLocal(osName) {
+		return "", syscall.EINVAL
+	}
+	return filepath.Join(c.tmpPath, tree, osName), nil
 }
 
 // Directory operations

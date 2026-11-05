@@ -50,7 +50,7 @@ type uploadJob struct {
 
 // lruQueueConfig holds the fields needed to construct an lruQueue.
 type lruQueueConfig struct {
-	cachePath string
+	localRoot string          // local/ beneath the tiered root
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	size      *cacheSizeTracker
 
@@ -358,7 +358,7 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 		if q.fileLocks.Get(node.name).Count() > 0 {
 			busy = append(busy, node)
 		} else {
-			info, err := os.Stat(filepath.Join(q.cachePath, node.name))
+			info, err := os.Stat(filepath.Join(q.localRoot, node.name))
 			if err != nil {
 				log.Warn("lruQueue::nominate : dropping %s [%v]", node.name, err)
 				q.extractNode(node)
@@ -445,7 +445,7 @@ func (q *lruQueue) evictOne(job uploadJob) {
 		return
 	}
 
-	_, err := os.Stat(filepath.Join(q.cachePath, job.name))
+	_, err := os.Stat(filepath.Join(q.localRoot, job.name))
 	if err != nil {
 		log.Warn("lruQueue::evictOne : %s has no local copy, dropping it [%v]", job.name, err)
 		q.drop(job.name)
