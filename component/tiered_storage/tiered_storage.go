@@ -556,6 +556,32 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	return nil
 }
 
+// errCloudDisconnected is wrapped by CloudUnreachableError when a namespace
+// change is refused while offline. It deliberately hides the GetAttr result,
+// so callers never mistake the refusal for ENOENT.
+var errCloudDisconnected = errors.New("cloud storage is disconnected")
+
+// checkCloudReachable refuses, before anything changes, a namespace change
+// (delete, rename) that might need the cloud while it is disconnected. This
+// avoids holding locks through SDK retries and exposing mixed local/cloud
+// state. Offline, only a plain not-exist from GetAttr lets the change go
+// ahead. It is a hint: callers still handle cloud failures afterwards.
+func (c *TieredStorage) checkCloudReachable(name string) error {
+	if c.NextComponent().CloudConnected() {
+		return nil
+	}
+	_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	}
+	log.Err(
+		"TieredStorage::checkCloudReachable : refusing to change %s while the cloud is disconnected [%v]",
+		name,
+		err,
+	)
+	return common.NewCloudUnreachableError(errCloudDisconnected)
+}
+
 // File operations
 
 // createEmptyLocal creates a new, empty local-owned file. The file lock must

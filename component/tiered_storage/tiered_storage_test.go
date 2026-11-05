@@ -469,6 +469,41 @@ func TestGetAttrLocalMakesNoCloudCall(t *testing.T) {
 	assert.EqualValues(t, 4, attrs.Size)
 }
 
+func TestCheckCloudReachable(t *testing.T) {
+	tests := []struct {
+		name      string
+		connected bool
+		getAttr   error // nil means the object exists
+		wantErr   bool
+	}{
+		{name: "connected", connected: true},
+		{name: "offline, not in cloud", getAttr: syscall.ENOENT},
+		{name: "offline, in cloud", wantErr: true},
+		{name: "offline, unknown", getAttr: common.NewNoCachedDataError(syscall.ENOENT), wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			next := internal.NewMockComponent(ctrl)
+			next.EXPECT().CloudConnected().Return(test.connected)
+			if !test.connected {
+				next.EXPECT().GetAttr(internal.GetAttrOptions{Name: "file"}).
+					Return(&internal.ObjAttr{}, test.getAttr)
+			}
+			storage := &TieredStorage{}
+			storage.SetNextComponent(next)
+
+			err := storage.checkCloudReachable("file")
+			if !test.wantErr {
+				assert.NoError(t, err)
+				return
+			}
+			assert.ErrorIs(t, err, &common.CloudUnreachableError{})
+			assert.NotErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
 func (suite *tieredStorageTestSuite) TestCreateFileRejectsExistingCloudObject() {
 	defer suite.cleanupTest()
 
