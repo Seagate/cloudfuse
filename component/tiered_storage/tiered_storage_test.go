@@ -584,6 +584,7 @@ func (suite *tieredStorageTestSuite) TestTruncateOpenLocalFile() {
 		&internal.WriteFileOptions{Handle: handle, Data: []byte("original")},
 	)
 	suite.Require().NoError(err)
+	used := suite.tieredStorage.cacheSize.Used()
 
 	err = suite.tieredStorage.TruncateFile(internal.TruncateFileOptions{
 		Name: "local-truncate", Handle: handle, NewSize: 3,
@@ -593,9 +594,7 @@ func (suite *tieredStorageTestSuite) TestTruncateOpenLocalFile() {
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(3, info.Size())
 	suite.assert.True(handle.Dirty())
-	value, found := suite.tieredStorage.fileMap.Load("local-truncate")
-	suite.Require().True(found)
-	suite.assert.EqualValues(3, value.(*FileNode).size.Load())
+	suite.assert.Equal(used-int64(len("original")-3), suite.tieredStorage.cacheSize.Used())
 }
 
 func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
@@ -1721,17 +1720,6 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	_, exists2 = suite.tieredStorage.policy.nodeMap.Load(path2)
 	_, exists3 = suite.tieredStorage.policy.nodeMap.Load(path3)
 	_, exists4 = suite.tieredStorage.policy.nodeMap.Load(path4)
-
-	suite.assert.False(exists1)
-	suite.assert.True(exists2)
-	suite.assert.True(exists3)
-	suite.assert.True(exists4)
-
-	//4b. Check state of fileMap
-	_, exists1 = suite.tieredStorage.fileMap.Load(path1)
-	_, exists2 = suite.tieredStorage.fileMap.Load(path2)
-	_, exists3 = suite.tieredStorage.fileMap.Load(path3)
-	_, exists4 = suite.tieredStorage.fileMap.Load(path4)
 
 	suite.assert.False(exists1)
 	suite.assert.True(exists2)

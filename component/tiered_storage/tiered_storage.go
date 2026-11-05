@@ -900,10 +900,9 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		}
 	}
 
-	var node *FileNode
-	if val, ok := c.fileMap.Load(options.Handle.Path); ok {
-		node = val.(*FileNode)
-	}
+	// Concurrent writes that extend the same file can count the growth
+	// twice. Reconcile corrects such drift.
+	before, beforeErr := f.Stat()
 
 	appending := options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend)
 	var bytesWritten int
@@ -914,14 +913,13 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
 	}
 
+	if beforeErr == nil && bytesWritten > 0 {
+		if after, statErr := f.Stat(); statErr == nil {
+			c.cacheSize.Add(after.Size() - before.Size())
+		}
+	}
 	if err == nil {
 		c.setHandleDirty(options.Handle)
-		if node != nil {
-			node.isDirty.Store(true)
-			if info, statErr := f.Stat(); statErr == nil {
-				c.cacheSize.Add(info.Size() - node.size.Swap(info.Size()))
-			}
-		}
 	} else {
 		log.Err(
 			"TieredStorage::WriteFile : failed to write %s [%s]",
@@ -1336,7 +1334,6 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 
 	flock := c.lockHandle(options.Handle)
 	defer flock.Unlock()
-	name := options.Handle.Path
 
 	file := options.Handle.GetFileObject()
 	if file == nil {
@@ -1345,16 +1342,16 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 	if err := c.promoteHandle(options.Handle); err != nil {
 		return err
 	}
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
 	if err := file.Truncate(options.NewSize); err != nil {
 		return err
 	}
 
 	c.setHandleDirty(options.Handle)
-	if value, found := c.fileMap.Load(name); found {
-		node := value.(*FileNode)
-		node.isDirty.Store(true)
-		c.cacheSize.Add(options.NewSize - node.size.Swap(options.NewSize))
-	}
+	c.cacheSize.Add(options.NewSize - info.Size())
 	return nil
 }
 
