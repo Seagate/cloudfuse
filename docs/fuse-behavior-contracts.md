@@ -274,7 +274,14 @@ configuration, libfuse handles an unlink of an open file, or a rename over an
 open destination, by renaming the file to a hidden `.fuse_hidden…` name with the
 filesystem's `Rename` callback. It removes that name with `Unlink` after the
 last `Release`. Components therefore see a `Rename` to a hidden name, not an
-`Unlink`, for files that are still open.
+`Unlink`, for files that are still open. The hidden name is visible in
+directory listings through the mount until the last handle closes.
+
+Observed on Linux with the `libfuse` and `loopbackfs` components: opening
+`victim.txt`, unlinking it, and then closing it produced `Getattr` for
+`.fuse_hidden0000000200000001` (not found), `Rename` from `victim.txt` to that
+name, `Flush` and `Release` on the hidden name, and finally `Unlink` of the
+hidden name. The hidden file existed in the backing store until the close.
 
 ### Windows
 
@@ -481,8 +488,8 @@ incorrect for existing workloads.
   may perform a cloud rename to that hidden name, and a crash before release
   can leave it behind. Decide whether to enable `hard_remove`, which relies on
   components keeping unlinked files usable, or to handle hidden names
-  explicitly. This was found by reading libfuse source and has not yet been
-  observed in a trace.
+  explicitly. Confirmed with a `loopbackfs` mount; see
+  [Unlink while open](#unlink-while-open).
 - **Specific errno preservation.** Errors outside the current translation table
   collapse to `EIO`. Add mappings when applications need to distinguish another
   documented filesystem error.
