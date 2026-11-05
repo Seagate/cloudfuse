@@ -337,6 +337,10 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 	if mode == 0 || runtime.GOOS == "windows" {
 		mode = common.DefaultDirectoryPermissionBits
 	}
+	// The parent may exist only in the cloud.
+	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
+		return err
+	}
 	if err := os.Mkdir(localPath, mode); err != nil {
 		return err
 	}
@@ -351,6 +355,14 @@ func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	if err != nil {
 		return err
 	}
+	cachePath, err := c.cachePath(options.Name)
+	if err != nil {
+		return err
+	}
+	if err := c.checkCloudReachable(options.Name); err != nil {
+		return err
+	}
+
 	cloudErr := c.NextComponent().DeleteDir(options)
 	if cloudErr != nil && !errors.Is(cloudErr, os.ErrNotExist) {
 		return cloudErr
@@ -359,6 +371,10 @@ func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return localErr
 	}
+	// cache/ is not pruned, so it may hold this directory. Startup clears it
+	// if this fails.
+	_ = os.Remove(cachePath)
+
 	if errors.Is(localErr, os.ErrNotExist) && errors.Is(cloudErr, os.ErrNotExist) {
 		return syscall.ENOENT
 	}
@@ -413,32 +429,29 @@ func (c *TieredStorage) StreamDir(
 		token = ""
 	}
 
+	// Local entries win, as in GetAttr. cache/ copies match the cloud, so
+	// cache/ is never listed.
 	localAttrs := make(map[string]*internal.ObjAttr, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
-		entryPath := common.JoinUnixFilepath(options.Name, name)
-		info, err := entry.Info()
+		// Lstat rather than entry.Info: on Windows, directory data can be
+		// stale for files being written.
+		info, err := os.Lstat(filepath.Join(localPath, name))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, "", err
 		}
-		localAttr := newTieredStorageObjAttr(entryPath, info)
-		if value, tracked := c.fileMap.Load(entryPath); tracked {
-			localAttr.Size = value.(*FileNode).size.Load()
-		}
-		localAttrs[name] = localAttr
+		localAttrs[name] = newTieredStorageObjAttr(common.JoinUnixFilepath(options.Name, name), info)
 	}
 
 	listed := make(map[string]struct{}, len(attrs))
 	for index, attr := range attrs {
 		listed[attr.Name] = struct{}{}
-		local, found := localAttrs[attr.Name]
-		if !found || attr.IsDir() {
-			continue
+		if local, found := localAttrs[attr.Name]; found {
+			attrs[index] = local
 		}
-		merged := *attr
-		merged.Size = local.Size
-		merged.Mtime = local.Mtime
-		attrs[index] = &merged
 	}
 
 	if token == "" {

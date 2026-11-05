@@ -1012,6 +1012,65 @@ func (suite *tieredStorageTestSuite) TestCreateAndDeleteLocalDirectory() {
 	suite.assert.ErrorIs(err, syscall.ENOENT)
 }
 
+func (suite *tieredStorageTestSuite) TestCreateDirUnderCloudOnlyParent() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(suite.loopback.CreateDir(internal.CreateDirOptions{Name: "parent", Mode: 0755}))
+	suite.Require().NoError(
+		suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "parent/child", Mode: 0755}),
+	)
+	suite.assert.DirExists(suite.localFile("parent/child"))
+	suite.assert.DirExists(filepath.Join(suite.fake_storage_path, "parent", "child"))
+}
+
+func (suite *tieredStorageTestSuite) TestStreamDirSkipsCacheAndPrefersLocal() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("cached", "cloud data")
+	suite.writeCloudFile("promoted", "cloud data")
+	cached, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY})
+	suite.Require().NoError(err)
+	promoted, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "promoted", Flags: os.O_RDWR})
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{
+		Handle: promoted, Offset: 10, Data: []byte(" and more"),
+	})
+	suite.Require().NoError(err)
+
+	attrs, _, err := suite.tieredStorage.StreamDir(internal.StreamDirOptions{Name: ""})
+	suite.Require().NoError(err)
+	sizes := map[string]int64{}
+	for _, attr := range attrs {
+		sizes[attr.Name] = attr.Size
+	}
+	suite.assert.Equal(map[string]int64{
+		"cached":   int64(len("cloud data")),
+		"promoted": int64(len("cloud data and more")),
+	}, sizes)
+	for _, handle := range []*handlemap.Handle{cached, promoted} {
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+}
+
+func TestDeleteDirOfflineChangesNothing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	root := t.TempDir()
+	localPath := filepath.Join(root, localDirName, "dir")
+	require.NoError(t, os.MkdirAll(localPath, 0700))
+
+	storage := &TieredStorage{tmpPath: root}
+	storage.SetNextComponent(next)
+	next.EXPECT().CloudConnected().Return(false)
+	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)
+
+	err := storage.DeleteDir(internal.DeleteDirOptions{Name: "dir"})
+	assert.ErrorIs(t, err, &common.CloudUnreachableError{})
+	assert.DirExists(t, localPath)
+}
+
 func (suite *tieredStorageTestSuite) TestStreamDirListsImplicitLocalDirectory() {
 	defer suite.cleanupTest()
 
