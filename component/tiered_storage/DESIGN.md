@@ -92,14 +92,15 @@ Consequences:
 - **Per-object file locks** (`common.LockMap`), with open-handle counts.
 - **LRU queue** of local-owned files, used for eviction.
 - **Cache size tracker**, covering both `local/` and `cache/`.
-- **Cache handles**: a lock-free hint marking handles opened on a `cache/` copy
-  that may still need promoting. Writes on other handles skip promotion without
-  taking the file lock. Whether `x` is in `cache/` is still decided by name,
-  from the layout, under the file lock. The hint is per handle, not per name,
-  because a rename can change a handle's name while a write is checking it. A
-  handle's file never moves back into `cache/`, so the hint can be stale only
-  in the safe direction: after another handle promotes the file, this handle's
-  next write costs one extra lock and `stat`. This is not
+- **Cache-copy handle mark**: a value in the handle's metadata, guarded by the
+  handle lock, set on handles opened on a `cache/` copy and removed when they
+  promote. It is a hint that lets writes on other handles skip promotion
+  without taking the file lock. Whether `x` is in `cache/` is still decided by
+  name, from the layout, under the file lock. The mark is per handle, not per
+  name, because a rename can change a handle's name while a write is checking
+  it. A handle's file never moves back into `cache/`, so the mark can be stale
+  only in the safe direction: after another handle promotes the file, this
+  handle's next write costs one extra lock and `stat`. This is not
   `handlemap.HandleFlagCached`, which tells libfuse to read the file object
   directly and bypass the pipeline. Tiered storage never sets that flag.
 - **`cloudStale` set** of local-owned files, keyed by object name. Each entry

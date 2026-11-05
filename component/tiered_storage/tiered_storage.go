@@ -69,15 +69,6 @@ type TieredStorage struct {
 	// be outdated. Each entry is only read or changed under its file lock.
 	cloudStale sync.Map // object name -> struct{}
 
-	// cacheHandles is a lock-free hint for WriteFile and TruncateFile: handles
-	// opened on a cache/ copy that may still need promoting. Whether x is in
-	// cache/ is decided by name, from the layout, under the file lock (see
-	// promote). The hint is keyed by handle because a rename changes the name
-	// under a handle but never moves its file back into cache/, so a stale
-	// entry only costs one lock and stat. It is not handlemap.HandleFlagCached,
-	// which tells libfuse to read the file object directly.
-	cacheHandles sync.Map // *handlemap.Handle -> struct{}
-
 	cacheSize    *cacheSizeTracker
 	maxCacheSize float64
 }
@@ -100,6 +91,10 @@ const (
 	defaultMaxEviction        = 5000
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
+	// cacheCopyKey marks a handle opened on a cache/ copy. It is not
+	// handlemap.HandleFlagCached, which tells libfuse to read the file object
+	// directly.
+	cacheCopyKey = "tieredStorage.cacheCopy"
 	// The tiered root holds exactly these two trees. A file is in at most one.
 	localDirName = "local"
 	cacheDirName = "cache"
@@ -677,7 +672,8 @@ func (c *TieredStorage) openHandle(
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 	if cached {
-		c.cacheHandles.Store(handle, struct{}{})
+		// The handle is not published yet, so it needs no lock.
+		handle.SetValue(cacheCopyKey, true)
 	}
 	flock.Inc()
 	return handle, nil
@@ -732,14 +728,22 @@ func (c *TieredStorage) promoteHandle(handle *handlemap.Handle) error {
 	if err := c.promote(handle.Path); err != nil {
 		return err
 	}
-	c.cacheHandles.Delete(handle)
+	handle.Lock()
+	handle.RemoveValue(cacheCopyKey)
+	handle.Unlock()
 	return nil
 }
 
 // onCacheCopy reports whether a handle was opened on a cache/ copy and has not
-// been promoted since.
+// been promoted since. It is a hint that lets writes skip promotion without
+// the file lock; promote decides by location under the lock. It is per handle
+// because a rename can change a handle's name while a write checks it, but
+// never moves its file back into cache/, so a stale hint only costs one lock
+// and stat.
 func (c *TieredStorage) onCacheCopy(handle *handlemap.Handle) bool {
-	_, found := c.cacheHandles.Load(handle)
+	handle.RLock()
+	defer handle.RUnlock()
+	_, found := handle.GetValue(cacheCopyKey)
 	return found
 }
 
@@ -1101,7 +1105,6 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	}
 
 	c.clearHandleDirty(options.Handle)
-	c.cacheHandles.Delete(options.Handle)
 	options.Handle.Cleanup()
 
 	handlemap.Delete(options.Handle.ID)
