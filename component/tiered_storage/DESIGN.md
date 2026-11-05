@@ -223,9 +223,11 @@ local copy is gone.
 
 ### RenameFile
 
-1. Take both file locks in lexical order.
+1. Take `dirRenameMu` for reading, then both file locks in lexical order. A
+   rename to itself does nothing.
 2. Check cloud connectivity; fail early if disconnected.
-3. Fail early if the destination exists and replacing it is not permitted.
+3. Fail early if the destination exists and replacing it is not permitted
+   (`local/dst` is a directory).
 4. If the source is in `local/` or `cache/`: `MkdirAll` the destination parent
    and rename the local file.
 5. Rename in the cloud.
@@ -233,7 +235,11 @@ local copy is gone.
    - On any other failure, rename the local file back and return the error. If
      the revert fails, log an error naming both paths and stating that local and
      cloud have diverged, then return the original error.
-6. Update in-memory state: LRU entry, open-handle paths, lock counts. The
+6. If a replaced destination had a copy in the other tree (for example
+   `cache/dst` when `local/src` moved in), delete it, so the object is in at
+   most one tree. This runs only after the cloud rename succeeds, so a failed
+   rename cannot lose an authoritative `local/dst`.
+7. Update in-memory state: LRU entry, open-handle paths, lock counts. The
    `cloudStale` flag moves with the file. If the cloud rename returned
    `ENOENT`, clear it.
 
@@ -243,7 +249,7 @@ harmless: evict on close or normal eviction will overwrite it.
 ### Chmod
 
 - `local/x` exists: chmod the local file only. The mode is applied to the cloud
-  object when the file is uploaded.
+  object when the file is uploaded (Linux only; see [Eviction](#eviction)).
 - `cache/x` exists: chmod the cloud object (authoritative), then the local copy.
 - Neither: chmod the cloud object.
 
@@ -277,15 +283,20 @@ empty.
 
 ### StreamDir
 
-Merge cloud entries with `local/<dir>` entries. For files present in both,
-local attributes win. `cache/` is never listed. No name filtering is needed,
+Merge cloud entries with `local/<dir>` entries. For entries present in both,
+local attributes win, as in `GetAttr`. Local entries are `Lstat`ed
+individually, because directory data can be stale on Windows for files being
+written. `cache/` is never listed. No name filtering is needed,
 because the tiered root is never exposed.
 
 ### RenameDir
 
-1. Take locks for every affected object. Collect affected names **after**
-   locking (or hold a coarse directory-rename lock), so files created during the
-   operation cannot be missed.
+1. Take `dirRenameMu` exclusively. Operations that can add a name (`CreateFile`,
+   `OpenFile`, `RenameFile`, `CreateDir`) take it for reading, so no file can
+   appear under `src` while it is held. Then list the files under `local/src`
+   and `cache/src`, and lock each one and its destination name. A pending
+   `RenameDir` therefore waits for in-flight opens, including downloads, and new
+   opens wait for it. Directory renames are rare, so this is accepted.
 2. Check cloud connectivity; fail early if disconnected.
 3. Cheap pre-checks: source exists, destination does not exist, destination
    parent can be created.
@@ -332,8 +343,9 @@ their write rate.
 For each candidate, with its file lock held:
 
 1. Skip it if it has open handles.
-2. Upload `local/x` to the cloud, including mode (and owner/group on Linux) read
-   from the local file.
+2. Upload `local/x` to the cloud, then apply the mode and owner/group read
+   from the local file (Linux only). Windows files have no POSIX mode or owner,
+   so applying their defaults would overwrite the cloud object's metadata.
 3. On upload failure: leave the file in place and keep it eligible for later
    eviction.
 4. On success: delete `local/x` and remove it from the LRU.
@@ -400,8 +412,10 @@ reopen, as unmodified cloud files already are.
   goroutines. File operations never take it, and never block on eviction.
   `ReleaseFile` starts an evict-on-close goroutine but does not wait for it.
 - `cloudStale` is only read or changed with the file lock held.
-- Lock order: `evictMu`, then file lock(s), then the LRU queue mutex. Never take
-  a file lock while holding the LRU queue mutex.
+- Lock order: `dirRenameMu`, `evictMu`, then file lock(s), then the LRU queue
+  mutex. Never take a file lock while holding the LRU queue mutex.
+- Operations on a handle lock the handle's current path, and retry if a
+  rename changes it while they wait.
 - Multi-object operations take file locks in lexical order.
 - `GetAttr` and `StreamDir` do not take file locks. They rely on atomic renames
   and on the connectivity pre-check to keep mixed-state windows short.
