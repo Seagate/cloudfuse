@@ -791,6 +791,65 @@ func (suite *tieredStorageTestSuite) TestOpenTruncPromotesOpenCachedFile() {
 	}
 }
 
+func (suite *tieredStorageTestSuite) TestOpenFileExclusiveChangesNothing() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("cached", "cloud data")
+	reader, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY},
+	)
+	suite.Require().NoError(err)
+	local, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "local", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: local, Data: []byte("local")},
+	)
+	suite.Require().NoError(err)
+	used := suite.tieredStorage.cacheSize.Used()
+
+	for _, name := range []string{"cached", "local"} {
+		_, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{
+			Name: name, Flags: os.O_CREATE | os.O_EXCL | os.O_TRUNC | os.O_RDWR, Mode: 0644,
+		})
+		suite.assert.ErrorIs(err, syscall.EEXIST)
+	}
+	suite.assert.FileExists(suite.cacheFile("cached"))
+	_, stale := suite.tieredStorage.cloudStale.Load("cached")
+	suite.assert.False(stale)
+	suite.assert.Equal(used, suite.tieredStorage.cacheSize.Used())
+	for _, handle := range []*handlemap.Handle{reader, local} {
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+}
+
+func (suite *tieredStorageTestSuite) TestRenameFileOverwriteUpdatesUsage() {
+	defer suite.cleanupTest()
+
+	for name, data := range map[string]string{"src": "s", "dst": "replaced data"} {
+		handle, err := suite.tieredStorage.CreateFile(
+			internal.CreateFileOptions{Name: name, Mode: 0644},
+		)
+		suite.Require().NoError(err)
+		_, err = suite.tieredStorage.WriteFile(
+			&internal.WriteFileOptions{Handle: handle, Data: []byte(data)},
+		)
+		suite.Require().NoError(err)
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+	used := suite.tieredStorage.cacheSize.Used()
+
+	suite.Require().NoError(
+		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
+	)
+	suite.assert.Equal(used-int64(len("replaced data")), suite.tieredStorage.cacheSize.Used())
+}
+
 func (suite *tieredStorageTestSuite) TestDownloadToCache() {
 	defer suite.cleanupTest()
 

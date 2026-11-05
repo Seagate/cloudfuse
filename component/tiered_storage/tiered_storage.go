@@ -869,22 +869,27 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	truncate := options.Flags&os.O_TRUNC != 0
 
 	path, cached, created := "", false, false
+	var truncatedSize int64
 	if info, err := os.Stat(localPath); err == nil {
-		path = localPath
-		if truncate {
-			c.cacheSize.Add(-info.Size())
+		if exclusive {
+			return nil, syscall.EEXIST
 		}
+		path = localPath
+		truncatedSize = info.Size()
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	} else if info, err := os.Stat(cachePath); err == nil {
+		if exclusive {
+			return nil, syscall.EEXIST
+		}
 		// Another handle has this cloud-owned file open.
 		path, cached = cachePath, true
 		if truncate {
 			if err := c.promote(options.Name); err != nil {
 				return nil, err
 			}
-			c.cacheSize.Add(-info.Size())
 			path, cached = localPath, false
+			truncatedSize = info.Size()
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -917,13 +922,13 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			path, cached = cachePath, true
 		}
 	}
-	if exclusive && !created {
-		return nil, syscall.EEXIST
-	}
 
 	handle, err := c.openHandle(options.Name, path, options.Flags, cached, flock)
 	if err != nil {
 		return nil, err
+	}
+	if truncate {
+		c.cacheSize.Add(-truncatedSize)
 	}
 	if created || truncate {
 		c.setHandleDirty(handle)
@@ -1253,8 +1258,13 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		if err := os.MkdirAll(filepath.Dir(to), cacheDirPerm); err != nil {
 			return err
 		}
+		replaced, replacedErr := os.Stat(to)
 		if err := os.Rename(from, to); err != nil {
 			return err
+		}
+		// The rename overwrote dst's copy in this tree, even if later reverted.
+		if replacedErr == nil {
+			c.cacheSize.Add(-replaced.Size())
 		}
 	}
 
