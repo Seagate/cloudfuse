@@ -1005,72 +1005,59 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	return closeErr
 }
 
-func (c *TieredStorage) uploadCachedFile(name string) error {
+// uploadLocal copies local/x to the cloud, with its mode and owner where the
+// platform has them. The file lock must be held.
+func (c *TieredStorage) uploadLocal(name string) error {
 	localPath, err := c.localPath(name)
 	if err != nil {
 		return err
 	}
-
 	f, err := common.Open(localPath)
 	if err != nil {
-		log.Err("TieredStorage::uploadFile : %s open failed [%v]", name, err)
+		log.Err("TieredStorage::uploadLocal : %s open failed [%v]", name, err)
 		return err
 	}
 	defer f.Close()
-
-	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	info, err := f.Stat()
 	if err != nil {
-		log.Err("TieredStorage::uploadFile : %s upload failed [%v]", name, err)
 		return err
 	}
 
-	value, found := c.fileMap.Load(name)
-	if !found {
+	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	if err != nil {
+		log.Err("TieredStorage::uploadLocal : %s upload failed [%v]", name, err)
+		return err
+	}
+
+	mode, owner, group, ok := uploadMetadata(info)
+	if !ok {
 		return nil
 	}
-	node := value.(*FileNode)
-	node.cloudBacked.Store(true)
-	if node.modeDirty.Load() {
-		err = c.NextComponent().Chmod(internal.ChmodOptions{
-			Name: name,
-			Mode: os.FileMode(node.mode.Load()),
-		})
-		if err != nil && !errors.Is(err, syscall.ENOTSUP) {
-			return err
-		}
-		node.modeDirty.Store(false)
+	err = c.NextComponent().Chmod(internal.ChmodOptions{Name: name, Mode: mode})
+	if err != nil && !errors.Is(err, syscall.ENOTSUP) {
+		log.Err("TieredStorage::uploadLocal : %s chmod failed [%v]", name, err)
+		return err
 	}
-	if node.ownerDirty.Load() {
-		err = c.NextComponent().Chown(internal.ChownOptions{
-			Name:  name,
-			Owner: int(node.owner.Load()),
-			Group: int(node.group.Load()),
-		})
-		if err != nil && !errors.Is(err, syscall.ENOTSUP) {
-			return err
-		}
-		node.ownerDirty.Store(false)
+	err = c.NextComponent().Chown(internal.ChownOptions{Name: name, Owner: owner, Group: group})
+	if err != nil && !errors.Is(err, syscall.ENOTSUP) {
+		log.Err("TieredStorage::uploadLocal : %s chown failed [%v]", name, err)
+		return err
 	}
 	return nil
 }
 
-// uploadandCleanFile moves an object to cloud storage and removes the local
-// copy. It is the LRU's eviction callback, so it runs with the object's file
-// lock held.
+// uploadandCleanFile evicts a closed local-owned file: it uploads local/x,
+// then deletes it. It is the LRU's eviction callback, so it runs with the
+// object's file lock held.
 func (c *TieredStorage) uploadandCleanFile(name string) error {
-	err := c.uploadCachedFile(name)
-	if err != nil {
+	if err := c.uploadLocal(name); err != nil {
 		return err
 	}
-	if value, found := c.fileMap.Load(name); found {
-		value.(*FileNode).isDirty.Store(false)
-	}
-	err = c.purgeLocal(name)
-	if err != nil {
+	if err := c.purgeLocal(name); err != nil {
 		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
 		return err
 	}
-	c.fileMap.Delete(name)
+	c.cloudStale.Delete(name)
 	return nil
 }
 

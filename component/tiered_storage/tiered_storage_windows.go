@@ -69,3 +69,10 @@ func (c *TieredStorage) getAvailableSize() (uint64, error) {
 	}
 	return available, nil
 }
+
+// uploadMetadata reports nothing on Windows. Local files there carry no POSIX
+// mode or owner, so applying them would overwrite the cloud object's metadata
+// with defaults.
+func uploadMetadata(info fs.FileInfo) (mode os.FileMode, owner, group int, ok bool) {
+	return 0, 0, 0, false
+}

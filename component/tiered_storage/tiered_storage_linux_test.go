@@ -29,24 +29,25 @@ package tiered_storage
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
-func TestChownLocalFilePersistsOnUpload(t *testing.T) {
+func TestEvictionUploadsLocalModeAndOwner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	next := internal.NewMockComponent(ctrl)
-	path := "local-chown"
+	path := "local-metadata"
 	cachePath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(cachePath, localDirName), 0700))
-	require.NoError(
-		t,
-		os.WriteFile(filepath.Join(cachePath, localDirName, path), []byte("data"), 0644),
-	)
+	localPath := filepath.Join(cachePath, localDirName, path)
+	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
+	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0600))
+	require.NoError(t, os.Chmod(localPath, 0640))
 
 	storage := &TieredStorage{
 		tmpPath:   cachePath,
@@ -54,17 +55,17 @@ func TestChownLocalFilePersistsOnUpload(t *testing.T) {
 		cacheSize: newCacheSizeTracker(cachePath, 0),
 	}
 	storage.SetNextComponent(next)
-	node := &FileNode{name: path}
-	node.size.Store(4)
-	storage.fileMap.Store(path, node)
+	storage.cloudStale.Store(path, struct{}{})
 
 	owner, group := os.Getuid(), os.Getgid()
-	require.NoError(t, storage.Chown(internal.ChownOptions{
-		Name: path, Owner: owner, Group: group,
-	}))
 	next.EXPECT().CopyFromFile(gomock.Any()).Return(nil)
+	next.EXPECT().Chmod(internal.ChmodOptions{Name: path, Mode: 0640}).Return(nil)
 	next.EXPECT().Chown(internal.ChownOptions{
 		Name: path, Owner: owner, Group: group,
-	}).Return(nil)
-	require.NoError(t, storage.uploadCachedFile(path))
+	}).Return(syscall.ENOTSUP)
+
+	require.NoError(t, storage.uploadandCleanFile(path))
+	assert.NoFileExists(t, localPath)
+	_, stale := storage.cloudStale.Load(path)
+	assert.False(t, stale)
 }

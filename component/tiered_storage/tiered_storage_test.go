@@ -442,14 +442,14 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 		cacheSize: newCacheSizeTracker(cachePath, 0),
 	}
 	storage.SetNextComponent(next)
-	storage.fileMap.Store("file", &FileNode{name: "file"})
+	storage.cloudStale.Store("file", struct{}{})
 	next.EXPECT().CopyFromFile(gomock.Any()).Return(errors.New("upload failed"))
 
 	err := storage.uploadandCleanFile("file")
 	require.Error(t, err)
 	assert.FileExists(t, localPath)
-	_, found := storage.fileMap.Load("file")
-	assert.True(t, found)
+	_, stale := storage.cloudStale.Load("file")
+	assert.True(t, stale)
 }
 
 func (suite *tieredStorageTestSuite) TestCreateFileRejectsExistingCloudObject() {
