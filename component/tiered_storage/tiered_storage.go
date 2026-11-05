@@ -388,17 +388,6 @@ func (c *TieredStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return c.NextComponent().IsDirEmpty(options)
 }
 
-func (c *TieredStorage) OpenDir(options internal.OpenDirOptions) error {
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return err
-	}
-	if info, err := os.Stat(localPath); err == nil && info.IsDir() {
-		return nil
-	}
-	return c.NextComponent().OpenDir(options)
-}
-
 func (c *TieredStorage) StreamDir(
 	options internal.StreamDirOptions,
 ) ([]*internal.ObjAttr, string, error) {
@@ -458,17 +447,6 @@ func (c *TieredStorage) StreamDir(
 		return strings.Compare(a.Path, b.Path)
 	})
 	return attrs, token, nil
-}
-
-func (c *TieredStorage) CloseDir(options internal.CloseDirOptions) error {
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return err
-	}
-	if info, err := os.Stat(localPath); err == nil && info.IsDir() {
-		return nil
-	}
-	return c.NextComponent().CloseDir(options)
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
@@ -626,11 +604,6 @@ func (c *TieredStorage) filesUnder(dir string) ([]string, error) {
 	return names, nil
 }
 
-// errCloudDisconnected is wrapped by CloudUnreachableError when a namespace
-// change is refused while offline. It deliberately hides the GetAttr result,
-// so callers never mistake the refusal for ENOENT.
-var errCloudDisconnected = errors.New("cloud storage is disconnected")
-
 // checkCloudReachable refuses, before anything changes, a namespace change
 // (delete, rename) that might need the cloud while it is disconnected. This
 // avoids holding locks through SDK retries and exposing mixed local/cloud
@@ -649,7 +622,8 @@ func (c *TieredStorage) checkCloudReachable(name string) error {
 		name,
 		err,
 	)
-	return common.NewCloudUnreachableError(errCloudDisconnected)
+	cloudErr := common.NewCloudUnreachableError(errors.New("cloud storage is disconnected"))
+	return &cloudErr
 }
 
 // File operations
