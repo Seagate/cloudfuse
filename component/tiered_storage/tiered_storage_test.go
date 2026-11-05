@@ -228,6 +228,42 @@ func TestCachePath(t *testing.T) {
 	assert.ErrorIs(t, err, syscall.EINVAL)
 }
 
+// restart stops the component and starts a fresh instance on the same root.
+func (suite *tieredStorageTestSuite) restart() error {
+	suite.Require().NoError(suite.tieredStorage.Stop())
+	suite.tieredStorage = newTestTieredStorage(suite.loopback)
+	return suite.tieredStorage.Start(context.Background())
+}
+
+func (suite *tieredStorageTestSuite) TestStartClearsCacheAndKeepsLocal() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(os.MkdirAll(filepath.Dir(suite.cacheFile("dir/cached")), 0700))
+	suite.Require().NoError(os.WriteFile(suite.cacheFile("dir/cached"), []byte("c"), 0644))
+	suite.Require().NoError(os.WriteFile(suite.localFile("owned"), []byte("l"), 0644))
+
+	suite.Require().NoError(suite.restart())
+
+	suite.assert.NoFileExists(suite.cacheFile("dir/cached"))
+	suite.assert.DirExists(suite.cacheFile(""))
+	suite.assert.FileExists(suite.localFile("owned"))
+}
+
+func (suite *tieredStorageTestSuite) TestStartRejectsUnexpectedRootEntries() {
+	defer suite.cleanupTest()
+
+	stray := filepath.Join(suite.cache_path, "stray")
+	suite.Require().NoError(os.WriteFile(stray, []byte("old layout"), 0644))
+	suite.Require().NoError(os.WriteFile(suite.cacheFile("cached"), []byte("c"), 0644))
+
+	err := suite.restart()
+	suite.Require().Error(err)
+	suite.assert.Contains(err.Error(), "stray")
+	suite.assert.FileExists(stray)
+	// Nothing is changed before the check fails.
+	suite.assert.FileExists(suite.cacheFile("cached"))
+}
+
 func TestTieredStoragePolicyConfig(t *testing.T) {
 	tests := []struct {
 		name         string

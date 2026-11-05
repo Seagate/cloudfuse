@@ -122,7 +122,10 @@ func (c *TieredStorage) SetNextComponent(nc internal.Component) {
 func (c *TieredStorage) Start(ctx context.Context) error {
 	log.Trace("TieredStorage::Start : Starting component %s", c.Name())
 
-	// clear cache
+	if err := c.prepareRoot(); err != nil {
+		log.Err("TieredStorage::Start : %v", err)
+		return err
+	}
 
 	c.cacheSize.Refresh()
 
@@ -133,6 +136,40 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 		}
 	}
 
+	return nil
+}
+
+// prepareRoot lays out the tiered root and discards cache/ from any previous
+// run. Entries other than local/ and cache/ are refused rather than guessed at,
+// since they may hold data from an older layout or a misconfigured path.
+func (c *TieredStorage) prepareRoot() error {
+	if err := os.MkdirAll(c.tmpPath, cacheDirPerm); err != nil {
+		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
+	}
+	entries, err := os.ReadDir(c.tmpPath)
+	if err != nil {
+		return fmt.Errorf("TieredStorage: failed to read %s: %w", c.tmpPath, err)
+	}
+	for _, entry := range entries {
+		if name := entry.Name(); name != localDirName && name != cacheDirName {
+			return fmt.Errorf(
+				"TieredStorage: %s contains unexpected entry %q; it may only contain %s and %s (move existing files into %s)",
+				c.tmpPath,
+				name,
+				localDirName,
+				cacheDirName,
+				filepath.Join(c.tmpPath, localDirName),
+			)
+		}
+	}
+	if err := os.RemoveAll(filepath.Join(c.tmpPath, cacheDirName)); err != nil {
+		return fmt.Errorf("TieredStorage: failed to clear %s: %w", cacheDirName, err)
+	}
+	for _, tree := range []string{localDirName, cacheDirName} {
+		if err := os.MkdirAll(filepath.Join(c.tmpPath, tree), cacheDirPerm); err != nil {
+			return fmt.Errorf("TieredStorage: failed to create %s: %w", tree, err)
+		}
+	}
 	return nil
 }
 
@@ -161,12 +198,6 @@ func (c *TieredStorage) Configure(_ bool) error {
 	c.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
 	if c.tmpPath == "" || c.tmpPath == "." {
 		return fmt.Errorf("TieredStorage: path not set in config")
-	}
-	err = os.MkdirAll(c.tmpPath, cacheDirPerm)
-
-	if err != nil {
-		log.Err("TieredStorage::Configure : failed to create tmp path %s [%v]", c.tmpPath, err)
-		return fmt.Errorf("TieredStorage: failed to create tmp path: %w", err)
 	}
 	if conf.MaxSizeMB <= 0 {
 		return fmt.Errorf("TieredStorage: max-size-mb must be greater than 0")
