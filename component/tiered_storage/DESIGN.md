@@ -428,7 +428,7 @@ Limits:
   local-first ordering in `RenameDir`).
 - On older Windows delete semantics, a deleted-but-open file keeps its name
   reserved until the last handle closes, blocking re-creation and parent
-  directory removal. Verify on target Windows versions.
+  directory removal. This is acceptable behavior.
 
 ## Crash recovery
 
@@ -480,10 +480,7 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
 
 ## Code removed by this design
 
-- State snapshot (`persistence.go` snapshot read/write, LRU order persistence).
-- Partial-download suffix and the interim `.cloudfuse-downloads` staging
-  directory.
-- `replaceFile`.
+- Partial-download suffix and `replaceFile`.
 - Synchronous eviction and space reservation (`EvictNow`, `reserveSpace`, and
   their call sites in `OpenFile`, `WriteFile`, and `TruncateFile`).
 - `FileNode` flags: `cloudBacked`, `isDirty`, `modeDirty`, `ownerDirty`, and
