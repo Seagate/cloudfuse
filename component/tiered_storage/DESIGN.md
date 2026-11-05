@@ -441,8 +441,10 @@ reopen, as unmodified cloud files already are.
   or the local and cloud names could diverge. Moving to libfuse's low-level
   API, or enabling `nullpath_ok`, would require a component-level lock here.
   Background eviction does not depend on this; it is covered by file locks.
-- Operations on a handle lock the handle's current path, and retry if a
-  rename changes it while they wait.
+- Operations on a handle lock the file lock for `handle.Path` directly. A
+  rename cannot change that path during the callback: libfuse holds the
+  handle's path lock for the whole callback, and WinFSP serializes a rename
+  with I/O on the same file through its file-node lock.
 - Multi-object operations take file locks in lexical order.
 - `GetAttr` and `StreamDir` do not take file locks. They rely on atomic renames
   and on the connectivity pre-check to keep mixed-state windows short.

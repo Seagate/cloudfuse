@@ -733,25 +733,6 @@ func (c *TieredStorage) onCacheCopy(handle *handlemap.Handle) bool {
 	return found
 }
 
-// lockHandle takes the file lock for a handle's current path. A rename can
-// change the path while waiting for the lock, so retry until they match.
-func (c *TieredStorage) lockHandle(handle *handlemap.Handle) *common.LockMapItem {
-	for {
-		handle.RLock()
-		name := handle.Path
-		handle.RUnlock()
-		flock := c.fileLocks.Get(name)
-		flock.Lock()
-		handle.RLock()
-		current := handle.Path
-		handle.RUnlock()
-		if current == name {
-			return flock
-		}
-		flock.Unlock()
-	}
-}
-
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
@@ -999,7 +980,8 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		return 0, syscall.EBADF
 	}
 	if c.onCacheCopy(options.Handle) {
-		flock := c.lockHandle(options.Handle)
+		flock := c.fileLocks.Get(options.Handle.Path)
+		flock.Lock()
 		err := c.promoteHandle(options.Handle)
 		flock.Unlock()
 		if err != nil {
@@ -1072,7 +1054,8 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 }
 
 func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
-	flock := c.lockHandle(options.Handle)
+	flock := c.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
 	defer flock.Unlock()
 	name := options.Handle.Path
 
@@ -1464,7 +1447,8 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 		return c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	}
 
-	flock := c.lockHandle(options.Handle)
+	flock := c.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
 	defer flock.Unlock()
 
 	file := options.Handle.GetFileObject()
