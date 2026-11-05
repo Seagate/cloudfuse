@@ -854,9 +854,14 @@ func (c *TieredStorage) purgeLocal(name string) error {
 	if err != nil {
 		return err
 	}
+	return c.removeFile(localPath)
+}
 
-	info, statErr := os.Stat(localPath)
-	err = os.Remove(localPath)
+// removeFile deletes a file under the tiered root and updates the usage
+// counter.
+func (c *TieredStorage) removeFile(path string) error {
+	info, statErr := os.Stat(path)
+	err := os.Remove(path)
 	if err == nil && statErr == nil {
 		c.cacheSize.Add(-info.Size())
 	}
@@ -962,9 +967,9 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 }
 
 func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
-	flock := c.fileLocks.Get(options.Handle.Path)
-	flock.Lock()
+	flock := c.lockHandle(options.Handle)
 	defer flock.Unlock()
+	name := options.Handle.Path
 
 	flock.Dec()
 
@@ -982,41 +987,23 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		return closeErr
 	}
 
-	val, ok := c.fileMap.Load(options.Handle.Path)
-	if !ok {
-		log.Debug(
-			"TieredStorage::ReleaseFile : %s has no local data left",
-			options.Handle.Path,
-		)
-		return closeErr
-	}
-	node := val.(*FileNode)
-
-	if !node.cloudBacked.Load() {
-		c.policy.Enqueue(options.Handle.Path)
-		return closeErr
-	}
-
-	if node.isDirty.Load() {
-		if err := c.uploadCachedFile(options.Handle.Path); err != nil {
-			// Keep failed uploads local and eligible for eviction.
-			log.Err(
-				"TieredStorage::ReleaseFile : upload failed for %s [%v]",
-				options.Handle.Path,
-				err,
-			)
-			c.policy.Enqueue(options.Handle.Path)
-			return err
-		}
-		node.isDirty.Store(false)
-	}
-
-	if err := c.purgeLocal(options.Handle.Path); err != nil {
-		c.policy.Enqueue(options.Handle.Path)
+	cachePath, err := c.cachePath(name)
+	if err != nil {
 		return err
 	}
-	c.policy.Dequeue(options.Handle.Path)
-	c.fileMap.Delete(options.Handle.Path)
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(cachePath); err == nil {
+		// The copy is clean, so it can be dropped. If that fails, the next
+		// release or startup removes it.
+		if err := c.removeFile(cachePath); err != nil {
+			log.Warn("TieredStorage::ReleaseFile : failed to remove cached %s [%v]", name, err)
+		}
+	} else if _, err := os.Stat(localPath); err == nil {
+		c.policy.Enqueue(name)
+	}
 	return closeErr
 }
 
