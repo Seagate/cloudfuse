@@ -69,10 +69,13 @@ type TieredStorage struct {
 	// be outdated. Each entry is only read or changed under its file lock.
 	cloudStale sync.Map // object name -> struct{}
 
-	// cacheHandles holds open handles on a cache/ copy, which must be promoted
-	// before their first change. This is not handlemap.HandleFlagCached: that
-	// flag tells libfuse to read the file object directly, bypassing the
-	// pipeline.
+	// cacheHandles is a lock-free hint for WriteFile and TruncateFile: handles
+	// opened on a cache/ copy that may still need promoting. Whether x is in
+	// cache/ is decided by name, from the layout, under the file lock (see
+	// promote). The hint is keyed by handle because a rename changes the name
+	// under a handle but never moves its file back into cache/, so a stale
+	// entry only costs one lock and stat. It is not handlemap.HandleFlagCached,
+	// which tells libfuse to read the file object directly.
 	cacheHandles sync.Map // *handlemap.Handle -> struct{}
 
 	cacheSize    *cacheSizeTracker
