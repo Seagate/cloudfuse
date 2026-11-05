@@ -452,6 +452,23 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	assert.True(t, stale)
 }
 
+func TestGetAttrLocalMakesNoCloudCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	// Any call on next fails the test.
+	next := internal.NewMockComponent(ctrl)
+	root := t.TempDir()
+	localPath := filepath.Join(root, localDirName, "file")
+	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
+	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
+
+	storage := &TieredStorage{tmpPath: root}
+	storage.SetNextComponent(next)
+
+	attrs, err := storage.GetAttr(internal.GetAttrOptions{Name: "file"})
+	require.NoError(t, err)
+	assert.EqualValues(t, 4, attrs.Size)
+}
+
 func (suite *tieredStorageTestSuite) TestCreateFileRejectsExistingCloudObject() {
 	defer suite.cleanupTest()
 

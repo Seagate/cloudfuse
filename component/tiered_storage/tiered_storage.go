@@ -1185,36 +1185,22 @@ func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 	}
 }
 
+// GetAttr answers from local/ when the file is local-owned, without a cloud
+// call. A cache/ copy matches the cloud object, so it is never consulted.
+// It takes no lock: files move between trees by atomic rename.
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	// Lock-free: local copies are published by rename and removed only after
-	// upload, so each read sees a complete copy; libfuse orders this against
-	// rename/unlink of the same path.
 	localPath, err := c.localPath(options.Name)
 	if err != nil {
 		return nil, err
 	}
-	info, localErr := os.Stat(localPath)
-	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
-		return nil, localErr
+	info, err := os.Stat(localPath)
+	if err == nil {
+		return newTieredStorageObjAttr(options.Name, info), nil
 	}
-
-	attrs, cloudErr := c.NextComponent().GetAttr(options)
-	if localErr != nil {
-		return attrs, cloudErr
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
-
-	localAttrs := newTieredStorageObjAttr(options.Name, info)
-	if cloudErr != nil || attrs == nil {
-		return localAttrs, nil
-	}
-	if info.IsDir() {
-		return attrs, nil
-	}
-
-	merged := *attrs
-	merged.Size = localAttrs.Size
-	merged.Mtime = localAttrs.Mtime
-	return &merged, nil
+	return c.NextComponent().GetAttr(options)
 }
 
 func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
