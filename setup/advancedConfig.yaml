@@ -137,7 +137,6 @@ tiered_storage:
   max-size-mb: <maximum local storage size in MB. Required.>
   high-threshold: <% local storage consumed which triggers eviction. Leave enough margin to absorb bursts of new data while uploads catch up; otherwise local usage can exceed max-size-mb, and writes fail if the disk fills. Default - 90>
   low-threshold: <% local storage consumed which eviction targets. Default - 80>
-  max-eviction: <maximum files selected in one eviction pass. Default - 5000>
   parallelism: <number of parallel cloud uploads. Default - 8>
 
 # Attribute cache related configuration

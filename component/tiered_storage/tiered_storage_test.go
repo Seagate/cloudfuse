@@ -284,8 +284,8 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 		{
 			name: "custom",
 			config: "max-size-mb: 2\n  high-threshold: 90\n  low-threshold: 70\n" +
-				"  max-eviction: 25\n  parallelism: 3",
-			high: 0.9, low: 0.7, maxEviction: 25, parallelism: 3,
+				"  parallelism: 3",
+			high: 0.9, low: 0.7, maxEviction: 5000, parallelism: 3,
 			pollInterval: time.Second,
 		},
 		{name: "missing capacity", config: "high-threshold: 80", wantErr: true},

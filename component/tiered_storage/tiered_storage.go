@@ -68,7 +68,6 @@ type TieredStorageOptions struct {
 	MaxSizeMB     float64 `config:"max-size-mb"    yaml:"max-size-mb,omitempty"`
 	HighThreshold uint32  `config:"high-threshold" yaml:"high-threshold,omitempty"`
 	LowThreshold  uint32  `config:"low-threshold"  yaml:"low-threshold,omitempty"`
-	MaxEviction   uint32  `config:"max-eviction"   yaml:"max-eviction,omitempty"`
 	Parallelism   uint32  `config:"parallelism"    yaml:"parallelism,omitempty"`
 }
 
@@ -249,9 +248,6 @@ func (c *TieredStorage) Configure(_ bool) error {
 			"TieredStorage: thresholds must satisfy 0 < low-threshold < high-threshold <= 100",
 		)
 	}
-	if conf.MaxEviction == 0 {
-		conf.MaxEviction = defaultMaxEviction
-	}
 	if conf.Parallelism == 0 {
 		conf.Parallelism = defaultParallelism
 	}
@@ -267,7 +263,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		threshold:        float64(conf.HighThreshold) / 100,
 		targetRatio:      float64(conf.LowThreshold) / 100,
 		numWorkers:       int(conf.Parallelism),
-		maxEviction:      conf.MaxEviction,
+		maxEviction:      defaultMaxEviction,
 		pollInterval:     capacityPollInterval,
 		uploadandCleanFn: c.uploadandCleanFile,
 	})
