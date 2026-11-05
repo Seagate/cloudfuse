@@ -1103,10 +1103,12 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("TieredStorage::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
+	if options.Src == options.Dst {
+		return nil
+	}
 
 	sflock := c.fileLocks.Get(options.Src)
 	dflock := c.fileLocks.Get(options.Dst)
-
 	if options.Src < options.Dst {
 		sflock.Lock()
 		dflock.Lock()
@@ -1117,48 +1119,84 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	defer sflock.Unlock()
 	defer dflock.Unlock()
 
-	val, exists := c.fileMap.Load(options.Src)
-	if !exists {
-		return c.NextComponent().RenameFile(options)
+	srcLocal, err := c.localPath(options.Src)
+	if err != nil {
+		return err
+	}
+	srcCache, err := c.cachePath(options.Src)
+	if err != nil {
+		return err
+	}
+	dstLocal, err := c.localPath(options.Dst)
+	if err != nil {
+		return err
+	}
+	dstCache, err := c.cachePath(options.Dst)
+	if err != nil {
+		return err
+	}
+	if err := c.checkCloudReachable(options.Src); err != nil {
+		return err
+	}
+	if info, err := os.Stat(dstLocal); err == nil && info.IsDir() {
+		return syscall.EISDIR
 	}
 
-	node := val.(*FileNode)
-	srcPath, err := c.localPath(options.Src)
-	if err != nil {
+	// Rename whichever local copy src has, before the harder-to-undo cloud rename.
+	from, to := "", ""
+	if _, err := os.Stat(srcLocal); err == nil {
+		from, to = srcLocal, dstLocal
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	} else if _, err := os.Stat(srcCache); err == nil {
+		from, to = srcCache, dstCache
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	dstPath, err := c.localPath(options.Dst)
-	if err != nil {
-		return err
+	if from != "" {
+		if err := os.MkdirAll(filepath.Dir(to), cacheDirPerm); err != nil {
+			return err
+		}
+		if err := os.Rename(from, to); err != nil {
+			return err
+		}
 	}
-	if err := os.Rename(srcPath, dstPath); err != nil {
-		return err
+
+	cloudErr := c.NextComponent().RenameFile(options)
+	neverUploaded := from == srcLocal && errors.Is(cloudErr, os.ErrNotExist)
+	if cloudErr != nil && !neverUploaded {
+		if from != "" {
+			if err := os.Rename(to, from); err != nil {
+				log.Err(
+					"TieredStorage::RenameFile : %s -> %s failed in cloud, and reverting %s -> %s failed; local and cloud have diverged [%v]",
+					options.Src,
+					options.Dst,
+					to,
+					from,
+					err,
+				)
+			}
+		}
+		return cloudErr
 	}
-	c.fileMap.Delete(options.Src)
-	node.name = options.Dst
-	c.fileMap.Store(options.Dst, node)
+
+	// dst may have had a copy in the other tree. It was replaced, so drop it.
+	for _, path := range []string{dstLocal, dstCache} {
+		if path == to {
+			continue
+		}
+		if err := c.removeFile(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Err("TieredStorage::RenameFile : failed to remove replaced %s [%v]", path, err)
+		}
+	}
+
 	c.policy.Rename(options.Src, options.Dst)
+	c.cloudStale.Delete(options.Dst)
+	if _, stale := c.cloudStale.LoadAndDelete(options.Src); stale && !neverUploaded {
+		c.cloudStale.Store(options.Dst, struct{}{})
+	}
 	c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
-
-	if !node.cloudBacked.Load() {
-		return nil
-	}
-	err = c.NextComponent().RenameFile(options)
-	if err == nil {
-		return nil
-	}
-	// The cloud copy may still be under src, so re-upload under dst.
-	node.isDirty.Store(true)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	log.Err(
-		"TieredStorage::RenameFile : %s -> %s renamed locally but not in cloud [%v]",
-		options.Src,
-		options.Dst,
-		err,
-	)
-	return err
+	return nil
 }
 
 // Both file locks must be held.

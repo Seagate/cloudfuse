@@ -1110,38 +1110,65 @@ func (suite *tieredStorageTestSuite) writeCloudFile(name, data string) {
 	suite.Require().NoError(suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 }
 
-func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureKeepsLocalRename() {
+func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureRevertsLocalRename() {
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("src", "data")
 	handle, err := suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY, Mode: 0644},
+		internal.OpenFileOptions{Name: "src", Flags: os.O_RDWR, Mode: 0644},
 	)
 	suite.Require().NoError(err)
-	handlemap.Add(handle)
+	// Not added to the handlemap: loopback renames handles even when it fails.
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: []byte("D")})
+	suite.Require().NoError(err)
 	// An existing cloud directory makes the cloud rename fail.
-	blocker := filepath.Join(suite.fake_storage_path, "dst")
-	suite.Require().NoError(os.Mkdir(blocker, 0755))
+	suite.Require().NoError(os.Mkdir(filepath.Join(suite.fake_storage_path, "dst"), 0755))
 
 	err = suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"})
 	suite.Require().Error(err)
-	suite.assert.FileExists(suite.localFile("dst"))
-	suite.assert.Equal("dst", handle.Path)
-	value, found := suite.tieredStorage.fileMap.Load("dst")
-	suite.Require().True(found)
-	suite.assert.True(value.(*FileNode).isDirty.Load())
-
-	suite.Require().NoError(os.Remove(blocker))
+	suite.assert.FileExists(suite.localFile("src"))
+	suite.assert.NoFileExists(suite.localFile("dst"))
+	suite.assert.Equal("src", handle.Path)
+	_, stale := suite.tieredStorage.cloudStale.Load("src")
+	suite.assert.True(stale)
+	suite.assert.Equal([]string{"src"}, lruOrder(suite.tieredStorage.policy))
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 	)
-	data, err := os.ReadFile(filepath.Join(suite.fake_storage_path, "dst"))
-	suite.Require().NoError(err)
-	suite.assert.Equal("data", string(data))
-	suite.assert.NoFileExists(suite.localFile("dst"))
 }
 
-func (suite *tieredStorageTestSuite) TestRenameFileMissingCloudObjectSucceeds() {
+func (suite *tieredStorageTestSuite) TestRenameFileMovesStateWithFile() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("src", "data")
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src", Flags: os.O_RDWR, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	handlemap.Add(handle)
+	_, err = suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: []byte("D")})
+	suite.Require().NoError(err)
+	// Loopback, unlike object storage, needs the parent to exist.
+	suite.Require().NoError(os.Mkdir(filepath.Join(suite.fake_storage_path, "dir"), 0755))
+
+	suite.Require().NoError(
+		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dir/dst"}),
+	)
+	suite.assert.FileExists(suite.localFile("dir/dst"))
+	suite.assert.NoFileExists(suite.localFile("src"))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dir", "dst"))
+	suite.assert.Equal("dir/dst", handle.Path)
+	_, stale := suite.tieredStorage.cloudStale.Load("dir/dst")
+	suite.assert.True(stale)
+	_, stale = suite.tieredStorage.cloudStale.Load("src")
+	suite.assert.False(stale)
+	suite.assert.Equal([]string{"dir/dst"}, lruOrder(suite.tieredStorage.policy))
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+}
+
+func (suite *tieredStorageTestSuite) TestRenameOpenCachedFile() {
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("src", "data")
@@ -1150,15 +1177,61 @@ func (suite *tieredStorageTestSuite) TestRenameFileMissingCloudObjectSucceeds() 
 	)
 	suite.Require().NoError(err)
 	handlemap.Add(handle)
-	suite.Require().NoError(os.Remove(filepath.Join(suite.fake_storage_path, "src")))
 
 	suite.Require().NoError(
 		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
 	)
+	suite.assert.FileExists(suite.cacheFile("dst"))
+	suite.assert.NoFileExists(suite.localFile("dst"))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dst"))
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 	)
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dst"))
+	suite.assert.NoFileExists(suite.cacheFile("dst"))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameFileNeverUploadedSucceeds() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: "src", Mode: 0644})
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+
+	suite.Require().NoError(
+		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
+	)
+	suite.assert.FileExists(suite.localFile("dst"))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, "dst"))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameFileReplacesCopyInOtherTree() {
+	defer suite.cleanupTest()
+
+	// dst is local-owned; src is a cloud file that is open in cache/.
+	suite.writeCloudFile("src", "cloud src")
+	dstHandle, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: "dst", Mode: 0644})
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: dstHandle}),
+	)
+	srcHandle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY})
+	suite.Require().NoError(err)
+	handlemap.Add(srcHandle)
+
+	suite.Require().NoError(
+		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
+	)
+	suite.assert.NoFileExists(suite.localFile("dst"))
+	suite.assert.FileExists(suite.cacheFile("dst"))
+	suite.assert.NotContains(lruOrder(suite.tieredStorage.policy), "dst")
+	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: "dst"})
+	suite.Require().NoError(err)
+	suite.assert.EqualValues(len("cloud src"), attrs.Size)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: srcHandle}),
+	)
 }
 
 func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureSkipsLocalRename() {
@@ -1910,6 +1983,25 @@ func TestDeleteFileOfflineChangesNothing(t *testing.T) {
 	err := storage.DeleteFile(internal.DeleteFileOptions{Name: "file"})
 	assert.ErrorIs(t, err, &common.CloudUnreachableError{})
 	assert.FileExists(t, localPath)
+}
+
+func TestRenameFileOfflineChangesNothing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	root := t.TempDir()
+	localPath := filepath.Join(root, localDirName, "src")
+	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
+	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
+
+	storage := &TieredStorage{tmpPath: root, fileLocks: common.NewLockMap()}
+	storage.SetNextComponent(next)
+	next.EXPECT().CloudConnected().Return(false)
+	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)
+
+	err := storage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"})
+	assert.ErrorIs(t, err, &common.CloudUnreachableError{})
+	assert.FileExists(t, localPath)
+	assert.NoFileExists(t, filepath.Join(root, localDirName, "dst"))
 }
 
 func (suite *tieredStorageTestSuite) TestDeleteFileNotExists() {
