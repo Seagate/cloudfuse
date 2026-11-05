@@ -708,9 +708,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 				localCopyNode.size.Store(0)
 				localCopyNode.isDirty.Store(true)
 			} else {
-				if err := c.reserveSpace(attrs.Size); err != nil {
-					return nil, err
-				}
 				if err := c.downloadCopyFromCloud(options); err != nil {
 					return nil, err
 				}
@@ -831,27 +828,6 @@ func (c *TieredStorage) purgeLocal(name string) error {
 	return err
 }
 
-// reserveSpace evicts files as needed. Workers never block on file locks.
-func (c *TieredStorage) reserveSpace(numBytes int64) error {
-	if c.maxCacheSize <= 0 || numBytes <= 0 {
-		return nil
-	}
-	if float64(c.cacheSize.Used()+numBytes) <= c.maxCacheSize {
-		return nil
-	}
-	if c.policy == nil || c.policy.EvictNow(numBytes) {
-		return nil
-	}
-
-	log.Err(
-		"TieredStorage::reserveSpace : cache is full and nothing can be evicted (need %d bytes, using %d of %d)",
-		numBytes,
-		c.cacheSize.Used(),
-		int64(c.maxCacheSize),
-	)
-	return syscall.ENOSPC
-}
-
 func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
 	f := options.Handle.GetFileObject()
 	if f == nil {
@@ -882,14 +858,6 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	}
 
 	appending := options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend)
-	growth := int64(len(options.Data))
-	if !appending && node != nil {
-		growth = max(options.Offset+int64(len(options.Data))-node.size.Load(), 0)
-	}
-	if err := c.reserveSpace(growth); err != nil {
-		return 0, err
-	}
-
 	var bytesWritten int
 	var err error
 	if appending {
@@ -1344,13 +1312,6 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 	file := options.Handle.GetFileObject()
 	if file == nil {
 		return syscall.EBADF
-	}
-	info, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	if err := c.reserveSpace(max(options.NewSize-info.Size(), 0)); err != nil {
-		return err
 	}
 	if err := file.Truncate(options.NewSize); err != nil {
 		return err

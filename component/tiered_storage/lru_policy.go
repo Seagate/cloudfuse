@@ -132,12 +132,9 @@ func (q *lruQueue) StopPolicy() error {
 		return nil
 	}
 	close(q.doneChan)
+	// The checker is the only sender on uploadChan.
 	q.checkerWg.Wait()
-
-	// Prevent EvictNow from sending while uploadChan is closed.
-	q.evictMu.Lock()
 	close(q.uploadChan)
-	q.evictMu.Unlock()
 
 	q.workerWg.Wait()
 	return nil
@@ -282,13 +279,6 @@ func (q *lruQueue) capacityChecker() {
 			q.evictDownTo(int64(q.maxCacheSize * q.targetRatio))
 		}
 	}
-}
-
-// EvictNow synchronously makes room for growBytes.
-func (q *lruQueue) EvictNow(growBytes int64) bool {
-	target := min(int64(q.maxCacheSize*q.targetRatio), int64(q.maxCacheSize)-growBytes)
-	q.evictDownTo(target)
-	return float64(q.size.Used()+growBytes) <= q.maxCacheSize
 }
 
 // evictDownTo runs one eviction pass toward targetUsed.

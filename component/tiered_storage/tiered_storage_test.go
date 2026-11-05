@@ -590,6 +590,27 @@ func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
 	suite.assert.NoFileExists(suite.localFile(path))
 }
 
+func (suite *tieredStorageTestSuite) TestWriteIsNotLimitedByMaxSize() {
+	defer suite.cleanupTest()
+
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "big", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	data := make([]byte, 2*int(suite.tieredStorage.maxCacheSize))
+	n, err := suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.Require().NoError(err)
+	suite.assert.Equal(len(data), n)
+	suite.assert.Greater(float64(suite.tieredStorage.cacheSize.Used()), suite.tieredStorage.maxCacheSize)
+
+	suite.Require().NoError(suite.tieredStorage.TruncateFile(internal.TruncateFileOptions{
+		Name: "big", Handle: handle, NewSize: int64(3 * suite.tieredStorage.maxCacheSize),
+	}))
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+}
+
 func (suite *tieredStorageTestSuite) TestTruncateInvalidSize() {
 	defer suite.cleanupTest()
 
