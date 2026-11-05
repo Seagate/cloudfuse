@@ -336,6 +336,60 @@ func (suite *lruPolicyTestSuite) TestStopPolicyMidUpload() {
 	suite.assert.NoError(err)
 }
 
+func (suite *lruPolicyTestSuite) TestStopPolicyWaitsForEvictOnClose() {
+	started, release := make(chan struct{}), make(chan struct{})
+	var uploaded []string
+	var mu sync.Mutex
+	suite.policy.uploadandCleanFn = func(name string) error {
+		if name == "first" {
+			close(started)
+			<-release
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		uploaded = append(uploaded, name)
+		return nil
+	}
+
+	always := func() bool { return true }
+	suite.policy.EvictOnClose("first", always)
+	// "second" queues on evictMu behind "first".
+	<-started
+	suite.policy.EvictOnClose("second", always)
+
+	stopped := make(chan error, 1)
+	go func() { stopped <- suite.policy.StopPolicy() }()
+	suite.Never(func() bool { return len(stopped) > 0 }, 50*time.Millisecond, 5*time.Millisecond)
+	close(release)
+	suite.Require().NoError(<-stopped)
+
+	// The in-flight upload finished; the one that had not started was skipped.
+	suite.assert.Equal([]string{"first"}, uploaded)
+	// Nothing new starts after stopping.
+	suite.policy.EvictOnClose("third", always)
+	suite.policy.closeWg.Wait()
+	suite.assert.Equal([]string{"first"}, uploaded)
+
+	err := os.RemoveAll(cache_path)
+	suite.assert.NoError(err)
+}
+
+func (suite *lruPolicyTestSuite) TestEvictOnCloseSkipsOpenOrUnwantedFiles() {
+	defer suite.cleanupTest()
+	var uploaded []string
+	suite.policy.uploadandCleanFn = func(name string) error {
+		uploaded = append(uploaded, name)
+		return nil
+	}
+
+	suite.policy.fileLocks.Get("open").Inc()
+	suite.policy.EvictOnClose("open", func() bool { return true })
+	suite.policy.EvictOnClose("unwanted", func() bool { return false })
+	suite.policy.closeWg.Wait()
+
+	suite.assert.Empty(uploaded)
+}
+
 func TestLRUPolicyTestSuite(t *testing.T) {
 	suite.Run(t, new(lruPolicyTestSuite))
 }

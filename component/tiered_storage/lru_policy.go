@@ -76,11 +76,16 @@ type lruQueue struct {
 	// nodeMap is written under mu, but may be read without it.
 	nodeMap sync.Map
 
-	// evictMu serializes eviction cycles.
+	// evictMu serializes eviction: threshold passes and evict-on-close.
 	evictMu sync.Mutex
 
 	checkerWg sync.WaitGroup
 	workerWg  sync.WaitGroup
+
+	// closeMu keeps EvictOnClose from adding to closeWg once StopPolicy waits.
+	closeMu  sync.Mutex
+	stopping bool
+	closeWg  sync.WaitGroup
 
 	uploadChan chan uploadJob
 	doneChan   chan struct{}
@@ -137,7 +142,49 @@ func (q *lruQueue) StopPolicy() error {
 	close(q.uploadChan)
 
 	q.workerWg.Wait()
+
+	q.closeMu.Lock()
+	q.stopping = true
+	q.closeMu.Unlock()
+	q.closeWg.Wait()
 	return nil
+}
+
+// EvictOnClose evicts one file in the background, ahead of its LRU turn. It
+// skips the file if it is open, or if stillWanted (called with the file lock
+// held) returns false. A failed upload leaves the file for a later close or
+// for threshold eviction.
+func (q *lruQueue) EvictOnClose(name string, stillWanted func() bool) {
+	q.closeMu.Lock()
+	defer q.closeMu.Unlock()
+	if q.stopping {
+		return
+	}
+	q.closeWg.Add(1)
+
+	go func() {
+		defer q.closeWg.Done()
+
+		q.evictMu.Lock()
+		defer q.evictMu.Unlock()
+		select {
+		case <-q.doneChan:
+			return
+		default:
+		}
+
+		flock := q.fileLocks.Get(name)
+		flock.Lock()
+		defer flock.Unlock()
+		if flock.Count() > 0 || !stillWanted() {
+			return
+		}
+		if err := q.uploadandCleanFn(name); err != nil {
+			log.Err("lruQueue::EvictOnClose : %s upload failed [%v]", name, err)
+			return
+		}
+		q.Dequeue(name)
+	}()
 }
 
 // Enqueue adds or promotes an object unless a worker owns it.

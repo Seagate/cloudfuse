@@ -71,6 +71,8 @@ type TieredStorage struct {
 
 	cacheSize    *cacheSizeTracker
 	maxCacheSize float64
+	// evictOnClose evicts cloudStale files on their last close.
+	evictOnClose bool
 }
 
 type TieredStorageOptions struct {
@@ -81,6 +83,7 @@ type TieredStorageOptions struct {
 	MaxEviction     uint32  `config:"max-eviction"      yaml:"max-eviction,omitempty"`
 	Parallelism     uint32  `config:"parallelism"       yaml:"parallelism,omitempty"`
 	PollIntervalSec uint32  `config:"poll-interval-sec" yaml:"poll-interval-sec,omitempty"`
+	EvictOnClose    bool    `config:"evict-on-close"    yaml:"evict-on-close,omitempty"`
 }
 
 const (
@@ -267,6 +270,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		pollInterval = capacityPollInterval
 	}
 
+	c.evictOnClose = conf.EvictOnClose || !config.IsSet(compName+".evict-on-close")
 	c.maxCacheSize = conf.MaxSizeMB * common.MbToBytes
 	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
 
@@ -1106,6 +1110,13 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		}
 	} else if _, err := os.Stat(localPath); err == nil {
 		c.policy.Enqueue(name)
+		if _, stale := c.cloudStale.Load(name); stale && c.evictOnClose {
+			c.policy.EvictOnClose(name, func() bool {
+				_, stale := c.cloudStale.Load(name)
+				_, err := os.Stat(localPath)
+				return stale && err == nil
+			})
+		}
 	}
 	return closeErr
 }
