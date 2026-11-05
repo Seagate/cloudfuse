@@ -1286,38 +1286,11 @@ func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return err
-	}
-	info, localErr := os.Stat(localPath)
-	value, tracked := c.fileMap.Load(options.Name)
-	cloudBacked := !tracked || value.(*FileNode).cloudBacked.Load() ||
-		localErr == nil && info.IsDir()
-	if cloudBacked {
-		err = c.NextComponent().Chmod(options)
-		if err != nil && (localErr != nil || !errors.Is(err, os.ErrNotExist)) {
-			return err
-		}
-	}
-	if localErr != nil {
-		if cloudBacked {
-			return nil
-		}
-		return localErr
-	}
-	if err := os.Chmod(localPath, options.Mode); err != nil {
-		return err
-	}
-	if tracked {
-		// Keep mode current so a pending retry cannot apply a stale value.
-		node := value.(*FileNode)
-		node.mode.Store(uint32(options.Mode))
-		if !node.cloudBacked.Load() {
-			node.modeDirty.Store(true)
-		}
-	}
-	return nil
+	return c.changeAttr(
+		options.Name,
+		func() error { return c.NextComponent().Chmod(options) },
+		func(path string) error { return os.Chmod(path, options.Mode) },
+	)
 }
 
 func (c *TieredStorage) Chown(options internal.ChownOptions) error {
@@ -1325,38 +1298,58 @@ func (c *TieredStorage) Chown(options internal.ChownOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	localPath, err := c.localPath(options.Name)
+	return c.changeAttr(
+		options.Name,
+		func() error { return c.NextComponent().Chown(options) },
+		func(path string) error {
+			if runtime.GOOS == "windows" {
+				return nil
+			}
+			return os.Chown(path, options.Owner, options.Group)
+		},
+	)
+}
+
+// changeAttr applies a metadata change to the authoritative copy:
+//   - local/x: only the local file. Eviction uploads the change with the file.
+//   - cache/x: the cloud object, then the copy, which may later be promoted.
+//   - neither: only the cloud object.
+//
+// Directories exist in both places, so both are changed. The file lock must
+// be held.
+func (c *TieredStorage) changeAttr(
+	name string,
+	changeCloud func() error,
+	changeLocal func(path string) error,
+) error {
+	localPath, err := c.localPath(name)
 	if err != nil {
 		return err
 	}
-	info, localErr := os.Stat(localPath)
-	value, tracked := c.fileMap.Load(options.Name)
-	cloudBacked := !tracked || value.(*FileNode).cloudBacked.Load() ||
-		localErr == nil && info.IsDir()
-	if cloudBacked {
-		err = c.NextComponent().Chown(options)
-		if err != nil && (localErr != nil || !errors.Is(err, os.ErrNotExist)) {
+	cachePath, err := c.cachePath(name)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(localPath)
+	switch {
+	case err == nil && !info.IsDir():
+		return changeLocal(localPath)
+	case err == nil:
+		if err := changeCloud(); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
+		return changeLocal(localPath)
+	case !errors.Is(err, os.ErrNotExist):
+		return err
 	}
-	if localErr != nil {
-		if cloudBacked {
-			return nil
-		}
-		return localErr
+
+	if err := changeCloud(); err != nil {
+		return err
 	}
-	if runtime.GOOS != "windows" {
-		if err := os.Chown(localPath, options.Owner, options.Group); err != nil {
-			return err
-		}
-	}
-	if tracked {
-		// Keep owner current so a pending retry cannot apply a stale value.
-		node := value.(*FileNode)
-		node.owner.Store(int64(options.Owner))
-		node.group.Store(int64(options.Group))
-		if !node.cloudBacked.Load() {
-			node.ownerDirty.Store(true)
+	if _, err := os.Stat(cachePath); err == nil {
+		if err := changeLocal(cachePath); err != nil {
+			log.Warn("TieredStorage::changeAttr : %s changed in cloud, but not in cache [%v]", name, err)
 		}
 	}
 	return nil

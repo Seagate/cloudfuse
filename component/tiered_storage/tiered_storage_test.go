@@ -895,7 +895,7 @@ func (suite *tieredStorageTestSuite) TestChmodCloudBackedFileUpdatesBothTiers() 
 	suite.Require().NoError(suite.tieredStorage.Chmod(
 		internal.ChmodOptions{Name: path, Mode: 0600},
 	))
-	localInfo, err := os.Stat(suite.localFile(path))
+	localInfo, err := os.Stat(suite.cacheFile(path))
 	suite.Require().NoError(err)
 	cloudInfo, err := os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.Require().NoError(err)
@@ -904,6 +904,30 @@ func (suite *tieredStorageTestSuite) TestChmodCloudBackedFileUpdatesBothTiers() 
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 	)
+}
+
+func (suite *tieredStorageTestSuite) TestChmodLocalFileSkipsCloud() {
+	defer suite.cleanupTest()
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Windows only supports the read-only mode bit")
+	}
+
+	// A stale cloud copy must not be touched; the local file is authoritative.
+	const path = "local-over-stale"
+	suite.writeCloudFile(path, "stale")
+	cloudPath := filepath.Join(suite.fake_storage_path, path)
+	suite.Require().NoError(os.Chmod(cloudPath, 0644))
+	suite.Require().NoError(os.WriteFile(suite.localFile(path), []byte("local"), 0644))
+
+	suite.Require().NoError(suite.tieredStorage.Chmod(
+		internal.ChmodOptions{Name: path, Mode: 0600},
+	))
+	localInfo, err := os.Stat(suite.localFile(path))
+	suite.Require().NoError(err)
+	suite.assert.Equal(os.FileMode(0600), localInfo.Mode().Perm())
+	cloudInfo, err := os.Stat(cloudPath)
+	suite.Require().NoError(err)
+	suite.assert.Equal(os.FileMode(0644), cloudInfo.Mode().Perm())
 }
 
 func (suite *tieredStorageTestSuite) TestChmodCloudOnlyFile() {
