@@ -39,6 +39,9 @@ type LockMapItem struct {
 	downloadTime time.Time
 	// track if file is in lazy open state
 	LazyOpen bool
+	// CloudStale is set by tiered_storage when a local file's cloud copy is
+	// known to be outdated. Guarded by the item's lock.
+	CloudStale bool
 }
 
 // Map holding locks for all the files

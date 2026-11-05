@@ -103,10 +103,12 @@ Consequences:
   handle's next write costs one extra lock and `stat`. This is not
   `handlemap.HandleFlagCached`, which tells libfuse to read the file object
   directly and bypass the pipeline. Tiered storage never sets that flag.
-- **`cloudStale` set** of local-owned files, keyed by object name. Each entry
-  is guarded by that file's lock. Membership means a cloud copy is known to
+- **`cloudStale` flag** (`common.LockMapItem.CloudStale`) on each object's file
+  lock item, guarded by that lock. When it is set, a cloud copy is known to
   exist and to be outdated, so the file should be
-  [evicted on close](#evict-on-close).
+  [evicted on close](#evict-on-close). It has its own field instead of reusing
+  `file_cache`'s `DownloadTime` or the dirty-handle count, which mean
+  something different.
   - Set on promotion (`cache/x` → `local/x`) and on an `O_TRUNC` open of a
     cloud-owned file. Both of these already hold the file lock, and the cloud
     copy is known to exist at that moment, so no network call is needed.

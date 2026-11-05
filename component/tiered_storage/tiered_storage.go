@@ -65,10 +65,6 @@ type TieredStorage struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
 
-	// cloudStale holds names of local-owned files whose cloud copy is known to
-	// be outdated. Each entry is only read or changed under its file lock.
-	cloudStale sync.Map // object name -> struct{}
-
 	cacheSize    *cacheSizeTracker
 	maxCacheSize float64
 }
@@ -570,9 +566,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	for _, src := range names {
 		dst := dstName(src)
 		c.policy.Rename(src, dst)
-		if _, stale := c.cloudStale.LoadAndDelete(src); stale {
-			c.cloudStale.Store(dst, struct{}{})
-		}
+		sflock, dflock := c.fileLocks.Get(src), c.fileLocks.Get(dst)
+		dflock.CloudStale, sflock.CloudStale = sflock.CloudStale, false
 		c.renameOpenHandles(src, dst, c.fileLocks.Get(src), c.fileLocks.Get(dst))
 	}
 	return nil
@@ -714,7 +709,7 @@ func (c *TieredStorage) promote(name string) error {
 		log.Err("TieredStorage::promote : %s rename to local failed [%v]", name, err)
 		return err
 	}
-	c.cloudStale.Store(name, struct{}{})
+	c.fileLocks.Get(name).CloudStale = true
 	c.policy.Enqueue(name)
 	return nil
 }
@@ -840,7 +835,7 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 		}
 	}
 	c.policy.Dequeue(options.Name)
-	c.cloudStale.Delete(options.Name)
+	flock.CloudStale = false
 
 	if !found {
 		return syscall.ENOENT
@@ -913,7 +908,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			if err := c.createEmptyLocal(options.Name, attrs.Mode.Perm()); err != nil {
 				return nil, err
 			}
-			c.cloudStale.Store(options.Name, struct{}{})
+			flock.CloudStale = true
 			path = localPath
 		default:
 			if err := c.downloadToCache(options.Name, attrs.Mode.Perm()); err != nil {
@@ -1130,11 +1125,11 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	}
 	if _, err := os.Stat(localPath); err == nil {
 		c.policy.Enqueue(name)
-		if _, stale := c.cloudStale.Load(name); stale {
+		if flock.CloudStale {
+			// Called with the same file lock held.
 			c.policy.EvictOnClose(name, func() bool {
-				_, stale := c.cloudStale.Load(name)
 				_, err := os.Stat(localPath)
-				return stale && err == nil
+				return flock.CloudStale && err == nil
 			})
 		}
 	}
@@ -1197,7 +1192,7 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
 		return err
 	}
-	c.cloudStale.Delete(name)
+	c.fileLocks.Get(name).CloudStale = false
 	return nil
 }
 
@@ -1301,10 +1296,8 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	c.policy.Rename(options.Src, options.Dst)
-	c.cloudStale.Delete(options.Dst)
-	if _, stale := c.cloudStale.LoadAndDelete(options.Src); stale && !neverUploaded {
-		c.cloudStale.Store(options.Dst, struct{}{})
-	}
+	dflock.CloudStale = sflock.CloudStale && !neverUploaded
+	sflock.CloudStale = false
 	c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 	return nil
 }

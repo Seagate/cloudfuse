@@ -55,7 +55,7 @@ func TestEvictionUploadsLocalModeAndOwner(t *testing.T) {
 		cacheSize: newCacheSizeTracker(cachePath, 0),
 	}
 	storage.SetNextComponent(next)
-	storage.cloudStale.Store(path, struct{}{})
+	storage.fileLocks.Get(path).CloudStale = true
 
 	owner, group := os.Getuid(), os.Getgid()
 	next.EXPECT().CopyFromFile(gomock.Any()).Return(nil)
@@ -66,6 +66,6 @@ func TestEvictionUploadsLocalModeAndOwner(t *testing.T) {
 
 	require.NoError(t, storage.uploadandCleanFile(path))
 	assert.NoFileExists(t, localPath)
-	_, stale := storage.cloudStale.Load(path)
+	stale := storage.fileLocks.Get(path).CloudStale
 	assert.False(t, stale)
 }

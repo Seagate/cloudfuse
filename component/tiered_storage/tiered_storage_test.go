@@ -404,6 +404,14 @@ func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
 	suite.assert.EqualValues(len("cloud"), cloudAttrs.Size)
 }
 
+// isCloudStale reads a name's CloudStale flag under its file lock.
+func (suite *tieredStorageTestSuite) isCloudStale(name string) bool {
+	flock := suite.tieredStorage.fileLocks.Get(name)
+	flock.Lock()
+	defer flock.Unlock()
+	return flock.CloudStale
+}
+
 // lruOrder lists the LRU from tail (next to evict) to head.
 func lruOrder(q *lruQueue) []string {
 	q.mu.Lock()
@@ -453,13 +461,13 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 		cacheSize: newCacheSizeTracker(cachePath, 0),
 	}
 	storage.SetNextComponent(next)
-	storage.cloudStale.Store("file", struct{}{})
+	storage.fileLocks.Get("file").CloudStale = true
 	next.EXPECT().CopyFromFile(gomock.Any()).Return(errors.New("upload failed"))
 
 	err := storage.uploadandCleanFile("file")
 	require.Error(t, err)
 	assert.FileExists(t, localPath)
-	_, stale := storage.cloudStale.Load("file")
+	stale := storage.fileLocks.Get("file").CloudStale
 	assert.True(t, stale)
 }
 
@@ -578,7 +586,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileTruncatesCloudObjectWithoutDown
 	suite.Require().NoError(err)
 	suite.assert.Zero(info.Size())
 	suite.assert.NoFileExists(suite.cacheFile(path))
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.True(stale)
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
@@ -737,7 +745,7 @@ func (suite *tieredStorageTestSuite) TestWritePromotesCachedFile() {
 	suite.assert.NoFileExists(suite.cacheFile(path))
 	suite.assert.FileExists(suite.localFile(path))
 	suite.assert.False(suite.tieredStorage.onCacheCopy(writer))
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.True(stale)
 	suite.assert.Contains(lruOrder(suite.tieredStorage.policy), path)
 
@@ -810,7 +818,7 @@ func (suite *tieredStorageTestSuite) TestTruncatePromotesCachedFile() {
 	data, err := os.ReadFile(suite.localFile(path))
 	suite.Require().NoError(err)
 	suite.assert.Equal("cloud", string(data))
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.True(stale)
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
@@ -837,7 +845,7 @@ func (suite *tieredStorageTestSuite) TestOpenTruncPromotesOpenCachedFile() {
 	info, err := os.Stat(suite.localFile(path))
 	suite.Require().NoError(err)
 	suite.assert.Zero(info.Size())
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.True(stale)
 	for _, handle := range []*handlemap.Handle{reader, writer} {
 		suite.Require().NoError(
@@ -871,7 +879,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileExclusiveChangesNothing() {
 		suite.assert.ErrorIs(err, syscall.EEXIST)
 	}
 	suite.assert.FileExists(suite.cacheFile("cached"))
-	_, stale := suite.tieredStorage.cloudStale.Load("cached")
+	stale := suite.isCloudStale("cached")
 	suite.assert.False(stale)
 	suite.assert.Equal(used, suite.tieredStorage.cacheSize.Used())
 	for _, handle := range []*handlemap.Handle{reader, local} {
@@ -1356,7 +1364,7 @@ func (suite *tieredStorageTestSuite) TestRenameDirMovesCacheCopiesAndState() {
 	suite.assert.NoDirExists(suite.localFile("src"))
 	suite.assert.Equal("dst/cached", cached.Path)
 	suite.assert.Equal("dst/sub/promoted", promoted.Path)
-	_, stale := suite.tieredStorage.cloudStale.Load("dst/sub/promoted")
+	stale := suite.isCloudStale("dst/sub/promoted")
 	suite.assert.True(stale)
 	suite.assert.Equal([]string{"dst/sub/promoted"}, lruOrder(suite.tieredStorage.policy))
 	suite.assert.EqualValues(1, suite.tieredStorage.fileLocks.Get("dst/cached").Count())
@@ -1455,7 +1463,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureRevertsLocalRenam
 	suite.assert.FileExists(suite.localFile("src"))
 	suite.assert.NoFileExists(suite.localFile("dst"))
 	suite.assert.Equal("src", handle.Path)
-	_, stale := suite.tieredStorage.cloudStale.Load("src")
+	stale := suite.isCloudStale("src")
 	suite.assert.True(stale)
 	suite.assert.Equal([]string{"src"}, lruOrder(suite.tieredStorage.policy))
 	suite.Require().NoError(
@@ -1486,9 +1494,9 @@ func (suite *tieredStorageTestSuite) TestRenameFileMovesStateWithFile() {
 	suite.assert.NoFileExists(suite.localFile("src"))
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, "dir", "dst"))
 	suite.assert.Equal("dir/dst", handle.Path)
-	_, stale := suite.tieredStorage.cloudStale.Load("dir/dst")
+	stale := suite.isCloudStale("dir/dst")
 	suite.assert.True(stale)
-	_, stale = suite.tieredStorage.cloudStale.Load("src")
+	stale = suite.isCloudStale("src")
 	suite.assert.False(stale)
 	suite.assert.Equal([]string{"dir/dst"}, lruOrder(suite.tieredStorage.policy))
 	suite.Require().NoError(
@@ -1840,7 +1848,7 @@ func (suite *tieredStorageTestSuite) waitEvictOnClose() {
 }
 
 // promoteCloudFile writes data to the cloud, then opens and modifies it
-// through tiered storage, leaving it local-owned and cloudStale.
+// through tiered storage, leaving it local-owned and CloudStale.
 func (suite *tieredStorageTestSuite) promoteCloudFile(path, data string) *handlemap.Handle {
 	suite.writeCloudFile(path, data)
 	handle, err := suite.tieredStorage.OpenFile(
@@ -1868,7 +1876,7 @@ func (suite *tieredStorageTestSuite) TestReleasePromotedFileEvictsIt() {
 	suite.assert.Equal("LOCAL data", string(cloudData))
 	suite.assert.NoFileExists(suite.localFile(path))
 	suite.assert.Empty(lruOrder(suite.tieredStorage.policy))
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.False(stale)
 }
 
@@ -1930,7 +1938,7 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseUploadFailureKeepsFile() {
 
 	suite.assert.FileExists(suite.localFile(path))
 	suite.assert.Equal([]string{path}, lruOrder(suite.tieredStorage.policy))
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.True(stale)
 }
 
@@ -2038,7 +2046,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	suite.assert.False(handle2.Dirty())
 	suite.assert.False(handle.Dirty())
 
-	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	stale := suite.isCloudStale(path)
 	suite.assert.True(stale, "File should be marked as cloudStale")
 
 	//4. Release the read should upload to cloud
@@ -2355,7 +2363,7 @@ func (suite *tieredStorageTestSuite) TestDeleteFileOpenCachedAndPromoted() {
 		suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, name))
 	}
 	suite.assert.NotContains(lruOrder(suite.tieredStorage.policy), "promoted")
-	_, stale := suite.tieredStorage.cloudStale.Load("promoted")
+	stale := suite.isCloudStale("promoted")
 	suite.assert.False(stale)
 
 	// Handles stay usable after delete.
