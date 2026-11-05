@@ -209,9 +209,8 @@ repeatedly while open are uploaded at most once per close.
 1. Take the file lock, decrement the open count, close the file.
 2. If other handles remain open, return.
 3. If the file is in `cache/`: delete it.
-4. If the file is in `local/`: enqueue it in the LRU. If `cloudStale` is set
-   and `evict-on-close` is enabled, start an
-   [evict on close](#evict-on-close) goroutine.
+4. If the file is in `local/`: enqueue it in the LRU. If `cloudStale` is set,
+   start an [evict on close](#evict-on-close) goroutine.
 
 ### ReadInBuffer
 
@@ -374,9 +373,8 @@ A local-owned file with `cloudStale` set is evicted as soon as it is closed
 for the last time, whatever the usage thresholds say. A file that came from
 the cloud therefore returns to the cloud once it is no longer in use. The cloud
 copy does not stay stale until LRU eviction reaches the file, which may never
-happen for a frequently used file. This is controlled by
-`tiered_storage.evict-on-close` (default `true`). It only affects files with
-`cloudStale` set.
+happen for a frequently used file. It only affects files with `cloudStale`
+set. It is not configurable; an option can be added if users ask for one.
 
 `ReleaseFile` starts a goroutine for the path and returns. It never uploads
 inline. The goroutine:
@@ -510,7 +508,7 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
   set by create, and is unset after a restart.
 - Last close of a `cloudStale` file evicts it (upload, then delete `local/x`)
   regardless of thresholds. It is not evicted if it was reopened, deleted, or
-  renamed first, or if `evict-on-close` is false.
+  renamed first.
 - Last close of a locally created file does not evict it.
 - A failed evict on close leaves the file in `local/` with `cloudStale` set,
   and does not retry until the next close or normal eviction.

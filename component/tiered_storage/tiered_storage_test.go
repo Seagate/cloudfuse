@@ -274,7 +274,6 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 		maxEviction  uint32
 		parallelism  int
 		pollInterval time.Duration
-		keepOnClose  bool // evict-on-close is expected to be off
 	}{
 		{
 			name:   "defaults",
@@ -288,12 +287,6 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 				"  max-eviction: 25\n  parallelism: 3\n  poll-interval-sec: 4",
 			high: 0.9, low: 0.7, maxEviction: 25, parallelism: 3,
 			pollInterval: 4 * time.Second,
-		},
-		{
-			name:   "evict-on-close disabled",
-			config: "max-size-mb: 1\n  evict-on-close: false",
-			high:   0.9, low: 0.8, maxEviction: 5000, parallelism: 8,
-			pollInterval: time.Second, keepOnClose: true,
 		},
 		{name: "missing capacity", config: "high-threshold: 80", wantErr: true},
 		{
