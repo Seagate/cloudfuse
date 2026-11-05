@@ -18,13 +18,14 @@ jobs:
     permissions:
       security-events: write # Needed to upload the analysis results
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      - parallel:
+          - name: Checkout repository
+            uses: actions/checkout@v7.0.1
+            with:
+              persist-credentials: false
 
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+          - name: Install the latest version of uv
+            uses: astral-sh/setup-uv@v10.3.2
 
       - name: Run zizmor 🌈
         run: uvx zizmor --pedantic --format sarif . > results.sarif
@@ -32,7 +33,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@v4.39.1
         with:
           sarif_file: results.sarif
           category: zizmor
