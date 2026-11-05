@@ -92,6 +92,10 @@ Consequences:
 - **Per-object file locks** (`common.LockMap`), with open-handle counts.
 - **LRU queue** of local-owned files, used for eviction.
 - **Cache size tracker**, covering both `local/` and `cache/`.
+- **Cache handles**: the set of open handles opened on a `cache/` copy that have
+  not been promoted yet, so a change knows it must promote first. This is not
+  `handlemap.HandleFlagCached`, which tells libfuse to read the file object
+  directly and bypass the pipeline. Tiered storage never sets that flag.
 - **`cloudStale` set** of local-owned files, keyed by object name. Each entry
   is guarded by that file's lock. Membership means a cloud copy is known to
   exist and to be outdated, so the file should be

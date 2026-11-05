@@ -69,6 +69,12 @@ type TieredStorage struct {
 	// be outdated. Each entry is only read or changed under its file lock.
 	cloudStale sync.Map // object name -> struct{}
 
+	// cacheHandles holds open handles on a cache/ copy, which must be promoted
+	// before their first change. This is not handlemap.HandleFlagCached: that
+	// flag tells libfuse to read the file object directly, bypassing the
+	// pipeline.
+	cacheHandles sync.Map // *handlemap.Handle -> struct{}
+
 	cacheSize    *cacheSizeTracker
 	maxCacheSize float64
 }
@@ -668,7 +674,7 @@ func (c *TieredStorage) openHandle(
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 	if cached {
-		handle.Flags.Set(handlemap.HandleFlagCached)
+		c.cacheHandles.Store(handle, struct{}{})
 	}
 	flock.Inc()
 	return handle, nil
@@ -717,14 +723,21 @@ func (c *TieredStorage) promote(name string) error {
 // promoteHandle promotes the file behind a cached handle, so the handle no
 // longer refers to a copy in cache/. The handle's file lock must be held.
 func (c *TieredStorage) promoteHandle(handle *handlemap.Handle) error {
-	if !handle.Cached() {
+	if !c.onCacheCopy(handle) {
 		return nil
 	}
 	if err := c.promote(handle.Path); err != nil {
 		return err
 	}
-	handle.Flags.Clear(handlemap.HandleFlagCached)
+	c.cacheHandles.Delete(handle)
 	return nil
+}
+
+// onCacheCopy reports whether a handle was opened on a cache/ copy and has not
+// been promoted since.
+func (c *TieredStorage) onCacheCopy(handle *handlemap.Handle) bool {
+	_, found := c.cacheHandles.Load(handle)
+	return found
 }
 
 // lockHandle takes the file lock for a handle's current path. A rename can
@@ -999,7 +1012,7 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	if f == nil {
 		return 0, syscall.EBADF
 	}
-	if options.Handle.Cached() {
+	if c.onCacheCopy(options.Handle) {
 		flock := c.lockHandle(options.Handle)
 		err := c.promoteHandle(options.Handle)
 		flock.Unlock()
@@ -1085,6 +1098,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	}
 
 	c.clearHandleDirty(options.Handle)
+	c.cacheHandles.Delete(options.Handle)
 	options.Handle.Cleanup()
 
 	handlemap.Delete(options.Handle.ID)
