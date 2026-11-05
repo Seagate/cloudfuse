@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -1243,6 +1244,46 @@ func (suite *tieredStorageTestSuite) TestStreamDirListsImplicitLocalDirectory() 
 	suite.Require().NoError(
 		suite.tieredStorage.CloseDir(internal.CloseDirOptions{Name: "directory"}),
 	)
+}
+
+func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	root := t.TempDir()
+	localDir := filepath.Join(root, localDirName)
+	require.NoError(t, os.MkdirAll(localDir, 0700))
+	for _, name := range []string{"a", "c"} {
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, name), []byte("local"), 0600))
+	}
+
+	storage := &TieredStorage{tmpPath: root}
+	storage.SetNextComponent(next)
+	// attr_cache returns its cached listing, which must not be modified.
+	firstPage := []*internal.ObjAttr{{Path: "a", Name: "a"}, {Path: "b", Name: "b"}}
+	firstPageCopy := slices.Clone(firstPage)
+	next.EXPECT().StreamDir(internal.StreamDirOptions{}).Return(firstPage, "page2", nil)
+	next.EXPECT().StreamDir(internal.StreamDirOptions{Token: "page2"}).
+		Return([]*internal.ObjAttr{{Path: "c", Name: "c"}, {Path: "d", Name: "d"}}, "", nil)
+
+	var names []string
+	var sizes = map[string]int64{}
+	token := ""
+	for {
+		attrs, nextToken, err := storage.StreamDir(internal.StreamDirOptions{Token: token})
+		require.NoError(t, err)
+		for _, attr := range attrs {
+			names = append(names, attr.Name)
+			sizes[attr.Name] = attr.Size
+		}
+		if nextToken == "" {
+			break
+		}
+		token = nextToken
+	}
+	assert.ElementsMatch(t, []string{"a", "b", "c", "d"}, names)
+	assert.EqualValues(t, len("local"), sizes["a"])
+	assert.EqualValues(t, len("local"), sizes["c"])
+	assert.Equal(t, firstPageCopy, firstPage)
 }
 
 func (suite *tieredStorageTestSuite) TestRenameLocalOnlyDirectory() {

@@ -392,43 +392,45 @@ func (c *TieredStorage) StreamDir(
 		token = ""
 	}
 
-	// Local entries win, as in GetAttr. cache/ copies match the cloud, so
-	// cache/ is never listed.
-	localAttrs := make(map[string]*internal.ObjAttr, len(entries))
+	// Local entries win, as in GetAttr: they are listed once, on the first
+	// page, and their cloud counterparts are dropped from every page. cache/
+	// copies match the cloud, so cache/ is never listed.
+	firstPage := options.Token == ""
+	localNames := make(map[string]struct{}, len(entries))
+	var localAttrs []*internal.ObjAttr
 	for _, entry := range entries {
 		name := entry.Name()
-		// Lstat rather than entry.Info: on Windows, directory data can be
-		// stale for files being written.
-		info, err := os.Lstat(filepath.Join(localPath, name))
+		if !firstPage {
+			localNames[name] = struct{}{}
+			continue
+		}
+		// On Windows this is the directory data, whose size can lag for an
+		// open file, as on NTFS itself. GetAttr reports the current size.
+		info, err := entry.Info()
 		if errors.Is(err, os.ErrNotExist) {
+			// Evicted since ReadDir, so the cloud entry stands.
 			continue
 		}
 		if err != nil {
 			return nil, "", err
 		}
+		localNames[name] = struct{}{}
 		entryName := common.JoinUnixFilepath(options.Name, name)
-		localAttrs[name] = newTieredStorageObjAttr(entryName, info)
+		localAttrs = append(localAttrs, newTieredStorageObjAttr(entryName, info))
 	}
 
-	listed := make(map[string]struct{}, len(attrs))
-	for index, attr := range attrs {
-		listed[attr.Name] = struct{}{}
-		if local, found := localAttrs[attr.Name]; found {
-			attrs[index] = local
+	// attrs may be attr_cache's cached listing, so build a new slice.
+	merged := make([]*internal.ObjAttr, 0, len(attrs)+len(localAttrs))
+	for _, attr := range attrs {
+		if _, found := localNames[attr.Name]; !found {
+			merged = append(merged, attr)
 		}
 	}
-
-	if token == "" {
-		for name, attr := range localAttrs {
-			if _, found := listed[name]; !found {
-				attrs = append(attrs, attr)
-			}
-		}
-	}
-	slices.SortFunc(attrs, func(a, b *internal.ObjAttr) int {
+	merged = append(merged, localAttrs...)
+	slices.SortFunc(merged, func(a, b *internal.ObjAttr) int {
 		return strings.Compare(a.Path, b.Path)
 	})
-	return attrs, token, nil
+	return merged, token, nil
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
