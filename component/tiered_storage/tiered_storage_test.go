@@ -619,6 +619,102 @@ func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
 	suite.assert.NoFileExists(suite.localFile(path))
 }
 
+func (suite *tieredStorageTestSuite) TestWritePromotesCachedFile() {
+	defer suite.cleanupTest()
+
+	const path = "dir/promote"
+	suite.writeCloudFile(path, "cloud data")
+	openRW := internal.OpenFileOptions{Name: path, Flags: os.O_RDWR}
+	writer, err := suite.tieredStorage.OpenFile(openRW)
+	suite.Require().NoError(err)
+	reader, err := suite.tieredStorage.OpenFile(openRW)
+	suite.Require().NoError(err)
+
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: writer, Data: []byte("LOCAL")},
+	)
+	suite.Require().NoError(err)
+
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	suite.assert.FileExists(suite.localFile(path))
+	suite.assert.False(writer.Cached())
+	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	suite.assert.True(stale)
+	suite.assert.Contains(lruOrder(suite.tieredStorage.policy), path)
+
+	// The other handle still works, and sees the promoted file.
+	buffer := make([]byte, len("LOCAL data"))
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: reader, Data: buffer},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Equal("LOCAL data", string(buffer))
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: reader, Offset: 5, Data: []byte("!")},
+	)
+	suite.Require().NoError(err)
+	suite.assert.False(reader.Cached())
+
+	data, err := os.ReadFile(suite.localFile(path))
+	suite.Require().NoError(err)
+	suite.assert.Equal("LOCAL!data", string(data))
+	for _, handle := range []*handlemap.Handle{writer, reader} {
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+}
+
+func (suite *tieredStorageTestSuite) TestTruncatePromotesCachedFile() {
+	defer suite.cleanupTest()
+
+	const path = "truncate-promote"
+	suite.writeCloudFile(path, "cloud data")
+	handle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
+	suite.Require().NoError(err)
+
+	suite.Require().NoError(suite.tieredStorage.TruncateFile(
+		internal.TruncateFileOptions{Name: path, Handle: handle, NewSize: 5},
+	))
+
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	data, err := os.ReadFile(suite.localFile(path))
+	suite.Require().NoError(err)
+	suite.assert.Equal("cloud", string(data))
+	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	suite.assert.True(stale)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+}
+
+func (suite *tieredStorageTestSuite) TestOpenTruncPromotesOpenCachedFile() {
+	defer suite.cleanupTest()
+
+	const path = "trunc-open-cached"
+	suite.writeCloudFile(path, "cloud data")
+	reader, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
+	suite.Require().NoError(err)
+
+	writer, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_WRONLY | os.O_TRUNC},
+	)
+	suite.Require().NoError(err)
+
+	suite.assert.False(writer.Cached())
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	info, err := os.Stat(suite.localFile(path))
+	suite.Require().NoError(err)
+	suite.assert.Zero(info.Size())
+	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	suite.assert.True(stale)
+	for _, handle := range []*handlemap.Handle{reader, writer} {
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
+}
+
 func (suite *tieredStorageTestSuite) TestDownloadToCache() {
 	defer suite.cleanupTest()
 

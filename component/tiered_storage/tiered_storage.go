@@ -600,6 +600,68 @@ func (c *TieredStorage) openHandle(
 	return handle, nil
 }
 
+// promote makes an open cloud-owned file local-owned before its first
+// change: cache/x is renamed to local/x, marked cloudStale, and enqueued in the
+// LRU. Open handles stay valid. It does nothing if cache/x is gone, because
+// another handle promoted it or it was deleted. The file lock must be held.
+func (c *TieredStorage) promote(name string) error {
+	cachePath, err := c.cachePath(name)
+	if err != nil {
+		return err
+	}
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(cachePath); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
+		return err
+	}
+	if err := os.Rename(cachePath, localPath); err != nil {
+		log.Err("TieredStorage::promote : %s rename to local failed [%v]", name, err)
+		return err
+	}
+	c.cloudStale.Store(name, struct{}{})
+	c.policy.Enqueue(name)
+	return nil
+}
+
+// promoteHandle promotes the file behind a cached handle, so the handle no
+// longer refers to a copy in cache/. The handle's file lock must be held.
+func (c *TieredStorage) promoteHandle(handle *handlemap.Handle) error {
+	if !handle.Cached() {
+		return nil
+	}
+	if err := c.promote(handle.Path); err != nil {
+		return err
+	}
+	handle.Flags.Clear(handlemap.HandleFlagCached)
+	return nil
+}
+
+// lockHandle takes the file lock for a handle's current path. A rename can
+// change the path while waiting for the lock, so retry until they match.
+func (c *TieredStorage) lockHandle(handle *handlemap.Handle) *common.LockMapItem {
+	for {
+		handle.RLock()
+		name := handle.Path
+		handle.RUnlock()
+		flock := c.fileLocks.Get(name)
+		flock.Lock()
+		handle.RLock()
+		current := handle.Path
+		handle.RUnlock()
+		if current == name {
+			return flock
+		}
+		flock.Unlock()
+	}
+}
+
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
@@ -685,9 +747,16 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
-	} else if _, err := os.Stat(cachePath); err == nil {
+	} else if info, err := os.Stat(cachePath); err == nil {
 		// Another handle has this cloud-owned file open.
 		path, cached = cachePath, true
+		if truncate {
+			if err := c.promote(options.Name); err != nil {
+				return nil, err
+			}
+			c.cacheSize.Add(-info.Size())
+			path, cached = localPath, false
+		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	} else {
@@ -816,6 +885,14 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		return 0, syscall.EBADF
+	}
+	if options.Handle.Cached() {
+		flock := c.lockHandle(options.Handle)
+		err := c.promoteHandle(options.Handle)
+		flock.Unlock()
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	var node *FileNode
@@ -1270,14 +1347,16 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 		return c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	}
 
-	name := options.Handle.Path
-	flock := c.fileLocks.Get(name)
-	flock.Lock()
+	flock := c.lockHandle(options.Handle)
 	defer flock.Unlock()
+	name := options.Handle.Path
 
 	file := options.Handle.GetFileObject()
 	if file == nil {
 		return syscall.EBADF
+	}
+	if err := c.promoteHandle(options.Handle); err != nil {
+		return err
 	}
 	if err := file.Truncate(options.NewSize); err != nil {
 		return err
