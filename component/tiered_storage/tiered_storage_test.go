@@ -329,7 +329,6 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 			assert.Equal(t, test.maxEviction, storage.policy.maxEviction)
 			assert.Equal(t, test.parallelism, storage.policy.numWorkers)
 			assert.Equal(t, test.pollInterval, storage.policy.pollInterval)
-			assert.Equal(t, !test.keepOnClose, storage.evictOnClose)
 		})
 	}
 }
@@ -1843,23 +1842,6 @@ func (suite *tieredStorageTestSuite) TestReleasePromotedFileEvictsIt() {
 	suite.assert.Empty(lruOrder(suite.tieredStorage.policy))
 	_, stale := suite.tieredStorage.cloudStale.Load(path)
 	suite.assert.False(stale)
-}
-
-func (suite *tieredStorageTestSuite) TestEvictOnCloseDisabledKeepsFileLocal() {
-	defer suite.cleanupTest()
-	suite.tieredStorage.evictOnClose = false
-	const path = "keep-promoted"
-	handle := suite.promoteCloudFile(path, "cloud data")
-
-	suite.Require().
-		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
-	suite.waitEvictOnClose()
-
-	suite.assert.FileExists(suite.localFile(path))
-	suite.assert.Equal([]string{path}, lruOrder(suite.tieredStorage.policy))
-	cloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, path))
-	suite.Require().NoError(err)
-	suite.assert.Equal("cloud data", string(cloudData))
 }
 
 func (suite *tieredStorageTestSuite) TestEvictOnCloseSkipsLocallyCreatedFile() {

@@ -140,7 +140,6 @@ tiered_storage:
   max-eviction: <maximum files selected in one eviction pass. Default - 5000>
   parallelism: <number of parallel cloud uploads. Default - 8>
   poll-interval-sec: <seconds between capacity checks. Default - 1>
-  evict-on-close: true|false <upload and evict a file that came from the cloud as soon as it is closed after being modified, so the cloud copy does not stay stale. Files created locally are not affected. Default - true>
 
 # Attribute cache related configuration
 attr_cache:
