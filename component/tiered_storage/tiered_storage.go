@@ -98,7 +98,6 @@ const (
 	defaultMaxEviction        = 5000
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
-	partialDownloadSuffix     = ".cloudfuse-partial"
 	// The tiered root holds exactly these two trees. A file is in at most one.
 	localDirName = "local"
 	cacheDirName = "cache"
@@ -708,7 +707,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 				localCopyNode.size.Store(0)
 				localCopyNode.isDirty.Store(true)
 			} else {
-				if err := c.downloadCopyFromCloud(options); err != nil {
+				if err := c.downloadToCache(options.Name, attrs.Mode.Perm()); err != nil {
 					return nil, err
 				}
 			}
@@ -752,64 +751,42 @@ func (c *TieredStorage) cacheFileMode(mode os.FileMode) os.FileMode {
 	return mode
 }
 
-// downloadCopyFromCloud publishes the local path only after a complete download.
-func (c *TieredStorage) downloadCopyFromCloud(options internal.OpenFileOptions) error {
-	localPath, err := c.localPath(options.Name)
+// downloadToCache copies a cloud object into cache/. The object's file lock
+// must be held, which keeps other openers from seeing a partial download. A
+// failed download is removed; startup removes any left by a crash.
+func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
+	cachePath, err := c.cachePath(name)
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(filepath.Dir(localPath), cacheDirPerm)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Dir(cachePath), cacheDirPerm); err != nil {
 		return err
 	}
-	// dummy code so it compiles (for now)
-	partPath := localPath + partialDownloadSuffix
-	partFile, err := common.OpenFile(partPath, 0, 0)
+	// The mode matters if the file is later promoted to local/.
+	file, err := common.OpenFile(cachePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, c.cacheFileMode(mode))
 	if err != nil {
 		return err
 	}
 
-	err = c.NextComponent().CopyToFile(internal.CopyToFileOptions{
-		Name:   options.Name,
-		Offset: 0,
-		Count:  0,
-		File:   partFile,
-	})
+	err = c.NextComponent().CopyToFile(internal.CopyToFileOptions{Name: name, File: file})
+	var size int64
 	if err == nil {
-		err = partFile.Sync()
+		var info os.FileInfo
+		if info, err = file.Stat(); err == nil {
+			size = info.Size()
+		}
 	}
-	if closeErr := partFile.Close(); err == nil {
+	if closeErr := file.Close(); err == nil {
 		err = closeErr
 	}
 	if err != nil {
-		log.Err("TieredStorage::downloadCopyFromCloud : %s download failed [%v]", options.Name, err)
-		_ = os.Remove(partPath)
+		log.Err("TieredStorage::downloadToCache : %s download failed [%v]", name, err)
+		_ = os.Remove(cachePath)
 		return err
 	}
 
-	if err := replaceFile(partPath, localPath); err != nil {
-		log.Err("TieredStorage::downloadCopyFromCloud : %s rename failed [%v]", options.Name, err)
-		_ = os.Remove(partPath)
-		return err
-	}
-
-	if info, statErr := os.Stat(localPath); statErr == nil {
-		c.cacheSize.Add(info.Size())
-	}
-
+	c.cacheSize.Add(size)
 	return nil
-}
-
-// replaceFile handles Windows rename-over-existing behavior.
-func replaceFile(src, dst string) error {
-	err := os.Rename(src, dst)
-	if err == nil {
-		return nil
-	}
-	if rmErr := os.Remove(dst); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-		return err
-	}
-	return os.Rename(src, dst)
 }
 
 // purgeLocal removes an object's local copy and updates the usage counter.

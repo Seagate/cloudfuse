@@ -590,6 +590,20 @@ func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
 	suite.assert.NoFileExists(suite.localFile(path))
 }
 
+func (suite *tieredStorageTestSuite) TestDownloadToCache() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("dir/cloud", "cloud data")
+	suite.Require().NoError(suite.tieredStorage.downloadToCache("dir/cloud", 0640))
+	data, err := os.ReadFile(suite.cacheFile("dir/cloud"))
+	suite.Require().NoError(err)
+	suite.assert.Equal("cloud data", string(data))
+
+	err = suite.tieredStorage.downloadToCache("missing", 0640)
+	suite.assert.Error(err)
+	suite.assert.NoFileExists(suite.cacheFile("missing"))
+}
+
 func (suite *tieredStorageTestSuite) TestWriteIsNotLimitedByMaxSize() {
 	defer suite.cleanupTest()
 
@@ -909,6 +923,8 @@ func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
 }
 
 func (suite *tieredStorageTestSuite) writeCloudFile(name, data string) {
+	cloudDir := filepath.Join(suite.fake_storage_path, filepath.Dir(filepath.FromSlash(name)))
+	suite.Require().NoError(os.MkdirAll(cloudDir, 0755))
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: name, Mode: 0644})
 	suite.Require().NoError(err)
 	_, err = suite.loopback.WriteFile(
