@@ -51,10 +51,15 @@ import (
 // TieredStorage keeps new data local and uses cloud storage as overflow.
 // Cloud objects are cached only while open.
 //
-// Lock order: file lock, evictMu, then lruQueue.mu. Rename takes file locks in
-// lexical order. Never acquire a file lock while holding lruQueue.mu.
+// Lock order: dirRenameMu, evictMu, file locks (lexical order), then
+// lruQueue.mu. Never acquire a file lock while holding lruQueue.mu.
 type TieredStorage struct {
 	internal.BaseComponent
+
+	// dirRenameMu keeps new names from appearing while RenameDir collects and
+	// moves the names under a directory. Operations that can add a name take
+	// it for reading.
+	dirRenameMu sync.RWMutex
 
 	fileMap sync.Map // uses object name (common.JoinUnixFilepath)
 
@@ -323,6 +328,9 @@ func (c *TieredStorage) treePath(tree, name string) (string, error) {
 
 // Directory operations
 func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
+	c.dirRenameMu.RLock()
+	defer c.dirRenameMu.RUnlock()
+
 	if _, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name}); err == nil {
 		return syscall.EEXIST
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -479,94 +487,157 @@ func (c *TieredStorage) CloseDir(options internal.CloseDirOptions) error {
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
-	srcPath, err := c.localPath(options.Src)
+	log.Trace("TieredStorage::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
+
+	// Hold off new names under src, so none are missed below.
+	c.dirRenameMu.Lock()
+	defer c.dirRenameMu.Unlock()
+
+	srcLocal, err := c.localPath(options.Src)
 	if err != nil {
 		return err
 	}
-	dstPath, err := c.localPath(options.Dst)
+	srcCache, err := c.cachePath(options.Src)
 	if err != nil {
 		return err
 	}
-	_, localErr := os.Stat(srcPath)
-	localExists := !errors.Is(localErr, os.ErrNotExist)
-	if localErr != nil && localExists {
-		return localErr
+	dstLocal, err := c.localPath(options.Dst)
+	if err != nil {
+		return err
+	}
+	dstCache, err := c.cachePath(options.Dst)
+	if err != nil {
+		return err
 	}
 
-	prefix := common.JoinUnixFilepath(options.Src) + "/"
-	var srcNames []string
-	c.fileMap.Range(func(key, _ any) bool {
-		name := key.(string)
-		if strings.HasPrefix(name, prefix) {
-			srcNames = append(srcNames, name)
-		}
-		return true
-	})
-
-	type renameEntry struct {
-		src string
-		dst string
+	srcPrefix := common.JoinUnixFilepath(options.Src) + "/"
+	names, err := c.filesUnder(options.Src)
+	if err != nil {
+		return err
 	}
-	entries := make([]renameEntry, 0, len(srcNames))
-	lockNames := make([]string, 0, len(srcNames)*2)
-	for _, src := range srcNames {
-		dst := common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, prefix))
-		entries = append(entries, renameEntry{src: src, dst: dst})
-		lockNames = append(lockNames, src, dst)
+	dstName := func(src string) string {
+		return common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, srcPrefix))
+	}
+	lockNames := make([]string, 0, len(names)*2)
+	for _, src := range names {
+		lockNames = append(lockNames, src, dstName(src))
 	}
 	slices.Sort(lockNames)
 	lockNames = slices.Compact(lockNames)
-	locks := make([]*common.LockMapItem, 0, len(lockNames))
 	for _, name := range lockNames {
-		flock := c.fileLocks.Get(name)
-		flock.Lock()
-		locks = append(locks, flock)
+		c.fileLocks.Get(name).Lock()
 	}
 	defer func() {
-		for _, flock := range slices.Backward(locks) {
-			flock.Unlock()
+		for _, name := range slices.Backward(lockNames) {
+			c.fileLocks.Get(name).Unlock()
 		}
 	}()
 
-	if !localExists {
-		return c.NextComponent().RenameDir(options)
+	if err := c.checkCloudReachable(options.Src); err != nil {
+		return err
+	}
+	if _, err := os.Stat(dstLocal); err == nil {
+		return syscall.EEXIST
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	// cache/ is not pruned, so dst may be an empty leftover there.
+	_ = os.Remove(dstCache)
+
+	// Rename locally first: it can fail (on Windows, for open files), but is
+	// cheap to undo. The cloud rename runs last.
+	type move struct{ from, to string }
+	var moved []move
+	revert := func() {
+		for _, m := range slices.Backward(moved) {
+			if err := os.Rename(m.to, m.from); err != nil {
+				log.Err(
+					"TieredStorage::RenameDir : reverting %s -> %s failed; local and cloud have diverged [%v]",
+					m.to,
+					m.from,
+					err,
+				)
+			}
+		}
+	}
+	srcLocalExists := false
+	for _, m := range []move{{srcLocal, dstLocal}, {srcCache, dstCache}} {
+		if _, err := os.Stat(m.from); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			revert()
+			return err
+		}
+		if m.from == srcLocal {
+			srcLocalExists = true
+		}
+		err := os.MkdirAll(filepath.Dir(m.to), cacheDirPerm)
+		if err == nil {
+			err = os.Rename(m.from, m.to)
+		}
+		if err != nil {
+			revert()
+			if runtime.GOOS == "windows" && errors.Is(err, os.ErrPermission) {
+				// Windows refuses to rename a directory with open files in it.
+				return syscall.EBUSY
+			}
+			return err
+		}
+		moved = append(moved, m)
 	}
 
+	// A directory that exists only locally may be unknown to the cloud.
 	cloudErr := c.NextComponent().RenameDir(options)
-	if cloudErr != nil && !errors.Is(cloudErr, os.ErrNotExist) {
+	if cloudErr != nil && !(srcLocalExists && errors.Is(cloudErr, os.ErrNotExist)) {
 		log.Err(
-			"TieredStorage::RenameDir : %s -> %s cloud rename failed; skipping local rename to avoid mixed state [%v]",
+			"TieredStorage::RenameDir : %s -> %s cloud rename failed [%v]",
 			options.Src,
 			options.Dst,
 			cloudErr,
 		)
+		revert()
 		return cloudErr
 	}
-	if err := os.MkdirAll(filepath.Dir(dstPath), cacheDirPerm); err != nil {
-		return err
-	}
-	if err := os.Rename(srcPath, dstPath); err != nil {
-		return err
-	}
 
-	for _, entry := range entries {
-		value, found := c.fileMap.LoadAndDelete(entry.src)
-		if !found {
-			continue
+	for _, src := range names {
+		dst := dstName(src)
+		c.policy.Rename(src, dst)
+		if _, stale := c.cloudStale.LoadAndDelete(src); stale {
+			c.cloudStale.Store(dst, struct{}{})
 		}
-		node := value.(*FileNode)
-		node.name = entry.dst
-		c.fileMap.Store(entry.dst, node)
-
-		c.policy.Rename(entry.src, entry.dst)
-		c.renameOpenHandles(
-			entry.src,
-			entry.dst,
-			c.fileLocks.Get(entry.src),
-			c.fileLocks.Get(entry.dst),
-		)
+		c.renameOpenHandles(src, dst, c.fileLocks.Get(src), c.fileLocks.Get(dst))
 	}
 	return nil
+}
+
+// filesUnder lists the object names of files beneath a directory in local/ and
+// cache/.
+func (c *TieredStorage) filesUnder(dir string) ([]string, error) {
+	var names []string
+	for _, tree := range []string{localDirName, cacheDirName} {
+		root, err := c.treePath(tree, dir)
+		if err != nil {
+			return nil, err
+		}
+		err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			if err != nil || !entry.Type().IsRegular() {
+				return err
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			names = append(names, common.JoinUnixFilepath(dir, filepath.ToSlash(rel)))
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return names, nil
 }
 
 // errCloudDisconnected is wrapped by CloudUnreachableError when a namespace
@@ -704,6 +775,9 @@ func (c *TieredStorage) lockHandle(handle *handlemap.Handle) *common.LockMapItem
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
+	c.dirRenameMu.RLock()
+	defer c.dirRenameMu.RUnlock()
+
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -777,6 +851,10 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+	// Held through any download, so a pending RenameDir waits for it.
+	c.dirRenameMu.RLock()
+	defer c.dirRenameMu.RUnlock()
+
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -1119,6 +1197,8 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	if options.Src == options.Dst {
 		return nil
 	}
+	c.dirRenameMu.RLock()
+	defer c.dirRenameMu.RUnlock()
 
 	sflock := c.fileLocks.Get(options.Src)
 	dflock := c.fileLocks.Get(options.Dst)
