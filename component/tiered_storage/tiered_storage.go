@@ -36,7 +36,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -50,15 +49,10 @@ import (
 // TieredStorage keeps new data local and uses cloud storage as overflow.
 // Cloud objects are cached only while open.
 //
-// Lock order: dirRenameMu, evictMu, file locks (lexical order), then
-// lruQueue.mu. Never acquire a file lock while holding lruQueue.mu.
+// Lock order: evictMu, file locks (lexical order), then lruQueue.mu. Never
+// acquire a file lock while holding lruQueue.mu.
 type TieredStorage struct {
 	internal.BaseComponent
-
-	// dirRenameMu keeps new names from appearing while RenameDir collects and
-	// moves the names under a directory. Operations that can add a name take
-	// it for reading.
-	dirRenameMu sync.RWMutex
 
 	policy *lruQueue
 
@@ -312,9 +306,6 @@ func (c *TieredStorage) treePath(tree, name string) (string, error) {
 
 // Directory operations
 func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
-	c.dirRenameMu.RLock()
-	defer c.dirRenameMu.RUnlock()
-
 	if _, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name}); err == nil {
 		return syscall.EEXIST
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -452,9 +443,9 @@ func (c *TieredStorage) StreamDir(
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("TieredStorage::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	// Hold off new names under src, so none are missed below.
-	c.dirRenameMu.Lock()
-	defer c.dirRenameMu.Unlock()
+	// The FUSE layer keeps every other operation under src and dst out until
+	// this returns (libfuse's path tree lock; WinFsp's rename lock), so no
+	// name can appear under src after it is listed below.
 
 	srcLocal, err := c.localPath(options.Src)
 	if err != nil {
@@ -764,9 +755,6 @@ func (c *TieredStorage) lockHandle(handle *handlemap.Handle) *common.LockMapItem
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
-	c.dirRenameMu.RLock()
-	defer c.dirRenameMu.RUnlock()
-
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -844,10 +832,6 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
-	// Held through any download, so a pending RenameDir waits for it.
-	c.dirRenameMu.RLock()
-	defer c.dirRenameMu.RUnlock()
-
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -1198,9 +1182,6 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 
 func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("TieredStorage::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
-	c.dirRenameMu.RLock()
-	defer c.dirRenameMu.RUnlock()
-
 	sflock := c.fileLocks.Get(options.Src)
 	dflock := c.fileLocks.Get(options.Dst)
 	if options.Src < options.Dst {

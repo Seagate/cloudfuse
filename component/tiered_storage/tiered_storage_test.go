@@ -1391,26 +1391,6 @@ func (suite *tieredStorageTestSuite) TestRenameDirRefusesExistingLocalDestinatio
 	suite.assert.DirExists(suite.localFile("src"))
 }
 
-func (suite *tieredStorageTestSuite) TestNewNamesWaitForRenameDir() {
-	defer suite.cleanupTest()
-
-	// RenameDir holds dirRenameMu while it collects and moves names.
-	suite.tieredStorage.dirRenameMu.Lock()
-	created := make(chan error, 1)
-	go func() {
-		handle, err := suite.tieredStorage.CreateFile(
-			internal.CreateFileOptions{Name: "src/new", Mode: 0644},
-		)
-		if err == nil {
-			err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-		}
-		created <- err
-	}()
-	suite.Never(func() bool { return len(created) > 0 }, 50*time.Millisecond, 5*time.Millisecond)
-	suite.tieredStorage.dirRenameMu.Unlock()
-	suite.Require().NoError(<-created)
-}
-
 func TestRenameDirOfflineChangesNothing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	next := internal.NewMockComponent(ctrl)

@@ -239,8 +239,7 @@ local copy is gone.
 
 ### RenameFile
 
-1. Take `dirRenameMu` for reading, then both file locks in lexical order. A
-   rename to itself does nothing.
+1. Take both file locks in lexical order. A rename to itself does nothing.
 2. Check cloud connectivity; fail early if disconnected.
 3. Fail early if the destination exists and replacing it is not permitted
    (`local/dst` is a directory).
@@ -309,12 +308,10 @@ because the tiered root is never exposed.
 
 ### RenameDir
 
-1. Take `dirRenameMu` exclusively. Operations that can add a name (`CreateFile`,
-   `OpenFile`, `RenameFile`, `CreateDir`) take it for reading, so no file can
-   appear under `src` while it is held. Then list the files under `local/src`
-   and `cache/src`, and lock each one and its destination name. A pending
-   `RenameDir` therefore waits for in-flight opens, including downloads, and new
-   opens wait for it. Directory renames are rare, so this is accepted.
+1. List the files under `local/src` and `cache/src`, then lock each one and
+   its destination name. No name can appear under `src` meanwhile, because
+   the FUSE layer serializes a directory rename against everything beneath it
+   (see [Locking](#locking)).
 2. Check cloud connectivity; fail early if disconnected.
 3. Cheap pre-checks: source exists, destination does not exist, destination
    parent can be created.
@@ -430,8 +427,20 @@ reopen, as unmodified cloud files already are.
   goroutines. File operations never take it, and never block on eviction.
   `ReleaseFile` starts an evict-on-close goroutine but does not wait for it.
 - `cloudStale` is only read or changed with the file lock held.
-- Lock order: `dirRenameMu`, `evictMu`, then file lock(s), then the LRU queue
-  mutex. Never take a file lock while holding the LRU queue mutex.
+- Lock order: `evictMu`, then file lock(s), then the LRU queue mutex. Never
+  take a file lock while holding the LRU queue mutex.
+- `RenameDir` relies on the FUSE layer for atomicity against other
+  operations. libfuse's high-level API write-locks the renamed path, so every
+  operation whose path passes through it waits until the rename returns. That
+  includes operations on open handles, because cgofuse does not set
+  `nullpath_ok`. WinFsp takes its volume rename lock exclusively for a rename
+  and shared for every create. Without this, a file created, opened, or renamed
+  under `src` after `RenameDir` lists it would be moved on disk without its
+  in-memory state (handle path, lock counts, LRU entry, cache-copy mark). An
+  acknowledged write could then land in a `cache/` copy that is later deleted,
+  or the local and cloud names could diverge. Moving to libfuse's low-level
+  API, or enabling `nullpath_ok`, would require a component-level lock here.
+  Background eviction does not depend on this; it is covered by file locks.
 - Operations on a handle lock the handle's current path, and retry if a
   rename changes it while they wait.
 - Multi-object operations take file locks in lexical order.
