@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -126,6 +127,10 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 		log.Err("TieredStorage::Start : %v", err)
 		return err
 	}
+	if err := c.recoverLocalFiles(); err != nil {
+		log.Err("TieredStorage::Start : %v", err)
+		return err
+	}
 
 	c.cacheSize.Refresh()
 
@@ -170,6 +175,51 @@ func (c *TieredStorage) prepareRoot() error {
 			return fmt.Errorf("TieredStorage: failed to create %s: %w", tree, err)
 		}
 	}
+	return nil
+}
+
+// recoverLocalFiles enqueues every file in local/ in the LRU, oldest
+// modification time at the tail. Every such file is local-owned.
+func (c *TieredStorage) recoverLocalFiles() error {
+	if c.policy == nil {
+		return nil
+	}
+	type localFile struct {
+		name  string
+		mtime time.Time
+	}
+	var files []localFile
+	localRoot := filepath.Join(c.tmpPath, localDirName)
+	err := filepath.WalkDir(localRoot, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(localRoot, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, localFile{name: filepath.ToSlash(rel), mtime: info.ModTime()})
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("TieredStorage: failed to scan %s: %w", localRoot, err)
+	}
+
+	// Enqueue puts each file at the head, so enqueue oldest first.
+	slices.SortFunc(files, func(a, b localFile) int {
+		return a.mtime.Compare(b.mtime)
+	})
+	for _, file := range files {
+		c.policy.Enqueue(file.name)
+	}
+	log.Info("TieredStorage::recoverLocalFiles : found %d local files", len(files))
 	return nil
 }
 

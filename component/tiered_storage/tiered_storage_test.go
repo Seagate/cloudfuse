@@ -397,28 +397,35 @@ func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
 	suite.assert.EqualValues(len("cloud"), cloudAttrs.Size)
 }
 
-func (suite *tieredStorageTestSuite) TestRestartWithStaleSnapshotKeepsChangedFile() {
+// lruOrder lists the LRU from tail (next to evict) to head.
+func lruOrder(q *lruQueue) []string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	var names []string
+	for node := q.tail; node != nil; node = node.prev {
+		names = append(names, node.name)
+	}
+	return names
+}
+
+func (suite *tieredStorageTestSuite) TestStartRecoversLocalFilesByMtime() {
 	defer suite.cleanupTest()
 
-	const path = "changed"
-	localPath := suite.localFile(path)
-	suite.Require().NoError(os.WriteFile(localPath, []byte("old"), 0644))
-	node := &FileNode{name: path}
-	node.size.Store(3)
-	node.cloudBacked.Store(true)
-	suite.tieredStorage.fileMap.Store(path, node)
-	suite.Require().NoError(suite.tieredStorage.Stop())
-	suite.Require().NoError(os.WriteFile(localPath, []byte("changed"), 0644))
+	now := time.Now()
+	files := map[string]time.Duration{"newest": 0, "dir/oldest": -2 * time.Hour, "middle": -time.Hour}
+	for name, age := range files {
+		path := suite.localFile(name)
+		suite.Require().NoError(os.MkdirAll(filepath.Dir(path), 0700))
+		suite.Require().NoError(os.WriteFile(path, []byte(name), 0644))
+		suite.Require().NoError(os.Chtimes(path, now.Add(age), now.Add(age)))
+	}
 
-	restarted := newTestTieredStorage(suite.loopback)
-	suite.Require().NoError(restarted.Start(context.Background()))
-	suite.tieredStorage = restarted
-	value, found := restarted.fileMap.Load(path)
-	suite.Require().True(found)
-	recovered := value.(*FileNode)
-	suite.assert.False(recovered.cloudBacked.Load())
-	suite.assert.True(recovered.isDirty.Load())
-	suite.assert.FileExists(localPath)
+	suite.Require().NoError(suite.restart())
+
+	suite.assert.Equal(
+		[]string{"dir/oldest", "middle", "newest"},
+		lruOrder(suite.tieredStorage.policy),
+	)
 }
 
 func TestUploadFailureKeepsLocalFile(t *testing.T) {
