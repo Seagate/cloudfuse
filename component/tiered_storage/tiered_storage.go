@@ -557,37 +557,46 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 }
 
 // File operations
-func (c *TieredStorage) createFileUnlocked(
-	options internal.CreateFileOptions,
+
+// createEmptyLocal creates a new, empty local-owned file. The file lock must
+// be held.
+func (c *TieredStorage) createEmptyLocal(name string, mode os.FileMode) error {
+	localPath, err := c.localPath(name)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
+		return err
+	}
+	file, err := common.OpenFile(localPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, c.cacheFileMode(mode))
+	if err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+// openHandle opens a file under the tiered root for an object. cached marks a
+// copy in cache/, which must be promoted before it is changed. The file lock
+// must be held.
+func (c *TieredStorage) openHandle(
+	name, path string,
+	flags int,
+	cached bool,
+	flock *common.LockMapItem,
 ) (*handlemap.Handle, error) {
-	localPath, err := c.localPath(options.Name)
+	file, err := common.OpenFile(path, flags&^(os.O_CREATE|os.O_EXCL), 0)
 	if err != nil {
 		return nil, err
 	}
-	err = os.MkdirAll(filepath.Dir(localPath), cacheDirPerm)
-
-	if err != nil {
-		return nil, err
+	handle := handlemap.NewHandle(name)
+	handle.SetFileObject(file)
+	if flags&os.O_APPEND != 0 {
+		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
-
-	localFile, err := common.OpenFile(
-		localPath,
-		os.O_CREATE|os.O_EXCL|os.O_RDWR,
-		c.cacheFileMode(options.Mode),
-	)
-	if err != nil {
-		return nil, err
+	if cached {
+		handle.Flags.Set(handlemap.HandleFlagCached)
 	}
-
-	node := &FileNode{name: options.Name}
-	node.isDirty.Store(true)
-	c.fileMap.Store(options.Name, node)
-
-	handle := handlemap.NewHandle(options.Name)
-	handle.SetFileObject(localFile)
-
-	c.setHandleDirty(handle)
-
+	flock.Inc()
 	return handle, nil
 }
 
@@ -605,11 +614,18 @@ func (c *TieredStorage) CreateFile(
 		return nil, err
 	}
 
-	handle, err := c.createFileUnlocked(options)
+	if err := c.createEmptyLocal(options.Name, options.Mode); err != nil {
+		return nil, err
+	}
+	localPath, err := c.localPath(options.Name)
 	if err != nil {
 		return nil, err
 	}
-	flock.Inc()
+	handle, err := c.openHandle(options.Name, localPath, os.O_RDWR, false, flock)
+	if err != nil {
+		return nil, err
+	}
+	c.setHandleDirty(handle)
 	return handle, nil
 }
 
@@ -654,97 +670,66 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	if err != nil {
 		return nil, err
 	}
-	attrs, attrErr := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
-	if attrErr != nil && !errors.Is(attrErr, os.ErrNotExist) {
-		return nil, attrErr
-	}
-	exists := attrErr == nil
-	if options.Flags&os.O_CREATE != 0 && options.Flags&os.O_EXCL != 0 && exists {
-		return nil, syscall.EEXIST
-	}
-	if !exists {
-		if options.Flags&os.O_CREATE == 0 {
-			return nil, syscall.ENOENT
-		}
-		handle, err := c.createFileUnlocked(
-			internal.CreateFileOptions{Name: options.Name, Mode: options.Mode},
-		)
-		if err != nil {
-			return nil, err
-		}
-		flock.Inc()
-		return handle, nil
-	}
-
-	_, tracked := c.fileMap.Load(options.Name)
-	if !tracked {
-		info, statErr := os.Stat(localPath)
-		if statErr == nil {
-			log.Warn(
-				"TieredStorage::OpenFile : Warning file exists locally on disk but not in tiered storage cache: %s",
-				options.Name,
-			)
-			node := &FileNode{name: options.Name}
-			node.size.Store(info.Size())
-			node.isDirty.Store(true)
-			c.fileMap.Store(options.Name, node)
-		} else {
-			localCopyNode := &FileNode{name: options.Name}
-			localCopyNode.size.Store(attrs.Size)
-			localCopyNode.cloudBacked.Store(true)
-
-			if options.Flags&os.O_TRUNC != 0 {
-				if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
-					return nil, err
-				}
-				file, err := common.OpenFile(
-					localPath,
-					os.O_CREATE|os.O_EXCL|os.O_RDWR,
-					c.cacheFileMode(options.Mode),
-				)
-				if err != nil {
-					return nil, err
-				}
-				if err := file.Close(); err != nil {
-					return nil, err
-				}
-				localCopyNode.size.Store(0)
-				localCopyNode.isDirty.Store(true)
-			} else {
-				if err := c.downloadToCache(options.Name, attrs.Mode.Perm()); err != nil {
-					return nil, err
-				}
-			}
-			c.fileMap.Store(options.Name, localCopyNode)
-		}
-	}
-
-	openFlags := options.Flags &^ (os.O_CREATE | os.O_EXCL)
-	localFile, err := common.OpenFile(
-		localPath,
-		openFlags,
-		c.cacheFileMode(options.Mode),
-	)
+	cachePath, err := c.cachePath(options.Name)
 	if err != nil {
 		return nil, err
 	}
+	exclusive := options.Flags&os.O_CREATE != 0 && options.Flags&os.O_EXCL != 0
+	truncate := options.Flags&os.O_TRUNC != 0
 
-	handle := handlemap.NewHandle(options.Name)
-	handle.SetFileObject(localFile)
-	if options.Flags&os.O_APPEND != 0 {
-		handle.Flags.Set(handlemap.HandleOpenedAppend)
-	}
-	if options.Flags&os.O_TRUNC != 0 {
-		if value, found := c.fileMap.Load(options.Name); found {
-			node := value.(*FileNode)
-			c.cacheSize.Add(-node.size.Swap(0))
-			node.isDirty.Store(true)
+	path, cached, created := "", false, false
+	if info, err := os.Stat(localPath); err == nil {
+		path = localPath
+		if truncate {
+			c.cacheSize.Add(-info.Size())
 		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	} else if _, err := os.Stat(cachePath); err == nil {
+		// Another handle has this cloud-owned file open.
+		path, cached = cachePath, true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	} else {
+		attrs, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			if options.Flags&os.O_CREATE == 0 {
+				return nil, syscall.ENOENT
+			}
+			if err := c.createEmptyLocal(options.Name, options.Mode); err != nil {
+				return nil, err
+			}
+			path, created = localPath, true
+		case err != nil:
+			return nil, err
+		case exclusive:
+			return nil, syscall.EEXIST
+		case truncate:
+			// The old content is discarded, so there is nothing to download.
+			if err := c.createEmptyLocal(options.Name, attrs.Mode.Perm()); err != nil {
+				return nil, err
+			}
+			c.cloudStale.Store(options.Name, struct{}{})
+			path = localPath
+		default:
+			if err := c.downloadToCache(options.Name, attrs.Mode.Perm()); err != nil {
+				return nil, err
+			}
+			path, cached = cachePath, true
+		}
+	}
+	if exclusive && !created {
+		return nil, syscall.EEXIST
+	}
+
+	handle, err := c.openHandle(options.Name, path, options.Flags, cached, flock)
+	if err != nil {
+		return nil, err
+	}
+	if created || truncate {
 		c.setHandleDirty(handle)
 	}
-
-	flock.Inc()
-
 	return handle, nil
 }
 

@@ -506,16 +506,45 @@ func (suite *tieredStorageTestSuite) TestOpenFileTruncatesCloudObjectWithoutDown
 	})
 	suite.Require().NoError(err)
 	suite.assert.True(handle.Dirty())
+	suite.assert.False(handle.Cached())
 	info, err := os.Stat(suite.localFile(path))
 	suite.Require().NoError(err)
 	suite.assert.Zero(info.Size())
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	_, stale := suite.tieredStorage.cloudStale.Load(path)
+	suite.assert.True(stale)
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 	)
+}
 
-	attrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
+func (suite *tieredStorageTestSuite) TestOpenFileSharesCacheCopy() {
+	defer suite.cleanupTest()
+
+	const path = "shared-cache"
+	suite.writeCloudFile(path, "cloud data")
+
+	first, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
 	suite.Require().NoError(err)
-	suite.assert.Zero(attrs.Size)
+	// Make a second download detectable.
+	suite.writeCloudFile(path, "changed in cloud")
+
+	second, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY})
+	suite.Require().NoError(err)
+	suite.assert.True(second.Cached())
+	buffer := make([]byte, len("cloud data"))
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: second, Data: buffer},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Equal("cloud data", string(buffer))
+	suite.assert.EqualValues(2, suite.tieredStorage.fileLocks.Get(path).Count())
+
+	for _, handle := range []*handlemap.Handle{first, second} {
+		suite.Require().NoError(
+			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+		)
+	}
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileHonorsReadOnlyFlag() {
@@ -1065,11 +1094,13 @@ func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 			Mode:  0666, //random mode, since we didn't do the other stuff yet
 		},
 	)
-	suite.assert.NoError(err)
+	suite.Require().NoError(err)
 	suite.assert.Equal(path, handle.Path)
+	suite.assert.True(handle.Cached())
 
-	// Verify it was now downloaded to the local tiered storage cache
-	suite.assert.FileExists(suite.localFile(path))
+	// Cloud files are downloaded into cache/, not local/.
+	suite.assert.FileExists(suite.cacheFile(path))
+	suite.assert.NoFileExists(suite.localFile(path))
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileInCache() {
@@ -1163,11 +1194,13 @@ func (suite *tieredStorageTestSuite) TestOpenFileOCreateExistsCloud() {
 			Mode:  0777,
 		},
 	)
-	suite.assert.NoError(err)
+	suite.Require().NoError(err)
 	suite.assert.Equal(path, handle.Path)
+	suite.assert.True(handle.Cached())
 
-	// Verify it was now downloaded to the local tiered storage cache
-	suite.assert.FileExists(suite.localFile(path))
+	// Cloud files are downloaded into cache/, not local/.
+	suite.assert.FileExists(suite.cacheFile(path))
+	suite.assert.NoFileExists(suite.localFile(path))
 }
 
 //Testing WriteFile
