@@ -16,7 +16,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux-unit-test:
@@ -69,7 +69,7 @@ jobs:
           - 10002:10002
 
     env:
-      cgo: "1"
+      CGO_ENABLED: "1"
       go: "1.27"
       zig: 0.16.0
 
@@ -84,38 +84,88 @@ jobs:
       BLOB_KEY: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install libfuse on Linux
+        id: libfuse
+        background: true
+        shell: bash
+        env:
+          FUSELIB: ${{ matrix.fuselib }}
+        run: |
+          sudo apt-get install -y pkg-config fuse3 "$FUSELIB" || {
+            sudo apt-get update
+            sudo apt-get install -y pkg-config fuse3 "$FUSELIB"
+          }
+
+      - name: Install Zig
+        id: zig
+        background: true
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          persist-credentials: false
+          version: ${{ env.zig }}
+          cache-key: zig-${{ env.zig }}-${{ matrix.job_name }}
+
+      - name: Bootstrap S3 bucket on LocalStack
+        id: s3-bucket
+        background: true
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        run: |
+          aws --version
+          timeout 120s bash -c 'until aws --endpoint-url "${AWS_ENDPOINT}" s3 ls >/dev/null 2>&1; do sleep 1; done'
+          aws --endpoint-url "${AWS_ENDPOINT}" s3 mb s3://test || true
+          aws --endpoint-url "${AWS_ENDPOINT}" s3 ls
+
+      - parallel:
+          - name: Checkout code
+            uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            with:
+              persist-credentials: false
+
+          - name: Create Azure Configuration File on Linux
+            env:
+              BLOB_ACCOUNT: ${{ env.BLOB_ACCOUNT }}
+              BLOB_KEY: ${{ env.BLOB_KEY }}
+              BLOB_ENDPOINT: ${{ env.BLOB_ENDPOINT }}
+            run: |-
+              cnfFile=$HOME/azuretest.json
+              echo $cnfFile
+              touch $cnfFile
+              echo "{" > $cnfFile
+              echo "\"block-acct\"": "\"${BLOB_ACCOUNT}\"", >> $cnfFile
+              echo "\"block-key\"": "\"${BLOB_KEY}\"", >> $cnfFile
+              echo "\"endpoint\"": "\"${BLOB_ENDPOINT}\"", >> $cnfFile
+              echo "\"skip-msi\"": "true", >> $cnfFile
+              echo "\"skip-azcli\"": "true", >> $cnfFile
+              echo "\"proxy-address\"": "\"\"" >> $cnfFile
+              echo "}" >> $cnfFile
+
+          - name: Create S3 Configuration File on Linux
+            env:
+              AWS_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+              AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+              AWS_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+              AWS_REGION: ${{ env.AWS_REGION }}
+            run: |-
+              cnfFile=$HOME/s3test.json
+              echo $cnfFile
+              touch $cnfFile
+              echo "{" > $cnfFile
+              echo "\"bucket-name\"": "\"${AWS_BUCKET_NAME}\"", >> $cnfFile
+              echo "\"access-key\"": "\"${AWS_ACCESS_KEY_ID}\"", >> $cnfFile
+              echo "\"secret-key\"": "\"${AWS_SECRET_ACCESS_KEY}\"", >> $cnfFile
+              echo "\"endpoint\"": "\"${AWS_ENDPOINT}\"", >> $cnfFile
+              echo "\"region\"": "\"${AWS_REGION}\"", >> $cnfFile
+              echo "\"use-path-style\"": true\ >> $cnfFile
+              echo "}" >> $cnfFile
 
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
-          check-latest: true
 
-      - name: Install Zig
-        if: runner.os == 'Linux'
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
-        with:
-          version: ${{ env.zig }}
-          cache-key: zig-${{ env.zig }}-${{ runner.arch }}-${{ runner.os }}
-
-      - name: Set CGO
-        env:
-          ENV_CGO: ${{ env.cgo }}
-        shell: bash
-        run: |
-          if [[ "${ENV_CGO}" != "" ]]; then echo 'CGO_ENABLED=${ENV_CGO}' >> $GITHUB_ENV ; fi
-
-      - name: Install libfuse on Linux
-        shell: bash
-        env:
-          FUSELIB: ${{ matrix.fuselib }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config fuse3 "$FUSELIB"
+      - name: Wait for build tools
+        wait: [libfuse, zig]
 
       - name: Build
         env:
@@ -127,51 +177,8 @@ jobs:
             ./build.sh;
           fi
 
-      - name: Create Azure Configuration File on Linux
-        env:
-          BLOB_ACCOUNT: ${{ env.BLOB_ACCOUNT }}
-          BLOB_KEY: ${{ env.BLOB_KEY }}
-          BLOB_ENDPOINT: ${{ env.BLOB_ENDPOINT }}
-        run: |-
-          cnfFile=$HOME/azuretest.json
-          echo $cnfFile
-          touch $cnfFile
-          echo "{" > $cnfFile
-          echo "\"block-acct\"": "\"${BLOB_ACCOUNT}\"", >> $cnfFile
-          echo "\"block-key\"": "\"${BLOB_KEY}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${BLOB_ENDPOINT}\"", >> $cnfFile
-          echo "\"skip-msi\"": "true", >> $cnfFile
-          echo "\"skip-azcli\"": "true", >> $cnfFile
-          echo "\"proxy-address\"": "\"\"" >> $cnfFile
-          echo "}" >> $cnfFile
-
-      - name: Create S3 Configuration File on Linux
-        env:
-          AWS_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
-          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          AWS_ENDPOINT: ${{ env.AWS_ENDPOINT }}
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |-
-          cnfFile=$HOME/s3test.json
-          echo $cnfFile
-          touch $cnfFile
-          echo "{" > $cnfFile
-          echo "\"bucket-name\"": "\"${AWS_BUCKET_NAME}\"", >> $cnfFile
-          echo "\"access-key\"": "\"${AWS_ACCESS_KEY_ID}\"", >> $cnfFile
-          echo "\"secret-key\"": "\"${AWS_SECRET_ACCESS_KEY}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${AWS_ENDPOINT}\"", >> $cnfFile
-          echo "\"region\"": "\"${AWS_REGION}\"", >> $cnfFile
-          echo "\"use-path-style\"": true\ >> $cnfFile
-          echo "}" >> $cnfFile
-
-      - name: Bootstrap S3 bucket on LocalStack
-        env:
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-        run: |
-          aws --version
-          aws --endpoint-url "${AWS_ENDPOINT}" s3 mb s3://test || true
-          aws --endpoint-url "${AWS_ENDPOINT}" s3 ls
+      - name: Wait for S3 bucket
+        wait: s3-bucket
 
       - name: Run unit tests
         env:
@@ -286,7 +293,7 @@ jobs:
     timeout-minutes: 15
     env:
       go: "1.27"
-      cgo: "0"
+      CGO_ENABLED: "0"
 
     steps:
       - name: Checkout code
@@ -298,14 +305,11 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.go }}
-          check-latest: true
 
-      - name: Set CGO
-        shell: bash
-        run: |
-          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
-
+      # Windows unit tests do not execute the built binaries, so build them alongside the tests.
       - name: Build
+        id: build
+        background: true
         shell: bash
         run: |
           ./build.sh
@@ -315,44 +319,33 @@ jobs:
           GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: go test -v -timeout=1h ./... --tags=unittest,authtest
 
+      - name: Wait for build
+        wait: build
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
     env:
       go: "1.27"
     steps:
+      - name: Install libfuse on Linux
+        id: libfuse
+        background: true
+        shell: bash
+        run: |
+          sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev || {
+            sudo apt-get update
+            sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev
+          }
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ env.go }}
-          check-latest: true
-      - run: go version
-
-      - name: Set CGO
-        shell: bash
-        env:
-          CGO: ${{ env.cgo }}
-        run: |
-          if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
-
-      - name: Install libfuse on Linux
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: latest
-          args: --timeout=5m
-
       - name: Notice file check
+        id: notice
+        background: true
         run: |
           ./scripts/notices_fix.sh
           result=$(git diff NOTICE | wc -l)
@@ -362,3 +355,22 @@ jobs:
           else
             echo "Notices are up to date."
           fi
+
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.go }}
+
+      - run: go version
+
+      - name: Wait for libfuse
+        wait: libfuse
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Wait for notice check
+        wait: notice
