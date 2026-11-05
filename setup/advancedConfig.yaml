@@ -139,7 +139,6 @@ tiered_storage:
   low-threshold: <% local storage consumed which eviction targets. Default - 80>
   max-eviction: <maximum files selected in one eviction pass. Default - 5000>
   parallelism: <number of parallel cloud uploads. Default - 8>
-  poll-interval-sec: <seconds between capacity checks. Default - 1>
 
 # Attribute cache related configuration
 attr_cache:

@@ -64,13 +64,12 @@ type TieredStorage struct {
 }
 
 type TieredStorageOptions struct {
-	TmpPath         string  `config:"path"              yaml:"path,omitempty"`
-	MaxSizeMB       float64 `config:"max-size-mb"       yaml:"max-size-mb,omitempty"`
-	HighThreshold   uint32  `config:"high-threshold"    yaml:"high-threshold,omitempty"`
-	LowThreshold    uint32  `config:"low-threshold"     yaml:"low-threshold,omitempty"`
-	MaxEviction     uint32  `config:"max-eviction"      yaml:"max-eviction,omitempty"`
-	Parallelism     uint32  `config:"parallelism"       yaml:"parallelism,omitempty"`
-	PollIntervalSec uint32  `config:"poll-interval-sec" yaml:"poll-interval-sec,omitempty"`
+	TmpPath       string  `config:"path"           yaml:"path,omitempty"`
+	MaxSizeMB     float64 `config:"max-size-mb"    yaml:"max-size-mb,omitempty"`
+	HighThreshold uint32  `config:"high-threshold" yaml:"high-threshold,omitempty"`
+	LowThreshold  uint32  `config:"low-threshold"  yaml:"low-threshold,omitempty"`
+	MaxEviction   uint32  `config:"max-eviction"   yaml:"max-eviction,omitempty"`
+	Parallelism   uint32  `config:"parallelism"    yaml:"parallelism,omitempty"`
 }
 
 const (
@@ -256,10 +255,6 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if conf.Parallelism == 0 {
 		conf.Parallelism = defaultParallelism
 	}
-	pollInterval := time.Duration(conf.PollIntervalSec) * time.Second
-	if pollInterval == 0 {
-		pollInterval = capacityPollInterval
-	}
 
 	c.maxCacheSize = conf.MaxSizeMB * common.MbToBytes
 	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
@@ -273,7 +268,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		targetRatio:      float64(conf.LowThreshold) / 100,
 		numWorkers:       int(conf.Parallelism),
 		maxEviction:      conf.MaxEviction,
-		pollInterval:     pollInterval,
+		pollInterval:     capacityPollInterval,
 		uploadandCleanFn: c.uploadandCleanFile,
 	})
 
