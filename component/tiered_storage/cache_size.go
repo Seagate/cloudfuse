@@ -25,6 +25,10 @@
 package tiered_storage
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -49,14 +53,17 @@ const driftWarnBytes = 16 * common.MbToBytes
 // allocated sectors instead, so the two platforms disagree slightly for small
 // files; Reconcile is what keeps that from accumulating.
 type cacheSizeTracker struct {
-	path              string
+	paths             []string
 	used              atomic.Int64
 	reconcileInterval time.Duration
 	lastReconcile     atomic.Int64 // unix nanoseconds
 }
 
-func newCacheSizeTracker(path string, reconcileInterval time.Duration) *cacheSizeTracker {
-	t := &cacheSizeTracker{path: path, reconcileInterval: reconcileInterval}
+// newCacheSizeTracker tracks the combined size of paths. Only the trees the
+// component owns are measured, so other entries that share the tiered root are
+// not counted against max-size-mb.
+func newCacheSizeTracker(paths []string, reconcileInterval time.Duration) *cacheSizeTracker {
+	t := &cacheSizeTracker{paths: paths, reconcileInterval: reconcileInterval}
 	t.lastReconcile.Store(time.Now().UnixNano())
 	return t
 }
@@ -81,19 +88,21 @@ func (t *cacheSizeTracker) Add(delta int64) {
 	}
 }
 
-// Refresh measures the cache directory and replaces the running total.
+// Refresh measures the tracked trees and replaces the running total.
 // Changes made while the measurement is in flight are lost, which is inherent
 // to reconciling against a moving target and is why it is not the hot path.
-func (t *cacheSizeTracker) Refresh() {
+func (t *cacheSizeTracker) Refresh() error {
 	t.lastReconcile.Store(time.Now().UnixNano())
 
-	usage, err := common.GetUsage(t.path)
-	if err != nil {
-		log.Err("cacheSizeTracker::Refresh : failed to measure %s [%v]", t.path, err)
-		return
+	var measured int64
+	for _, path := range t.paths {
+		usage, err := measureTree(path)
+		if err != nil {
+			return fmt.Errorf("failed to measure %s: %w", path, err)
+		}
+		measured += usage
 	}
 
-	measured := int64(usage)
 	previous := t.used.Swap(measured)
 	if drift := measured - previous; drift > driftWarnBytes || drift < -driftWarnBytes {
 		log.Info(
@@ -103,6 +112,7 @@ func (t *cacheSizeTracker) Refresh() {
 			measured,
 		)
 	}
+	return nil
 }
 
 // Reconcile refreshes the running total, but no more often than reconcileInterval.
@@ -110,5 +120,18 @@ func (t *cacheSizeTracker) Reconcile() {
 	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
 		return
 	}
-	t.Refresh()
+	if err := t.Refresh(); err != nil {
+		log.Err("cacheSizeTracker::Reconcile : %v", err)
+	}
+}
+
+// measureTree returns the size of a tree in bytes, or 0 if it does not exist.
+func measureTree(path string) (int64, error) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	usage, err := common.GetUsage(path)
+	return int64(usage), err
 }

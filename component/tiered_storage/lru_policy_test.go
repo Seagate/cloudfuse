@@ -68,7 +68,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 		numWorkers:   8,
 		pollInterval: time.Millisecond,
 		fileLocks:    common.NewLockMap(),
-		size:         newCacheSizeTracker(cache_path, 0),
+		size:         newCacheSizeTracker([]string{cache_path}, 0),
 
 		uploadandCleanFn: func(name string) error {
 			return nil
@@ -165,7 +165,7 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	suite.cleanupTest() // teardown the default policy generated in SetupTest
 
 	cachePath := suite.T().TempDir()
-	size := newCacheSizeTracker(cachePath, time.Hour)
+	size := newCacheSizeTracker([]string{cachePath}, time.Hour)
 	var uploaded atomic.Int32
 	suite.setupTestHelper(lruQueueConfig{
 		localRoot:    cachePath,
@@ -198,7 +198,7 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 		suite.Require().NoError(err)
 		suite.policy.Enqueue(name)
 	}
-	size.Refresh()
+	suite.Require().NoError(size.Refresh())
 
 	suite.policy.evictDownTo(int64(suite.policy.maxCacheSize * suite.policy.targetRatio))
 

@@ -232,11 +232,15 @@ func TestCachePath(t *testing.T) {
 // restart stops the component and starts a fresh instance on the same root.
 func (suite *tieredStorageTestSuite) restart() error {
 	suite.Require().NoError(suite.tieredStorage.Stop())
-	suite.tieredStorage = newTestTieredStorage(suite.loopback)
+	suite.tieredStorage = NewTieredStorageComponent().(*TieredStorage)
+	suite.tieredStorage.SetNextComponent(suite.loopback)
+	if err := suite.tieredStorage.Configure(true); err != nil {
+		return err
+	}
 	return suite.tieredStorage.Start(context.Background())
 }
 
-func (suite *tieredStorageTestSuite) TestStartClearsCacheAndKeepsLocal() {
+func (suite *tieredStorageTestSuite) TestConfigureClearsCacheAndKeepsLocal() {
 	defer suite.cleanupTest()
 
 	suite.Require().NoError(os.MkdirAll(filepath.Dir(suite.cacheFile("dir/cached")), 0700))
@@ -250,7 +254,7 @@ func (suite *tieredStorageTestSuite) TestStartClearsCacheAndKeepsLocal() {
 	suite.assert.FileExists(suite.localFile("owned"))
 }
 
-func (suite *tieredStorageTestSuite) TestStartRejectsUnexpectedRootEntries() {
+func (suite *tieredStorageTestSuite) TestConfigureRejectsUnexpectedRootEntries() {
 	defer suite.cleanupTest()
 
 	stray := filepath.Join(suite.cache_path, "stray")
@@ -263,6 +267,27 @@ func (suite *tieredStorageTestSuite) TestStartRejectsUnexpectedRootEntries() {
 	suite.assert.FileExists(stray)
 	// Nothing is changed before the check fails.
 	suite.assert.FileExists(suite.cacheFile("cached"))
+}
+
+func (suite *tieredStorageTestSuite) TestConfigureIgnoresOSManagedRootEntries() {
+	defer suite.cleanupTest()
+
+	const osDataSize = 1 << 20
+	osEntries := []string{"System Volume Information", "$Recycle.Bin", "lost+found"}
+	for _, name := range osEntries {
+		dir := filepath.Join(suite.cache_path, name)
+		suite.Require().NoError(os.MkdirAll(dir, 0700))
+		suite.Require().
+			NoError(os.WriteFile(filepath.Join(dir, "os-data"), make([]byte, osDataSize), 0600))
+	}
+
+	suite.Require().NoError(suite.restart())
+
+	for _, name := range osEntries {
+		suite.assert.FileExists(filepath.Join(suite.cache_path, name, "os-data"))
+	}
+	// Only local/ and cache/ count against max-size-mb.
+	suite.assert.Less(suite.tieredStorage.cacheSize.Used(), int64(osDataSize))
 }
 
 func TestTieredStoragePolicyConfig(t *testing.T) {
@@ -289,7 +314,13 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 			high: 0.9, low: 0.7, maxEviction: 5000, parallelism: 3,
 			pollInterval: time.Second,
 		},
-		{name: "missing capacity", config: "high-threshold: 80", wantErr: true},
+		{
+			name:   "default capacity",
+			config: "parallelism: 2",
+			high:   0.9, low: 0.8, maxEviction: 5000, parallelism: 2,
+			pollInterval: time.Second,
+		},
+		{name: "negative capacity", config: "max-size-mb: -1", wantErr: true},
 		{
 			name:    "reversed thresholds",
 			config:  "max-size-mb: 1\n  high-threshold: 60\n  low-threshold: 80",
@@ -325,6 +356,32 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 			assert.Equal(t, test.pollInterval, storage.policy.pollInterval)
 		})
 	}
+}
+
+func TestTieredStorageDefaultMaxSize(t *testing.T) {
+	root := t.TempDir()
+	const fileSize = 1 << 20
+	for _, tree := range []string{localDirName, cacheDirName} {
+		require.NoError(t, os.MkdirAll(filepath.Join(root, tree), 0700))
+		require.NoError(
+			t,
+			os.WriteFile(filepath.Join(root, tree, "file"), make([]byte, fileSize), 0600),
+		)
+	}
+	require.NoError(t, config.ReadConfigFromReader(strings.NewReader(
+		fmt.Sprintf("tiered_storage:\n  path: %s\n", root),
+	)))
+
+	storage := NewTieredStorageComponent().(*TieredStorage)
+	require.NoError(t, storage.Configure(true))
+
+	assert.NoFileExists(t, filepath.Join(root, cacheDirName, "file"))
+	used := storage.cacheSize.Used()
+	assert.GreaterOrEqual(t, used, int64(fileSize))
+	assert.Less(t, used, int64(2*fileSize))
+	free, err := availableSize(root)
+	require.NoError(t, err)
+	assert.InEpsilon(t, defaultMaxSizeRatio*float64(free+uint64(used)), storage.maxCacheSize, 0.01)
 }
 
 func (suite *tieredStorageTestSuite) TestGetAttrLocalOnly() {
@@ -452,7 +509,7 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	storage := &TieredStorage{
 		tmpPath:   cachePath,
 		fileLocks: common.NewLockMap(),
-		cacheSize: newCacheSizeTracker(cachePath, 0),
+		cacheSize: newCacheSizeTracker([]string{cachePath}, 0),
 	}
 	storage.SetNextComponent(next)
 	storage.fileLocks.Get("file").CloudStale = true

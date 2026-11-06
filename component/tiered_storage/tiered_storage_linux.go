@@ -56,12 +56,17 @@ func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 	return attrs
 }
 
-func (c *TieredStorage) getAvailableSize() (uint64, error) {
+func availableSize(path string) (uint64, error) {
 	stat := &unix.Statfs_t{}
-	if err := unix.Statfs(c.tmpPath, stat); err != nil {
+	if err := unix.Statfs(path, stat); err != nil {
 		return 0, err
 	}
 	return stat.Bavail * uint64(stat.Bsize), nil
+}
+
+// isProtectedSystemEntry reports false: Linux has no system file attribute.
+func isProtectedSystemEntry(entry fs.DirEntry) bool {
+	return false
 }
 
 // uploadMetadata returns the mode and owner to apply to the cloud object when

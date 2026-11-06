@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -88,6 +89,8 @@ const (
 	cacheDirName = "cache"
 	// Cache holds user data and is only accessed by this process (CWE-732).
 	cacheDirPerm os.FileMode = 0700
+	// share of free disk space to use when max-size-mb is not set
+	defaultMaxSizeRatio = 0.8
 )
 
 var _ internal.Component = &TieredStorage{}
@@ -107,16 +110,10 @@ func (c *TieredStorage) SetNextComponent(nc internal.Component) {
 func (c *TieredStorage) Start(ctx context.Context) error {
 	log.Trace("TieredStorage::Start : Starting component %s", c.Name())
 
-	if err := c.prepareRoot(); err != nil {
-		log.Err("TieredStorage::Start : %v", err)
-		return err
-	}
 	if err := c.recoverLocalFiles(); err != nil {
 		log.Err("TieredStorage::Start : %v", err)
 		return err
 	}
-
-	c.cacheSize.Refresh()
 
 	if c.policy != nil {
 		if err := c.policy.StartPolicy(); err != nil {
@@ -129,8 +126,9 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 }
 
 // prepareRoot lays out the tiered root and discards cache/ from any previous
-// run. Entries other than local/ and cache/ are refused rather than guessed at,
-// since they may hold data from an older layout or a misconfigured path.
+// run. Entries other than local/, cache/, and OS-managed volume entries are
+// refused rather than guessed at, since they may hold data from an older layout
+// or a misconfigured path.
 func (c *TieredStorage) prepareRoot() error {
 	if err := os.MkdirAll(c.tmpPath, cacheDirPerm); err != nil {
 		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
@@ -140,16 +138,22 @@ func (c *TieredStorage) prepareRoot() error {
 		return fmt.Errorf("TieredStorage: failed to read %s: %w", c.tmpPath, err)
 	}
 	for _, entry := range entries {
-		if name := entry.Name(); name != localDirName && name != cacheDirName {
-			return fmt.Errorf(
-				"TieredStorage: %s contains unexpected entry %q; it may only contain %s and %s (move existing files into %s)",
-				c.tmpPath,
-				name,
-				localDirName,
-				cacheDirName,
-				filepath.Join(c.tmpPath, localDirName),
-			)
+		name := entry.Name()
+		if name == localDirName || name == cacheDirName {
+			continue
 		}
+		if isOSManagedEntry(entry) {
+			log.Debug("TieredStorage::prepareRoot : ignoring OS-managed entry %q", name)
+			continue
+		}
+		return fmt.Errorf(
+			"TieredStorage: %s contains unexpected entry %q; it may only contain %s and %s (move existing files into %s)",
+			c.tmpPath,
+			name,
+			localDirName,
+			cacheDirName,
+			filepath.Join(c.tmpPath, localDirName),
+		)
 	}
 	if err := os.RemoveAll(filepath.Join(c.tmpPath, cacheDirName)); err != nil {
 		return fmt.Errorf("TieredStorage: failed to clear %s: %w", cacheDirName, err)
@@ -160,6 +164,21 @@ func (c *TieredStorage) prepareRoot() error {
 		}
 	}
 	return nil
+}
+
+// osManagedRootEntries are created by the OS or filesystem at the root of a
+// volume, so they are expected when the tiered root is a volume root. The NTFS
+// names also appear when an NTFS or exFAT volume is mounted on Linux.
+var osManagedRootEntries = []string{"System Volume Information", "$RECYCLE.BIN", "lost+found"}
+
+// isOSManagedEntry reports whether a tiered root entry belongs to the OS.
+func isOSManagedEntry(entry fs.DirEntry) bool {
+	for _, name := range osManagedRootEntries {
+		if strings.EqualFold(entry.Name(), name) {
+			return true
+		}
+	}
+	return isProtectedSystemEntry(entry)
 }
 
 // recoverLocalFiles enqueues every file in local/ in the LRU, oldest
@@ -233,10 +252,6 @@ func (c *TieredStorage) Configure(_ bool) error {
 	if c.tmpPath == "" || c.tmpPath == "." {
 		return fmt.Errorf("TieredStorage: path not set in config")
 	}
-	if conf.MaxSizeMB <= 0 {
-		return fmt.Errorf("TieredStorage: max-size-mb must be greater than 0")
-	}
-
 	if conf.HighThreshold == 0 {
 		conf.HighThreshold = defaultHighThreshold
 	}
@@ -252,8 +267,35 @@ func (c *TieredStorage) Configure(_ bool) error {
 		conf.Parallelism = defaultParallelism
 	}
 
+	if err := c.prepareRoot(); err != nil {
+		log.Err("TieredStorage::Configure : %v", err)
+		return err
+	}
+	c.cacheSize = newCacheSizeTracker(
+		[]string{
+			filepath.Join(c.tmpPath, localDirName),
+			filepath.Join(c.tmpPath, cacheDirName),
+		},
+		reconcileCapacityInterval,
+	)
+	if err := c.cacheSize.Refresh(); err != nil {
+		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
+	}
+	if conf.MaxSizeMB == 0 {
+		free, err := availableSize(c.tmpPath)
+		if err != nil {
+			return fmt.Errorf("TieredStorage: failed to get free space for %s: %w", c.tmpPath, err)
+		}
+		// local/ persists across mounts, so count it as available.
+		conf.MaxSizeMB = math.Floor(
+			defaultMaxSizeRatio * float64(free+uint64(c.cacheSize.Used())) / common.MbToBytes,
+		)
+		log.Info("TieredStorage::Configure : max-size-mb defaulted to %.0f", conf.MaxSizeMB)
+	}
+	if conf.MaxSizeMB <= 0 {
+		return fmt.Errorf("TieredStorage: max-size-mb must be greater than 0")
+	}
 	c.maxCacheSize = conf.MaxSizeMB * common.MbToBytes
-	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
 
 	c.policy = newLRUQueue(lruQueueConfig{
 		localRoot:        filepath.Join(c.tmpPath, localDirName),
@@ -1476,7 +1518,7 @@ func (c *TieredStorage) FileUsed(name string) error {
 func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 	const blockSize = 4096
 
-	physicalFree, err := c.getAvailableSize()
+	physicalFree, err := availableSize(c.tmpPath)
 	if err != nil {
 		return nil, false, err
 	}

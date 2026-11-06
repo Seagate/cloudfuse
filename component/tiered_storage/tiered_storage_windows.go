@@ -58,16 +58,31 @@ func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 	return attrs
 }
 
-func (c *TieredStorage) getAvailableSize() (uint64, error) {
-	path, err := windows.UTF16PtrFromString(c.tmpPath)
+func availableSize(path string) (uint64, error) {
+	pathPtr, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return 0, err
 	}
 	var free, total, available uint64
-	if err := windows.GetDiskFreeSpaceEx(path, &free, &total, &available); err != nil {
+	if err := windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &available); err != nil {
 		return 0, err
 	}
 	return available, nil
+}
+
+// isProtectedSystemEntry reports whether entry is marked both hidden and
+// system, which Explorer treats as a protected operating system file.
+func isProtectedSystemEntry(entry fs.DirEntry) bool {
+	info, err := entry.Info()
+	if err != nil {
+		return false
+	}
+	stat, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return false
+	}
+	const protected = windows.FILE_ATTRIBUTE_HIDDEN | windows.FILE_ATTRIBUTE_SYSTEM
+	return stat.FileAttributes&protected == protected
 }
 
 // uploadMetadata reports nothing on Windows. Local files there carry no POSIX
