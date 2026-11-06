@@ -121,15 +121,18 @@ file when needed.
 
 ## Startup
 
+`Configure`:
+
 1. Ensure `<tiered_root>` exists.
-2. If `<tiered_root>` contains entries other than `local/` and `cache/`, fail
-   to start with a clear error. This prevents silently misinterpreting data from
-   an older layout or a misconfigured path.
+2. If `<tiered_root>` contains entries other than `local/`, `cache/`, and OS-managed volume entries, fail with a clear error.
 3. `RemoveAll(cache/)`, then recreate `local/` and `cache/`.
-4. Walk `local/`. Every regular file is local-owned. Enqueue them in the LRU,
+4. If `max-size-mb` is not set, default it to 80% of free space plus the size of `local/`, since `local/` persists across mounts.
+
+`Start`:
+
+1. Walk `local/`. Every regular file is local-owned. Enqueue them in the LRU,
    ordered by modification time (oldest at the tail).
-5. Measure cache size.
-6. Start the eviction policy.
+2. Start the eviction policy.
 
 ## Shutdown
 
@@ -414,8 +417,8 @@ reopen, as unmodified cloud files already are.
   `setup/advancedConfig.yaml`. The application may retry once background
   eviction has freed space.
 - Usage is tracked incrementally after each write, truncate, download, and
-  delete, and periodically reconciled by measuring `<tiered_root>`, which
-  includes both `local/` and `cache/`. Only the eviction policy reads it.
+  delete, and periodically reconciled by measuring `local/` and `cache/`. Other
+  entries in `<tiered_root>` are not counted. Only the eviction policy reads it.
 
 ## Locking
 
@@ -491,8 +494,9 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
 
 ## Required tests
 
-- Startup clears `cache/`, recovers `local/` into the LRU by mtime, and fails on
-  unexpected root entries.
+- Startup clears `cache/`, recovers `local/` into the LRU by mtime, fails on
+  unexpected root entries, and ignores OS-managed root entries without counting
+  them toward usage.
 - Open of a cloud file downloads into `cache/`; last close deletes it.
 - First write to a cached file promotes it to `local/` while handles remain
   valid.
