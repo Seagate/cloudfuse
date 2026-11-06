@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/cache_size"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -60,8 +61,19 @@ type TieredStorage struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
 
-	cacheSize    *cacheSizeTracker
+	cacheSize    *cache_size.Tracker
 	maxCacheSize float64
+}
+
+// newCacheSizeTracker tracks the local/ and cache/ trees under path. Only the
+// trees the component owns are measured, so OS-managed entries that share the
+// tiered path are not counted against max-size-mb.
+func newCacheSizeTracker(path string, reconcileInterval time.Duration) *cache_size.Tracker {
+	return cache_size.NewTracker(
+		reconcileInterval,
+		filepath.Join(path, localDirName),
+		filepath.Join(path, cacheDirName),
+	)
 }
 
 type TieredStorageOptions struct {

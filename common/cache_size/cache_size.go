@@ -22,11 +22,10 @@
    SOFTWARE
 */
 
-package tiered_storage
+package cache_size
 
 import (
 	"fmt"
-	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -38,8 +37,7 @@ import (
 // before the correction is worth a log line.
 const driftWarnBytes = 16 * common.MbToBytes
 
-// cacheSizeTracker tracks how many bytes of local storage the component is
-// using.
+// Tracker tracks how many bytes of local storage a caching component is using.
 //
 // The total is maintained incrementally, because measuring it costs a du(1)
 // subprocess on Linux and a full tree walk on Windows - far too expensive to do
@@ -50,30 +48,29 @@ const driftWarnBytes = 16 * common.MbToBytes
 // Sizes are apparent bytes, matching `du -sb` on Linux. Windows measures
 // allocated sectors instead, so the two platforms disagree slightly for small
 // files; Reconcile is what keeps that from accumulating.
-type cacheSizeTracker struct {
-	path              string
+type Tracker struct {
+	paths             []string
 	used              atomic.Int64
 	reconcileInterval time.Duration
 	lastReconcile     atomic.Int64 // unix nanoseconds
 }
 
-// newCacheSizeTracker tracks the local/ and cache/ trees under path. Only the
-// trees the component owns are measured, so OS-managed entries that share the
-// tiered path are not counted against max-size-mb.
-func newCacheSizeTracker(path string, reconcileInterval time.Duration) *cacheSizeTracker {
-	t := &cacheSizeTracker{path: path, reconcileInterval: reconcileInterval}
+// NewTracker tracks the combined size of paths. The total starts at zero; call
+// Refresh to seed it with a measurement.
+func NewTracker(reconcileInterval time.Duration, paths ...string) *Tracker {
+	t := &Tracker{paths: paths, reconcileInterval: reconcileInterval}
 	t.lastReconcile.Store(time.Now().UnixNano())
 	return t
 }
 
 // Used returns the current cache usage in bytes.
-func (t *cacheSizeTracker) Used() int64 {
+func (t *Tracker) Used() int64 {
 	return t.used.Load()
 }
 
 // Add applies a signed change in bytes. The total is clamped at zero: drift
 // could otherwise drive it negative and hide a full cache.
-func (t *cacheSizeTracker) Add(delta int64) {
+func (t *Tracker) Add(delta int64) {
 	if delta == 0 {
 		return
 	}
@@ -86,15 +83,14 @@ func (t *cacheSizeTracker) Add(delta int64) {
 	}
 }
 
-// Refresh measures the tracked trees and replaces the running total.
+// Refresh measures the tracked paths and replaces the running total.
 // Changes made while the measurement is in flight are lost, which is inherent
 // to reconciling against a moving target and is why it is not the hot path.
-func (t *cacheSizeTracker) Refresh() error {
+func (t *Tracker) Refresh() error {
 	t.lastReconcile.Store(time.Now().UnixNano())
 
 	var measured int64
-	for _, tree := range []string{localDirName, cacheDirName} {
-		path := filepath.Join(t.path, tree)
+	for _, path := range t.paths {
 		usage, err := common.GetUsage(path)
 		if err != nil {
 			return fmt.Errorf("failed to measure %s: %w", path, err)
@@ -105,7 +101,7 @@ func (t *cacheSizeTracker) Refresh() error {
 	previous := t.used.Swap(measured)
 	if drift := measured - previous; drift > driftWarnBytes || drift < -driftWarnBytes {
 		log.Info(
-			"cacheSizeTracker::Refresh : corrected usage by %d bytes (was %d, now %d)",
+			"Tracker::Refresh : corrected usage by %d bytes (was %d, now %d)",
 			drift,
 			previous,
 			measured,
@@ -115,11 +111,11 @@ func (t *cacheSizeTracker) Refresh() error {
 }
 
 // Reconcile refreshes the running total, but no more often than reconcileInterval.
-func (t *cacheSizeTracker) Reconcile() {
+func (t *Tracker) Reconcile() {
 	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
 		return
 	}
 	if err := t.Refresh(); err != nil {
-		log.Err("cacheSizeTracker::Reconcile : %v", err)
+		log.Err("Tracker::Reconcile : %v", err)
 	}
 }

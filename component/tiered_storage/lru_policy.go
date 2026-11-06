@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/cache_size"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -52,7 +53,7 @@ type uploadJob struct {
 type lruQueueConfig struct {
 	localRoot string          // local/ beneath the tiered root
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
-	size      *cacheSizeTracker
+	size      *cache_size.Tracker
 
 	maxCacheSize float64
 	// threshold and targetRatio are fractions of maxCacheSize.
