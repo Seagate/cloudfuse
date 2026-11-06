@@ -1129,15 +1129,17 @@ func (suite *tieredStorageTestSuite) TestStreamDirMergesLocalAndCloudEntries() {
 	)
 	suite.Require().NoError(err)
 
-	attrs, token, err := suite.tieredStorage.StreamDir(internal.StreamDirOptions{})
-	suite.Require().NoError(err)
-	suite.assert.Empty(token)
+	attrs := listDir(suite.T(), suite.tieredStorage, "")
 	suite.Require().Len(attrs, 3)
-	suite.assert.Equal([]string{"cloud", "local", "shared"}, []string{
+	suite.assert.ElementsMatch([]string{"cloud", "local", "shared"}, []string{
 		attrs[0].Name, attrs[1].Name, attrs[2].Name,
 	})
-	suite.assert.EqualValues(len("local data"), attrs[1].Size)
-	suite.assert.EqualValues(len("local data"), attrs[2].Size)
+	sizes := map[string]int64{}
+	for _, attr := range attrs {
+		sizes[attr.Name] = attr.Size
+	}
+	suite.assert.EqualValues(len("local data"), sizes["local"])
+	suite.assert.EqualValues(len("local data"), sizes["shared"])
 }
 
 func (suite *tieredStorageTestSuite) TestCreateAndDeleteLocalDirectory() {
@@ -1186,8 +1188,7 @@ func (suite *tieredStorageTestSuite) TestStreamDirSkipsCacheAndPrefersLocal() {
 	})
 	suite.Require().NoError(err)
 
-	attrs, _, err := suite.tieredStorage.StreamDir(internal.StreamDirOptions{Name: ""})
-	suite.Require().NoError(err)
+	attrs := listDir(suite.T(), suite.tieredStorage, "")
 	sizes := map[string]int64{}
 	for _, attr := range attrs {
 		sizes[attr.Name] = attr.Size
@@ -1234,16 +1235,31 @@ func (suite *tieredStorageTestSuite) TestStreamDirListsImplicitLocalDirectory() 
 		suite.tieredStorage.OpenDir(internal.OpenDirOptions{Name: "directory"}),
 	)
 
-	attrs, token, err := suite.tieredStorage.StreamDir(
-		internal.StreamDirOptions{Name: "directory"},
-	)
-	suite.Require().NoError(err)
-	suite.assert.Empty(token)
+	attrs := listDir(suite.T(), suite.tieredStorage, "directory")
 	suite.Require().Len(attrs, 1)
 	suite.assert.Equal("directory/file", attrs[0].Path)
 	suite.Require().NoError(
 		suite.tieredStorage.CloseDir(internal.CloseDirOptions{Name: "directory"}),
 	)
+}
+
+// listDir pages through StreamDir as libfuse does.
+func listDir(t *testing.T, storage *TieredStorage, name string) []*internal.ObjAttr {
+	var attrs []*internal.ObjAttr
+	token := ""
+	for {
+		page, nextToken, err := storage.StreamDir(
+			internal.StreamDirOptions{Name: name, Token: token},
+		)
+		require.NoError(t, err)
+		// libfuse takes an empty page as the end of the listing.
+		require.True(t, len(page) > 0 || nextToken == "", "empty page before the end")
+		attrs = append(attrs, page...)
+		if nextToken == "" {
+			return attrs
+		}
+		token = nextToken
+	}
 }
 
 func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
@@ -1258,32 +1274,40 @@ func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
 
 	storage := &TieredStorage{tmpPath: root}
 	storage.SetNextComponent(next)
-	// attr_cache returns its cached listing, which must not be modified.
-	firstPage := []*internal.ObjAttr{{Path: "a", Name: "a"}, {Path: "b", Name: "b"}}
+	// Every name on the first cloud page is local, so it must be skipped
+	// rather than returned empty. attr_cache returns its cached listing, which
+	// must not be modified.
+	firstPage := []*internal.ObjAttr{{Path: "a", Name: "a"}, {Path: "c", Name: "c"}}
 	firstPageCopy := slices.Clone(firstPage)
 	next.EXPECT().StreamDir(internal.StreamDirOptions{}).Return(firstPage, "page2", nil)
 	next.EXPECT().StreamDir(internal.StreamDirOptions{Token: "page2"}).
-		Return([]*internal.ObjAttr{{Path: "c", Name: "c"}, {Path: "d", Name: "d"}}, "", nil)
+		Return([]*internal.ObjAttr{{Path: "b", Name: "b"}, {Path: "d", Name: "d"}}, "", nil)
 
+	sizes := map[string]int64{}
 	var names []string
-	var sizes = map[string]int64{}
-	token := ""
-	for {
-		attrs, nextToken, err := storage.StreamDir(internal.StreamDirOptions{Token: token})
-		require.NoError(t, err)
-		for _, attr := range attrs {
-			names = append(names, attr.Name)
-			sizes[attr.Name] = attr.Size
-		}
-		if nextToken == "" {
-			break
-		}
-		token = nextToken
+	for _, attr := range listDir(t, storage, "") {
+		names = append(names, attr.Name)
+		sizes[attr.Name] = attr.Size
 	}
-	assert.ElementsMatch(t, []string{"a", "b", "c", "d"}, names)
+	assert.Equal(t, []string{"a", "c", "b", "d"}, names)
 	assert.EqualValues(t, len("local"), sizes["a"])
 	assert.EqualValues(t, len("local"), sizes["c"])
 	assert.Equal(t, firstPageCopy, firstPage)
+}
+
+func TestStreamDirWithoutLocalEntriesStartsWithCloud(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	storage := &TieredStorage{tmpPath: t.TempDir()}
+	storage.SetNextComponent(next)
+	next.EXPECT().StreamDir(internal.StreamDirOptions{Name: "dir"}).
+		Return([]*internal.ObjAttr{{Path: "dir/a", Name: "a"}}, "", nil)
+
+	attrs, token, err := storage.StreamDir(internal.StreamDirOptions{Name: "dir"})
+	require.NoError(t, err)
+	assert.Empty(t, token)
+	require.Len(t, attrs, 1)
+	assert.Equal(t, "dir/a", attrs[0].Path)
 }
 
 func (suite *tieredStorageTestSuite) TestRenameLocalOnlyDirectory() {

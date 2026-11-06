@@ -88,6 +88,10 @@ const (
 	cacheDirName = "cache"
 	// Cache holds user data and is only accessed by this process (CWE-732).
 	cacheDirPerm os.FileMode = 0700
+	// cloudListingToken follows a first page of local entries and stands for
+	// the start of the cloud listing. Cloud tokens are printable, so it cannot
+	// collide with one.
+	cloudListingToken = "\x00cloud"
 )
 
 var _ internal.Component = &TieredStorage{}
@@ -378,59 +382,62 @@ func (c *TieredStorage) StreamDir(
 		return nil, "", pathErr
 	}
 
-	attrs, token, cloudErr := c.NextComponent().StreamDir(options)
 	entries, localErr := os.ReadDir(localPath)
-	localExists := localErr == nil
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return nil, "", localErr
 	}
-	if cloudErr != nil && (!localExists || !errors.Is(cloudErr, os.ErrNotExist)) {
-		return attrs, token, cloudErr
-	}
-	if cloudErr != nil {
-		attrs = nil
-		token = ""
+	localNames := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		localNames[entry.Name()] = struct{}{}
 	}
 
-	// Local entries win, as in GetAttr: they are listed once, on the first
-	// page, and their cloud counterparts are dropped from every page. cache/
-	// copies match the cloud, so cache/ is never listed.
-	firstPage := options.Token == ""
-	localNames := make(map[string]struct{}, len(entries))
-	var localAttrs []*internal.ObjAttr
-	for _, entry := range entries {
-		name := entry.Name()
-		if !firstPage {
-			localNames[name] = struct{}{}
-			continue
+	// Local entries win, as in GetAttr. They make up the first page, and the
+	// cloud listing follows without them. cache/ copies match the cloud, so
+	// cache/ is never listed.
+	if options.Token == "" {
+		var attrs []*internal.ObjAttr
+		for _, entry := range entries {
+			// On Windows this is the directory data, whose size can lag for an
+			// open file, as on NTFS itself. GetAttr reports the current size.
+			info, err := entry.Info()
+			if err != nil {
+				// Evicted since ReadDir, so the cloud lists it.
+				delete(localNames, entry.Name())
+				continue
+			}
+			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
+			attrs = append(attrs, newTieredStorageObjAttr(entryName, info))
 		}
-		// On Windows this is the directory data, whose size can lag for an
-		// open file, as on NTFS itself. GetAttr reports the current size.
-		info, err := entry.Info()
-		if errors.Is(err, os.ErrNotExist) {
-			// Evicted since ReadDir, so the cloud entry stands.
-			continue
+		if len(attrs) > 0 {
+			return attrs, cloudListingToken, nil
+		}
+	}
+	if options.Token == cloudListingToken {
+		options.Token = ""
+	}
+
+	for {
+		attrs, token, err := c.NextComponent().StreamDir(options)
+		// A directory that exists only locally may be unknown to the cloud.
+		if errors.Is(err, os.ErrNotExist) && localErr == nil {
+			return nil, "", nil
 		}
 		if err != nil {
 			return nil, "", err
 		}
-		localNames[name] = struct{}{}
-		entryName := common.JoinUnixFilepath(options.Name, name)
-		localAttrs = append(localAttrs, newTieredStorageObjAttr(entryName, info))
-	}
-
-	// attrs may be attr_cache's cached listing, so build a new slice.
-	merged := make([]*internal.ObjAttr, 0, len(attrs)+len(localAttrs))
-	for _, attr := range attrs {
-		if _, found := localNames[attr.Name]; !found {
-			merged = append(merged, attr)
+		// attrs may be attr_cache's cached listing, so build a new slice.
+		cloudOnly := make([]*internal.ObjAttr, 0, len(attrs))
+		for _, attr := range attrs {
+			if _, isLocal := localNames[attr.Name]; !isLocal {
+				cloudOnly = append(cloudOnly, attr)
+			}
 		}
+		// libfuse takes an empty page as the end of the listing.
+		if len(cloudOnly) > 0 || token == "" {
+			return cloudOnly, token, nil
+		}
+		options.Token = token
 	}
-	merged = append(merged, localAttrs...)
-	slices.SortFunc(merged, func(a, b *internal.ObjAttr) int {
-		return strings.Compare(a.Path, b.Path)
-	})
-	return merged, token, nil
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
