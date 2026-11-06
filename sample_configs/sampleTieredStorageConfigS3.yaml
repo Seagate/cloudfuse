@@ -14,10 +14,7 @@ components:
 
 tiered_storage:
   path: /<PATH>/<TO>/<LOCAL_STORAGE>
-  max-size-mb: 102400
-
-attr_cache:
-  timeout-sec: 120
+  #max-size-mb: 102400
 
 s3storage:
   bucket-name: <ACCOUNT_NAME>
