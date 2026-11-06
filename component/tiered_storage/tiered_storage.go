@@ -89,9 +89,8 @@ const (
 	// Cache holds user data and is only accessed by this process (CWE-732).
 	cacheDirPerm os.FileMode = 0700
 	// cloudListingToken follows a first page of local entries and stands for
-	// the start of the cloud listing. Cloud tokens are printable, so it cannot
-	// collide with one.
-	cloudListingToken = "\x00cloud"
+	// the start of the cloud listing.
+	cloudListingToken = "tiered_storage:cloud"
 )
 
 var _ internal.Component = &TieredStorage{}
