@@ -36,6 +36,7 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
 - [Offline Access (New)](#offline-access-new)
+- [Tiered Storage](#tiered-storage)
 - [Command Line Interface](#command-line-interface)
 - [Limitations](#limitations)
 - [License](#license)
@@ -316,18 +317,98 @@ Cloudfuse now supports offline access through the `file_cache` component. When c
 
 ## Tiered Storage
 
-Use `tiered_storage` for on-prem-first configurations, when you want cloud storage to expand existing local storage. To minimize cloud storage costs, `tiered_storage` only maintains one copy of each file, moving old files to cloud storage once local storage fills up.
+Use `tiered_storage` for on-prem-first configurations, when you want cloud storage to expand existing local storage. To minimize cloud storage costs, `tiered_storage` keeps only one copy of each file: files stay on local disk until local storage fills up, and then the least recently used files are moved to the cloud.
 
-Note: Do not use `tiered_storage` if you use cloud storage to access your data remotely. Only overflow data will be present in the cloud.
+> **Note:** With `tiered_storage`, your bucket does **not** hold a complete copy of your data. New and recently used files stay only on local disk, and they move to the cloud only when local storage fills up. If you browse the bucket directly or mount it from another machine, you will see only the files that have overflowed, and your newest data will be missing. Don't use `tiered_storage` for remote access, sharing between machines, or backup.
 
-See `sample_configs/sampleTieredStorageConfigS3.yaml` and `setup/baseConfig.yaml` for configuration.
+See [sampleTieredStorageConfigS3.yaml](sample_configs/sampleTieredStorageConfigS3.yaml) and [baseConfig.yaml](setup/baseConfig.yaml) for configuration, and [DESIGN.md](component/tiered_storage/DESIGN.md) for implementation details.
 
-### Expanding Existing Local Storage Using Tiered Storage
+### How Tiered Storage Works
 
-When using `tiered_storage` to add cloud capacity to an existing local storage location, please ensure all access is done through the Cloudfuse mount path / virtual drive. The `tiered_storage` `path` becomes *internal* local storage: Cloudfuse keeps files in its `local` subfolder, and temporary copies of open cloud files in its `cache` subfolder, which is cleared at every mount. Cloudfuse refuses to start if `path` contains anything else, so move existing data into `<path>/local` before the first mount. Accessing the `tiered_storage` `path` directly may have unpredictable results.
-For example, if you want to expand the capacity of your existing local drive, `D:`, you could change that local drive's letter to `E:` first, move its contents into `E:\cloudfuse\local`, then set `tiered_storage` `path` to `E:\cloudfuse` and mount cloudfuse to `D:`. Then any existing applications or workflows that normally use `D:` would continue as normal, now pointed at the cloudfuse mount location. (`path` cannot be the drive root itself, which always contains system folders.)
+The `tiered_storage` `path` is a directory that only Cloudfuse uses. Local data is organized into two directories:
 
-**Cloudfuse may upload and delete local files under `path` as part of normal overflow eviction, so anything still reading or writing there directly can lose data or see missing files.**
+| Location | Contents |
+|---|---|
+| `<path>/local` | Local-only. This is the only copy of each file. |
+| `<path>/cache` | Working copies of cloud files currently in use. Cleared at every mount. |
+
+- New files are created in `local`.
+- When the combined size of `local` and `cache` rises above `high-threshold` percent of `max-size-mb`, Cloudfuse uploads the least recently used closed files to the cloud and deletes their local copies, until usage is below `low-threshold` percent.
+- Opening a cloud file downloads a temporary copy into `cache`. The copy is deleted when the file is closed.
+- Cloudfuse will fail to start if `path` contains anything other than `local` and `cache`.
+- `max-size-mb` is not a hard limit. Eviction runs in the background, so usage can exceed it briefly. If the disk itself fills up, writes fail with a "no space" error. `max-size-mb` defaults to 80% of free disk space.
+
+### Migrating Existing Local Storage to Tiered Storage
+
+To add cloud capacity to existing local storage, move the existing data into `<path>/local`, then mount Cloudfuse where the data used to be. Applications keep using the same location, and Cloudfuse moves older files to the cloud as local storage fills up.
+For example, see the [Windows example](#windows-example) below.
+
+Tips:
+
+- **Use a dedicated container or prefix** for each tiered mount. If a local file has the same name as an existing cloud object, it will overwrite the cloud object when it is uploaded.
+- **Put `path` on the same volume as the existing data**, so that moving data into it is a fast rename instead of a copy.
+- **`path` can be the root of a drive or filesystem.** Move everything else at that root into `<path>/local` first.
+- **Stop applications before mounting**
+
+#### Windows Example
+
+To expand drive `D:`:
+
+1. Stop all applications that use `D:`.
+2. In Disk Management, change the drive letter of the existing volume from `D:` to `E:`.
+3. Create the folder `E:\local`, and move all of your data from `E:\` into it. If hidden files are visible, leave the system folders where they are.
+4. In your config file, set:
+
+   ```yaml
+   tiered_storage:
+     path: E:\
+     # optionally, configure how tiered_storage manages space
+     # max-size-mb: ...
+     # high-threshold: ...
+     # low-threshold: ...
+   ```
+
+5. Mount Cloudfuse as `D:`:
+
+   ```bash
+   cloudfuse mount D: --config-file=<config file>
+   ```
+
+6. Check that your files appear in `D:`, then start your applications.
+
+Run `cloudfuse service install` so that `D:` is remounted at login after a restart.
+
+#### Linux Example
+
+To expand `/data`, if `/data` is a normal directory:
+
+```bash
+sudo mkdir /data-tiered
+sudo mv /data /data-tiered/local
+sudo mkdir /data
+```
+
+If `/data` is the mount point of its own disk, mount that disk somewhere else instead (for example `/mnt/data-disk`, updating `/etc/fstab`), and move its contents into a `local` folder at its root:
+
+```bash
+sudo mkdir /mnt/data-disk/local
+cd /mnt/data-disk
+sudo find . -mindepth 1 -maxdepth 1 ! -name local ! -name lost+found -exec mv -t local {} +
+```
+
+Then set `tiered_storage` `path` to `/data-tiered` (or `/mnt/data-disk`), and mount Cloudfuse at `/data`:
+
+```bash
+cloudfuse mount /data --config-file=<config file>
+```
+
+Run Cloudfuse as a user that can read and write all of the moved files. To mount at boot, before your applications start, see [Setup for systemd instructions](setup/readme.md).
+
+#### After Migrating
+
+**Only access your data through the Cloudfuse mount.** Do not read, write, or clean up `path` directly. Cloudfuse uploads and deletes files in `local` during eviction, and deletes everything in `cache` at every mount, so other programs that use `path` directly can lose data or find files missing. If possible, exclude `path` from antivirus scans and search indexing, because programs that keep files open there can delay eviction.
+
+To stop using tiered storage, copy your data out through the mount to a location with enough space for all of it. Reading through the mount downloads evicted files from the cloud.
 
 ## Limitations
 
