@@ -25,10 +25,8 @@
 package tiered_storage
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -53,17 +51,17 @@ const driftWarnBytes = 16 * common.MbToBytes
 // allocated sectors instead, so the two platforms disagree slightly for small
 // files; Reconcile is what keeps that from accumulating.
 type cacheSizeTracker struct {
-	paths             []string
+	path              string
 	used              atomic.Int64
 	reconcileInterval time.Duration
 	lastReconcile     atomic.Int64 // unix nanoseconds
 }
 
-// newCacheSizeTracker tracks the combined size of paths. Only the trees the
-// component owns are measured, so other entries that share the tiered root are
-// not counted against max-size-mb.
-func newCacheSizeTracker(paths []string, reconcileInterval time.Duration) *cacheSizeTracker {
-	t := &cacheSizeTracker{paths: paths, reconcileInterval: reconcileInterval}
+// newCacheSizeTracker tracks the local/ and cache/ trees under path. Only the
+// trees the component owns are measured, so OS-managed entries that share the
+// tiered path are not counted against max-size-mb.
+func newCacheSizeTracker(path string, reconcileInterval time.Duration) *cacheSizeTracker {
+	t := &cacheSizeTracker{path: path, reconcileInterval: reconcileInterval}
 	t.lastReconcile.Store(time.Now().UnixNano())
 	return t
 }
@@ -95,12 +93,13 @@ func (t *cacheSizeTracker) Refresh() error {
 	t.lastReconcile.Store(time.Now().UnixNano())
 
 	var measured int64
-	for _, path := range t.paths {
-		usage, err := measureTree(path)
+	for _, tree := range []string{localDirName, cacheDirName} {
+		path := filepath.Join(t.path, tree)
+		usage, err := common.GetUsage(path)
 		if err != nil {
 			return fmt.Errorf("failed to measure %s: %w", path, err)
 		}
-		measured += usage
+		measured += int64(usage)
 	}
 
 	previous := t.used.Swap(measured)
@@ -123,15 +122,4 @@ func (t *cacheSizeTracker) Reconcile() {
 	if err := t.Refresh(); err != nil {
 		log.Err("cacheSizeTracker::Reconcile : %v", err)
 	}
-}
-
-// measureTree returns the size of a tree in bytes, or 0 if it does not exist.
-func measureTree(path string) (int64, error) {
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-	usage, err := common.GetUsage(path)
-	return int64(usage), err
 }

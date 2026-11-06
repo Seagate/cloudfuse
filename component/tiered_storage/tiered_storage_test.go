@@ -509,7 +509,7 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	storage := &TieredStorage{
 		tmpPath:   cachePath,
 		fileLocks: common.NewLockMap(),
-		cacheSize: newCacheSizeTracker([]string{cachePath}, 0),
+		cacheSize: newCacheSizeTracker(cachePath, 0),
 	}
 	storage.SetNextComponent(next)
 	storage.fileLocks.Get("file").CloudStale = true

@@ -47,6 +47,7 @@ type lruPolicyTestSuite struct {
 }
 
 var cache_path = filepath.Join(home_dir, "file_cache"+randomString(8))
+var local_path = filepath.Join(cache_path, localDirName)
 
 const lruTestFileSize = 250 * 1024
 
@@ -57,23 +58,32 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 	}
 	suite.assert = assert.New(suite.T())
 
-	err = os.Mkdir(cache_path, 0777)
-	suite.assert.NoError(err)
+	suite.Require().NoError(makeTieredRoot(cache_path))
 
 	suite.setupTestHelper(lruQueueConfig{
-		localRoot:    cache_path,
+		localRoot:    local_path,
 		maxCacheSize: 1 * common.MbToBytes,
 		threshold:    0.8,
 		targetRatio:  0.6,
 		numWorkers:   8,
 		pollInterval: time.Millisecond,
 		fileLocks:    common.NewLockMap(),
-		size:         newCacheSizeTracker([]string{cache_path}, 0),
+		size:         newCacheSizeTracker(cache_path, 0),
 
 		uploadandCleanFn: func(name string) error {
 			return nil
 		},
 	})
+}
+
+// makeTieredRoot creates the local/ and cache/ trees the size tracker measures.
+func makeTieredRoot(root string) error {
+	for _, tree := range []string{localDirName, cacheDirName} {
+		if err := os.MkdirAll(filepath.Join(root, tree), 0777); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // setupTestHelper creates and starts an lruQueue for testing.
@@ -95,7 +105,7 @@ func (suite *lruPolicyTestSuite) cleanupTest() {
 func (suite *lruPolicyTestSuite) createQueuedFiles(names ...string) {
 	data := make([]byte, lruTestFileSize)
 	for _, name := range names {
-		suite.Require().NoError(os.WriteFile(filepath.Join(cache_path, name), data, 0644))
+		suite.Require().NoError(os.WriteFile(filepath.Join(local_path, name), data, 0644))
 		suite.policy.Enqueue(name)
 	}
 }
@@ -164,8 +174,10 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default policy generated in SetupTest
 
-	cachePath := suite.T().TempDir()
-	size := newCacheSizeTracker([]string{cachePath}, time.Hour)
+	root := suite.T().TempDir()
+	suite.Require().NoError(makeTieredRoot(root))
+	cachePath := filepath.Join(root, localDirName)
+	size := newCacheSizeTracker(root, time.Hour)
 	var uploaded atomic.Int32
 	suite.setupTestHelper(lruQueueConfig{
 		localRoot:    cachePath,
@@ -223,7 +235,7 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 		mu.Lock()
 		defer mu.Unlock()
 		uploaded = append(uploaded, name)
-		return os.Remove(filepath.Join(cache_path, name))
+		return os.Remove(filepath.Join(local_path, name))
 	}
 
 	suite.createQueuedFiles("file1", "file2", "file3", "file4")
@@ -272,7 +284,7 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEvictionOpenHandle() {
 		mu.Lock()
 		defer mu.Unlock()
 		uploaded = append(uploaded, name)
-		return os.Remove(filepath.Join(cache_path, name))
+		return os.Remove(filepath.Join(local_path, name))
 	}
 
 	suite.createQueuedFiles("file1")
@@ -317,7 +329,7 @@ func (suite *lruPolicyTestSuite) TestStopPolicyMidUpload() {
 		mu.Lock()
 		defer mu.Unlock()
 		uploaded = append(uploaded, name)
-		return os.Remove(filepath.Join(cache_path, name))
+		return os.Remove(filepath.Join(local_path, name))
 	}
 
 	suite.createQueuedFiles("file1", "file2", "file3", "file4")

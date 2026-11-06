@@ -271,13 +271,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		log.Err("TieredStorage::Configure : %v", err)
 		return err
 	}
-	c.cacheSize = newCacheSizeTracker(
-		[]string{
-			filepath.Join(c.tmpPath, localDirName),
-			filepath.Join(c.tmpPath, cacheDirName),
-		},
-		reconcileCapacityInterval,
-	)
+	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
 	if err := c.cacheSize.Refresh(); err != nil {
 		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
 	}
