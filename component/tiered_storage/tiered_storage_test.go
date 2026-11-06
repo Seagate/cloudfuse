@@ -550,8 +550,11 @@ func TestCheckCloudReachable(t *testing.T) {
 		{name: "offline, not in cloud", getAttr: syscall.ENOENT},
 		{name: "offline, in cloud", wantErr: true},
 		{
-			name:    "offline, unknown",
-			getAttr: common.NewNoCachedDataError(syscall.ENOENT),
+			name: "offline, unknown",
+			getAttr: func() error {
+				err := common.NewNoCachedDataError(syscall.ENOENT)
+				return &err
+			}(),
 			wantErr: true,
 		},
 	}
