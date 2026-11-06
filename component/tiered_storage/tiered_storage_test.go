@@ -287,7 +287,7 @@ func (suite *tieredStorageTestSuite) TestConfigureIgnoresOSManagedRootEntries() 
 		suite.assert.FileExists(filepath.Join(suite.cache_path, name, "os-data"))
 	}
 	// Only local/ and cache/ count against max-size-mb.
-	suite.assert.Less(suite.tieredStorage.cacheSize.Used(), int64(osDataSize))
+	suite.assert.Less(suite.tieredStorage.diskUsage.Used(), int64(osDataSize))
 }
 
 func TestTieredStoragePolicyConfig(t *testing.T) {
@@ -376,12 +376,12 @@ func TestTieredStorageDefaultMaxSize(t *testing.T) {
 	require.NoError(t, storage.Configure(true))
 
 	assert.NoFileExists(t, filepath.Join(root, cacheDirName, "file"))
-	used := storage.cacheSize.Used()
+	used := storage.diskUsage.Used()
 	assert.GreaterOrEqual(t, used, int64(fileSize))
 	assert.Less(t, used, int64(2*fileSize))
 	free, err := availableSize(root)
 	require.NoError(t, err)
-	assert.InEpsilon(t, defaultMaxSizeRatio*float64(free+uint64(used)), storage.maxCacheSize, 0.01)
+	assert.InEpsilon(t, defaultMaxSizeRatio*float64(free+uint64(used)), storage.maxSize, 0.01)
 }
 
 func (suite *tieredStorageTestSuite) TestGetAttrLocalOnly() {
@@ -509,7 +509,7 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	storage := &TieredStorage{
 		tmpPath:   cachePath,
 		fileLocks: common.NewLockMap(),
-		cacheSize: newCacheSizeTracker(cachePath, 0),
+		diskUsage: newDiskUsageTracker(cachePath, 0),
 	}
 	storage.SetNextComponent(next)
 	storage.fileLocks.Get("file").CloudStale = true
@@ -717,7 +717,7 @@ func (suite *tieredStorageTestSuite) TestTruncateOpenLocalFile() {
 		&internal.WriteFileOptions{Handle: handle, Data: []byte("original")},
 	)
 	suite.Require().NoError(err)
-	used := suite.tieredStorage.cacheSize.Used()
+	used := suite.tieredStorage.diskUsage.Used()
 
 	err = suite.tieredStorage.TruncateFile(internal.TruncateFileOptions{
 		Name: "local-truncate", Handle: handle, NewSize: 3,
@@ -727,7 +727,7 @@ func (suite *tieredStorageTestSuite) TestTruncateOpenLocalFile() {
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(3, info.Size())
 	suite.assert.True(handle.Dirty())
-	suite.assert.Equal(used-int64(len("original")-3), suite.tieredStorage.cacheSize.Used())
+	suite.assert.Equal(used-int64(len("original")-3), suite.tieredStorage.diskUsage.Used())
 }
 
 func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
@@ -924,7 +924,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileExclusiveChangesNothing() {
 		&internal.WriteFileOptions{Handle: local, Data: []byte("local")},
 	)
 	suite.Require().NoError(err)
-	used := suite.tieredStorage.cacheSize.Used()
+	used := suite.tieredStorage.diskUsage.Used()
 
 	for _, name := range []string{"cached", "local"} {
 		_, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{
@@ -935,7 +935,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileExclusiveChangesNothing() {
 	suite.assert.FileExists(suite.cacheFile("cached"))
 	stale := suite.isCloudStale("cached")
 	suite.assert.False(stale)
-	suite.assert.Equal(used, suite.tieredStorage.cacheSize.Used())
+	suite.assert.Equal(used, suite.tieredStorage.diskUsage.Used())
 	for _, handle := range []*handlemap.Handle{reader, local} {
 		suite.Require().NoError(
 			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
@@ -959,12 +959,12 @@ func (suite *tieredStorageTestSuite) TestRenameFileOverwriteUpdatesUsage() {
 			suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 		)
 	}
-	used := suite.tieredStorage.cacheSize.Used()
+	used := suite.tieredStorage.diskUsage.Used()
 
 	suite.Require().NoError(
 		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
 	)
-	suite.assert.Equal(used-int64(len("replaced data")), suite.tieredStorage.cacheSize.Used())
+	suite.assert.Equal(used-int64(len("replaced data")), suite.tieredStorage.diskUsage.Used())
 }
 
 func (suite *tieredStorageTestSuite) TestDownloadToCache() {
@@ -988,17 +988,17 @@ func (suite *tieredStorageTestSuite) TestWriteIsNotLimitedByMaxSize() {
 		internal.CreateFileOptions{Name: "big", Mode: 0644},
 	)
 	suite.Require().NoError(err)
-	data := make([]byte, 2*int(suite.tieredStorage.maxCacheSize))
+	data := make([]byte, 2*int(suite.tieredStorage.maxSize))
 	n, err := suite.tieredStorage.WriteFile(&internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.Require().NoError(err)
 	suite.assert.Equal(len(data), n)
 	suite.assert.Greater(
-		float64(suite.tieredStorage.cacheSize.Used()),
-		suite.tieredStorage.maxCacheSize,
+		float64(suite.tieredStorage.diskUsage.Used()),
+		suite.tieredStorage.maxSize,
 	)
 
 	suite.Require().NoError(suite.tieredStorage.TruncateFile(internal.TruncateFileOptions{
-		Name: "big", Handle: handle, NewSize: int64(3 * suite.tieredStorage.maxCacheSize),
+		Name: "big", Handle: handle, NewSize: int64(3 * suite.tieredStorage.maxSize),
 	}))
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
@@ -1031,9 +1031,9 @@ func (suite *tieredStorageTestSuite) TestStatFs() {
 	suite.Require().NoError(err)
 	suite.assert.True(populated)
 	suite.assert.EqualValues(4096, stat.Bsize)
-	suite.assert.Equal(uint64(suite.tieredStorage.maxCacheSize)/4096, stat.Blocks)
+	suite.assert.Equal(uint64(suite.tieredStorage.maxSize)/4096, stat.Blocks)
 	expectedAvailable := max(
-		int64(suite.tieredStorage.maxCacheSize)-suite.tieredStorage.cacheSize.Used(),
+		int64(suite.tieredStorage.maxSize)-suite.tieredStorage.diskUsage.Used(),
 		0,
 	)
 	suite.assert.Equal(uint64(expectedAvailable)/4096, stat.Bavail)
@@ -1928,7 +1928,7 @@ func (suite *tieredStorageTestSuite) TestReleaseDeletesCachedCopy() {
 	suite.Require().NoError(err)
 	second, err := suite.tieredStorage.OpenFile(openRead)
 	suite.Require().NoError(err)
-	used := suite.tieredStorage.cacheSize.Used()
+	used := suite.tieredStorage.diskUsage.Used()
 
 	// The copy stays while any handle is open.
 	suite.Require().
@@ -1940,7 +1940,7 @@ func (suite *tieredStorageTestSuite) TestReleaseDeletesCachedCopy() {
 	suite.assert.NoFileExists(suite.cacheFile(path))
 	suite.assert.NoFileExists(suite.localFile(path))
 	suite.assert.NotContains(lruOrder(suite.tieredStorage.policy), path)
-	suite.assert.Equal(used-int64(len("cloud data")), suite.tieredStorage.cacheSize.Used())
+	suite.assert.Equal(used-int64(len("cloud data")), suite.tieredStorage.diskUsage.Used())
 }
 
 // waitEvictOnClose waits for evict-on-close goroutines started so far.

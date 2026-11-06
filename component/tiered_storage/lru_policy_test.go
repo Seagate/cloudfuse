@@ -62,13 +62,13 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 
 	suite.setupTestHelper(lruQueueConfig{
 		localRoot:    local_path,
-		maxCacheSize: 1 * common.MbToBytes,
+		maxSize:      1 * common.MbToBytes,
 		threshold:    0.8,
 		targetRatio:  0.6,
 		numWorkers:   8,
 		pollInterval: time.Millisecond,
 		fileLocks:    common.NewLockMap(),
-		size:         newCacheSizeTracker(cache_path, 0),
+		size:         newDiskUsageTracker(cache_path, 0),
 
 		uploadandCleanFn: func(name string) error {
 			return nil
@@ -177,11 +177,11 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	root := suite.T().TempDir()
 	suite.Require().NoError(makeTieredRoot(root))
 	cachePath := filepath.Join(root, localDirName)
-	size := newCacheSizeTracker(root, time.Hour)
+	size := newDiskUsageTracker(root, time.Hour)
 	var uploaded atomic.Int32
 	suite.setupTestHelper(lruQueueConfig{
 		localRoot:    cachePath,
-		maxCacheSize: common.MbToBytes,
+		maxSize:      common.MbToBytes,
 		threshold:    0.8,
 		targetRatio:  0.6,
 		numWorkers:   1,
@@ -212,16 +212,16 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	}
 	suite.Require().NoError(size.Refresh())
 
-	suite.policy.evictDownTo(int64(suite.policy.maxCacheSize * suite.policy.targetRatio))
+	suite.policy.evictDownTo(int64(suite.policy.maxSize * suite.policy.targetRatio))
 
 	suite.assert.EqualValues(1, uploaded.Load())
 	suite.assert.LessOrEqual(
 		float64(size.Used()),
-		suite.policy.maxCacheSize*suite.policy.threshold,
+		suite.policy.maxSize*suite.policy.threshold,
 	)
 	suite.assert.Greater(
 		float64(size.Used()),
-		suite.policy.maxCacheSize*suite.policy.targetRatio,
+		suite.policy.maxSize*suite.policy.targetRatio,
 	)
 }
 

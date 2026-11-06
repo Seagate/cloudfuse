@@ -55,8 +55,8 @@ type lruQueueConfig struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	size      *cache_size.Tracker
 
-	maxCacheSize float64
-	// threshold and targetRatio are fractions of maxCacheSize.
+	maxSize float64
+	// threshold and targetRatio are fractions of maxSize.
 	threshold    float64
 	targetRatio  float64
 	numWorkers   int
@@ -109,7 +109,7 @@ func (q *lruQueue) StartPolicy() error {
 		return fmt.Errorf("lruQueue: file locks not set")
 	}
 	if q.size == nil {
-		return fmt.Errorf("lruQueue: cache size tracker not set")
+		return fmt.Errorf("lruQueue: disk usage tracker not set")
 	}
 	if q.pollInterval <= 0 {
 		q.pollInterval = capacityPollInterval
@@ -321,10 +321,10 @@ func (q *lruQueue) capacityChecker() {
 			return
 		case <-ticker.C:
 			q.size.Reconcile()
-			if float64(q.size.Used()) <= q.maxCacheSize*q.threshold {
+			if float64(q.size.Used()) <= q.maxSize*q.threshold {
 				continue
 			}
-			q.evictDownTo(int64(q.maxCacheSize * q.targetRatio))
+			q.evictDownTo(int64(q.maxSize * q.targetRatio))
 		}
 	}
 }
@@ -352,11 +352,11 @@ func (q *lruQueue) evictDownTo(targetUsed int64) {
 	}
 
 	q.runBatch(names)
-	if usedAfter := q.size.Used(); float64(usedAfter) > q.maxCacheSize*q.threshold {
+	if usedAfter := q.size.Used(); float64(usedAfter) > q.maxSize*q.threshold {
 		log.Err(
 			"lruQueue::evictDownTo : usage remains above high threshold after eviction (using %d, high threshold %.0f)",
 			usedAfter,
-			q.maxCacheSize*q.threshold,
+			q.maxSize*q.threshold,
 		)
 	}
 }

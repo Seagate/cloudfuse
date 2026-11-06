@@ -61,14 +61,14 @@ type TieredStorage struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	tmpPath   string          // uses os.Separator (filepath.Join)
 
-	cacheSize    *cache_size.Tracker
-	maxCacheSize float64
+	diskUsage *cache_size.Tracker
+	maxSize   float64
 }
 
-// newCacheSizeTracker tracks the local/ and cache/ trees under path. Only the
+// newDiskUsageTracker tracks the local/ and cache/ trees under path. Only the
 // trees the component owns are measured, so OS-managed entries that share the
 // tiered path are not counted against max-size-mb.
-func newCacheSizeTracker(path string, reconcileInterval time.Duration) *cache_size.Tracker {
+func newDiskUsageTracker(path string, reconcileInterval time.Duration) *cache_size.Tracker {
 	return cache_size.NewTracker(
 		reconcileInterval,
 		filepath.Join(path, localDirName),
@@ -99,8 +99,8 @@ const (
 	// The tiered root holds exactly these two trees. A file is in at most one.
 	localDirName = "local"
 	cacheDirName = "cache"
-	// Cache holds user data and is only accessed by this process (CWE-732).
-	cacheDirPerm os.FileMode = 0700
+	// The tiered root holds user data and is only accessed by this process (CWE-732).
+	dirPerm os.FileMode = 0700
 	// share of free disk space to use when max-size-mb is not set
 	defaultMaxSizeRatio = 0.8
 )
@@ -142,7 +142,7 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 // refused rather than guessed at, since they may hold data from an older layout
 // or a misconfigured path.
 func (c *TieredStorage) prepareRoot() error {
-	if err := os.MkdirAll(c.tmpPath, cacheDirPerm); err != nil {
+	if err := os.MkdirAll(c.tmpPath, dirPerm); err != nil {
 		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
 	}
 	entries, err := os.ReadDir(c.tmpPath)
@@ -171,7 +171,7 @@ func (c *TieredStorage) prepareRoot() error {
 		return fmt.Errorf("TieredStorage: failed to clear %s: %w", cacheDirName, err)
 	}
 	for _, tree := range []string{localDirName, cacheDirName} {
-		if err := os.MkdirAll(filepath.Join(c.tmpPath, tree), cacheDirPerm); err != nil {
+		if err := os.MkdirAll(filepath.Join(c.tmpPath, tree), dirPerm); err != nil {
 			return fmt.Errorf("TieredStorage: failed to create %s: %w", tree, err)
 		}
 	}
@@ -283,8 +283,8 @@ func (c *TieredStorage) Configure(_ bool) error {
 		log.Err("TieredStorage::Configure : %v", err)
 		return err
 	}
-	c.cacheSize = newCacheSizeTracker(c.tmpPath, reconcileCapacityInterval)
-	if err := c.cacheSize.Refresh(); err != nil {
+	c.diskUsage = newDiskUsageTracker(c.tmpPath, reconcileCapacityInterval)
+	if err := c.diskUsage.Refresh(); err != nil {
 		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
 	}
 	if conf.MaxSizeMB == 0 {
@@ -294,20 +294,20 @@ func (c *TieredStorage) Configure(_ bool) error {
 		}
 		// local/ persists across mounts, so count it as available.
 		conf.MaxSizeMB = math.Floor(
-			defaultMaxSizeRatio * float64(free+uint64(c.cacheSize.Used())) / common.MbToBytes,
+			defaultMaxSizeRatio * float64(free+uint64(c.diskUsage.Used())) / common.MbToBytes,
 		)
 		log.Info("TieredStorage::Configure : max-size-mb defaulted to %.0f", conf.MaxSizeMB)
 	}
 	if conf.MaxSizeMB <= 0 {
 		return fmt.Errorf("TieredStorage: max-size-mb must be greater than 0")
 	}
-	c.maxCacheSize = conf.MaxSizeMB * common.MbToBytes
+	c.maxSize = conf.MaxSizeMB * common.MbToBytes
 
 	c.policy = newLRUQueue(lruQueueConfig{
 		localRoot:        filepath.Join(c.tmpPath, localDirName),
-		maxCacheSize:     c.maxCacheSize,
+		maxSize:          c.maxSize,
 		fileLocks:        c.fileLocks,
-		size:             c.cacheSize,
+		size:             c.diskUsage,
 		threshold:        float64(conf.HighThreshold) / 100,
 		targetRatio:      float64(conf.LowThreshold) / 100,
 		numWorkers:       int(conf.Parallelism),
@@ -360,7 +360,7 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 		mode = common.DefaultDirectoryPermissionBits
 	}
 	// The parent may exist only in the cloud.
-	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
 		return err
 	}
 	if err := os.Mkdir(localPath, mode); err != nil {
@@ -563,7 +563,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		if m.from == srcLocal {
 			srcLocalExists = true
 		}
-		err := os.MkdirAll(filepath.Dir(m.to), cacheDirPerm)
+		err := os.MkdirAll(filepath.Dir(m.to), dirPerm)
 		if err == nil {
 			err = os.Rename(m.from, m.to)
 		}
@@ -663,13 +663,13 @@ func (c *TieredStorage) createEmptyLocal(name string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
 		return err
 	}
 	file, err := common.OpenFile(
 		localPath,
 		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
-		c.cacheFileMode(mode),
+		c.fileMode(mode),
 	)
 	if err != nil {
 		return err
@@ -731,7 +731,7 @@ func (c *TieredStorage) promote(name string) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(localPath), cacheDirPerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
 		return err
 	}
 	if err := os.Rename(cachePath, localPath); err != nil {
@@ -926,7 +926,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 		return nil, err
 	}
 	if truncate {
-		c.cacheSize.Add(-truncatedSize)
+		c.diskUsage.Add(-truncatedSize)
 	}
 	if created || truncate {
 		c.setHandleDirty(handle)
@@ -934,7 +934,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	return handle, nil
 }
 
-func (c *TieredStorage) cacheFileMode(mode os.FileMode) os.FileMode {
+func (c *TieredStorage) fileMode(mode os.FileMode) os.FileMode {
 	if mode == 0 || runtime.GOOS == "windows" {
 		return common.DefaultFilePermissionBits
 	}
@@ -949,14 +949,14 @@ func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(cachePath), cacheDirPerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cachePath), dirPerm); err != nil {
 		return err
 	}
 	// The mode matters if the file is later promoted to local/.
 	file, err := common.OpenFile(
 		cachePath,
 		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
-		c.cacheFileMode(mode),
+		c.fileMode(mode),
 	)
 	if err != nil {
 		return err
@@ -979,7 +979,7 @@ func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
 		return err
 	}
 
-	c.cacheSize.Add(size)
+	c.diskUsage.Add(size)
 	return nil
 }
 
@@ -989,7 +989,7 @@ func (c *TieredStorage) removeFile(path string) error {
 	info, statErr := os.Stat(path)
 	err := os.Remove(path)
 	if err == nil && statErr == nil {
-		c.cacheSize.Add(-info.Size())
+		c.diskUsage.Add(-info.Size())
 	}
 	return err
 }
@@ -1042,7 +1042,7 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 
 	if beforeErr == nil && bytesWritten > 0 {
 		if after, statErr := f.Stat(); statErr == nil {
-			c.cacheSize.Add(after.Size() - before.Size())
+			c.diskUsage.Add(after.Size() - before.Size())
 		}
 	}
 	if err == nil {
@@ -1256,7 +1256,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 	if from != "" {
-		if err := os.MkdirAll(filepath.Dir(to), cacheDirPerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(to), dirPerm); err != nil {
 			return err
 		}
 		replaced, replacedErr := os.Stat(to)
@@ -1265,7 +1265,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		}
 		// The rename overwrote dst's copy in this tree, even if later reverted.
 		if replacedErr == nil {
-			c.cacheSize.Add(-replaced.Size())
+			c.diskUsage.Add(-replaced.Size())
 		}
 	}
 
@@ -1505,7 +1505,7 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 	}
 
 	c.setHandleDirty(options.Handle)
-	c.cacheSize.Add(options.NewSize - info.Size())
+	c.diskUsage.Add(options.NewSize - info.Size())
 	return nil
 }
 
@@ -1528,9 +1528,9 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	available := max(int64(c.maxCacheSize)-c.cacheSize.Used(), 0)
+	available := max(int64(c.maxSize)-c.diskUsage.Used(), 0)
 	stat := &common.Statfs_t{
-		Blocks:  uint64(c.maxCacheSize) / blockSize,
+		Blocks:  uint64(c.maxSize) / blockSize,
 		Bavail:  uint64(available) / blockSize,
 		Bfree:   physicalFree / blockSize,
 		Bsize:   blockSize,
