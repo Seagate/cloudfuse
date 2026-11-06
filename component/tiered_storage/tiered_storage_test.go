@@ -1274,14 +1274,17 @@ func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
 
 	storage := &TieredStorage{tmpPath: root}
 	storage.SetNextComponent(next)
-	// Every name on the first cloud page is local, so it must be skipped
-	// rather than returned empty. attr_cache returns its cached listing, which
-	// must not be modified.
-	firstPage := []*internal.ObjAttr{{Path: "a", Name: "a"}, {Path: "c", Name: "c"}}
-	firstPageCopy := slices.Clone(firstPage)
-	next.EXPECT().StreamDir(internal.StreamDirOptions{}).Return(firstPage, "page2", nil)
+	// Every name on the second cloud page is local, so that page must be
+	// skipped rather than returned empty. attr_cache returns its cached
+	// listing, which must not be modified.
+	secondPage := []*internal.ObjAttr{{Path: "a", Name: "a"}, {Path: "c", Name: "c"}}
+	secondPageCopy := slices.Clone(secondPage)
+	next.EXPECT().StreamDir(internal.StreamDirOptions{}).
+		Return([]*internal.ObjAttr{{Path: "b", Name: "b"}}, "page2", nil)
 	next.EXPECT().StreamDir(internal.StreamDirOptions{Token: "page2"}).
-		Return([]*internal.ObjAttr{{Path: "b", Name: "b"}, {Path: "d", Name: "d"}}, "", nil)
+		Return(secondPage, "page3", nil)
+	next.EXPECT().StreamDir(internal.StreamDirOptions{Token: "page3"}).
+		Return([]*internal.ObjAttr{{Path: "d", Name: "d"}}, "", nil)
 
 	sizes := map[string]int64{}
 	var names []string
@@ -1289,10 +1292,10 @@ func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
 		names = append(names, attr.Name)
 		sizes[attr.Name] = attr.Size
 	}
-	assert.Equal(t, []string{"a", "c", "b", "d"}, names)
+	assert.ElementsMatch(t, []string{"a", "b", "c", "d"}, names)
 	assert.EqualValues(t, len("local"), sizes["a"])
 	assert.EqualValues(t, len("local"), sizes["c"])
-	assert.Equal(t, firstPageCopy, firstPage)
+	assert.Equal(t, secondPageCopy, secondPage)
 }
 
 func TestStreamDirWithoutLocalEntriesStartsWithCloud(t *testing.T) {

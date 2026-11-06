@@ -88,9 +88,6 @@ const (
 	cacheDirName = "cache"
 	// Cache holds user data and is only accessed by this process (CWE-732).
 	cacheDirPerm os.FileMode = 0700
-	// cloudListingToken follows a first page of local entries and stands for
-	// the start of the cloud listing.
-	cloudListingToken = "tiered_storage:cloud"
 )
 
 var _ internal.Component = &TieredStorage{}
@@ -391,46 +388,43 @@ func (c *TieredStorage) StreamDir(
 		localNames[entry.Name()] = struct{}{}
 	}
 
-	// Local entries win, as in GetAttr. They make up the first page, and the
-	// cloud listing follows without them. cache/ copies match the cloud, so
-	// cache/ is never listed.
-	if options.Token == "" && localExists {
-		var attrs []*internal.ObjAttr
+	// Local entries win, as in GetAttr. They are listed with the first page,
+	// and their names are dropped from every cloud page. cache/ copies match
+	// the cloud, so cache/ is never listed.
+	var page []*internal.ObjAttr
+	if options.Token == "" {
 		for _, entry := range entries {
 			// On Windows this is the directory data, whose size can lag for an
 			// open file, as on NTFS itself.
-			if info, err := entry.Info(); err == nil {
-				entryName := common.JoinUnixFilepath(options.Name, entry.Name())
-				attrs = append(attrs, newTieredStorageObjAttr(entryName, info))
+			info, err := entry.Info()
+			if err != nil {
+				// Evicted since ReadDir, so the cloud lists it.
+				delete(localNames, entry.Name())
+				continue
 			}
+			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
+			page = append(page, newTieredStorageObjAttr(entryName, info))
 		}
-		if len(attrs) > 0 {
-			return attrs, cloudListingToken, nil
-		}
-	}
-	if options.Token == cloudListingToken {
-		options.Token = ""
 	}
 
 	for {
 		attrs, token, err := c.NextComponent().StreamDir(options)
 		if errors.Is(err, os.ErrNotExist) && localExists {
-			// local entries have already been reported, and no cloud entries are left
-			return nil, "", nil
+			// A directory that exists only locally may be unknown to the cloud.
+			return page, "", nil
 		}
 		if err != nil {
 			return nil, "", err
 		}
-		// attrs may be attr_cache's cached listing, so build a new slice.
-		cloudOnly := make([]*internal.ObjAttr, 0, len(attrs))
+		// attrs may be attr_cache's cached listing, so it is copied, not edited.
 		for _, attr := range attrs {
 			if _, isLocal := localNames[attr.Name]; !isLocal {
-				cloudOnly = append(cloudOnly, attr)
+				page = append(page, attr)
 			}
 		}
 		// libfuse takes an empty page as the end of the listing.
-		if len(cloudOnly) > 0 || token == "" {
-			return cloudOnly, token, nil
+		if len(page) > 0 || token == "" {
+			return page, token, nil
 		}
 		options.Token = token
 	}
