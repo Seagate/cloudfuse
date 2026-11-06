@@ -386,6 +386,7 @@ func (c *TieredStorage) StreamDir(
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return nil, "", localErr
 	}
+	localExists := localErr == nil
 	localNames := make(map[string]struct{}, len(entries))
 	for _, entry := range entries {
 		localNames[entry.Name()] = struct{}{}
@@ -394,19 +395,15 @@ func (c *TieredStorage) StreamDir(
 	// Local entries win, as in GetAttr. They make up the first page, and the
 	// cloud listing follows without them. cache/ copies match the cloud, so
 	// cache/ is never listed.
-	if options.Token == "" {
+	if options.Token == "" && localExists {
 		var attrs []*internal.ObjAttr
 		for _, entry := range entries {
 			// On Windows this is the directory data, whose size can lag for an
-			// open file, as on NTFS itself. GetAttr reports the current size.
-			info, err := entry.Info()
-			if err != nil {
-				// Evicted since ReadDir, so the cloud lists it.
-				delete(localNames, entry.Name())
-				continue
+			// open file, as on NTFS itself.
+			if info, err := entry.Info(); err == nil {
+				entryName := common.JoinUnixFilepath(options.Name, entry.Name())
+				attrs = append(attrs, newTieredStorageObjAttr(entryName, info))
 			}
-			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
-			attrs = append(attrs, newTieredStorageObjAttr(entryName, info))
 		}
 		if len(attrs) > 0 {
 			return attrs, cloudListingToken, nil
@@ -418,8 +415,8 @@ func (c *TieredStorage) StreamDir(
 
 	for {
 		attrs, token, err := c.NextComponent().StreamDir(options)
-		// A directory that exists only locally may be unknown to the cloud.
-		if errors.Is(err, os.ErrNotExist) && localErr == nil {
+		if errors.Is(err, os.ErrNotExist) && localExists {
+			// local entries have already been reported, and no cloud entries are left
 			return nil, "", nil
 		}
 		if err != nil {
