@@ -62,8 +62,9 @@ type lruQueueConfig struct {
 	uploadandCleanFn func(name string) error
 }
 
-// lruQueue moves local-only objects to cloud storage. All eviction runs on
-// one goroutine, which uploads up to numWorkers files at a time.
+// lruQueue moves local-only objects to cloud storage. Threshold passes and
+// evict-on-close each run on their own goroutine, which uploads up to
+// numWorkers files at a time.
 // File locks may be held before mu, never after it.
 type lruQueue struct {
 	mu         sync.Mutex
@@ -74,7 +75,7 @@ type lruQueue struct {
 
 	wake chan struct{}
 	stop chan struct{}
-	done chan struct{}
+	wg   sync.WaitGroup
 
 	lruQueueConfig
 }
@@ -109,8 +110,8 @@ func (q *lruQueue) StartPolicy() error {
 	}
 
 	q.stop = make(chan struct{})
-	q.done = make(chan struct{})
-	go q.run()
+	q.wg.Go(q.watchCapacity)
+	q.wg.Go(q.watchCloses)
 	return nil
 }
 
@@ -120,7 +121,7 @@ func (q *lruQueue) StopPolicy() error {
 		return nil
 	}
 	close(q.stop)
-	<-q.done
+	q.wg.Wait()
 	return nil
 }
 
@@ -133,9 +134,7 @@ func (q *lruQueue) stopping() bool {
 	}
 }
 
-func (q *lruQueue) run() {
-	defer close(q.done)
-
+func (q *lruQueue) watchCapacity() {
 	ticker := time.NewTicker(q.pollInterval)
 	defer ticker.Stop()
 
@@ -143,13 +142,22 @@ func (q *lruQueue) run() {
 		select {
 		case <-q.stop:
 			return
-		case <-q.wake:
-			q.evictClosed()
 		case <-ticker.C:
 			q.size.Reconcile()
 			if float64(q.size.Used()) > q.maxSize*q.threshold {
 				q.evictDownTo(int64(q.maxSize * q.targetRatio))
 			}
+		}
+	}
+}
+
+func (q *lruQueue) watchCloses() {
+	for {
+		select {
+		case <-q.stop:
+			return
+		case <-q.wake:
+			q.evictClosed()
 		}
 	}
 }

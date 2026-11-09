@@ -348,9 +348,10 @@ Eviction is always asynchronous. It runs only in the background LRU policy,
 which triggers when usage exceeds `high-threshold` and evicts until usage is
 below `low-threshold`. File operations never evict, and never wait for eviction.
 
-A single goroutine runs all eviction, both threshold passes and
-[evict on close](#evict-on-close), one batch at a time. Within a batch, up to
-8 uploads run in parallel. Candidates stay in the LRU until they are evicted.
+Threshold passes and [evict on close](#evict-on-close) each run on their own
+goroutine, one batch at a time, with up to 8 uploads in parallel per batch.
+Candidates stay in the LRU until they are evicted. If both pick the same file,
+the file lock serializes them and the second finds nothing to do.
 
 Rationale: synchronous eviction makes a write wait on cloud uploads, holds the
 writer's file lock across network calls, and adds a second eviction entry point
@@ -381,9 +382,9 @@ copy does not stay stale until LRU eviction reaches the file, which may never
 happen for a frequently used file. It only affects files with `cloudStale`
 set. It is not configurable; an option can be added if users ask for one.
 
-`ReleaseFile` adds the name to a set of pending requests, wakes the eviction
-goroutine, and returns. It never uploads inline. For each pending name, the
-eviction goroutine takes the file lock, removes the request, and:
+`ReleaseFile` adds the name to a set of pending requests, wakes the
+evict-on-close goroutine, and returns. It never uploads inline. For each
+pending name, that goroutine takes the file lock, removes the request, and:
 
 1. Skips the file if it is no longer in `local/` or `cloudStale` is no longer
    set. A file that was reopened is skipped by the eviction steps, because it
