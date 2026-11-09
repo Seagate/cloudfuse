@@ -394,9 +394,8 @@ func (suite *tieredStorageTestSuite) TestReleaseDeletesCachedCopy() {
 	suite.assert.Equal(used-int64(len("cloud data")), suite.tieredStorage.diskUsage.Used())
 }
 
-// waitEvictOnClose waits for evict-on-close goroutines started so far.
-func (suite *tieredStorageTestSuite) waitEvictOnClose() {
-	suite.tieredStorage.policy.closeWg.Wait()
+func (suite *tieredStorageTestSuite) waitEvictOnClose(name string) {
+	waitEvictOnClose(suite.T(), suite.tieredStorage.policy, name)
 }
 
 // promoteCloudFile writes data to the cloud, then opens and modifies it
@@ -421,7 +420,7 @@ func (suite *tieredStorageTestSuite) TestReleasePromotedFileEvictsIt() {
 
 	suite.Require().
 		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
-	suite.waitEvictOnClose()
+	suite.waitEvictOnClose(path)
 
 	cloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, path))
 	suite.Require().NoError(err)
@@ -445,7 +444,7 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseSkipsLocallyCreatedFile() {
 
 	suite.Require().
 		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
-	suite.waitEvictOnClose()
+	suite.waitEvictOnClose("new")
 
 	suite.assert.FileExists(suite.localFile("new"))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, "new"))
@@ -457,21 +456,21 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseSkipsReopenedFile() {
 	handle := suite.promoteCloudFile(path, "cloud data")
 
 	// Hold eviction back until the file is open again.
-	suite.tieredStorage.policy.evictMu.Lock()
+	suite.Require().NoError(suite.tieredStorage.policy.StopPolicy())
 	suite.Require().
 		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
 	handle, err := suite.tieredStorage.OpenFile(
 		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
 	)
 	suite.Require().NoError(err)
-	suite.tieredStorage.policy.evictMu.Unlock()
-	suite.waitEvictOnClose()
+	suite.Require().NoError(suite.tieredStorage.policy.StartPolicy())
+	suite.waitEvictOnClose(path)
 	suite.assert.FileExists(suite.localFile(path))
 
 	// The next close evicts it.
 	suite.Require().
 		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
-	suite.waitEvictOnClose()
+	suite.waitEvictOnClose(path)
 	suite.assert.NoFileExists(suite.localFile(path))
 }
 
@@ -486,7 +485,7 @@ func (suite *tieredStorageTestSuite) TestEvictOnCloseUploadFailureKeepsFile() {
 
 	suite.Require().
 		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
-	suite.waitEvictOnClose()
+	suite.waitEvictOnClose(path)
 
 	suite.assert.FileExists(suite.localFile(path))
 	suite.assert.Equal([]string{path}, lruOrder(suite.tieredStorage.policy))
@@ -604,7 +603,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	//4. Release the read should upload to cloud
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
-	suite.waitEvictOnClose()
+	suite.waitEvictOnClose(path)
 	_, err = os.Stat(suite.localFile(path))
 	suite.assert.True(os.IsNotExist(err), "File should be deleted from cache after release")
 
@@ -687,7 +686,7 @@ func (suite *tieredStorageTestSuite) TestReleaseReturnsCloseError() {
 	suite.Require().NoError(handle.GetFileObject().Close())
 	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	suite.assert.Error(err)
-	_, queued := suite.tieredStorage.policy.nodeMap.Load("close-error")
+	queued := queued(suite.tieredStorage.policy, "close-error")
 	suite.assert.True(queued)
 }
 
@@ -777,10 +776,10 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	suite.assert.Equal(path2, suite.tieredStorage.policy.head.next.next.name)
 	suite.assert.Equal(path1, suite.tieredStorage.policy.tail.name)
 
-	_, exists1 := suite.tieredStorage.policy.nodeMap.Load(path1)
-	_, exists2 := suite.tieredStorage.policy.nodeMap.Load(path2)
-	_, exists3 := suite.tieredStorage.policy.nodeMap.Load(path3)
-	_, exists4 := suite.tieredStorage.policy.nodeMap.Load(path4)
+	exists1 := queued(suite.tieredStorage.policy, path1)
+	exists2 := queued(suite.tieredStorage.policy, path2)
+	exists3 := queued(suite.tieredStorage.policy, path3)
+	exists4 := queued(suite.tieredStorage.policy, path4)
 
 	suite.assert.True(exists1)
 	suite.assert.True(exists2)
@@ -789,7 +788,7 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 
 	// 4. Wait for one eviction pass to drop the oldest file.
 	suite.assert.Eventually(func() bool {
-		_, exists1 := suite.tieredStorage.policy.nodeMap.Load(path1)
+		exists1 := queued(suite.tieredStorage.policy, path1)
 		return !exists1
 	}, 2*capacityPollInterval, 10*time.Millisecond)
 
@@ -797,10 +796,10 @@ func (suite *tieredStorageTestSuite) TestReleaseToTriggerEviction() {
 	//And the local files should be gone (uploaded and cleaned up), not in either map
 
 	// 4a. Check state of NodeMap
-	_, exists1 = suite.tieredStorage.policy.nodeMap.Load(path1)
-	_, exists2 = suite.tieredStorage.policy.nodeMap.Load(path2)
-	_, exists3 = suite.tieredStorage.policy.nodeMap.Load(path3)
-	_, exists4 = suite.tieredStorage.policy.nodeMap.Load(path4)
+	exists1 = queued(suite.tieredStorage.policy, path1)
+	exists2 = queued(suite.tieredStorage.policy, path2)
+	exists3 = queued(suite.tieredStorage.policy, path3)
+	exists4 = queued(suite.tieredStorage.policy, path4)
 
 	suite.assert.False(exists1)
 	suite.assert.True(exists2)
@@ -1558,7 +1557,7 @@ func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
 	suite.Require().NoError(suite.tieredStorage.TruncateFile(
 		internal.TruncateFileOptions{Name: path, NewSize: 4},
 	))
-	suite.waitEvictOnClose()
+	suite.waitEvictOnClose(path)
 	attrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(4, attrs.Size)
@@ -2202,8 +2201,8 @@ func (suite *tieredStorageTestSuite) TestRenameLocalOnlyDirectory() {
 	))
 	suite.assert.NoFileExists(suite.localFile("src/file"))
 	suite.assert.FileExists(suite.localFile("dst/file"))
-	_, oldQueued := suite.tieredStorage.policy.nodeMap.Load("src/file")
-	_, newQueued := suite.tieredStorage.policy.nodeMap.Load("dst/file")
+	oldQueued := queued(suite.tieredStorage.policy, "src/file")
+	newQueued := queued(suite.tieredStorage.policy, "dst/file")
 	suite.assert.False(oldQueued)
 	suite.assert.True(newQueued)
 }
@@ -2262,7 +2261,7 @@ func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
 	)
-	_, queued := suite.tieredStorage.policy.nodeMap.Load("dst/open")
+	queued := queued(suite.tieredStorage.policy, "dst/open")
 	suite.assert.True(queued)
 }
 

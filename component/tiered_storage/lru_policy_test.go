@@ -110,6 +110,38 @@ func (suite *lruPolicyTestSuite) createQueuedFiles(names ...string) {
 	}
 }
 
+func queued(q *lruQueue, name string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	_, found := q.nodes[name]
+	return found
+}
+
+// waitEvictOnClose waits until evict-on-close requests for names are handled.
+func waitEvictOnClose(t *testing.T, q *lruQueue, names ...string) {
+	for _, name := range names {
+		assert.Eventually(t, func() bool {
+			q.mu.Lock()
+			defer q.mu.Unlock()
+			_, pending := q.closed[name]
+			return !pending
+		}, time.Second, time.Millisecond)
+		// The request is removed under the file lock, which is held until the
+		// upload finishes.
+		flock := q.fileLocks.Get(name)
+		flock.Lock()
+		flock.Unlock()
+	}
+}
+
+// markStale creates local files and marks them cloudStale.
+func (suite *lruPolicyTestSuite) markStale(names ...string) {
+	for _, name := range names {
+		suite.Require().NoError(os.WriteFile(filepath.Join(local_path, name), nil, 0644))
+		suite.policy.fileLocks.Get(name).CloudStale = true
+	}
+}
+
 func (suite *lruPolicyTestSuite) TestEnqueue() {
 	defer suite.cleanupTest()
 
@@ -147,27 +179,10 @@ func (suite *lruPolicyTestSuite) TestRenameKeepsPosition() {
 	suite.assert.Equal("renamed", suite.policy.tail.name)
 	suite.assert.Equal(suite.policy.tail, suite.policy.head.next)
 	suite.assert.Nil(suite.policy.tail.next)
-	_, found := suite.policy.nodeMap.Load("file1")
+	found := queued(suite.policy, "file1")
 	suite.assert.False(found)
-	_, found = suite.policy.nodeMap.Load("file2")
+	found = queued(suite.policy, "file2")
 	suite.assert.False(found)
-}
-
-func (suite *lruPolicyTestSuite) TestRenameCancelsEviction() {
-	defer suite.cleanupTest()
-
-	suite.policy.Enqueue("file1")
-	suite.policy.Enqueue("file2")
-	suite.policy.mu.Lock()
-	node := suite.policy.tail
-	suite.policy.extractNode(node)
-	node.evicting = true
-	suite.policy.mu.Unlock()
-
-	suite.policy.Rename("file1", "renamed")
-	suite.assert.False(suite.policy.claimed("file1"))
-	suite.assert.False(suite.policy.claimed("renamed"))
-	suite.assert.Equal("renamed", suite.policy.tail.name)
 }
 
 func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
@@ -240,10 +255,10 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 
 	suite.createQueuedFiles("file1", "file2", "file3", "file4")
 
-	_, ex1 := suite.policy.nodeMap.Load("file1")
-	_, ex2 := suite.policy.nodeMap.Load("file2")
-	_, ex3 := suite.policy.nodeMap.Load("file3")
-	_, ex4 := suite.policy.nodeMap.Load("file4")
+	ex1 := queued(suite.policy, "file1")
+	ex2 := queued(suite.policy, "file2")
+	ex3 := queued(suite.policy, "file3")
+	ex4 := queued(suite.policy, "file4")
 
 	suite.assert.True(ex1)
 	suite.assert.True(ex2)
@@ -264,10 +279,10 @@ func (suite *lruPolicyTestSuite) TestCapacityCheckerEviction() {
 	suite.assert.NotContains(snapshot, "file3")
 	suite.assert.NotContains(snapshot, "file4")
 
-	_, ex1 = suite.policy.nodeMap.Load("file1")
-	_, ex2 = suite.policy.nodeMap.Load("file2")
-	_, ex3 = suite.policy.nodeMap.Load("file3")
-	_, ex4 = suite.policy.nodeMap.Load("file4")
+	ex1 = queued(suite.policy, "file1")
+	ex2 = queued(suite.policy, "file2")
+	ex3 = queued(suite.policy, "file3")
+	ex4 = queued(suite.policy, "file4")
 
 	suite.assert.False(ex1)
 	suite.assert.False(ex2)
@@ -363,11 +378,10 @@ func (suite *lruPolicyTestSuite) TestStopPolicyWaitsForEvictOnClose() {
 		return nil
 	}
 
-	always := func() bool { return true }
-	suite.policy.EvictOnClose("first", always)
-	// "second" queues on evictMu behind "first".
+	suite.markStale("first", "second", "third")
+	suite.policy.EvictOnClose("first")
 	<-started
-	suite.policy.EvictOnClose("second", always)
+	suite.policy.EvictOnClose("second")
 
 	stopped := make(chan error, 1)
 	go func() { stopped <- suite.policy.StopPolicy() }()
@@ -378,28 +392,36 @@ func (suite *lruPolicyTestSuite) TestStopPolicyWaitsForEvictOnClose() {
 	// The in-flight upload finished; the one that had not started was skipped.
 	suite.assert.Equal([]string{"first"}, uploaded)
 	// Nothing new starts after stopping.
-	suite.policy.EvictOnClose("third", always)
-	suite.policy.closeWg.Wait()
+	suite.policy.EvictOnClose("third")
+	time.Sleep(10 * time.Millisecond)
 	suite.assert.Equal([]string{"first"}, uploaded)
 
 	err := os.RemoveAll(cache_path)
 	suite.assert.NoError(err)
 }
 
-func (suite *lruPolicyTestSuite) TestEvictOnCloseSkipsOpenOrUnwantedFiles() {
+func (suite *lruPolicyTestSuite) TestEvictOnCloseSkipsOpenOrFreshFiles() {
 	defer suite.cleanupTest()
+	var mu sync.Mutex
 	var uploaded []string
 	suite.policy.uploadandCleanFn = func(name string) error {
+		mu.Lock()
+		defer mu.Unlock()
 		uploaded = append(uploaded, name)
 		return nil
 	}
 
+	suite.markStale("open", "stale")
+	suite.Require().NoError(os.WriteFile(filepath.Join(local_path, "fresh"), nil, 0644))
 	suite.policy.fileLocks.Get("open").Inc()
-	suite.policy.EvictOnClose("open", func() bool { return true })
-	suite.policy.EvictOnClose("unwanted", func() bool { return false })
-	suite.policy.closeWg.Wait()
+	for _, name := range []string{"open", "fresh", "stale", "missing"} {
+		suite.policy.EvictOnClose(name)
+	}
+	waitEvictOnClose(suite.T(), suite.policy, "open", "fresh", "stale", "missing")
 
-	suite.assert.Empty(uploaded)
+	mu.Lock()
+	defer mu.Unlock()
+	suite.assert.Equal([]string{"stale"}, uploaded)
 }
 
 func TestLRUPolicyTestSuite(t *testing.T) {

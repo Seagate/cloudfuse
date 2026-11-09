@@ -1066,11 +1066,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	if _, err := os.Stat(localPath); err == nil {
 		c.policy.Enqueue(name)
 		if flock.CloudStale {
-			// Called with the same file lock held.
-			c.policy.EvictOnClose(name, func() bool {
-				_, err := os.Stat(localPath)
-				return flock.CloudStale && err == nil
-			})
+			c.policy.EvictOnClose(name)
 		}
 	}
 	return closeErr

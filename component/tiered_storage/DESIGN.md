@@ -136,10 +136,8 @@ file when needed.
 
 ## Shutdown
 
-Stop the eviction policy and wait for in-flight uploads, including
-evict-on-close goroutines (tracked with a `sync.WaitGroup`). Evict-on-close
-goroutines that have not started uploading exit without doing anything. Leave
-`local/` in place.
+Stop the eviction policy and wait for in-flight uploads. Pending evictions that
+have not started uploading are dropped. Leave `local/` in place.
 Nothing is persisted. `cache/` contents are discarded on next start.
 
 ## Cloud connectivity rule
@@ -350,6 +348,10 @@ Eviction is always asynchronous. It runs only in the background LRU policy,
 which triggers when usage exceeds `high-threshold` and evicts until usage is
 below `low-threshold`. File operations never evict, and never wait for eviction.
 
+A single goroutine runs all eviction, both threshold passes and
+[evict on close](#evict-on-close), one batch at a time. Within a batch, up to
+8 uploads run in parallel. Candidates stay in the LRU until they are evicted.
+
 Rationale: synchronous eviction makes a write wait on cloud uploads, holds the
 writer's file lock across network calls, and adds a second eviction entry point
 with its own locking and target calculation. Letting writes fail with the
@@ -379,24 +381,20 @@ copy does not stay stale until LRU eviction reaches the file, which may never
 happen for a frequently used file. It only affects files with `cloudStale`
 set. It is not configurable; an option can be added if users ask for one.
 
-`ReleaseFile` starts a goroutine for the path and returns. It never uploads
-inline. The goroutine:
+`ReleaseFile` adds the name to a set of pending requests, wakes the eviction
+goroutine, and returns. It never uploads inline. For each pending name, the
+eviction goroutine takes the file lock, removes the request, and:
 
-1. Takes `evictMu`, then the file lock (the normal lock order).
-2. Returns if the component is shutting down, the file is no longer in
-   `local/`, or `cloudStale` is no longer set. A file that was reopened is
-   skipped by the eviction steps, because it has open handles. Its next close
-   will start another goroutine.
-3. Runs the [eviction](#eviction) steps for that file.
-4. On upload failure: logs the error and returns. The file stays local-owned
-   with `cloudStale` set. It is retried at its next close or by normal
-   eviction. There is no retry loop.
+1. Skips the file if it is no longer in `local/` or `cloudStale` is no longer
+   set. A file that was reopened is skipped by the eviction steps, because it
+   has open handles. Its next close makes a new request.
+2. Runs the [eviction](#eviction) steps for that file.
+3. On upload failure: logs the error. The file stays local-owned with
+   `cloudStale` set. It is retried at its next close or by normal eviction.
+   There is no retry loop.
 
-No queue or deduplication is needed. Extra goroutines for the same file find
-nothing to do after step 2. Holding `evictMu` means only one eviction upload
-runs at a time, whether it was started by a close or by a threshold pass.
-- No connectivity pre-check is made. If the cloud is disconnected, the upload
-  fails and the file stays local.
+No connectivity pre-check is made. If the cloud is disconnected, the upload
+fails and the file stays local.
 
 Files without `cloudStale` set are not affected. Data created locally, and
 any file after a restart, stays local until threshold-driven eviction.
@@ -424,12 +422,10 @@ reopen, as unmodified cloud files already are.
 
 - Per-object file locks serialize open, release, promotion, delete, rename, and
   eviction for that object.
-- `evictMu` serializes all eviction: threshold passes and evict-on-close
-  goroutines. File operations never take it, and never block on eviction.
-  `ReleaseFile` starts an evict-on-close goroutine but does not wait for it.
+- File operations never block on eviction.
 - `cloudStale` is only read or changed with the file lock held.
-- Lock order: `evictMu`, then file lock(s), then the LRU queue mutex. Never
-  take a file lock while holding the LRU queue mutex.
+- Lock order: file lock(s), then the LRU queue mutex. Never take a file lock
+  while holding the LRU queue mutex.
 - `RenameDir` relies on the FUSE layer for atomicity against other
   operations. libfuse's high-level API write-locks the renamed path, so every
   operation whose path passes through it waits until the rename returns. That
