@@ -65,31 +65,22 @@ type TieredStorage struct {
 	maxSize   float64
 }
 
-// newDiskUsageTracker tracks the local/ and cache/ trees under path. Only the
-// trees the component owns are measured, so OS-managed entries that share the
-// tiered path are not counted against max-size-mb.
-func newDiskUsageTracker(path string, reconcileInterval time.Duration) *cache_size.Tracker {
-	return cache_size.NewTracker(
-		reconcileInterval,
-		filepath.Join(path, localDirName),
-		filepath.Join(path, cacheDirName),
-	)
-}
-
 type TieredStorageOptions struct {
-	TmpPath       string  `config:"path"           yaml:"path,omitempty"`
-	MaxSizeMB     float64 `config:"max-size-mb"    yaml:"max-size-mb,omitempty"`
-	HighThreshold uint32  `config:"high-threshold" yaml:"high-threshold,omitempty"`
-	LowThreshold  uint32  `config:"low-threshold"  yaml:"low-threshold,omitempty"`
-	Parallelism   uint32  `config:"parallelism"    yaml:"parallelism,omitempty"`
+	TmpPath   string  `config:"path"        yaml:"path,omitempty"`
+	MaxSizeMB float64 `config:"max-size-mb" yaml:"max-size-mb,omitempty"`
+	// thresholds
+	HighThreshold uint32 `config:"high-threshold" yaml:"high-threshold,omitempty"`
+	LowThreshold  uint32 `config:"low-threshold"  yaml:"low-threshold,omitempty"`
+	Parallelism   uint32 `config:"parallelism"    yaml:"parallelism,omitempty"`
 }
 
 const (
-	compName                  = "tiered_storage"
+	compName           = "tiered_storage"
+	defaultMaxEviction = 5000
+	// thresholds
 	defaultHighThreshold      = 90
 	defaultLowThreshold       = 80
 	defaultParallelism        = 8
-	defaultMaxEviction        = 5000
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
 	// cacheCopyKey marks a handle opened on a cache/ copy. It is not
@@ -127,6 +118,7 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 		return err
 	}
 
+	//Start the policy
 	if c.policy != nil {
 		if err := c.policy.StartPolicy(); err != nil {
 			log.Err("TieredStorage::Start : failed to start LRU policy [%v]", err)
@@ -135,62 +127,6 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// prepareRoot lays out the tiered root and discards cache/ from any previous
-// run. Entries other than local/, cache/, and OS-managed volume entries are
-// refused rather than guessed at, since they may hold data from an older layout
-// or a misconfigured path.
-func (c *TieredStorage) prepareRoot() error {
-	if err := os.MkdirAll(c.tmpPath, dirPerm); err != nil {
-		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
-	}
-	entries, err := os.ReadDir(c.tmpPath)
-	if err != nil {
-		return fmt.Errorf("TieredStorage: failed to read %s: %w", c.tmpPath, err)
-	}
-	for _, entry := range entries {
-		name := entry.Name()
-		if name == localDirName || name == cacheDirName {
-			continue
-		}
-		if isOSManagedEntry(entry) {
-			log.Debug("TieredStorage::prepareRoot : ignoring OS-managed entry %q", name)
-			continue
-		}
-		return fmt.Errorf(
-			"TieredStorage: %s contains unexpected entry %q; it may only contain %s and %s (move existing files into %s)",
-			c.tmpPath,
-			name,
-			localDirName,
-			cacheDirName,
-			filepath.Join(c.tmpPath, localDirName),
-		)
-	}
-	if err := os.RemoveAll(filepath.Join(c.tmpPath, cacheDirName)); err != nil {
-		return fmt.Errorf("TieredStorage: failed to clear %s: %w", cacheDirName, err)
-	}
-	for _, tree := range []string{localDirName, cacheDirName} {
-		if err := os.MkdirAll(filepath.Join(c.tmpPath, tree), dirPerm); err != nil {
-			return fmt.Errorf("TieredStorage: failed to create %s: %w", tree, err)
-		}
-	}
-	return nil
-}
-
-// osManagedRootEntries are created by the OS or filesystem at the root of a
-// volume, so they are expected when the tiered root is a volume root. The NTFS
-// names also appear when an NTFS or exFAT volume is mounted on Linux.
-var osManagedRootEntries = []string{"System Volume Information", "$RECYCLE.BIN", "lost+found"}
-
-// isOSManagedEntry reports whether a tiered root entry belongs to the OS.
-func isOSManagedEntry(entry fs.DirEntry) bool {
-	for _, name := range osManagedRootEntries {
-		if strings.EqualFold(entry.Name(), name) {
-			return true
-		}
-	}
-	return isProtectedSystemEntry(entry)
 }
 
 // recoverLocalFiles enqueues every file in local/ in the LRU, oldest
@@ -317,6 +253,73 @@ func (c *TieredStorage) Configure(_ bool) error {
 	})
 
 	return nil
+}
+
+// prepareRoot lays out the tiered root and discards cache/ from any previous
+// run. Entries other than local/, cache/, and OS-managed volume entries are
+// refused rather than guessed at, since they may hold data from an older layout
+// or a misconfigured path.
+func (c *TieredStorage) prepareRoot() error {
+	if err := os.MkdirAll(c.tmpPath, dirPerm); err != nil {
+		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
+	}
+	entries, err := os.ReadDir(c.tmpPath)
+	if err != nil {
+		return fmt.Errorf("TieredStorage: failed to read %s: %w", c.tmpPath, err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == localDirName || name == cacheDirName {
+			continue
+		}
+		if isOSManagedEntry(entry) {
+			log.Debug("TieredStorage::prepareRoot : ignoring OS-managed entry %q", name)
+			continue
+		}
+		return fmt.Errorf(
+			"TieredStorage: %s contains unexpected entry %q; it may only contain %s and %s (move existing files into %s)",
+			c.tmpPath,
+			name,
+			localDirName,
+			cacheDirName,
+			filepath.Join(c.tmpPath, localDirName),
+		)
+	}
+	if err := os.RemoveAll(filepath.Join(c.tmpPath, cacheDirName)); err != nil {
+		return fmt.Errorf("TieredStorage: failed to clear %s: %w", cacheDirName, err)
+	}
+	for _, tree := range []string{localDirName, cacheDirName} {
+		if err := os.MkdirAll(filepath.Join(c.tmpPath, tree), dirPerm); err != nil {
+			return fmt.Errorf("TieredStorage: failed to create %s: %w", tree, err)
+		}
+	}
+	return nil
+}
+
+// osManagedRootEntries are created by the OS or filesystem at the root of a
+// volume, so they are expected when the tiered root is a volume root. The NTFS
+// names also appear when an NTFS or exFAT volume is mounted on Linux.
+var osManagedRootEntries = []string{"System Volume Information", "$RECYCLE.BIN", "lost+found"}
+
+// isOSManagedEntry reports whether a tiered root entry belongs to the OS.
+func isOSManagedEntry(entry fs.DirEntry) bool {
+	for _, name := range osManagedRootEntries {
+		if strings.EqualFold(entry.Name(), name) {
+			return true
+		}
+	}
+	return isProtectedSystemEntry(entry)
+}
+
+// newDiskUsageTracker tracks the local/ and cache/ trees under path. Only the
+// trees the component owns are measured, so OS-managed entries that share the
+// tiered path are not counted against max-size-mb.
+func newDiskUsageTracker(path string, reconcileInterval time.Duration) *cache_size.Tracker {
+	return cache_size.NewTracker(
+		reconcileInterval,
+		filepath.Join(path, localDirName),
+		filepath.Join(path, cacheDirName),
+	)
 }
 
 func (c *TieredStorage) OnConfigChange() {
