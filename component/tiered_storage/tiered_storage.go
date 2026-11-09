@@ -179,10 +179,9 @@ func (c *TieredStorage) Stop() error {
 	log.Trace("TieredStorage::Stop : Stopping component %s", c.Name())
 
 	if c.policy != nil {
-		if err := c.policy.StopPolicy(); err != nil {
-			return err
-		}
+		return c.policy.StopPolicy()
 	}
+
 	return nil
 }
 
