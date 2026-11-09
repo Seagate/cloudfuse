@@ -71,7 +71,6 @@ type TieredStorageOptions struct {
 
 	HighThreshold uint32 `config:"high-threshold" yaml:"high-threshold,omitempty"`
 	LowThreshold  uint32 `config:"low-threshold"  yaml:"low-threshold,omitempty"`
-	Parallelism   uint32 `config:"parallelism"    yaml:"parallelism,omitempty"`
 }
 
 const (
@@ -80,7 +79,7 @@ const (
 
 	defaultHighThreshold      = 90
 	defaultLowThreshold       = 80
-	defaultParallelism        = 8
+	numUploadWorkers          = 8
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
 	// cacheCopyKey marks a handle opened on a cache/ copy. It is not
@@ -209,9 +208,6 @@ func (c *TieredStorage) Configure(_ bool) error {
 			"TieredStorage: thresholds must satisfy 0 < low-threshold < high-threshold <= 100",
 		)
 	}
-	if conf.Parallelism == 0 {
-		conf.Parallelism = defaultParallelism
-	}
 
 	if err := c.prepareRoot(); err != nil {
 		log.Err("TieredStorage::Configure : %v", err)
@@ -244,7 +240,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		size:             c.diskUsage,
 		threshold:        float64(conf.HighThreshold) / 100,
 		targetRatio:      float64(conf.LowThreshold) / 100,
-		numWorkers:       int(conf.Parallelism),
+		numWorkers:       numUploadWorkers,
 		maxEviction:      defaultMaxEviction,
 		pollInterval:     capacityPollInterval,
 		uploadandCleanFn: c.uploadandCleanFile,

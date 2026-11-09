@@ -1113,26 +1113,24 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 		high         float64
 		low          float64
 		maxEviction  uint32
-		parallelism  int
 		pollInterval time.Duration
 	}{
 		{
 			name:   "defaults",
 			config: "max-size-mb: 1",
-			high:   0.9, low: 0.8, maxEviction: 5000, parallelism: 8,
+			high:   0.9, low: 0.8, maxEviction: 5000,
 			pollInterval: time.Second,
 		},
 		{
-			name: "custom",
-			config: "max-size-mb: 2\n  high-threshold: 90\n  low-threshold: 70\n" +
-				"  parallelism: 3",
-			high: 0.9, low: 0.7, maxEviction: 5000, parallelism: 3,
+			name:   "custom",
+			config: "max-size-mb: 2\n  high-threshold: 90\n  low-threshold: 70",
+			high:   0.9, low: 0.7, maxEviction: 5000,
 			pollInterval: time.Second,
 		},
 		{
 			name:   "default capacity",
-			config: "parallelism: 2",
-			high:   0.9, low: 0.8, maxEviction: 5000, parallelism: 2,
+			config: "",
+			high:   0.9, low: 0.8, maxEviction: 5000,
 			pollInterval: time.Second,
 		},
 		{name: "negative capacity", config: "max-size-mb: -1", wantErr: true},
@@ -1167,7 +1165,7 @@ func TestTieredStoragePolicyConfig(t *testing.T) {
 			assert.InEpsilon(t, test.high, storage.policy.threshold, 0.0001)
 			assert.InEpsilon(t, test.low, storage.policy.targetRatio, 0.0001)
 			assert.Equal(t, test.maxEviction, storage.policy.maxEviction)
-			assert.Equal(t, test.parallelism, storage.policy.numWorkers)
+			assert.Equal(t, numUploadWorkers, storage.policy.numWorkers)
 			assert.Equal(t, test.pollInterval, storage.policy.pollInterval)
 		})
 	}
