@@ -68,7 +68,7 @@ type TieredStorage struct {
 type TieredStorageOptions struct {
 	TmpPath   string  `config:"path"        yaml:"path,omitempty"`
 	MaxSizeMB float64 `config:"max-size-mb" yaml:"max-size-mb,omitempty"`
-	// thresholds
+
 	HighThreshold uint32 `config:"high-threshold" yaml:"high-threshold,omitempty"`
 	LowThreshold  uint32 `config:"low-threshold"  yaml:"low-threshold,omitempty"`
 	Parallelism   uint32 `config:"parallelism"    yaml:"parallelism,omitempty"`
@@ -77,7 +77,7 @@ type TieredStorageOptions struct {
 const (
 	compName           = "tiered_storage"
 	defaultMaxEviction = 5000
-	// thresholds
+
 	defaultHighThreshold      = 90
 	defaultLowThreshold       = 80
 	defaultParallelism        = 8
@@ -118,7 +118,6 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 		return err
 	}
 
-	//Start the policy
 	if c.policy != nil {
 		if err := c.policy.StartPolicy(); err != nil {
 			log.Err("TieredStorage::Start : failed to start LRU policy [%v]", err)
