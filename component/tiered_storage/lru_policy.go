@@ -70,12 +70,12 @@ type lruQueueConfig struct {
 // lruQueue moves local-only objects to cloud storage.
 // File locks may be held before mu, never after it.
 type lruQueue struct {
-	// mu guards the list and its nodes.
-	mu   sync.Mutex
-	head *lruNode
-	tail *lruNode
+	mu sync.Mutex
 	// nodeMap is written under mu, but may be read without it.
 	nodeMap sync.Map
+
+	head *lruNode
+	tail *lruNode
 
 	// evictMu serializes eviction: threshold passes and evict-on-close.
 	evictMu sync.Mutex
