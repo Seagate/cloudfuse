@@ -1012,31 +1012,23 @@ func TestLocalPath(t *testing.T) {
 	tests := []struct {
 		name     string
 		expected string
-		valid    bool
 	}{
-		{name: "", expected: localRoot, valid: true},
-		{name: "dir/file", expected: filepath.Join(localRoot, "dir", "file"), valid: true},
-		{name: "../file", valid: false},
-		{name: "dir/../../file", valid: false},
-		{name: absoluteName, valid: false},
+		{name: "", expected: localRoot},
+		{name: "dir/file", expected: filepath.Join(localRoot, "dir", "file")},
+		{name: "../file", expected: ""},
+		{name: "dir/../../file", expected: ""},
+		{name: absoluteName, expected: ""},
 	}
 	if runtime.GOOS == "windows" {
 		tests = append(tests, struct {
 			name     string
 			expected string
-			valid    bool
-		}{name: `dir\file`, expected: filepath.Join(localRoot, "dir", "file"), valid: true})
+		}{name: `dir\file`, expected: filepath.Join(localRoot, "dir", "file")})
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			path, err := storage.localPath(test.name)
-			if test.valid {
-				assert.NoError(t, err)
-				assert.Equal(t, test.expected, path)
-				return
-			}
-			assert.ErrorIs(t, err, syscall.EINVAL)
+			assert.Equal(t, test.expected, storage.localPath(test.name))
 		})
 	}
 }
@@ -1044,12 +1036,12 @@ func TestLocalPath(t *testing.T) {
 func TestCachePath(t *testing.T) {
 	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "root")}
 
-	path, err := storage.cachePath("dir/file")
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(storage.tmpPath, cacheDirName, "dir", "file"), path)
-
-	_, err = storage.cachePath("../file")
-	assert.ErrorIs(t, err, syscall.EINVAL)
+	assert.Equal(
+		t,
+		filepath.Join(storage.tmpPath, cacheDirName, "dir", "file"),
+		storage.cachePath("dir/file"),
+	)
+	assert.Empty(t, storage.cachePath("../file"))
 }
 
 // restart stops the component and starts a fresh instance on the same root.

@@ -324,24 +324,25 @@ func (c *TieredStorage) OnConfigChange() {
 }
 
 // localPath resolves an object name beneath local/, which holds local-owned files.
-func (c *TieredStorage) localPath(name string) (string, error) {
+func (c *TieredStorage) localPath(name string) string {
 	return c.treePath(localDirName, name)
 }
 
 // cachePath resolves an object name beneath cache/, which holds disposable
 // copies of open cloud-owned files.
-func (c *TieredStorage) cachePath(name string) (string, error) {
+func (c *TieredStorage) cachePath(name string) string {
 	return c.treePath(cacheDirName, name)
 }
 
 // treePath resolves an object name beneath one of the tiered root's trees.
-// An empty name resolves to the tree itself.
-func (c *TieredStorage) treePath(tree, name string) (string, error) {
+// An empty name resolves to the tree itself. A name that would escape the tree
+// resolves to "", which every file operation rejects.
+func (c *TieredStorage) treePath(tree, name string) string {
 	osName := filepath.FromSlash(name)
 	if osName != "" && !filepath.IsLocal(osName) {
-		return "", syscall.EINVAL
+		return ""
 	}
-	return filepath.Join(c.tmpPath, tree, osName), nil
+	return filepath.Join(c.tmpPath, tree, osName)
 }
 
 // Directory operations
@@ -352,10 +353,7 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 		return err
 	}
 
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(options.Name)
 	mode := options.Mode
 	if mode == 0 || runtime.GOOS == "windows" {
 		mode = common.DefaultDirectoryPermissionBits
@@ -374,14 +372,8 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 }
 
 func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return err
-	}
-	cachePath, err := c.cachePath(options.Name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(options.Name)
+	cachePath := c.cachePath(options.Name)
 	if err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
@@ -405,10 +397,7 @@ func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 }
 
 func (c *TieredStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return false
-	}
+	localPath := c.localPath(options.Name)
 	entries, localErr := os.ReadDir(localPath)
 	if localErr == nil && len(entries) > 0 {
 		return false
@@ -422,10 +411,7 @@ func (c *TieredStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (c *TieredStorage) StreamDir(
 	options internal.StreamDirOptions,
 ) ([]*internal.ObjAttr, string, error) {
-	localPath, pathErr := c.localPath(options.Name)
-	if pathErr != nil {
-		return nil, "", pathErr
-	}
+	localPath := c.localPath(options.Name)
 
 	entries, localErr := os.ReadDir(localPath)
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
@@ -486,22 +472,10 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	// this returns (libfuse's path tree lock; WinFsp's rename lock), so no
 	// name can appear under src after it is listed below.
 
-	srcLocal, err := c.localPath(options.Src)
-	if err != nil {
-		return err
-	}
-	srcCache, err := c.cachePath(options.Src)
-	if err != nil {
-		return err
-	}
-	dstLocal, err := c.localPath(options.Dst)
-	if err != nil {
-		return err
-	}
-	dstCache, err := c.cachePath(options.Dst)
-	if err != nil {
-		return err
-	}
+	srcLocal := c.localPath(options.Src)
+	srcCache := c.cachePath(options.Src)
+	dstLocal := c.localPath(options.Dst)
+	dstCache := c.cachePath(options.Dst)
 
 	srcPrefix := common.JoinUnixFilepath(options.Src) + "/"
 	names, err := c.filesUnder(options.Src)
@@ -608,11 +582,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 func (c *TieredStorage) filesUnder(dir string) ([]string, error) {
 	var names []string
 	for _, tree := range []string{localDirName, cacheDirName} {
-		root, err := c.treePath(tree, dir)
-		if err != nil {
-			return nil, err
-		}
-		err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		root := c.treePath(tree, dir)
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 			if errors.Is(err, os.ErrNotExist) {
 				return nil
 			}
@@ -660,10 +631,7 @@ func (c *TieredStorage) checkCloudReachable(name string) error {
 // createEmptyLocal creates a new, empty local-owned file. The file lock must
 // be held.
 func (c *TieredStorage) createEmptyLocal(name string, mode os.FileMode) error {
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(name)
 	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
 		return err
 	}
@@ -709,14 +677,8 @@ func (c *TieredStorage) openHandle(
 // LRU. Open handles stay valid. It does nothing if cache/x is gone, because
 // another handle promoted it or it was deleted. The file lock must be held.
 func (c *TieredStorage) promote(name string) error {
-	cachePath, err := c.cachePath(name)
-	if err != nil {
-		return err
-	}
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
+	cachePath := c.cachePath(name)
+	localPath := c.localPath(name)
 	if _, err := os.Stat(cachePath); errors.Is(err, os.ErrNotExist) {
 		return nil
 	} else if err != nil {
@@ -789,10 +751,7 @@ func (c *TieredStorage) CreateFile(
 	if err := c.createEmptyLocal(options.Name, options.Mode); err != nil {
 		return nil, err
 	}
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return nil, err
-	}
+	localPath := c.localPath(options.Name)
 	handle, err := c.openHandle(options.Name, localPath, os.O_RDWR, false, flock)
 	if err != nil {
 		return nil, err
@@ -808,14 +767,8 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return err
-	}
-	cachePath, err := c.cachePath(options.Name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(options.Name)
+	cachePath := c.cachePath(options.Name)
 	if err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
@@ -856,14 +809,8 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	flock.Lock()
 	defer flock.Unlock()
 
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return nil, err
-	}
-	cachePath, err := c.cachePath(options.Name)
-	if err != nil {
-		return nil, err
-	}
+	localPath := c.localPath(options.Name)
+	cachePath := c.cachePath(options.Name)
 	exclusive := options.Flags&os.O_CREATE != 0 && options.Flags&os.O_EXCL != 0
 	truncate := options.Flags&os.O_TRUNC != 0
 
@@ -946,10 +893,7 @@ func (c *TieredStorage) fileMode(mode os.FileMode) os.FileMode {
 // must be held, which keeps other openers from seeing a partial download. A
 // failed download is removed; startup removes any left by a crash.
 func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
-	cachePath, err := c.cachePath(name)
-	if err != nil {
-		return err
-	}
+	cachePath := c.cachePath(name)
 	if err := os.MkdirAll(filepath.Dir(cachePath), dirPerm); err != nil {
 		return err
 	}
@@ -1114,14 +1058,8 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		return closeErr
 	}
 
-	cachePath, err := c.cachePath(name)
-	if err != nil {
-		return err
-	}
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
+	cachePath := c.cachePath(name)
+	localPath := c.localPath(name)
 	if _, err := os.Stat(cachePath); err == nil {
 		// The copy is clean, so it can be dropped. If that fails, the next
 		// release or startup removes it.
@@ -1145,10 +1083,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 // uploadLocal copies local/x to the cloud, with its mode and owner where the
 // platform has them. The file lock must be held.
 func (c *TieredStorage) uploadLocal(name string) error {
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(name)
 	f, err := common.Open(localPath)
 	if err != nil {
 		log.Err("TieredStorage::uploadLocal : %s open failed [%v]", name, err)
@@ -1190,10 +1125,7 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 	if err := c.uploadLocal(name); err != nil {
 		return err
 	}
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(name)
 	if err := c.removeFile(localPath); err != nil {
 		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
 		return err
@@ -1216,22 +1148,10 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	defer sflock.Unlock()
 	defer dflock.Unlock()
 
-	srcLocal, err := c.localPath(options.Src)
-	if err != nil {
-		return err
-	}
-	srcCache, err := c.cachePath(options.Src)
-	if err != nil {
-		return err
-	}
-	dstLocal, err := c.localPath(options.Dst)
-	if err != nil {
-		return err
-	}
-	dstCache, err := c.cachePath(options.Dst)
-	if err != nil {
-		return err
-	}
+	srcLocal := c.localPath(options.Src)
+	srcCache := c.cachePath(options.Src)
+	dstLocal := c.localPath(options.Dst)
+	dstCache := c.cachePath(options.Dst)
 	if err := c.checkCloudReachable(options.Src); err != nil {
 		return err
 	}
@@ -1373,10 +1293,7 @@ func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 // call. A cache/ copy matches the cloud object, so it is never consulted.
 // It takes no lock: files move between trees by atomic rename.
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	localPath, err := c.localPath(options.Name)
-	if err != nil {
-		return nil, err
-	}
+	localPath := c.localPath(options.Name)
 	info, err := os.Stat(localPath)
 	if err == nil {
 		return newTieredStorageObjAttr(options.Name, info), nil
@@ -1428,14 +1345,8 @@ func (c *TieredStorage) changeAttr(
 	changeCloud func() error,
 	changeLocal func(path string) error,
 ) error {
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
-	cachePath, err := c.cachePath(name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(name)
+	cachePath := c.cachePath(name)
 
 	info, err := os.Stat(localPath)
 	switch {
@@ -1512,10 +1423,7 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 
 // FileUsed refreshes a local-owned file's LRU position.
 func (c *TieredStorage) FileUsed(name string) error {
-	localPath, err := c.localPath(name)
-	if err != nil {
-		return err
-	}
+	localPath := c.localPath(name)
 	if _, err := os.Stat(localPath); err == nil {
 		c.policy.Enqueue(name)
 	}
