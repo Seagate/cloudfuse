@@ -4699,6 +4699,113 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	suite.assert.Error(err)
 }
 
+// The hard limit must account for everything in the cache, not just the file being written.
+func (suite *fileCacheTestSuite) TestHardLimitAcrossFiles() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
+	config := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  hard-limit: true\n  max-size-mb: 2\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
+	suite.setupTestHelper(config)
+
+	first, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: "first", Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: first, Offset: 0, Data: make([]byte, 3*MB/2)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: first}))
+
+	second, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: "second", Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: second, Offset: 0, Data: make([]byte, MB)},
+	)
+	suite.assert.Equal(syscall.ENOSPC, err)
+
+	// freeing space lets the write through
+	suite.assert.NoError(suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: "first"}))
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: second, Offset: 0, Data: make([]byte, MB)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: second}))
+}
+
+// Every operation that changes the size of a cached file must update the tracked cache usage.
+func (suite *fileCacheTestSuite) TestCacheSizeTracking() {
+	defer suite.cleanupTest()
+	used := func() int64 { return suite.fileCache.cacheSize.Used() }
+	baseline := used()
+
+	// write
+	a, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: "a", Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: a, Offset: 0, Data: make([]byte, 1000)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(baseline+1000, used())
+	// overwriting existing data does not grow the file
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: a, Offset: 500, Data: make([]byte, 1000)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(baseline+1500, used())
+
+	// truncate through a handle
+	err = suite.fileCache.TruncateFile(
+		internal.TruncateFileOptions{Name: "a", Handle: a, NewSize: 1200},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(baseline+1200, used())
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: a}))
+
+	// truncate by path
+	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: "a", NewSize: 1100})
+	suite.assert.NoError(err)
+	suite.assert.Equal(baseline+1100, used())
+
+	// rename over a cached file
+	b, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: "b", Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(
+		&internal.WriteFileOptions{Handle: b, Offset: 0, Data: make([]byte, 300)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: b}))
+	suite.assert.Equal(baseline+1400, used())
+	suite.assert.NoError(suite.fileCache.RenameFile(internal.RenameFileOptions{Src: "a", Dst: "b"}))
+	suite.assert.Equal(baseline+1100, used())
+
+	// delete
+	suite.assert.NoError(suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: "b"}))
+	suite.assert.Equal(baseline, used())
+
+	// download
+	suite.assert.NoError(
+		os.WriteFile(filepath.Join(suite.fake_storage_path, "c"), make([]byte, 2000), 0777),
+	)
+	c, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: "c", Mode: 0777})
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: c, Offset: 0, Data: make([]byte, 10)},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(baseline+2000, used())
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: c}))
+
+	// create over a cached file truncates it
+	c, err = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: "c", Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.Equal(baseline, used())
+	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: c}))
+}
+
 func (suite *fileCacheTestSuite) TestHandleDataChange() {
 	defer suite.cleanupTest()
 
