@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,9 +61,11 @@ func TestRefreshSumsAllPaths(t *testing.T) {
 	tracker.Add(1)
 	assert.NoError(t, tracker.Refresh())
 
-	// directory entries are counted too, so allow some slack
-	assert.GreaterOrEqual(t, tracker.Used(), int64(8000))
-	assert.Less(t, tracker.Used(), int64(15000))
+	firstUsage, err := common.GetUsage(first)
+	assert.NoError(t, err)
+	secondUsage, err := common.GetUsage(second)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(firstUsage+secondUsage), tracker.Used())
 }
 
 func TestRefreshMissingPath(t *testing.T) {

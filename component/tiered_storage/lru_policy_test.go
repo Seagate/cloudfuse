@@ -129,8 +129,9 @@ func waitEvictOnClose(t *testing.T, q *lruQueue, names ...string) {
 		// The request is removed under the file lock, which is held until the
 		// upload finishes.
 		flock := q.fileLocks.Get(name)
-		flock.Lock()
-		flock.Unlock()
+		if assert.Eventually(t, flock.TryLock, time.Second, time.Millisecond) {
+			flock.Unlock()
+		}
 	}
 }
 

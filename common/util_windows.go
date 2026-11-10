@@ -44,7 +44,7 @@ func NotifyMountToParent() error {
 
 // totalSectors walks through all files in the path and gives an estimate of the total number of sectors
 // that are being used. Based on https://stackoverflow.com/questions/32482673/how-to-get-directory-total-size
-func totalSectors(path string) int64 {
+func totalSectors(path string) (int64, error) {
 	//bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
 	// https://devblogs.microsoft.com/oldnewthing/20160427-00/?p=93365
 
@@ -62,20 +62,22 @@ func totalSectors(path string) int64 {
 		return err
 	})
 
-	// TODO: Handle this error properly
 	if err != nil {
-		return totalSectors
+		return totalSectors, err
 	}
 
-	return totalSectors
+	return totalSectors, nil
 
 }
 
 // GetUsage: The current disk usage in bytes
 func GetUsage(path string) (float64, error) {
-	totalSectors := totalSectors(path)
+	sectors, err := totalSectors(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to measure %s: %w", path, err)
+	}
 
-	totalBytes := float64(totalSectors * SectorSize)
+	totalBytes := float64(sectors * SectorSize)
 
 	return totalBytes, nil
 }
