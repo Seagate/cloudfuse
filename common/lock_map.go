@@ -82,10 +82,6 @@ func (l *LockMapItem) Unlock() {
 	l.mtx.Unlock()
 }
 
-func (l *LockMapItem) TryLock() bool {
-	return l.mtx.TryLock()
-}
-
 func (l *LockMapItem) RLock() {
 	l.mtx.RLock()
 }
