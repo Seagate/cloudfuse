@@ -28,49 +28,12 @@
 package file_cache
 
 import (
-	"io/fs"
 	"os"
 	"syscall"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common/log"
-	"github.com/Seagate/cloudfuse/internal"
 	"golang.org/x/sys/unix"
 )
-
-// Creates a new object attribute
-func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	stat := info.Sys().(*syscall.Stat_t)
-	attrs := &internal.ObjAttr{
-		Path:  path,
-		Name:  info.Name(),
-		Size:  info.Size(),
-		Mode:  info.Mode(),
-		Mtime: time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec),
-		Atime: time.Unix(stat.Atim.Sec, stat.Atim.Nsec),
-		Ctime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec),
-	}
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		attrs.Flags.Set(internal.PropFlagSymlink)
-	} else if info.IsDir() {
-		attrs.Flags.Set(internal.PropFlagIsDir)
-	}
-
-	return attrs
-}
-
-func (fc *FileCache) getAvailableSize() (uint64, error) {
-	statfs := &unix.Statfs_t{}
-	err := unix.Statfs(fc.tmpPath, statfs)
-	if err != nil {
-		log.Debug("FileCache::getAvailableSize : statfs err [%s].", err.Error())
-		return 0, err
-	}
-
-	available := statfs.Bavail * uint64(statfs.Bsize)
-	return available, nil
-}
 
 func (fc *FileCache) syncFile(f *os.File, path string) error {
 	// Flush all data to disk that has been buffered by the kernel.

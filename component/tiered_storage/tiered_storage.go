@@ -306,34 +306,6 @@ func isOSManagedEntry(entry fs.DirEntry) bool {
 	return err == nil && common.IsProtectedSystemFile(info)
 }
 
-func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	atime, ctime := common.GetFileTimes(info)
-	attrs := &internal.ObjAttr{
-		Path:  path,
-		Name:  info.Name(),
-		Size:  info.Size(),
-		Mode:  info.Mode(),
-		Mtime: info.ModTime(),
-		Atime: atime,
-		Ctime: ctime,
-	}
-
-	if runtime.GOOS == "windows" {
-		attrs.Path = common.NormalizeObjectName(attrs.Path)
-		attrs.Name = common.NormalizeObjectName(attrs.Name)
-		// Windows has no POSIX permissions; let libfuse supply the default.
-		attrs.Mode &^= os.ModePerm
-		attrs.Flags.Set(internal.PropFlagModeDefault)
-	}
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		attrs.Flags.Set(internal.PropFlagSymlink)
-	} else if info.IsDir() {
-		attrs.Flags.Set(internal.PropFlagIsDir)
-	}
-	return attrs
-}
-
 // newDiskUsageTracker tracks the local/ and cache/ trees under path. Only the
 // trees the component owns are measured, so OS-managed entries that share the
 // tiered path are not counted against max-size-mb.
@@ -463,7 +435,7 @@ func (c *TieredStorage) StreamDir(
 				continue
 			}
 			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
-			page = append(page, newTieredStorageObjAttr(entryName, info))
+			page = append(page, internal.NewLocalObjAttr(entryName, info))
 		}
 	}
 
@@ -1319,7 +1291,7 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	localPath := c.localPath(options.Name)
 	info, err := os.Stat(localPath)
 	if err == nil {
-		return newTieredStorageObjAttr(options.Name, info), nil
+		return internal.NewLocalObjAttr(options.Name, info), nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err

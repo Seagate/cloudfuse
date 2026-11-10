@@ -28,60 +28,11 @@
 package file_cache
 
 import (
-	"io/fs"
 	"os"
 	"syscall"
-	"time"
 
-	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
-	"github.com/Seagate/cloudfuse/internal"
-
-	"golang.org/x/sys/windows"
 )
-
-// Creates a new object attribute
-func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	stat := info.Sys().(*syscall.Win32FileAttributeData)
-	attrs := &internal.ObjAttr{
-		Path: common.NormalizeObjectName(path),
-		Name: common.NormalizeObjectName(info.Name()),
-		Size: info.Size(),
-		// mask off the permission bits, which are meaningless on Windows
-		Mode:  info.Mode() &^ os.ModePerm,
-		Mtime: time.Unix(0, stat.LastWriteTime.Nanoseconds()),
-		Atime: time.Unix(0, stat.LastAccessTime.Nanoseconds()),
-		Ctime: time.Unix(0, stat.CreationTime.Nanoseconds()),
-	}
-
-	// let the fuse layer supply the configured default permission
-	attrs.Flags.Set(internal.PropFlagModeDefault)
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		attrs.Flags.Set(internal.PropFlagSymlink)
-	} else if info.IsDir() {
-		attrs.Flags.Set(internal.PropFlagIsDir)
-	}
-
-	return attrs
-}
-
-func (fc *FileCache) getAvailableSize() (uint64, error) {
-	var free, total, avail uint64
-
-	// Get path to the cache
-	pathPtr, err := windows.UTF16PtrFromString(fc.tmpPath)
-	if err != nil {
-		return 0, err
-	}
-	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
-	if err != nil {
-		log.Debug("FileCache::StatFs : statfs err [%s].", err.Error())
-		return 0, err
-	}
-
-	return avail, nil
-}
 
 func (fc *FileCache) syncFile(f *os.File, path string) error {
 	err := f.Sync()
