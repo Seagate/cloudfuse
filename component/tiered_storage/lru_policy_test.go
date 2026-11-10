@@ -130,7 +130,7 @@ func waitEvictOnClose(t *testing.T, q *lruQueue, names ...string) {
 		// upload finishes.
 		flock := q.fileLocks.Get(name)
 		flock.Lock()
-		defer flock.Unlock()
+		flock.Unlock()
 	}
 }
 
