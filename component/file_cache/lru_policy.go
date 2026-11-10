@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/cache_size"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -74,9 +75,6 @@ type lruPolicy struct {
 
 	// Channel to check for file eviction based on file-cache timeout
 	cacheTimeoutMonitor <-chan time.Time
-
-	// DU utility was found on the path or not
-	duPresent bool
 }
 
 type pendingOpSnapshot struct {
@@ -97,6 +95,8 @@ type lruPolicySnapshot struct {
 const (
 	// Check for disk usage in below number of minutes
 	DiskUsageCheckInterval = 1
+	// Correct drift in the tracked cache usage by measuring the disk at most this often
+	reconcileUsageInterval = 5 * time.Minute
 	// Cache snapshot relative filepath
 	snapshotPath = ".fileCacheSnapshot.gob"
 )
@@ -104,6 +104,9 @@ const (
 var _ cachePolicy = &lruPolicy{}
 
 func NewLRUPolicy(cfg cachePolicyConfig) cachePolicy {
+	if cfg.cacheSize == nil {
+		cfg.cacheSize = cache_size.NewTracker(reconcileUsageInterval, cfg.tmpPath)
+	}
 	obj := &lruPolicy{
 		cachePolicyConfig: cfg,
 		head:              nil,
@@ -113,7 +116,6 @@ func NewLRUPolicy(cfg cachePolicyConfig) cachePolicy {
 		lastMarker: &lruNode{
 			name: "##",
 		},
-		duPresent: false,
 	}
 	obj.currMarker.usage.Store(-1)
 	obj.lastMarker.usage.Store(-1)
@@ -139,16 +141,11 @@ func (p *lruPolicy) StartPolicy() error {
 	p.closeSignalValidate = make(chan int)
 	p.validateChan = make(chan string, 10000)
 
-	_, err = common.GetUsage(p.tmpPath)
-	if err == nil {
-		p.duPresent = true
-	} else {
-		log.Err("lruPolicy::StartPolicy : 'du' command not found, disabling disk usage checks")
+	// Seed the usage tracker. If this fails, tracking still works for changes made from now on.
+	if err = p.cacheSize.Refresh(); err != nil {
+		log.Err("lruPolicy::StartPolicy : failed to measure cache usage [%v]", err)
 	}
-
-	if p.duPresent {
-		p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
-	}
+	p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
 
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
@@ -347,7 +344,7 @@ func (p *lruPolicy) CachePurge(name string) {
 	log.Trace("lruPolicy::CachePurge : %s", name)
 
 	p.removeNode(name)
-	err := deleteFile(name)
+	err := deleteFile(name, p.cacheSize)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::CachePurge : failed to delete local file %s. Here's why: %v", name, err)
 	}
@@ -433,7 +430,8 @@ func (p *lruPolicy) clearCache() {
 		case <-p.diskUsageMonitor:
 			// File cache timeout has not occurred so just monitor the cache usage
 			cleanupCount := 0
-			pUsage := getUsagePercentage(p.tmpPath, p.maxSizeMB)
+			p.cacheSize.Reconcile()
+			pUsage := getUsagePercentage(p.cacheSize, p.maxSizeMB)
 			if pUsage > p.highThreshold {
 				continueDeletion := true
 				for continueDeletion {
@@ -448,7 +446,7 @@ func (p *lruPolicy) clearCache() {
 					p.printNodes()
 					p.deleteExpiredNodes()
 
-					pUsage := getUsagePercentage(p.tmpPath, p.maxSizeMB)
+					pUsage := getUsagePercentage(p.cacheSize, p.maxSizeMB)
 					if pUsage < p.lowThreshold || cleanupCount >= 3 {
 						log.Info(
 							"lruPolicy::ClearCache : Threshold stabilized %f > %f",
@@ -629,7 +627,7 @@ func (p *lruPolicy) deleteItem(name string) {
 		// file was already deleted - this is normal
 		return
 	}
-	err = deleteFile(name)
+	err = deleteFile(name, p.cacheSize)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
 	}
