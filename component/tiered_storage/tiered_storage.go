@@ -218,7 +218,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
 	}
 	if conf.MaxSizeMB == 0 {
-		free, err := availableSize(c.tmpPath)
+		free, _, err := common.GetAvailFree(c.tmpPath)
 		if err != nil {
 			return fmt.Errorf("TieredStorage: failed to get free space for %s: %w", c.tmpPath, err)
 		}
@@ -302,7 +302,36 @@ func isOSManagedEntry(entry fs.DirEntry) bool {
 			return true
 		}
 	}
-	return isProtectedSystemEntry(entry)
+	info, err := entry.Info()
+	return err == nil && common.IsProtectedSystemFile(info)
+}
+
+func newTieredStorageObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
+	atime, ctime := common.GetFileTimes(info)
+	attrs := &internal.ObjAttr{
+		Path:  path,
+		Name:  info.Name(),
+		Size:  info.Size(),
+		Mode:  info.Mode(),
+		Mtime: info.ModTime(),
+		Atime: atime,
+		Ctime: ctime,
+	}
+
+	if runtime.GOOS == "windows" {
+		attrs.Path = common.NormalizeObjectName(attrs.Path)
+		attrs.Name = common.NormalizeObjectName(attrs.Name)
+		// Windows has no POSIX permissions; let libfuse supply the default.
+		attrs.Mode &^= os.ModePerm
+		attrs.Flags.Set(internal.PropFlagModeDefault)
+	}
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		attrs.Flags.Set(internal.PropFlagSymlink)
+	} else if info.IsDir() {
+		attrs.Flags.Set(internal.PropFlagIsDir)
+	}
+	return attrs
 }
 
 // newDiskUsageTracker tracks the local/ and cache/ trees under path. Only the
@@ -1093,11 +1122,13 @@ func (c *TieredStorage) uploadLocal(name string) error {
 		return err
 	}
 
-	mode, owner, group, ok := uploadMetadata(info)
+	// Windows files carry no POSIX mode or owner, so applying them would
+	// overwrite the cloud object's metadata with defaults.
+	owner, group, ok := common.GetFileOwner(info)
 	if !ok {
 		return nil
 	}
-	err = c.NextComponent().Chmod(internal.ChmodOptions{Name: name, Mode: mode})
+	err = c.NextComponent().Chmod(internal.ChmodOptions{Name: name, Mode: info.Mode().Perm()})
 	if err != nil && !errors.Is(err, syscall.ENOTSUP) {
 		log.Err("TieredStorage::uploadLocal : %s chmod failed [%v]", name, err)
 		return err
@@ -1425,7 +1456,7 @@ func (c *TieredStorage) FileUsed(name string) error {
 func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 	const blockSize = 4096
 
-	physicalFree, err := availableSize(c.tmpPath)
+	physicalFree, _, err := common.GetAvailFree(c.tmpPath)
 	if err != nil {
 		return nil, false, err
 	}

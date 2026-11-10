@@ -28,10 +28,13 @@ package common
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/sys/windows"
@@ -101,22 +104,45 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 	return usedSpace, float64(usedSpace) / float64(total) * 100, nil
 }
 
-// GetAvailFree: Available blocks
-func GetAvailFree(path string) (uint64, uint64, error) {
-	var free, total, avail uint64
-
-	// Get path to the cache
+// GetAvailFree returns the bytes available to the caller, honoring per-user
+// quotas, and the total free bytes on the volume containing path.
+func GetAvailFree(path string) (avail, free uint64, err error) {
 	pathPtr, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return 0, 0, err
 	}
-	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
-	if err != nil {
+	var total uint64
+	if err := windows.GetDiskFreeSpaceEx(pathPtr, &avail, &total, &free); err != nil {
 		return 0, 0, err
 	}
-	// Quick fix: Convert bytes to number of blocks to match Linux implementation for now.
-	// TODO: Eventually, change this back to return bytes instead of blocks, and fix linux implementation to match.
-	return avail / 4096, free / 4096, nil
+	return avail, free, nil
+}
+
+// GetFileTimes returns the last access and creation times of a local file.
+// The modification time is available portably from info.ModTime.
+func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
+	stat, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return info.ModTime(), info.ModTime()
+	}
+	return time.Unix(0, stat.LastAccessTime.Nanoseconds()),
+		time.Unix(0, stat.CreationTime.Nanoseconds())
+}
+
+// GetFileOwner reports no owner: Windows files carry no POSIX uid or gid.
+func GetFileOwner(info fs.FileInfo) (uid, gid int, ok bool) {
+	return 0, 0, false
+}
+
+// IsProtectedSystemFile reports whether info is marked both hidden and
+// system, which Explorer treats as a protected operating system file.
+func IsProtectedSystemFile(info fs.FileInfo) bool {
+	stat, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return false
+	}
+	const protected = windows.FILE_ATTRIBUTE_HIDDEN | windows.FILE_ATTRIBUTE_SYSTEM
+	return stat.FileAttributes&protected == protected
 }
 
 // GetFreeRam: Available ram
