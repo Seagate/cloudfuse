@@ -220,12 +220,16 @@ jobs:
           set -euo pipefail
           MOUNT_DIR=/tmp/cloudfuse-tiered-mount
           TIER_DIR=/tmp/cloudfuse-tiered-data
+          LOCAL_DIR="$TIER_DIR/local"
           CONFIG=/tmp/cloudfuse-tiered.yaml
           SOURCE=/tmp/cloudfuse-tiered-source
           PERSISTENT=/tmp/cloudfuse-tiered-persistent
           MOUNT_PID=
 
           cleanup() {
+            if [[ $? -ne 0 ]]; then
+              cat /tmp/cloudfuse-tiered.log || true
+            fi
             if mountpoint -q "$MOUNT_DIR"; then
               fusermount3 -u "$MOUNT_DIR" -z || true
             fi
@@ -262,23 +266,23 @@ jobs:
           head -c 900000 /dev/urandom > "$SOURCE"
           cp "$SOURCE" "$MOUNT_DIR/evicted.bin"
           for _ in {1..30}; do
-            aws --endpoint-url "$AWS_ENDPOINT" s3api head-object \
+            [[ ! -e "$LOCAL_DIR/evicted.bin" ]] && aws --endpoint-url "$AWS_ENDPOINT" s3api head-object \
               --bucket "$AWS_BUCKET_NAME" --key evicted.bin >/dev/null 2>&1 && break
             sleep 1
           done
           aws --endpoint-url "$AWS_ENDPOINT" s3api head-object \
             --bucket "$AWS_BUCKET_NAME" --key evicted.bin >/dev/null
-          test ! -e "$TIER_DIR/evicted.bin"
+          test ! -e "$LOCAL_DIR/evicted.bin"
           cmp "$SOURCE" "$MOUNT_DIR/evicted.bin"
-          test ! -e "$TIER_DIR/evicted.bin"
+          test ! -e "$LOCAL_DIR/evicted.bin"
 
           head -c 100000 /dev/urandom > "$PERSISTENT"
           cp "$PERSISTENT" "$MOUNT_DIR/persistent.bin"
-          test -e "$TIER_DIR/persistent.bin"
+          test -e "$LOCAL_DIR/persistent.bin"
           unmount_tiered
 
           mount_tiered
-          test -e "$TIER_DIR/persistent.bin"
+          test -e "$LOCAL_DIR/persistent.bin"
           cmp "$PERSISTENT" "$MOUNT_DIR/persistent.bin"
           rm "$MOUNT_DIR/persistent.bin"
           unmount_tiered
