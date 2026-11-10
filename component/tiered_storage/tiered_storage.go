@@ -982,14 +982,13 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
 	}
 
-	if beforeErr == nil && bytesWritten > 0 {
-		if after, statErr := f.Stat(); statErr == nil {
+	if bytesWritten > 0 {
+		c.setHandleDirty(options.Handle)
+		if after, statErr := f.Stat(); beforeErr == nil && statErr == nil {
 			c.diskUsage.Add(after.Size() - before.Size())
 		}
 	}
-	if err == nil {
-		c.setHandleDirty(options.Handle)
-	} else {
+	if err != nil {
 		log.Err(
 			"TieredStorage::WriteFile : failed to write %s [%s]",
 			options.Handle.Path,
