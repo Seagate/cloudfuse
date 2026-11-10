@@ -2000,10 +2000,9 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		return nil
 	}
 
-	// flush the local file
-	err := fc.flushFileLocal(options.Handle)
-	if err != nil {
-		return err
+	if options.Handle.GetFileObject() == nil {
+		log.Err("FileCache::FlushFile : %s couldn't find fd in handle", options.Handle.Path)
+		return syscall.EBADF
 	}
 
 	// If lazy write is enabled, stop here
@@ -2022,31 +2021,6 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 	return fc.flushFileCloud(options)
-}
-
-// flush local file
-func (fc *FileCache) flushFileLocal(handle *handlemap.Handle) error {
-	//defer exectime.StatTimeCurrentBlock("FileCache::flushFileLocal")()
-	log.Trace("FileCache::flushFileLocal : %s handle=%d", handle.Path, handle.ID)
-
-	// ignore clean handles
-	if !handle.Dirty() {
-		return nil
-	}
-
-	// Flush all data to disk that has been buffered by the kernel.
-	f := handle.GetFileObject()
-	if f == nil {
-		log.Err("FileCache::flushFileLocal : %s couldn't find fd in handle", handle.Path)
-		return syscall.EBADF
-	}
-	err := fc.syncFile(f, handle.Path)
-	if err != nil {
-		log.Err("FileCache::flushFileLocal : %s sync failed [%v]", handle.Path, err)
-		return syscall.EIO
-	}
-
-	return nil
 }
 
 // file must be locked before calling this function
