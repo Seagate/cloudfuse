@@ -46,7 +46,6 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/cache_size"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -75,7 +74,6 @@ type FileCache struct {
 	offloadIO       bool
 	offlineAccess   bool
 	maxCacheSizeMB  float64
-	cacheSize       *cache_size.Tracker // bytes used under tmpPath, shared with the cache policy
 
 	defaultPermission os.FileMode
 
@@ -373,8 +371,6 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.defaultPermission = common.DefaultFilePermissionBits
 	}
 
-	// the cache policy measures usage when it starts, and reconciles it periodically
-	fc.cacheSize = cache_size.NewTracker(reconcileUsageInterval, fc.tmpPath)
 	cacheConfig := fc.GetPolicyConfig(conf)
 	fc.policy = NewLRUPolicy(cacheConfig)
 	if fc.policy == nil {
@@ -468,7 +464,6 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		lowThreshold:  float64(conf.LowThreshold),
 		cacheTimeout:  uint32(fc.cacheTimeout),
 		maxSizeMB:     fc.maxCacheSizeMB,
-		cacheSize:     fc.cacheSize,
 		fileLocks:     fc.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
 		pendingOps:    &fc.pendingOps,
@@ -498,7 +493,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 		log.Err("FileCache::StatFs : Not responding to StatFs because max cache size is zero")
 		return nil, false, nil
 	}
-	usage := float64(fc.cacheSize.Used())
+	usage, _ := common.GetUsage(fc.tmpPath)
 	available := maxCacheSize - usage
 
 	// how much space is available on the underlying file system?
@@ -1295,7 +1290,6 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	oldSize := cachedSize(localPath)
 	f, err := fc.openCacheFile(
 		localPath,
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC,
@@ -1309,7 +1303,6 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		)
 		return nil, err
 	}
-	fc.cacheSize.Add(-oldSize)
 	// The user might change permissions WHILE creating the file therefore we need to account for that
 	if runtime.GOOS != "windows" && options.Mode != common.DefaultFilePermissionBits {
 		fc.missedChmodList.LoadOrStore(options.Name, true)
@@ -1494,14 +1487,12 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			return err
 		}
 
-		// Open a download handle (this truncates any existing cached copy)
-		oldSize := cachedSize(localPath)
+		// Open a download handle
 		downloadHandle, err := fc.openCacheFile(localPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, fMode)
 		if err != nil {
 			log.Err("FileCache::openFileInternal : %s open dl handle failed [%v]", handle.Path, err)
 			return err
 		}
-		fc.cacheSize.Add(-oldSize)
 
 		// download
 		if attr != nil && !overwrite {
@@ -1528,9 +1519,6 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 		// Update the last download time of this file
 		flock.SetDownloadTime()
-		if info, statErr := downloadHandle.Stat(); statErr == nil {
-			fc.cacheSize.Add(info.Size())
-		}
 		downloadHandle.Close()
 		log.Debug("FileCache::openFileInternal : %s download complete", handle.Path)
 
@@ -1642,8 +1630,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// check cache size hard limit
-	if cloudAttr != nil &&
-		fc.exceedsHardLimit(int64(cloudAttr.Size)-cachedSize(localPath), options.Name, "OpenFile") {
+	if cloudAttr != nil && fc.exceedsHardLimit(int64(cloudAttr.Size), options.Name, "OpenFile") {
 		return nil, syscall.ENOSPC
 	}
 
@@ -1674,24 +1661,30 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, nil
 }
 
-// cachedSize returns the size of the cached file at localPath, or zero if there is none.
-func cachedSize(localPath string) int64 {
-	if info, err := os.Stat(localPath); err == nil && info.Mode().IsRegular() {
-		return info.Size()
-	}
-	return 0
-}
-
-// exceedsHardLimit reports whether growing the cache by additionalSpace bytes would break the hard limit.
-// It uses the tracked cache usage, so it is cheap enough to call on every write.
-func (fc *FileCache) exceedsHardLimit(additionalSpace int64, name string, requestType string) bool {
+func (fc *FileCache) exceedsHardLimit(newSize int64, name string, requestType string) bool {
 	// this is only relevant if there is a hard limit
-	if fc.diskHighWaterMark == 0 || additionalSpace <= 0 {
+	if fc.diskHighWaterMark == 0 {
+		return false
+	}
+	// how much is being added?
+	existingSize := int64(0)
+	if info, statErr := os.Stat(filepath.Join(fc.tmpPath, name)); statErr == nil {
+		existingSize = info.Size()
+	}
+	additionalSpace := newSize - existingSize
+	// don't check usage needlessly
+	if additionalSpace <= 0 {
+		return false
+	}
+	// get current total cache size
+	currSize, err := common.GetUsage(fc.tmpPath)
+	if err != nil {
+		log.Err("FileCache::exceedsHardLimit : failed to get current cache size [%v]", err)
 		return false
 	}
 	// check if we are running out of space
 	// Add a buffer to the high water mark to account for any small discrepancies in usage calculations
-	if float64(fc.cacheSize.Used()+additionalSpace) > (fc.diskHighWaterMark + 4096) {
+	if currSize+float64(additionalSpace) > (fc.diskHighWaterMark + 4096) {
 		log.Err(
 			"FileCache::exceedsHardLimit : %s %s failed - cache size hard limit reached (%f MB)",
 			name,
@@ -1938,18 +1931,8 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 		return 0, syscall.EBADF
 	}
 
-	// how much will this write grow the file?
-	appending := options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend)
-	oldSize := int64(0)
-	if info, statErr := f.Stat(); statErr == nil {
-		oldSize = info.Size()
-	}
-	writeOffset := options.Offset
-	if appending {
-		writeOffset = oldSize
-	}
-	growth := writeOffset + int64(len(options.Data)) - oldSize
-	if fc.exceedsHardLimit(growth, options.Handle.Path, "WriteFile") {
+	newSize := options.Offset + int64(len(options.Data))
+	if fc.exceedsHardLimit(newSize, options.Handle.Path, "WriteFile") {
 		return 0, syscall.ENOSPC
 	}
 
@@ -1964,15 +1947,10 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
 
 	var bytesWritten int
-	if appending {
+	if options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend) {
 		bytesWritten, err = f.Write(options.Data)
 	} else {
 		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
-	}
-
-	// Concurrent writes that extend the same file can count the growth twice. Reconciliation corrects such drift.
-	if grown := writeOffset + int64(bytesWritten) - oldSize; grown > 0 {
-		fc.cacheSize.Add(grown)
 	}
 
 	if err == nil {
@@ -2353,10 +2331,11 @@ func (fc *FileCache) renameLocalFile(
 	localSrcPath := filepath.Join(fc.tmpPath, srcName)
 	localDstPath := filepath.Join(fc.tmpPath, dstName)
 
-	dstInfo, dstErr := os.Stat(localDstPath)
-	if runtime.GOOS == "windows" && dstErr == nil {
-		if !dstInfo.IsDir() && dstInfo.Mode().Perm()&0o200 == 0 {
-			fc.clearCacheFileReadOnly(localDstPath)
+	if runtime.GOOS == "windows" {
+		if dstInfo, dstErr := os.Stat(localDstPath); dstErr == nil {
+			if !dstInfo.IsDir() && dstInfo.Mode().Perm()&0o200 == 0 {
+				fc.clearCacheFileReadOnly(localDstPath)
+			}
 		}
 	}
 
@@ -2368,10 +2347,6 @@ func (fc *FileCache) renameLocalFile(
 			localSrcPath,
 			localDstPath,
 		)
-		// the rename replaced any cached copy of dst
-		if dstErr == nil && dstInfo.Mode().IsRegular() {
-			fc.cacheSize.Add(-dstInfo.Size())
-		}
 		fc.policy.CacheValid(localDstPath)
 
 	case isNotExist(err):
@@ -2454,8 +2429,7 @@ func (fc *FileCache) renameOpenHandles(
 func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.NewSize)
 
-	localGrowth := options.NewSize - cachedSize(filepath.Join(fc.tmpPath, options.Name))
-	if fc.exceedsHardLimit(localGrowth, options.Name, "TruncateFile") {
+	if fc.exceedsHardLimit(options.NewSize, options.Name, "TruncateFile") {
 		return syscall.ENOSPC
 	}
 
@@ -2500,12 +2474,12 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			return syscall.EBADF
 		}
 
-		info, statErr := f.Stat()
-		if statErr == nil && info.Size() == options.NewSize {
+		info, err := f.Stat()
+		if err == nil && info.Size() == options.NewSize {
 			return nil
 		}
 
-		err := f.Truncate(options.NewSize)
+		err = f.Truncate(options.NewSize)
 		if err != nil {
 			log.Err(
 				"FileCache::TruncateFile : error truncating file %s [%s]",
@@ -2513,9 +2487,6 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				err.Error(),
 			)
 			return err
-		}
-		if statErr == nil {
-			fc.cacheSize.Add(options.NewSize - info.Size())
 		}
 
 		fc.setHandleDirty(options.Handle)
@@ -2583,9 +2554,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 					err,
 				)
 				return err
-			}
-			fc.cacheSize.Add(options.NewSize - info.Size())
-			if offlineOkay {
+			} else if offlineOkay {
 				fc.addPendingOp(options.Name, pendingFlags{})
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 			}

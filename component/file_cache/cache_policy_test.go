@@ -34,7 +34,6 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/cache_size"
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
@@ -99,40 +98,24 @@ func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	_, err := f.Write(data)
 	suite.assert.NoError(err)
-	cacheSize := cache_size.NewTracker(0, cache_path)
-	suite.assert.NoError(cacheSize.Refresh())
-	result := getUsagePercentage(cacheSize, 4)
+	result := getUsagePercentage(cache_path, 4)
 	// since the value might defer a little distro to distro
 	suite.assert.GreaterOrEqual(result, float64(24))
 	suite.assert.LessOrEqual(result, float64(30))
 	f.Close()
 
-	result = getUsagePercentage(cacheSize, 0)
-	suite.assert.Zero(result)
+	result = getUsagePercentage("/", 0)
+	// since the value might defer a little distro to distro
+	suite.assert.GreaterOrEqual(result, float64(0))
+	suite.assert.LessOrEqual(result, float64(90))
 }
 
 func (suite *cachePolicyTestSuite) TestDeleteFile() {
 	defer suite.cleanupTest()
 	f, _ := os.Create(cache_path + "/test")
-	result := deleteFile(f.Name()+"not_exist", nil)
+	result := deleteFile(f.Name() + "not_exist")
 	suite.assert.NoError(result)
 	f.Close()
-}
-
-func (suite *cachePolicyTestSuite) TestDeleteFileUpdatesCacheSize() {
-	defer suite.cleanupTest()
-	name := filepath.Join(cache_path, "test")
-	suite.assert.NoError(os.WriteFile(name, make([]byte, 1000), 0644))
-	cacheSize := cache_size.NewTracker(0, cache_path)
-	cacheSize.Add(1500)
-
-	suite.assert.NoError(deleteFile(name, cacheSize))
-	suite.assert.NoFileExists(name)
-	suite.assert.EqualValues(500, cacheSize.Used())
-
-	// deleting a missing file changes nothing
-	suite.assert.NoError(deleteFile(name, cacheSize))
-	suite.assert.EqualValues(500, cacheSize.Used())
 }
 
 func TestCachePolicyTestSuite(t *testing.T) {

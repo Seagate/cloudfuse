@@ -31,7 +31,6 @@ import (
 	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/cache_size"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 )
@@ -46,9 +45,6 @@ type cachePolicyConfig struct {
 	maxSizeMB     float64
 	highThreshold float64
 	lowThreshold  float64
-
-	// cacheSize tracks the bytes used under tmpPath. It is shared with FileCache.
-	cacheSize *cache_size.Tracker
 
 	fileLocks  *common.LockMap // uses object name (common.JoinUnixFilepath)
 	pendingOps *sync.Map
@@ -71,7 +67,11 @@ type cachePolicy interface {
 }
 
 // getUsagePercentage:  The current cache usage as a percentage of the maxSize
-func getUsagePercentage(cacheSize *cache_size.Tracker, maxSizeMB float64) float64 {
+func getUsagePercentage(path string, maxSizeMB float64) float64 {
+	var curSize float64
+	var usagePercent float64
+	var err error
+
 	if maxSizeMB <= 0 {
 		// This should not happen as we validate config during startup. But log and return 0 to avoid division by zero
 		// Even if the user doesn't set max size, it will be set to the default value
@@ -80,8 +80,16 @@ func getUsagePercentage(cacheSize *cache_size.Tracker, maxSizeMB float64) float6
 	}
 
 	// We need to compute % usage of temp directory against configured limit
-	curSize := float64(cacheSize.Used())
-	usagePercent := (curSize / (maxSizeMB * float64(MB))) * 100
+	curSize, err = common.GetUsage(path)
+	if err != nil {
+		log.Err(
+			"cachePolicy::getUsagePercentage : failed to get directory usage for %s [%v]",
+			path,
+			err,
+		)
+	}
+
+	usagePercent = (curSize / (maxSizeMB * float64(MB))) * 100
 
 	log.Debug("cachePolicy::getUsagePercentage : current cache usage : %f%%", usagePercent)
 
@@ -99,11 +107,10 @@ func getUsagePercentage(cacheSize *cache_size.Tracker, maxSizeMB float64) float6
 	return usagePercent
 }
 
-// Delete a given file, and deduct its size from cacheSize (if not nil)
-func deleteFile(name string, cacheSize *cache_size.Tracker) error {
+// Delete a given file
+func deleteFile(name string) error {
 	log.Debug("cachePolicy::deleteFile : attempting to delete %s", name)
 
-	info, statErr := os.Stat(name)
 	err := os.Remove(name)
 	if err != nil && os.IsPermission(err) {
 		// File is not having delete permissions so change the mode and retry deletion
@@ -124,11 +131,6 @@ func deleteFile(name string, cacheSize *cache_size.Tracker) error {
 	if err != nil {
 		log.Err("cachePolicy::DeleteItem : Failed to delete local file %s [%v]", name, err.Error())
 		return err
-	}
-
-	// directory sizes are not tracked incrementally (reconciliation covers them)
-	if cacheSize != nil && statErr == nil && info.Mode().IsRegular() {
-		cacheSize.Add(-info.Size())
 	}
 
 	return nil
