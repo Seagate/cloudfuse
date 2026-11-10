@@ -5,10 +5,10 @@ go 1.27
 toolchain go1.27.3
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.24.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.2
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.7.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.3
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.7.1
 	github.com/awnumar/memguard v0.23.0
 	github.com/aws/aws-sdk-go-v2 v1.47.4
 	github.com/aws/aws-sdk-go-v2/config v1.33.11
