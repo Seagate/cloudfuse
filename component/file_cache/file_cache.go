@@ -329,7 +329,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		}
 	}
 
-	avail, err := fc.getAvailableSize()
+	avail, _, err := common.GetAvailFree(fc.tmpPath)
 	if err != nil {
 		log.Err(
 			"FileCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.",
@@ -497,10 +497,10 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	available := maxCacheSize - usage
 
 	// how much space is available on the underlying file system?
-	availableOnCacheFS, err := fc.getAvailableSize()
+	availableOnCacheFS, _, err := common.GetAvailFree(fc.tmpPath)
 	if err != nil {
 		log.Err(
-			"FileCache::StatFs : Not responding to StatFs because getAvailableSize failed. Here's why: %v",
+			"FileCache::StatFs : Not responding to StatFs because GetAvailFree failed. Here's why: %v",
 			err,
 		)
 		return nil, false, err
@@ -779,7 +779,7 @@ func (fc *FileCache) StreamDir(
 			if err == nil {
 				// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 				log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
-				attrs = append(attrs, newObjAttr(entryPath, info))
+				attrs = append(attrs, internal.NewLocalObjAttr(entryPath, info))
 			}
 		}
 	}
@@ -2000,10 +2000,9 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		return nil
 	}
 
-	// flush the local file
-	err := fc.flushFileLocal(options.Handle)
-	if err != nil {
-		return err
+	if options.Handle.GetFileObject() == nil {
+		log.Err("FileCache::FlushFile : %s couldn't find fd in handle", options.Handle.Path)
+		return syscall.EBADF
 	}
 
 	// If lazy write is enabled, stop here
@@ -2022,31 +2021,6 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 	return fc.flushFileCloud(options)
-}
-
-// flush local file
-func (fc *FileCache) flushFileLocal(handle *handlemap.Handle) error {
-	//defer exectime.StatTimeCurrentBlock("FileCache::flushFileLocal")()
-	log.Trace("FileCache::flushFileLocal : %s handle=%d", handle.Path, handle.ID)
-
-	// ignore clean handles
-	if !handle.Dirty() {
-		return nil
-	}
-
-	// Flush all data to disk that has been buffered by the kernel.
-	f := handle.GetFileObject()
-	if f == nil {
-		log.Err("FileCache::flushFileLocal : %s couldn't find fd in handle", handle.Path)
-		return syscall.EBADF
-	}
-	err := fc.syncFile(f, handle.Path)
-	if err != nil {
-		log.Err("FileCache::flushFileLocal : %s sync failed [%v]", handle.Path, err)
-		return syscall.EIO
-	}
-
-	return nil
 }
 
 // file must be locked before calling this function
@@ -2185,7 +2159,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	if flock.Count() > 0 && flock.DirtyCount() > 0 {
 		if info, err := os.Stat(localPath); err == nil && !info.IsDir() {
 			flock.RUnlock()
-			return newObjAttr(options.Name, info), nil
+			return internal.NewLocalObjAttr(options.Name, info), nil
 		}
 	}
 
@@ -2232,7 +2206,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	if localErr == nil {
 		if !inCloud { // Case 2 (only in local cache)
 			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
-			attrs = newObjAttr(options.Name, info)
+			attrs = internal.NewLocalObjAttr(options.Name, info)
 		} else if !info.IsDir() { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// attrs is a pointer returned by NextComponent
 			// modifying attrs could corrupt cached directory listings

@@ -1191,7 +1191,7 @@ func TestTieredStorageDefaultMaxSize(t *testing.T) {
 	used := storage.diskUsage.Used()
 	assert.GreaterOrEqual(t, used, int64(fileSize))
 	assert.Less(t, used, int64(2*fileSize))
-	free, err := availableSize(root)
+	free, _, err := common.GetAvailFree(root)
 	require.NoError(t, err)
 	assert.InEpsilon(t, defaultMaxSizeRatio*float64(free+uint64(used)), storage.maxSize, 0.01)
 }
@@ -1332,6 +1332,39 @@ func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	assert.FileExists(t, localPath)
 	stale := storage.fileLocks.Get("file").CloudStale
 	assert.True(t, stale)
+}
+
+func TestEvictionUploadsLocalModeAndOwner(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	path := "local-metadata"
+	cachePath := t.TempDir()
+	localPath := filepath.Join(cachePath, localDirName, path)
+	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
+	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0600))
+	require.NoError(t, os.Chmod(localPath, 0640))
+
+	storage := &TieredStorage{
+		tmpPath:   cachePath,
+		fileLocks: common.NewLockMap(),
+		diskUsage: newDiskUsageTracker(cachePath, 0),
+	}
+	storage.SetNextComponent(next)
+	storage.fileLocks.Get(path).CloudStale = true
+
+	next.EXPECT().CopyFromFile(gomock.Any()).Return(nil)
+	// Windows files have no POSIX mode or owner, so none is uploaded there.
+	if runtime.GOOS != "windows" {
+		next.EXPECT().Chmod(internal.ChmodOptions{Name: path, Mode: 0640}).Return(nil)
+		next.EXPECT().Chown(internal.ChownOptions{
+			Name: path, Owner: os.Getuid(), Group: os.Getgid(),
+		}).Return(syscall.ENOTSUP)
+	}
+
+	require.NoError(t, storage.uploadandCleanFile(path))
+	assert.NoFileExists(t, localPath)
+	stale := storage.fileLocks.Get(path).CloudStale
+	assert.False(t, stale)
 }
 
 func TestGetAttrLocalMakesNoCloudCall(t *testing.T) {

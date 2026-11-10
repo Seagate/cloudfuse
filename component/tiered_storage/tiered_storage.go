@@ -218,7 +218,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
 	}
 	if conf.MaxSizeMB == 0 {
-		free, err := availableSize(c.tmpPath)
+		free, _, err := common.GetAvailFree(c.tmpPath)
 		if err != nil {
 			return fmt.Errorf("TieredStorage: failed to get free space for %s: %w", c.tmpPath, err)
 		}
@@ -302,7 +302,8 @@ func isOSManagedEntry(entry fs.DirEntry) bool {
 			return true
 		}
 	}
-	return isProtectedSystemEntry(entry)
+	info, err := entry.Info()
+	return err == nil && common.IsProtectedSystemFile(info)
 }
 
 // newDiskUsageTracker tracks the local/ and cache/ trees under path. Only the
@@ -434,7 +435,7 @@ func (c *TieredStorage) StreamDir(
 				continue
 			}
 			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
-			page = append(page, newTieredStorageObjAttr(entryName, info))
+			page = append(page, internal.NewLocalObjAttr(entryName, info))
 		}
 	}
 
@@ -1093,11 +1094,13 @@ func (c *TieredStorage) uploadLocal(name string) error {
 		return err
 	}
 
-	mode, owner, group, ok := uploadMetadata(info)
+	// Windows files carry no POSIX mode or owner, so applying them would
+	// overwrite the cloud object's metadata with defaults.
+	owner, group, ok := common.GetFileOwner(info)
 	if !ok {
 		return nil
 	}
-	err = c.NextComponent().Chmod(internal.ChmodOptions{Name: name, Mode: mode})
+	err = c.NextComponent().Chmod(internal.ChmodOptions{Name: name, Mode: info.Mode().Perm()})
 	if err != nil && !errors.Is(err, syscall.ENOTSUP) {
 		log.Err("TieredStorage::uploadLocal : %s chmod failed [%v]", name, err)
 		return err
@@ -1288,7 +1291,7 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	localPath := c.localPath(options.Name)
 	info, err := os.Stat(localPath)
 	if err == nil {
-		return newTieredStorageObjAttr(options.Name, info), nil
+		return internal.NewLocalObjAttr(options.Name, info), nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -1425,7 +1428,7 @@ func (c *TieredStorage) FileUsed(name string) error {
 func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 	const blockSize = 4096
 
-	physicalFree, err := availableSize(c.tmpPath)
+	physicalFree, _, err := common.GetAvailFree(c.tmpPath)
 	if err != nil {
 		return nil, false, err
 	}
