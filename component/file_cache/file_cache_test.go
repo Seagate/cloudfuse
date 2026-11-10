@@ -4718,7 +4718,9 @@ func (suite *fileCacheTestSuite) TestHardLimitAcrossFiles() {
 	suite.assert.NoError(err)
 	suite.assert.NoError(suite.fileCache.ReleaseFile(internal.ReleaseFileOptions{Handle: first}))
 
-	second, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: "second", Mode: 0777})
+	second, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: "second", Mode: 0777},
+	)
 	suite.assert.NoError(err)
 	_, err = suite.fileCache.WriteFile(
 		&internal.WriteFileOptions{Handle: second, Offset: 0, Data: make([]byte, MB)},
