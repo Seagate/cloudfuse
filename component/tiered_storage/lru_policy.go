@@ -110,8 +110,11 @@ func (q *lruQueue) StartPolicy() error {
 	}
 
 	q.stop = make(chan struct{})
+
+	// start eviction goroutines
 	q.wg.Go(q.watchCapacity)
 	q.wg.Go(q.watchCloses)
+
 	return nil
 }
 
@@ -210,15 +213,17 @@ func (q *lruQueue) evictDownTo(targetUsed int64) {
 // more uploads, but waits for those already running.
 func (q *lruQueue) evictAll(names []string, onClose bool) {
 	var wg sync.WaitGroup
+	// use the channel buffer to limit concurrent evictions
 	sem := make(chan struct{}, q.numWorkers)
 	for _, name := range names {
 		sem <- struct{}{}
+		// stop may have been called while we waited for a slot
 		if q.stopping() {
 			break
 		}
 		wg.Go(func() {
-			defer func() { <-sem }()
 			q.evict(name, onClose)
+			<-sem
 		})
 	}
 	wg.Wait()
