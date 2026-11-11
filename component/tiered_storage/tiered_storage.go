@@ -764,8 +764,6 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	localPath := c.localPath(options.Name)
-	cachePath := c.cachePath(options.Name)
 	if err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
@@ -779,7 +777,7 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	found := cloudErr == nil
 
 	// Open handles stay valid after the file is removed.
-	for _, path := range []string{localPath, cachePath} {
+	for _, path := range []string{c.localPath(options.Name), c.cachePath(options.Name)} {
 		err := c.removeFile(path)
 		if err == nil {
 			found = true
