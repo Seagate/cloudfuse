@@ -142,7 +142,7 @@ func (p *lruPolicy) StartPolicy() error {
 	p.validateChan = make(chan string, 10000)
 
 	// Seed the usage tracker. If this fails, tracking still works for changes made from now on.
-	if err = p.cacheSize.Refresh(); err != nil {
+	if err = p.cacheSize.Reconcile(); err != nil {
 		log.Err("lruPolicy::StartPolicy : failed to measure cache usage [%v]", err)
 	}
 	p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
@@ -430,7 +430,9 @@ func (p *lruPolicy) clearCache() {
 		case <-p.diskUsageMonitor:
 			// File cache timeout has not occurred so just monitor the cache usage
 			cleanupCount := 0
-			p.cacheSize.Reconcile()
+			if err := p.cacheSize.Reconcile(); err != nil {
+				log.Err("lruPolicy::ClearCache : failed to measure cache usage [%v]", err)
+			}
 			pUsage := getUsagePercentage(p.cacheSize, p.maxSizeMB)
 			if pUsage > p.highThreshold {
 				continueDeletion := true

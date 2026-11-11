@@ -214,7 +214,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		return err
 	}
 	c.diskUsage = newDiskUsageTracker(c.tmpPath, reconcileCapacityInterval)
-	if err := c.diskUsage.Refresh(); err != nil {
+	if err := c.diskUsage.Reconcile(); err != nil {
 		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
 	}
 	if conf.MaxSizeMB == 0 {

@@ -225,7 +225,7 @@ func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 		suite.Require().NoError(err)
 		suite.policy.Enqueue(name)
 	}
-	suite.Require().NoError(size.Refresh())
+	suite.Require().NoError(size.Reconcile())
 
 	suite.policy.evictDownTo(int64(suite.policy.maxSize * suite.policy.targetRatio))
 

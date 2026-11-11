@@ -55,12 +55,10 @@ type Tracker struct {
 	lastReconcile     atomic.Int64 // unix nanoseconds
 }
 
-// NewTracker tracks the combined size of paths. The total starts at zero; call
-// Refresh to seed it with a measurement.
+// NewTracker tracks the combined size of paths. The total starts at zero; the
+// first Reconcile seeds it with a measurement.
 func NewTracker(reconcileInterval time.Duration, paths ...string) *Tracker {
-	t := &Tracker{paths: paths, reconcileInterval: reconcileInterval}
-	t.lastReconcile.Store(time.Now().UnixNano())
-	return t
+	return &Tracker{paths: paths, reconcileInterval: reconcileInterval}
 }
 
 // Used returns the current cache usage in bytes.
@@ -73,10 +71,14 @@ func (t *Tracker) Add(delta int64) {
 	t.used.Add(delta)
 }
 
-// Refresh measures the tracked paths and replaces the running total.
+// Reconcile measures the tracked paths and replaces the running total, but no
+// more often than reconcileInterval.
 // Changes made during the measurement can be lost, which is inherent
 // to reconciling against a moving target.
-func (t *Tracker) Refresh() error {
+func (t *Tracker) Reconcile() error {
+	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
+		return nil
+	}
 	// record the time of this attempt; don't retry on failure.
 	t.lastReconcile.Store(time.Now().UnixNano())
 	// check the counter
@@ -95,7 +97,7 @@ func (t *Tracker) Refresh() error {
 	// log if the drift is significant
 	if drift := measured - beforeMeasurement; drift > driftWarnBytes || drift < -driftWarnBytes {
 		log.Info(
-			"Tracker::Refresh : corrected usage by %d bytes (was %d, now %d)",
+			"Tracker::Reconcile : corrected usage by %d bytes (was %d, now %d)",
 			drift,
 			beforeMeasurement,
 			measured,
@@ -105,20 +107,10 @@ func (t *Tracker) Refresh() error {
 	deltaDuringMeasurement := beforeSwap - beforeMeasurement
 	if deltaDuringMeasurement > driftWarnBytes {
 		log.Info(
-			"Tracker::Refresh : %d bytes were added during measurement. Re-adding...",
+			"Tracker::Reconcile : %d bytes were added during measurement. Re-adding...",
 			deltaDuringMeasurement,
 		)
 		t.used.Add(deltaDuringMeasurement)
 	}
 	return nil
-}
-
-// Reconcile refreshes the running total, but no more often than reconcileInterval.
-func (t *Tracker) Reconcile() {
-	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
-		return
-	}
-	if err := t.Refresh(); err != nil {
-		log.Err("Tracker::Reconcile : %v", err)
-	}
 }

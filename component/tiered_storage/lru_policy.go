@@ -146,7 +146,9 @@ func (q *lruQueue) watchCapacity() {
 		case <-q.stop:
 			return
 		case <-ticker.C:
-			q.size.Reconcile()
+			if err := q.size.Reconcile(); err != nil {
+				log.Err("lruQueue::watchCapacity : failed to measure disk usage [%v]", err)
+			}
 			if float64(q.size.Used()) > q.maxSize*q.threshold {
 				q.evictDownTo(int64(q.maxSize * q.targetRatio))
 			}
