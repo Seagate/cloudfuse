@@ -1434,11 +1434,11 @@ func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	available := max(int64(c.maxSize)-c.diskUsage.Used(), 0)
+	available := min(uint64(max(int64(c.maxSize)-c.diskUsage.Used(), 0)), physicalFree)
 	stat := &common.Statfs_t{
 		Blocks:  uint64(c.maxSize) / blockSize,
-		Bavail:  uint64(available) / blockSize,
-		Bfree:   physicalFree / blockSize,
+		Bavail:  available / blockSize,
+		Bfree:   available / blockSize,
 		Bsize:   blockSize,
 		Frsize:  blockSize,
 		Files:   1e9,

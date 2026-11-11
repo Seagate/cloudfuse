@@ -1882,7 +1882,8 @@ func (suite *tieredStorageTestSuite) TestStatFs() {
 		0,
 	)
 	suite.assert.Equal(uint64(expectedAvailable)/4096, stat.Bavail)
-	suite.assert.Positive(stat.Bfree)
+	suite.assert.Equal(stat.Bavail, stat.Bfree)
+	suite.assert.LessOrEqual(stat.Bfree, stat.Blocks)
 }
 
 func (suite *tieredStorageTestSuite) TestSymlink() {
