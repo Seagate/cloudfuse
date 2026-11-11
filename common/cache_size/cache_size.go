@@ -74,7 +74,7 @@ func (t *Tracker) Add(delta int64) {
 }
 
 // Refresh measures the tracked paths and replaces the running total.
-// Changes made while the measurement is in flight are lost, which is inherent
+// Changes made during the measurement can be lost, which is inherent
 // to reconciling against a moving target.
 func (t *Tracker) Refresh() error {
 	// record the time of this attempt; don't retry on failure.
