@@ -1378,18 +1378,24 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 		return syscall.EINVAL
 	}
 	if options.Handle == nil {
+		flags := os.O_RDWR
+		if options.NewSize == 0 {
+			flags |= os.O_TRUNC
+		}
 		handle, err := c.OpenFile(internal.OpenFileOptions{
 			Name:  options.Name,
-			Flags: os.O_RDWR,
+			Flags: flags,
 			Mode:  common.DefaultFilePermissionBits,
 		})
 		if err != nil {
 			return err
 		}
-		options.Handle = handle
-		if err := c.TruncateFile(options); err != nil {
-			_ = c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
-			return err
+		if options.NewSize != 0 {
+			options.Handle = handle
+			if err := c.TruncateFile(options); err != nil {
+				_ = c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+				return err
+			}
 		}
 		return c.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
 	}
