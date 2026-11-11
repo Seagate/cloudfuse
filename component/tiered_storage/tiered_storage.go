@@ -1175,13 +1175,16 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		log.Err("TieredStorage::RenameFile : %s cache stat failed [%v]", options.Src, srcCacheErr)
 		return srcCacheErr
 	}
+
+	// local
 	if from != "" {
-		log.Debug("TieredStorage::RenameFile : %s -> %s cloud only", options.Src, options.Dst)
 		if err := os.MkdirAll(filepath.Dir(to), dirPerm); err != nil {
+			log.Err("TieredStorage::RenameFile : failed to create directory for %s [%v]", to, err)
 			return err
 		}
 		replaced, replacedErr := os.Stat(to)
 		if err := os.Rename(from, to); err != nil {
+			log.Err("TieredStorage::RenameFile : failed to rename %s -> %s [%v]", from, to, err)
 			return err
 		}
 		// The rename overwrote dst's copy in this tree, even if later reverted.
@@ -1190,6 +1193,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		}
 	}
 
+	// cloud
 	cloudErr := c.NextComponent().RenameFile(options)
 	neverUploaded := from == srcLocal && errors.Is(cloudErr, os.ErrNotExist)
 	if neverUploaded {
