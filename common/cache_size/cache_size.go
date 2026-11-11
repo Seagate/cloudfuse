@@ -68,25 +68,16 @@ func (t *Tracker) Used() int64 {
 	return t.used.Load()
 }
 
-// Add applies a signed change in bytes. The total is clamped at zero: drift
-// could otherwise drive it negative and hide a full cache.
+// Add applies a signed change in bytes.
 func (t *Tracker) Add(delta int64) {
-	if delta == 0 {
-		return
-	}
-	for {
-		current := t.used.Load()
-		next := max(current+delta, 0)
-		if t.used.CompareAndSwap(current, next) {
-			return
-		}
-	}
+	t.used.Add(delta)
 }
 
 // Refresh measures the tracked paths and replaces the running total.
 // Changes made while the measurement is in flight are lost, which is inherent
-// to reconciling against a moving target and is why it is not the hot path.
+// to reconciling against a moving target.
 func (t *Tracker) Refresh() error {
+	// record the time of this attempt; don't retry on failure.
 	t.lastReconcile.Store(time.Now().UnixNano())
 
 	var measured int64
