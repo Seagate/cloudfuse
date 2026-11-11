@@ -1149,28 +1149,34 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	if err := c.checkCloudReachable(options.Src); err != nil {
 		return err
 	}
-	if info, err := os.Stat(dstLocal); err == nil && info.IsDir() {
+	dstInfo, dstLocalErr := os.Stat(dstLocal)
+	if dstLocalErr == nil && dstInfo.IsDir() {
 		return syscall.EISDIR
 	}
 
 	// Rename whichever local copy src has, before the harder-to-undo cloud rename.
+	_, srcLocalErr := os.Stat(srcLocal)
+	_, srcCacheErr := os.Stat(srcCache)
 	from, to := "", ""
-	if _, err := os.Stat(srcLocal); err == nil {
+	switch {
+	case srcLocalErr == nil:
+		log.Debug("TieredStorage::RenameFile : %s -> %s src is local", options.Src, options.Dst)
 		from, to = srcLocal, dstLocal
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	} else if _, err := os.Stat(srcCache); err == nil {
+	case !errors.Is(srcLocalErr, os.ErrNotExist):
+		log.Err("TieredStorage::RenameFile : %s local stat failed [%v]", options.Src, srcLocalErr)
+		return srcLocalErr
+	case srcCacheErr == nil && dstLocalErr == nil:
+		log.Debug("TieredStorage::RenameFile : %s -> %s cache -> local", options.Src, options.Dst)
+		from, to = srcCache, dstLocal
+	case srcCacheErr == nil:
+		log.Debug("TieredStorage::RenameFile : %s -> %s cache -> cache", options.Src, options.Dst)
 		from, to = srcCache, dstCache
-		// Replace an authoritative local/dst atomically, rather than leaving it
-		// for cleanup. The copy then becomes local-owned; at worst that costs
-		// a redundant upload.
-		if _, err := os.Stat(dstLocal); err == nil {
-			to = dstLocal
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
+	case !errors.Is(srcCacheErr, os.ErrNotExist):
+		log.Err("TieredStorage::RenameFile : %s cache stat failed [%v]", options.Src, srcCacheErr)
+		return srcCacheErr
 	}
 	if from != "" {
+		log.Debug("TieredStorage::RenameFile : %s -> %s cloud only", options.Src, options.Dst)
 		if err := os.MkdirAll(filepath.Dir(to), dirPerm); err != nil {
 			return err
 		}
