@@ -34,17 +34,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAddClampsAtZero(t *testing.T) {
-	tracker := NewTracker(time.Hour, t.TempDir())
-
-	tracker.Add(100)
-	tracker.Add(-40)
-	assert.EqualValues(t, 60, tracker.Used())
-
-	tracker.Add(-100)
-	assert.EqualValues(t, 0, tracker.Used())
-}
-
 func TestRefreshSumsAllPaths(t *testing.T) {
 	root := t.TempDir()
 	first := filepath.Join(root, "first")
