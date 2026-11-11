@@ -76,6 +76,7 @@ func (t *Tracker) Add(delta int64) {
 // Changes made during the measurement can be lost, which is inherent
 // to reconciling against a moving target.
 func (t *Tracker) Reconcile() error {
+	// respect the interval
 	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
 		return nil
 	}
@@ -112,5 +113,6 @@ func (t *Tracker) Reconcile() error {
 		)
 		t.used.Add(deltaDuringMeasurement)
 	}
+
 	return nil
 }
