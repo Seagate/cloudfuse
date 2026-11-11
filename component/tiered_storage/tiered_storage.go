@@ -1186,18 +1186,21 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 
 	cloudErr := c.NextComponent().RenameFile(options)
 	neverUploaded := from == srcLocal && errors.Is(cloudErr, os.ErrNotExist)
-	if cloudErr != nil && !neverUploaded {
-		if from != "" {
-			if err := os.Rename(to, from); err != nil {
-				log.Err(
-					"TieredStorage::RenameFile : %s -> %s failed in cloud, and reverting %s -> %s failed; local and cloud have diverged [%v]",
-					options.Src,
-					options.Dst,
-					to,
-					from,
-					err,
-				)
-			}
+	if neverUploaded {
+		// don't leave a dangling object at dst in the cloud
+		_ = c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Dst})
+	} else if cloudErr != nil && from != "" {
+		// revert local rename if cloud rename failed
+		if err := os.Rename(to, from); err != nil {
+			// complain loudly if names diverge
+			log.Err(
+				"TieredStorage::RenameFile : %s -> %s failed in cloud, and revert %s -> %s failed; local and cloud have diverged! [%v]",
+				options.Src,
+				options.Dst,
+				to,
+				from,
+				err,
+			)
 		}
 		return cloudErr
 	}

@@ -2499,6 +2499,33 @@ func (suite *tieredStorageTestSuite) TestRenameFileNeverUploadedSucceeds() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, "dst"))
 }
 
+func (suite *tieredStorageTestSuite) TestRenameFileLocalReplacesCloudDst() {
+	defer suite.cleanupTest()
+
+	// dst is cloud-only; src is local-only and has never been uploaded.
+	suite.writeCloudFile("dst", "old cloud dst")
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Data: []byte("local src")},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+
+	suite.Require().NoError(
+		suite.tieredStorage.RenameFile(internal.RenameFileOptions{Src: "src", Dst: "dst"}),
+	)
+	// The replaced cloud object must not linger behind local/dst.
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, "dst"))
+	data, err := os.ReadFile(suite.localFile("dst"))
+	suite.Require().NoError(err)
+	suite.assert.Equal("local src", string(data))
+}
+
 func (suite *tieredStorageTestSuite) TestRenameFileReplacesCopyInOtherTree() {
 	defer suite.cleanupTest()
 
