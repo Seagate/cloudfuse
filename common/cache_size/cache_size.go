@@ -79,7 +79,9 @@ func (t *Tracker) Add(delta int64) {
 func (t *Tracker) Refresh() error {
 	// record the time of this attempt; don't retry on failure.
 	t.lastReconcile.Store(time.Now().UnixNano())
-
+	// check the counter
+	beforeMeasurement := t.used.Load()
+	// measure
 	var measured int64
 	for _, path := range t.paths {
 		usage, err := common.GetUsage(path)
@@ -88,15 +90,25 @@ func (t *Tracker) Refresh() error {
 		}
 		measured += int64(usage)
 	}
-
-	previous := t.used.Swap(measured)
-	if drift := measured - previous; drift > driftWarnBytes || drift < -driftWarnBytes {
+	// swap the measured value in, and note the intermediate delta
+	beforeSwap := t.used.Swap(measured)
+	// log if the drift is significant
+	if drift := measured - beforeMeasurement; drift > driftWarnBytes || drift < -driftWarnBytes {
 		log.Info(
 			"Tracker::Refresh : corrected usage by %d bytes (was %d, now %d)",
 			drift,
-			previous,
+			beforeMeasurement,
 			measured,
 		)
+	}
+	// did a lot of data get added during measurement?
+	deltaDuringMeasurement := beforeSwap - beforeMeasurement
+	if deltaDuringMeasurement > driftWarnBytes {
+		log.Info(
+			"Tracker::Refresh : %d bytes were added during measurement. Re-adding...",
+			deltaDuringMeasurement,
+		)
+		t.used.Add(deltaDuringMeasurement)
 	}
 	return nil
 }
