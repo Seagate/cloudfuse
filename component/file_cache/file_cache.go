@@ -1987,12 +1987,13 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
-	err := fc.NextComponent().SyncFile(options)
-	if err == nil {
-		err = fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true})
+	if f := options.Handle.GetFileObject(); f != nil && options.Handle.Dirty() {
+		if err := f.Sync(); err != nil {
+			log.Err("FileCache::SyncFile : %s local sync failed [%v]", options.Handle.Path, err)
+			return syscall.EIO
+		}
 	}
-
-	return err
+	return fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true})
 }
 
 // in SyncDir we're not going to clear the file cache for now
