@@ -245,13 +245,19 @@ This comes from the host layer, not from cgofuse or `CgofuseFS`.
 | Host | Mechanism | Effect for cloudfuse |
 |---|---|---|
 | Linux, libfuse high-level API | libfuse keeps a lock per in-memory path node. `Rename`, `Unlink`, and `Rmdir` write-lock the node they change; `Rename` also write-locks an existing destination node. Every other callback read-locks its target node and each ancestor. A callback that meets a write-locked node is queued until it is released, and a writer waits for readers already in progress. | While `Rename` of a directory runs, nothing can create, open, look up, or change a path beneath the source or destination. Callbacks on open handles beneath it (`Read`, `Write`, `Flush`, `Release`) also wait, because cgofuse does not enable `nullpath_ok`, so libfuse resolves and locks a path for handle operations too. Parent directories are only read-locked, so listing a parent can overlap the rename. |
-| Windows, WinFSP | The volume has a rename resource. A rename acquires it exclusively; every create or open acquires it shared. | While `Rename` runs, no file can be created or opened anywhere on the volume. This resource does not cover reads and writes on handles that are already open. |
+| Windows, WinFSP | The volume has a rename resource. A rename acquires it exclusively; every create or open acquires it shared. WinFSP also refuses to rename a directory while anything beneath it has an open handle, unless it is a POSIX rename and every opener shares delete. | While `Rename` runs, no file can be created or opened anywhere on the volume. This resource does not cover reads and writes on handles that are already open. |
 
 Consequences:
 
 - A storage component may list the contents of a directory inside `RenameDir`
   and rely on no new name appearing beneath it before the callback returns.
   `tiered_storage` relies on this instead of holding its own lock.
+- On Windows, NTFS refuses to rename a directory with open files beneath it.
+  A component backed by local files holds a backing handle for each open file
+  on the mount, so its backing rename fails while those files are open. This
+  covers I/O on open handles that WinFSP's rename resource does not.
+  Short-lived handles cloudfuse opens itself (for example, while listing or
+  measuring a directory) can make that rename fail spuriously.
 - The guarantee depends on configuration. Switching to libfuse's low-level
   API, or enabling `nullpath_ok`, removes it on Linux. A component that relies
   on it must then provide its own lock.
@@ -533,6 +539,8 @@ When changing a filesystem operation, check:
 - [libfuse high-level operations](https://libfuse.github.io/doxygen/structfuse__operations.html)
 - [libfuse high-level implementation, including path locking and hidden files](https://github.com/libfuse/libfuse/blob/master/lib/fuse.c)
 - [WinFSP rename locking: create](https://github.com/winfsp/winfsp/blob/master/src/sys/create.c) and [set-information](https://github.com/winfsp/winfsp/blob/master/src/sys/fileinfo.c)
+- [WinFSP open-descendant rename check (`FspFileNodeRenameCheck`)](https://github.com/winfsp/winfsp/blob/master/src/sys/file.c)
+- [Windows rules for renaming open files](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
 - [Linux `rename(2)`](https://man7.org/linux/man-pages/man2/rename.2.html)
 - [Linux `unlink(2)`](https://man7.org/linux/man-pages/man2/unlink.2.html)
 - [WinFSP native API and FUSE comparison](https://github.com/winfsp/winfsp/wiki/Native-API-vs-FUSE)
