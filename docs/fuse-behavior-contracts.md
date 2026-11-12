@@ -1,537 +1,269 @@
 # FUSE request behavior in cloudfuse
 
-This document describes the request patterns cloudfuse can expect from its FUSE
-hosts and the requirements those patterns place on the implementation. It is
-intended as a reference for design, debugging, and code review.
+This document describes the callback patterns cloudfuse can expect from its
+FUSE hosts and what those patterns require of the implementation. It is a
+reference for design, debugging, and code review.
 
-The current stack is:
+On Linux, requests come from the kernel FUSE driver through libfuse; on
+Windows, they come from WinFSP's FUSE layer. In both cases cgofuse adapts them
+to the same `CgofuseFS` callbacks, so this document is written in terms of the
+[cgofuse interface](https://github.com/winfsp/cgofuse/blob/v1.6.0/fuse/fsop.go).
 
-- Linux: the Linux VFS and FUSE kernel driver, with cgofuse adapting requests to
-  `CgofuseFS`
-- Windows: WinFSP's FUSE compatibility layer, with cgofuse adapting requests to
-  the same `CgofuseFS` interface
-- cloudfuse: the component named `libfuse` (implemented with cgofuse), handle
-  map, optional attribute cache, and storage components
+## Request lifecycle
 
-The relevant contract is therefore the high-level callback interface exposed by
-cgofuse. Lower-level FUSE protocol details are omitted unless they explain an
-observable callback pattern.
+| Area | Expectation | Requirement for cloudfuse |
+|---|---|---|
+| File handles | `Open` or `Create` returns a handle that later reads, writes, flushes, and release use. | Keep any state needed after a rename or unlink on the handle. |
+| Final close | Exactly one `Release` follows each successful `Open` or `Create`. | Attempt backend close, then remove local handle state regardless of the result. |
+| Directory handles | Exactly one `Releasedir` follows each successful `Opendir`. | Listing state may live on the directory handle. |
+| Metadata | `Getattr` is common but need not precede any other callback. | No operation may rely on a recent `Getattr`. |
+| Concurrency | Callbacks may overlap, including on the same path. | Protect shared state explicitly; callback order is not a lock. |
+| Forced shutdown | A killed process or forced unmount may skip `Release`, `Releasedir`, and `Destroy`. | Correctness must not depend on those callbacks running. |
 
-## Reading the tables
+### Typical traces
 
-The expectation column uses four terms:
-
-- **Always**: required by the current host contract during a normal mounted
-  session.
-- **Usually**: expected in ordinary application workloads, but caching, flags,
-  or a different syscall sequence can change it.
-- **May**: valid behavior that handlers must tolerate.
-- **Never**: excluded by the current contract during a normal session. Forced
-  unmount, process termination, and host failure are called out separately.
-
-The provider column identifies where the behavior comes from. If that layer is
-replaced or reconfigured, the expectation must be checked again.
-
-## Request lifecycle at a glance
-
-| Area | Expectation | Provider | Requirement for cloudfuse |
-|---|---|---|---|
-| Initialization | `Init` runs before normal filesystem callbacks. | cgofuse host | Global callback state may be initialized there. |
-| Clean shutdown | `Destroy` runs after request processing has stopped. | cgofuse host | It may release process-wide resources, but must not be the only cleanup path. |
-| Forced shutdown | `Destroy`, `Release`, and `Releasedir` may be absent. | OS and host failure behavior | Correctness must not depend on callbacks after process termination or forced unmount. |
-| Successful file open | `Open` or `Create` returns one handle. Reads, writes, flushes, and release for that opening use that handle. | cgofuse high-level interface | Store all state needed after namespace changes on the handle. |
-| Final file close | One `Release` follows each successful `Open` or `Create` in a normal session. | libfuse on Linux; WinFSP close mapping on Windows; exposed by cgofuse | Attempt backend close, then remove local handle state regardless of the backend result. |
-| Successful directory open | One `Releasedir` follows each successful `Opendir` in a normal session. | libfuse/WinFSP through cgofuse | Directory listing state may be scoped to the directory handle and freed in `Releasedir`. |
-| Path metadata | `Getattr` is common during path resolution, but need not immediately precede another callback. | VFS/WinFSP caches and cgofuse | No operation may require a recent `Getattr` callback for correctness. |
-| Concurrency | Callbacks for different operations, and sometimes the same path, may overlap. | Multithreaded host loop | Protect shared state explicitly; callback order is not a lock. |
-
-### Typical traces, not callback contracts
-
-The following sequences are useful when reading logs, but each can be shortened,
-repeated, or interleaved with another operation:
+These are useful when reading logs, but any of them can be shortened, repeated,
+or interleaved with other operations.
 
 | Application activity | Typical callbacks | Common variations |
 |---|---|---|
-| Inspect a path | `Getattr` | No callback on a cache hit; repeated `Getattr` after expiration or during Windows metadata queries |
-| Open and read a file | `Getattr`, `Open`, one or more `Read`, `Flush`, `Release` | `Getattr` may be absent; reads may be served by the kernel cache; `Flush` may be absent or repeated |
-| Create, write, and close a file | `Create`, one or more `Write`, `Flush`, `Release` | Writes may be split, combined, or delayed; `Fsync` appears only when requested by the application |
-| List a directory | `Opendir`, one or more `Readdir`, `Releasedir` | Enumeration may restart at offset zero; attributes returned by readdir-plus may avoid per-entry `Getattr` |
-| Rename a path | Metadata queries followed by `Rename` | Cached metadata can remove the queries; a no-op rename may be resolved before `Rename` reaches cloudfuse |
-| Remove an open file | `Unlink`, continued handle operations, then `Release` | The interval can be long; Windows behavior depends on WinFSP POSIX unlink support |
+| Inspect a path | `Getattr` | Skipped on a cache hit; repeated on Windows |
+| Read a file | `Getattr`, `Open`, `Read`…, `Flush`, `Release` | Reads may be served from the kernel cache; `Flush` may be absent or repeated |
+| Write a file | `Create`, `Write`…, `Flush`, `Release` | Writes may be split or combined; `Fsync` only if the application asks |
+| List a directory | `Opendir`, `Readdir`…, `Releasedir` | Enumeration may restart at offset zero |
+| Rename | `Getattr`…, `Rename` | Some no-op renames never reach cloudfuse |
+| Remove an open file | `Unlink` (or `Rename`, see [below](#unlink-while-open)), more handle I/O, `Release` | The file may stay open for a long time |
 
-### What should not happen in a normal session
+## Metadata and caching
 
-Subject to a correctly functioning host and a mount that is not forcibly
-terminated:
+`Getattr` is a query, not a prerequisite or a synchronization point. The host
+may skip it on a cache hit, reject a path from its negative cache, or get
+attributes from readdir-plus (which cloudfuse enables). `Open`, `Rename`,
+`Unlink`, and similar operations must validate what they need themselves.
+When a callback has a valid file handle, prefer the handle over the path.
 
-- `Release` is not issued more than once for one successful `Open` or `Create`.
-- `Releasedir` is not issued more than once for one successful `Opendir`.
-- A Linux application does not receive an error returned by final `Release`.
-- `Flush` does not establish that the handle has no remaining references.
-- After POSIX unlink succeeds, the removed name does not continue to identify
-  the unlinked object, although another object may subsequently be created at
-  the same name.
+Metadata is cached in two places that act as one policy:
 
-## Metadata and path resolution
+1. the host cache (`attribute-expiration-sec`, `entry-expiration-sec`,
+   `negative-entry-expiration-sec`), and
+2. the optional `attr_cache` component (`attr_cache.timeout-sec`).
 
-### What usually happens
+The staleness of changes made outside cloudfuse is roughly the longer of the
+two. A shorter host timeout just adds callbacks that return the same cached
+data, so keep the two close together. A long negative-entry timeout delays
+visibility of files created by other clients. Direct I/O zeroes the host
+timeouts but not `attr_cache`, so it does not guarantee fresh metadata on its
+own.
 
-Applications perform many operations that require the host to resolve a path or
-inspect its type, permissions, size, or timestamps. This commonly produces
-`Getattr` calls near `Open`, `Rename`, directory traversal, and existence
-checks. Windows tends to request more metadata than Linux because file opening,
-security checks, and directory enumeration need Windows file information.
+Long timeouts are fine when cloudfuse is the only writer. Workloads that need
+to see external changes promptly should use short, aligned timeouts.
 
-These calls are frequent enough to matter for performance, but their exact
-placement is not part of the cloudfuse contract.
+## Reads and writes
 
-### What may happen
-
-- A cached positive entry may let the host proceed without calling `Getattr`.
-- A cached negative entry may reject a path without calling cloudfuse again.
-- A file-handle operation may proceed using state established by `Open` or
-  `Create`.
-- `Readdir` with attributes can avoid a separate `Getattr` for each entry.
-  cloudfuse enables cgofuse's readdir-plus capability.
-- An expired kernel entry can cause another `Getattr`, while the pipeline
-  attribute cache still returns its cached value.
-
-### What cloudfuse must provide
-
-`Getattr` is a query, not a prerequisite or synchronization point. `Open`,
-`Rename`, `Unlink`, and other operations must validate the state they actually
-need or rely on an atomic backend operation. They must not assume that a
-previous `Getattr` result is current.
-
-When a callback includes a valid file handle, handle state is generally a
-better identity than the path. The path may have been renamed or unlinked since
-the handle was opened.
-
-## Metadata cache layers
-
-Metadata can be cached in two places:
-
-1. The host cache, controlled by `attribute-expiration-sec`,
-   `entry-expiration-sec`, and `negative-entry-expiration-sec`.
-2. The optional cloudfuse `attr_cache` component, controlled by
-   `attr_cache.timeout-sec` and whether attributes are cached during listing.
-
-These timeouts form one effective cache policy:
-
-- If a host timeout is shorter than the pipeline attribute-cache timeout, the
-  host calls cloudfuse again but may receive the same cached metadata. This adds
-  callback and pipeline overhead without improving freshness.
-- If a host timeout is longer than the pipeline attribute-cache timeout, the
-  host may continue using metadata after the pipeline entry would have expired.
-  The shorter pipeline timeout does not help until the host asks again.
-- Consequently, the observable staleness for changes made outside cloudfuse is
-  approximately the longest cache interval that can answer the request.
-
-For a predictable configuration, keep corresponding host and pipeline timeouts
-close to one another. A host timeout at least as long as the pipeline timeout
-avoids revalidation that cannot produce fresher data; equal values make the
-freshness and performance tradeoff easiest to explain.
-
-Negative caching deserves separate attention. A long
-`negative-entry-expiration-sec` delays the visibility of files created by
-another client, even if positive attribute caching is short.
-
-When direct I/O is enabled, cloudfuse sets the host attribute, entry, and
-negative-entry timeouts to zero. A nonzero `attr_cache.timeout-sec` can still
-return cached metadata, so direct I/O alone does not imply fresh metadata.
-
-### Recommended operating boundary
-
-Long metadata timeouts are appropriate when cloudfuse is the only writer, or
-when applications accept delayed visibility of external changes. Workloads
-that require prompt visibility of changes made through another client should
-use short, aligned host and pipeline timeouts. This is a configuration boundary
-rather than a case every filesystem operation can repair locally.
-
-## Open, create, read, and write
-
-| Behavior | Expectation | Provider | Notes |
-|---|---|---|---|
-| `Create` returns an opened handle | Always after successful `Create`. | cgofuse interface | The handle participates in the same lifecycle as one returned by `Open`. |
-| Reads and writes use a successful handle | Always with the current implementation. | cgofuse and cloudfuse | Missing handles are internal errors or stale requests and return `EBADF`. |
-| Read size equals the requested size | Usually, except at EOF or on error. | FUSE read contract | With buffered I/O, the kernel may fill or cache data around application requests. |
-| Write size equals the requested size | Usually on success. | FUSE write contract | Short writes must be reported accurately; success must not claim bytes that were not accepted. |
-| A write is followed by `Flush` | Often, but not always. | Application close sequence and host | Persistence and cleanup cannot depend on it. |
-| A write is followed by `Fsync` | Only when the application requests synchronization. | Application | Applications that do not call `fsync` have not requested a durability boundary. |
-
-With writeback caching, Linux may issue reads on a handle originally opened
-write-only and may transform write patterns. Handlers should use the callback
-arguments and handle state rather than reconstructing the application's
-original syscall sequence.
+- Reads and writes always arrive with a handle; an unknown handle returns
+  `EBADF`.
+- A successful write must report exactly the bytes accepted.
+- `Flush` often follows a write, but not always. `Fsync` appears only when the
+  application requests it.
+- With writeback caching, Linux may read from a write-only handle and reshape
+  writes. Use the callback arguments, not assumptions about the original
+  syscalls.
 
 ## Flush, fsync, and release
 
-These callbacks have distinct purposes.
+**`Flush`** runs when a file descriptor closes, not when the handle ends. `dup`
+and `fork` can cause several flushes per open, and some closes cause none. It
+must be safe to repeat, may report pending write errors, and must not free the
+handle or be the only path that persists data.
 
-### `Flush`
+**`Fsync`** is the explicit durability request. If a backend cannot provide it,
+document the limitation rather than approximating it.
 
-`Flush` is associated with closing a file descriptor, not with the lifetime of
-the underlying open handle. Duplicating a descriptor with `dup`, inheriting it
-across `fork`, or host-specific close handling can produce multiple `Flush`
-calls for one opening. Some paths produce no `Flush`.
-
-Therefore:
-
-- `Flush` must be safe to call more than once.
-- `Flush` may report pending write errors.
-- `Flush` must not free the handle.
-- `Flush` must not be the only path that uploads or preserves required state.
-- A `Flush` failure does not cancel the later `Release`.
-
-### `Fsync`
-
-`Fsync` is the explicit durability request. A nonzero `datasync` value allows
-the implementation to synchronize file data without all metadata. If cloudfuse
-cannot provide the requested durability through the configured backend, that
-limitation should be documented rather than approximated with close behavior.
-
-### `Release`
-
-`Release` ends the open-handle lifetime. During a normal mount, it occurs once
-for each successful `Open` or `Create`.
-
-Linux does not return a `Release` error to the `close` or `munmap` operation
-that caused the final release. On Windows, WinFSP's close path similarly uses
-release for final FUSE-handle disposal. A failed backend release therefore does
-not create another opportunity to release the same local handle.
-
-The handler must:
-
-1. find and detach the handle from the handle map;
-2. attempt backend release and log or return its error as appropriate;
-3. clean local resources and accounting regardless of that error.
-
-This is a cloudfuse requirement, not merely a common request pattern.
+**`Release`** ends the handle and happens once per open. Neither Linux nor
+WinFSP delivers a `Release` error to the application, and there is no retry. So
+the handler must detach the handle, attempt the backend release, and clean up
+local state regardless of the outcome.
 
 ## Rename
 
-### Application-visible requirements
+POSIX rename replaces the destination atomically, removes the old name, treats a
+rename onto itself as a no-op, and leaves open handles pointing at the renamed
+object. cloudfuse handles identical paths as a no-op itself so that it does not
+depend on the host filtering them out.
 
-POSIX rename has several important properties:
+A preceding `Getattr` does not make the rename atomic. Atomicity must come from
+the storage component or a cloudfuse transaction.
 
-- replacing an existing destination is atomic;
-- after success, the old name is gone and the new name identifies the object;
-- renaming a path to the same object succeeds without changing it;
-- open handles continue to refer to the opened object across a rename.
-
-The Linux VFS may resolve some no-op cases without sending a `Rename` callback.
-The Windows path through WinFSP may produce a different callback sequence.
-Handling an identical source and destination as a successful no-op remains
-inexpensive and makes the high-level handler independent of that distinction.
-
-### What cloudfuse can and cannot infer
-
-A preceding `Getattr` is common but does not make a later rename atomic. The
-atomicity must come from the storage component or from a cloudfuse transaction
-that preserves the visible rename contract. Checks performed before a
-non-atomic copy/delete sequence are vulnerable to concurrent changes.
-
-cgofuse itself does not serialize rename against other operations. The host
-below it does, for the paths a rename touches, as described next. Ordering
-between unrelated paths, and between a check and a later mutation inside one
-callback, still needs cloudfuse locks or atomic backend primitives.
-
-### Serialization provided by the host
-
-Callbacks are generally concurrent, but a rename, unlink, or rmdir excludes
-other callbacks on the paths it changes for as long as the callback runs.
-This comes from the host layer, not from cgofuse or `CgofuseFS`.
-
-| Host | Mechanism | Effect for cloudfuse |
-|---|---|---|
-| Linux, libfuse high-level API | libfuse keeps a lock per in-memory path node. `Rename`, `Unlink`, and `Rmdir` write-lock the node they change; `Rename` also write-locks an existing destination node. Every other callback read-locks its target node and each ancestor. A callback that meets a write-locked node is queued until it is released, and a writer waits for readers already in progress. | While `Rename` of a directory runs, nothing can create, open, look up, or change a path beneath the source or destination. Callbacks on open handles beneath it (`Read`, `Write`, `Flush`, `Release`) also wait, because cgofuse does not enable `nullpath_ok`, so libfuse resolves and locks a path for handle operations too. Parent directories are only read-locked, so listing a parent can overlap the rename. |
-| Windows, WinFSP | The volume has a rename resource. A rename acquires it exclusively; every create or open acquires it shared. WinFSP also refuses to rename a directory while anything beneath it has an open handle, unless it is a POSIX rename and every opener shares delete. | While `Rename` runs, no file can be created or opened anywhere on the volume. This resource does not cover reads and writes on handles that are already open. |
-
-Consequences:
-
-- A storage component may list the contents of a directory inside `RenameDir`
-  and rely on no new name appearing beneath it before the callback returns.
-  `tiered_storage` relies on this instead of holding its own lock.
-- On Windows, NTFS refuses to rename a directory with open files beneath it.
-  A component backed by local files holds a backing handle for each open file
-  on the mount, so its backing rename fails while those files are open. This
-  covers I/O on open handles that WinFSP's rename resource does not.
-  Short-lived handles cloudfuse opens itself (for example, while listing or
-  measuring a directory) can make that rename fail spuriously.
-- The guarantee depends on configuration. Switching to libfuse's low-level
-  API, or enabling `nullpath_ok`, removes it on Linux. A component that relies
-  on it must then provide its own lock.
-- The lock covers only the duration of the callback. Checks a component makes
-  inside the callback are safe from other FUSE callbacks, but not from
-  background work inside cloudfuse, such as eviction or upload goroutines,
-  which needs cloudfuse locks.
+The host does give some serialization. While `Rename`, `Unlink`, or `Rmdir`
+runs, the host holds back other callbacks on the affected paths (Linux) or all
+creates and opens on the volume (Windows). So a component may list a directory
+inside `RenameDir` and rely on nothing new appearing beneath it;
+`tiered_storage` relies on this. The lock lasts only for the callback and does
+not cover cloudfuse's own background work, such as eviction or upload
+goroutines. It also depends on configuration. See
+[Appendix A](#appendix-a-host-serialization-during-rename) for details.
 
 ## Unlink while open
 
-### Linux
+An open handle must stay usable after its path is unlinked. A component can do
+this with a local file, deferred deletion, or a stable object identity.
+Resolving the deleted path again on each read is not enough.
 
-After a successful unlink, the name no longer resolves, but existing handles
-continue to access the opened file until their own lifetimes end. The final
-`Release` may occur much later than `Unlink`. The handle must therefore contain
-enough state to operate without resolving the original path again.
+**Linux:** cloudfuse does not enable libfuse's `hard_remove`. As a result,
+libfuse turns an unlink of an open file, or a rename over one, into a `Rename`
+to a hidden `.fuse_hidden…` name. It then calls `Unlink` on that name after the
+last `Release`. Components therefore see a rename, not an unlink, and the hidden
+name shows up in listings until the file closes. See
+[Appendix B](#appendix-b-observed-unlink-while-open-trace).
 
-cloudfuse does not enable libfuse's `hard_remove` option. In that
-configuration, libfuse handles an unlink of an open file, or a rename over an
-open destination, by renaming the file to a hidden `.fuse_hidden…` name with the
-filesystem's `Rename` callback. It removes that name with `Unlink` after the
-last `Release`. Components therefore see a `Rename` to a hidden name, not an
-`Unlink`, for files that are still open. The hidden name is visible in
-directory listings through the mount until the last handle closes.
-
-Observed on Linux with the `libfuse` and `loopbackfs` components: opening
-`victim.txt`, unlinking it, and then closing it produced `Getattr` for
-`.fuse_hidden0000000200000001` (not found), `Rename` from `victim.txt` to that
-name, `Flush` and `Release` on the hidden name, and finally `Unlink` of the
-hidden name. The hidden file existed in the backing store until the close.
-
-### Windows
-
-Current WinFSP FUSE mode enables POSIX unlink/rename support by default. In that
-mode, WinFSP can remove the name while other handles remain open, and those
-handles continue to operate. The legacy `LegacyUnlinkRename` option disables
-that behavior and restores Windows-style delayed deletion.
-
-cloudfuse does not currently expose legacy delete behavior as a supported
-configuration. If that option or the WinFSP capability changes, unlink,
-rename, and open-handle tests must be rerun because the guarantee is provided
-by WinFSP, not by `CgofuseFS`.
-
-WinFSP's `.fuse_hidden...` names are an implementation detail used for selected
-FUSE compatibility operations such as replacing reparse points. They are not
-the general contract for unlinking an open file.
-
-### Requirement for storage components
-
-An open handle must remain usable after its path is unlinked. A storage
-component may implement this with a local file, an immutable object identity,
-deferred deletion, or another mechanism. Re-resolving the deleted path on each
-read or write is not sufficient.
+**Windows:** WinFSP's default POSIX unlink support removes the name while open
+handles keep working. The `LegacyUnlinkRename` option would change this, and
+cloudfuse does not support it.
 
 ## Directory enumeration
 
-`Opendir` establishes a directory handle, `Readdir` may be called repeatedly
-with continuation offsets, and `Releasedir` ends that handle's lifetime.
+`Readdir` may be called repeatedly with continuation offsets, stopped early, or
+restarted at offset zero. If the directory changes during enumeration, entries
+may be missing or stale, but unrelated entries must not be skipped or
+duplicated. Integer offsets are safe only over a stable snapshot or stable
+backend continuation tokens.
 
-Usually, an application reads a directory forward until the host's buffer is
-full and then resumes from the supplied offset. It may also stop early, restart
-at offset zero, or issue another enumeration while entries are changing.
+## Concurrency
 
-The listing may include entries that were removed after enumeration began and
-may omit entries created afterward. It must not skip or duplicate unrelated
-entries merely because the directory changed. An integer position is safe only
-when the directory handle refers to a stable snapshot or the backend
-continuation token provides equivalent stability.
+Callbacks run concurrently. Reads on one handle can overlap, I/O can overlap
+`Getattr`, and listings can overlap namespace changes. Callbacks on paths being
+renamed or removed are the exception (see [Rename](#rename)). Shared maps, dirty
+state, and cached listings need locks or immutable state.
 
-With readdir-plus enabled, attributes returned with directory entries reduce
-follow-up `Getattr` calls. This is an optimization, not a requirement that every
-enumeration include complete attributes.
+## Errors
 
-## Concurrency and ordering
-
-The host runs callbacks concurrently unless explicitly configured otherwise.
-The following are all possible:
-
-- reads on one handle overlapping;
-- a read or write overlapping `Getattr`;
-- operations on different handles for the same path;
-- rename or unlink racing with metadata queries on other paths (callbacks on
-  the paths being changed are excluded by the host; see
-  [Serialization provided by the host](#serialization-provided-by-the-host));
-- directory enumeration overlapping namespace changes.
-
-Sequential syscalls from one thread often produce an intuitive callback order,
-which is useful when reading traces, but that order is not a cross-request
-synchronization mechanism. Shared maps, dirty state, cached listings, and
-rename/unlink coordination need explicit locking or immutable state.
-
-## Errors and uncommon termination paths
-
-Handlers should return the documented errno for the application operation when
-possible. Unknown backend errors map to `EIO`; permission, existence, type, and
-path errors should retain their specific meaning.
-
-Some lifecycle errors cannot be delivered usefully:
-
-- Linux ignores errors returned from final `Release`.
-- WinFSP cleanup has no failure result at the Windows API boundary.
-- A killed process or forced unmount may skip all remaining cleanup callbacks.
-
-These cases justify local cleanup that is unconditional and idempotent. They do
-not justify silently discarding errors from operations whose callers can act on
-them, such as `Open`, `Write`, `Flush`, `Fsync`, `Rename`, or `Unlink`.
+Return the specific errno where possible; unknown backend errors become `EIO`.
+Errors from final `Release` and from WinFSP cleanup never reach the
+application, so local cleanup there must be unconditional and idempotent. That
+does not justify dropping errors from `Open`, `Write`, `Flush`, `Fsync`,
+`Rename`, or `Unlink`.
 
 ## Guarantees provided by the cloudfuse handler
 
-The preceding sections describe behavior supplied by the operating system,
-cgofuse, and WinFSP. This section describes the additional behavior currently
-provided by cloudfuse's [`CgofuseFS`
-handler](../component/libfuse/libfuse2_handler.go).
+The sections above describe host behavior. The
+[`CgofuseFS` handler](../component/libfuse/libfuse2_handler.go) adds the
+following. Final storage semantics still depend on the downstream components.
 
-These are interface-level guarantees only. When the handler delegates an
-operation to the next pipeline component, the final storage semantics still
-depend on that component.
+- **Paths:** Namespace callbacks strip the leading slash, normalize the name,
+  and reject paths over 4096 bytes or components over 255 bytes. Handle-based
+  callbacks use the handle's stored path instead of the callback's path.
+- **Errors:** Known Go and syscall errors map to specific errnos; the rest
+  become `EIO`.
+- **Attributes:** uid and gid come from the mount configuration. Inodes are
+  hashes of the path, so they change on rename.
+- **I/O:** `Read`, `Write`, `Flush`, `Fsync`, and `Release` require a known
+  handle or return `EBADF`. `Flush` skips clean handles. `Release` removes the
+  handle only if `ReleaseFile` succeeds.
+- **Directories:** `Opendir` creates a handle with a listing cache without
+  checking the path. `Readdir` at offset zero resets the cache and returns
+  attributes with every entry. `Rmdir` checks `IsDirEmpty` before `DeleteDir`.
+- **Rename:** Identical paths are a no-op. The handler checks source attributes
+  to choose file or directory rename. Directory rename rejects a nondirectory or
+  nonempty destination first.
+- **No-ops:** `Chown`, `Utimens`, and `Chmod` on Windows report success without
+  persisting anything. Access checks, hard links, xattrs, and `Mknod` return
+  `ENOSYS`.
 
-### Common path, attribute, and error handling
-
-| Handler behavior | Current guarantee |
-|---|---|
-| Path normalization | Implemented namespace callbacks remove the leading FUSE slash, normalize the object name, reject paths longer than 4096 bytes, and reject path components longer than 255 bytes. |
-| Error translation | Recognized Go filesystem and syscall errors are translated to specific FUSE errors. Unrecognized errors become `EIO`. |
-| Root attributes | `Getattr` synthesizes the root as a directory owned by the configured uid and gid, with mode `0777`, two links, and size 4096. |
-| Object attributes | Returned uid and gid come from mount configuration. File type and permission bits come from `ObjAttr`; configured defaults are used when the mode is marked default. Directories report two links and size 4096. |
-| Inode values | Inodes are deterministic hashes of object paths. This keeps values stable for one path but does not preserve an inode across rename. |
-| Filesystem statistics | `Statfs` uses storage-provided values when available. Otherwise it reports configured display capacity and synthetic file-count values. |
-| Metrics | Successful create, delete, rename, truncate, link, sync, and chmod operations update the corresponding libfuse statistics. Failed operations do not. |
-
-Path normalization is applied before namespace operations are sent down the
-pipeline. Handle-based `Read`, `Write`, `Flush`, `Fsync`, and `Release` instead
-use the path and identity stored on the handle; they do not re-resolve the path
-argument supplied with the callback.
-
-### File handles and I/O
-
-| Handler | Current guarantee |
-|---|---|
-| `Create` | Delegates creation, adds the returned handle to the global handle map, increments the open-handle count, and returns that handle to cgofuse. |
-| `Open` | Delegates opening with the received flags and configured file mode, then records and counts the returned handle. |
-| `Read` | Requires a known handle or returns `EBADF`. Cached handles use positional `ReadAt`; other handles delegate to `ReadInBuffer`. EOF is returned as a successful short read. |
-| `Write` | Requires a known handle or returns `EBADF`, then delegates the supplied buffer and offset. It returns the exact byte count reported by the next component. |
-| `Flush` | Requires a known handle. A clean handle succeeds without calling the next component; a dirty handle delegates to `FlushFile`. It does not remove the handle. |
-| `Truncate` | Passes both the normalized path and an optional matching handle to the next component. It does not require a valid handle for path-based truncation. |
-| `Fsync` | Requires a nonzero, known handle and delegates to `SyncFile`. |
-| `Release` | Requires a known handle and calls `ReleaseFile`. On success it removes the handle and decrements the open-handle count. |
-
-The handler therefore guarantees that normal read and write callbacks use a
-cloudfuse handle rather than resolving the callback path again. Whether that
-handle remains usable after rename or unlink depends on the components that
-created and subsequently operate on it.
-
-### Directories
-
-| Handler | Current guarantee |
-|---|---|
-| `Opendir` | Creates a directory handle and per-handle listing cache after path validation. It appends a trailing slash to non-root directory paths. |
-| `Readdir` | Requires an existing directory handle and cache. Offset zero resets the cache with `.` and `..`; later calls resume through cached entries and backend continuation tokens. Attributes are supplied with every returned entry. |
-| Listing memory | The per-handle cache is replaced when extending it would exceed `MaxDirListCount`, while offsets continue from the requested position. |
-| `Releasedir` | Atomically removes the handle from the handle map and calls its local cleanup. A repeated or unknown release returns `EBADF`. |
-| `Rmdir` | Checks `IsDirEmpty` before delegating to `DeleteDir`; a nonempty result becomes `ENOTEMPTY`. |
-
-### Namespace and metadata operations
-
-| Handler | Current guarantee |
-|---|---|
-| `Mkdir` | Preserves permission and special mode bits when delegating. On Windows it performs an additional destination existence check so an existing name returns `EEXIST`. |
-| `Unlink` | Normalizes the path and delegates to `DeleteFile`. It does not alter open handles itself. |
-| `Rename` | Rejects an empty source or destination, treats identical normalized paths as a successful no-op, and reads source attributes to choose file or directory handling. |
-| File rename | Delegates directly to `RenameFile`. If that fails, it queries the destination to refine directory and permission errors. |
-| Directory rename | Rejects an existing nondirectory destination and a nonempty destination directory before delegating to `RenameDir`. |
-| `Symlink` | Normalizes the link name and target before delegating to `CreateLink`. |
-| `Readlink` | Makes a best-effort attribute query for link size, then delegates to `ReadLink`; failure of the preliminary query does not prevent the read. |
-| `Chmod` | Delegates mode changes on Linux. On Windows it reports success without persisting the mode because WinFSP synthesizes it from Windows attributes. |
-| `Chown` | Reports success without changing stored ownership. |
-| `Utimens` | Reports success without changing stored timestamps, allowing common `touch` workflows to proceed. |
-| Unsupported operations | Access checks, hard links, extended attributes, and `Mknod` return `ENOSYS`. |
-
-The handler performs useful type and existence checks, but successful storage
-semantics remain the responsibility of the called component. In particular,
-the handler alone does not make replace-rename atomic, keep unlinked content
-alive, or serialize operations on the same path.
+The handler does not make replace-rename atomic, keep unlinked content alive,
+or serialize operations on one path. Those are up to the storage components.
 
 ### Areas for future inquiry
 
-The following behaviors are visible at the handler boundary and deserve
-focused investigation. They are not claims that the current implementation is
-incorrect for existing workloads.
+These are open questions, not known bugs.
 
-- **Release after backend failure.** `Release` currently leaves the handle and
-  open-handle count in place when `ReleaseFile` returns an error. The host does
-  not provide a second final-release callback, so local cleanup probably needs
-  to occur regardless of that result.
-- **Directory-open validation.** `Opendir` creates a handle without consulting
-  the next component. A missing path or nondirectory may therefore fail during
-  `Readdir` instead of `Opendir`.
-- **Handle-aware attributes.** `Getattr` currently ignores the supplied file
-  handle and always queries by path. Attribute requests for an open file after
-  rename or unlink may need to use handle state instead.
-- **Create flags.** `Create` receives open flags but does not pass them to
-  `CreateFile`, whereas `Open` passes its flags to `OpenFile`. Confirm which
-  create-time flags cgofuse has already handled and which lower components need
-  to see.
-- **Directory removal races.** `Rmdir` checks emptiness separately from
-  `DeleteDir`, and directory rename separately checks the destination before
-  `RenameDir`. Their final correctness depends on the storage component
-  detecting changes between the check and mutation.
-- **Directory-check errors.** `IsDirEmpty` returns only a boolean at this
-  boundary. A failure to inspect a directory may be indistinguishable from a
-  nonempty directory and surface as `ENOTEMPTY`.
-- **Concurrent `Readdir` on one handle.** The listing cache is mutable and is
-  not held under the handle lock while it is populated and served. Confirm
-  whether cgofuse can issue overlapping enumeration calls for one directory
-  handle; otherwise add synchronization.
-- **Stable directory cookies.** The handler exposes numerical offsets over
-  paged results. Confirm that every `StreamDir` implementation provides stable
-  continuation semantics under concurrent directory changes.
-- **`datasync` semantics.** `Fsync` and `Fsyncdir` currently ignore the
-  `datasync` argument. Determine whether any component can or should distinguish
-  data-only synchronization from full metadata synchronization.
-- **Successful no-ops.** `Chown` and `Utimens`, plus `Chmod` on Windows, report
-  success without persisting the requested metadata. This is convenient for
-  compatibility but should be an explicit supported limitation.
-- **Symlink target normalization.** The handler normalizes the target as an
-  object name. Confirm that relative targets, absolute targets, `..`, and
-  platform-specific separators retain the intended symlink meaning.
-- **Rename identity.** Inodes are derived from paths, so a rename changes the
-  inode reported by later `Getattr` calls. Confirm whether target applications
-  require stable inode identity across rename.
-- **Unlink of open files on Linux.** Because `hard_remove` is not enabled,
-  libfuse turns an unlink of an open file into a `Rename` to a `.fuse_hidden…`
-  name, followed by an `Unlink` after the final `Release`. Storage components
-  may perform a cloud rename to that hidden name, and a crash before release
-  can leave it behind. Decide whether to enable `hard_remove`, which relies on
-  components keeping unlinked files usable, or to handle hidden names
-  explicitly. Confirmed with a `loopbackfs` mount; see
-  [Unlink while open](#unlink-while-open).
-- **Specific errno preservation.** Errors outside the current translation table
-  collapse to `EIO`. Add mappings when applications need to distinguish another
-  documented filesystem error.
+- **Release after backend failure:** `Release` leaves the handle and count in
+  place if `ReleaseFile` fails, but no second release will come.
+- **`Opendir` validation:** Missing or nondirectory paths fail at `Readdir`
+  instead of `Opendir`.
+- **Handle-aware `Getattr`:** `Getattr` ignores the handle, which may matter
+  after rename or unlink.
+- **Create flags:** `Create` does not pass its flags to `CreateFile`.
+- **Check-then-act races:** `Rmdir` and directory rename check the destination
+  separately from the mutation.
+- **`IsDirEmpty` errors:** A failure to inspect a directory surfaces as
+  `ENOTEMPTY`.
+- **Concurrent `Readdir` on one handle:** The listing cache is not locked while
+  it is populated and served.
+- **Directory cookies:** Confirm that every `StreamDir` implementation
+  continues stably under concurrent changes.
+- **`datasync`:** `Fsync` and `Fsyncdir` ignore it.
+- **Silent no-ops:** Decide whether `Chown`, `Utimens`, and Windows `Chmod`
+  should be documented limitations.
+- **Symlink targets:** Confirm that normalizing targets preserves relative,
+  absolute, and `..` targets.
+- **Inode stability:** Check whether any target application needs inodes to
+  survive a rename.
+- **Hidden files on Linux:** Components may perform a cloud rename to
+  `.fuse_hidden…`, and a crash can leave it behind. Either enable `hard_remove`
+  (and rely on components keeping unlinked files usable) or handle hidden names
+  explicitly.
+- **Errno coverage:** Add mappings when applications need errors that currently
+  collapse to `EIO`.
 
-## Configuration expectations
+## Configuration assumptions
 
-The following configurations match the assumptions in this document:
+This document assumes:
 
-- cgofuse is the only FUSE adapter used by cloudfuse;
 - cgofuse uses libfuse's high-level path API on Linux, without `nullpath_ok`
   or `hard_remove`;
 - WinFSP uses its default POSIX unlink/rename support;
-- readdir-plus remains enabled;
-- host and `attr_cache` metadata timeouts are chosen as one cache policy;
-- applications accept the configured delay for changes made outside
-  cloudfuse;
-- direct I/O configurations also consider the pipeline attribute cache when
-  metadata freshness matters.
+- readdir-plus is enabled;
+- host and `attr_cache` timeouts are chosen together.
 
-Changing one of these is possible, but it changes request likelihoods or
-semantics and should be accompanied by focused mount tests.
+Changing any of these changes the behavior described above and should come with
+focused mount tests.
 
 ## Review checklist
 
 When changing a filesystem operation, check:
 
-1. Can the callback arrive without a recent `Getattr`?
-2. Does correctness depend on a cache timeout or on external writers being
-   absent?
-3. Does the operation still work after the path has been renamed or unlinked?
-4. Are repeated `Flush`, `Readdir`, or metadata callbacks harmless?
+1. Does it work without a recent `Getattr`?
+2. Does correctness depend on cache timeouts or the absence of external writers?
+3. Does it still work after the path is renamed or unlinked?
+4. Are repeated `Flush`, `Readdir`, and metadata calls harmless?
 5. Are local handles and counters cleaned up after backend failure?
 6. Is shared state protected against overlapping callbacks?
-7. Is the behavior provided by cloudfuse, cgofuse, the Linux VFS, or WinFSP?
-8. If it depends on configuration, is that configuration part of the supported
-   operating boundary?
+
+## Appendix A: Host serialization during rename
+
+This comes from the host layer, not from cgofuse or `CgofuseFS`.
+
+**Linux (libfuse high-level API).** libfuse keeps a lock for each path node.
+`Rename`, `Unlink`, and `Rmdir` write-lock the node they change, and `Rename`
+also locks an existing destination. Every other callback read-locks its target
+and that target's ancestors. While a directory rename runs, nothing beneath the
+source or destination can be looked up, created, or opened. Handle I/O beneath
+it (`Read`, `Write`, `Flush`, `Release`) also waits, because cgofuse does not
+enable `nullpath_ok`, so libfuse locks a path even for handle operations.
+Parent directories are only read-locked, so listing a parent can overlap the
+rename. Enabling `nullpath_ok` or switching to the low-level API removes this
+guarantee.
+
+**Windows (WinFSP).** A rename takes the volume's rename resource exclusively,
+and every create or open takes it shared. During a rename, nothing on the
+volume can be created or opened, but I/O on existing handles continues. WinFSP
+also refuses to rename a directory that has open handles beneath it, unless it
+is a POSIX rename and every opener shares delete. NTFS has a similar rule, so a
+component backed by local files cannot rename a directory while files beneath
+it are open. Short-lived handles that cloudfuse itself opens, for example while
+listing a directory, can cause such a rename to fail spuriously.
+
+## Appendix B: Observed unlink-while-open trace
+
+On Linux with the `libfuse` and `loopbackfs` components, opening `victim.txt`,
+unlinking it, and then closing it produced these callbacks:
+
+1. `Getattr` `.fuse_hidden0000000200000001` → not found
+2. `Rename` `victim.txt` → `.fuse_hidden0000000200000001`
+3. `Flush`, `Release` on the hidden name
+4. `Unlink` `.fuse_hidden0000000200000001`
+
+The hidden file existed in the backing store until the close.
 
 ## Sources
 
@@ -543,8 +275,6 @@ When changing a filesystem operation, check:
 - [Windows rules for renaming open files](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
 - [Linux `rename(2)`](https://man7.org/linux/man-pages/man2/rename.2.html)
 - [Linux `unlink(2)`](https://man7.org/linux/man-pages/man2/unlink.2.html)
-- [WinFSP native API and FUSE comparison](https://github.com/winfsp/winfsp/wiki/Native-API-vs-FUSE)
 - [WinFSP delete redesign](https://github.com/winfsp/winfsp/blob/master/doc/archive/WinFsp-Delete-Redesign.asciidoc)
-- [WinFSP FUSE implementation](https://github.com/winfsp/winfsp/tree/master/src/dll/fuse)
 - [cloudfuse FUSE configuration](../component/libfuse/libfuse.go)
 - [cloudfuse attribute cache](../component/attr_cache/attr_cache.go)
