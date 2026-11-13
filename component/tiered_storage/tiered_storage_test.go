@@ -1882,15 +1882,66 @@ func (suite *tieredStorageTestSuite) TestStatFs() {
 func (suite *tieredStorageTestSuite) TestSymlink() {
 	defer suite.cleanupTest()
 
+	// dangling target
+	link := internal.CreateLinkOptions{Name: "dir/link", Target: "../target"}
+	suite.Require().NoError(suite.tieredStorage.CreateLink(link))
+	suite.assert.ErrorIs(suite.tieredStorage.CreateLink(link), syscall.EEXIST)
+
+	target, err := suite.tieredStorage.ReadLink(internal.ReadLinkOptions{Name: link.Name})
+	suite.Require().NoError(err)
+	suite.assert.Equal(link.Target, target)
+	attr, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: link.Name})
+	suite.Require().NoError(err)
+	suite.assert.True(attr.IsSymlink())
+	suite.assert.EqualValues(len(link.Target), attr.Size)
+	listed := listDir(suite.T(), suite.tieredStorage, "dir")
+	suite.Require().Len(listed, 1)
+	suite.assert.True(listed[0].IsSymlink())
+
+	_, err = suite.loopback.GetAttr(internal.GetAttrOptions{Name: link.Name})
+	suite.assert.ErrorIs(err, os.ErrNotExist)
+}
+
+func (suite *tieredStorageTestSuite) TestSymlinkIsNeverFollowed() {
+	defer suite.cleanupTest()
+
+	outside := filepath.Join(suite.T().TempDir(), "secret")
+	suite.Require().NoError(os.WriteFile(outside, []byte("secret"), 0600))
 	suite.Require().NoError(suite.tieredStorage.CreateLink(
-		internal.CreateLinkOptions{Name: "link", Target: "target"},
+		internal.CreateLinkOptions{Name: "link", Target: outside},
 	))
-	target, err := suite.tieredStorage.ReadLink(
-		internal.ReadLinkOptions{Name: "link"},
+	policy := suite.tieredStorage.policy
+
+	_, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: "link"})
+	suite.assert.ErrorIs(err, syscall.ELOOP)
+	suite.Require().NoError(suite.tieredStorage.FileUsed("link"))
+	suite.assert.False(queued(policy, "link"))
+
+	// a link renamed over an open file is not enqueued on release
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "file", Mode: 0644},
 	)
 	suite.Require().NoError(err)
-	suite.assert.Equal("target", target)
-	suite.assert.NoFileExists(suite.localFile("link"))
+	suite.Require().NoError(suite.tieredStorage.RenameFile(
+		internal.RenameFileOptions{Src: "link", Dst: "file"},
+	))
+	suite.Require().NoError(suite.tieredStorage.ReleaseFile(
+		internal.ReleaseFileOptions{Handle: handle},
+	))
+	suite.assert.False(queued(policy, "file"))
+
+	// eviction drops a link without uploading it
+	policy.Enqueue("file")
+	policy.evict("file", false)
+	suite.assert.False(queued(policy, "file"))
+	_, err = suite.loopback.GetAttr(internal.GetAttrOptions{Name: "file"})
+	suite.assert.ErrorIs(err, os.ErrNotExist)
+
+	suite.Require().NoError(suite.tieredStorage.DeleteFile(
+		internal.DeleteFileOptions{Name: "file"},
+	))
+	suite.assert.NoFileExists(suite.localFile("file"))
+	suite.assert.FileExists(outside)
 }
 
 func (suite *tieredStorageTestSuite) TestChmodAndChownChangeNothing() {

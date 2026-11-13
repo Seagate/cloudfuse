@@ -49,7 +49,8 @@ import (
 )
 
 // TieredStorage keeps new data local and uses cloud storage as overflow.
-// Cloud objects are cached only while open.
+// Cloud objects are cached only while open. Symlinks are local-only, never
+// followed (the kernel resolves them), and never evicted.
 //
 // Lock order: evictMu, file locks (lexical order), then lruQueue.mu. Never
 // acquire a file lock while holding lruQueue.mu.
@@ -519,7 +520,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	}
 	srcLocalExists := false
 	for _, m := range []move{{srcLocal, dstLocal}, {srcCache, dstCache}} {
-		if _, err := os.Stat(m.from); errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Lstat(m.from); errors.Is(err, os.ErrNotExist) {
 			continue
 		} else if err != nil {
 			revert()
@@ -667,12 +668,12 @@ func (c *TieredStorage) openHandle(
 func (c *TieredStorage) promote(name string) error {
 	cachePath := c.cachePath(name)
 	localPath := c.localPath(name)
-	if _, err := os.Stat(cachePath); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Lstat(cachePath); errors.Is(err, os.ErrNotExist) {
 		return nil
 	} else if err != nil {
 		return err
 	}
-	if _, err := os.Stat(localPath); err == nil {
+	if _, err := os.Lstat(localPath); err == nil {
 		// local/x is authoritative, so cache/x is a stray left by a failed
 		// cleanup. Its handles refer to a replaced file; never let it win.
 		if err := c.removeFile(cachePath); err != nil {
@@ -802,15 +803,18 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 
 	path, cached, created := "", false, false
 	var truncatedSize int64
-	if info, err := os.Stat(localPath); err == nil {
+	if info, err := os.Lstat(localPath); err == nil {
 		if exclusive {
 			return nil, syscall.EEXIST
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil, syscall.ELOOP
 		}
 		path = localPath
 		truncatedSize = info.Size()
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
-	} else if info, err := os.Stat(cachePath); err == nil {
+	} else if info, err := os.Lstat(cachePath); err == nil {
 		if exclusive {
 			return nil, syscall.EEXIST
 		}
@@ -905,7 +909,7 @@ func (c *TieredStorage) downloadToCache(name string) error {
 // removeFile deletes a file under the tiered root and updates the usage
 // counter.
 func (c *TieredStorage) removeFile(path string) error {
-	info, statErr := os.Stat(path)
+	info, statErr := os.Lstat(path)
 	err := os.Remove(path)
 	if err == nil && statErr == nil {
 		c.diskUsage.Add(-info.Size())
@@ -1033,14 +1037,14 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 	cachePath := c.cachePath(name)
 	localPath := c.localPath(name)
-	if _, err := os.Stat(cachePath); err == nil {
+	if _, err := os.Lstat(cachePath); err == nil {
 		// The copy is clean, so it can be dropped. If that fails, the next
 		// release or startup removes it.
 		if err := c.removeFile(cachePath); err != nil {
 			log.Warn("TieredStorage::ReleaseFile : failed to remove cached %s [%v]", name, err)
 		}
 	}
-	if _, err := os.Stat(localPath); err == nil {
+	if info, err := os.Lstat(localPath); err == nil && info.Mode().IsRegular() {
 		c.policy.Enqueue(name)
 		if flock.CloudStale {
 			c.policy.EvictOnClose(name)
@@ -1108,14 +1112,14 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 	cloudExists := err == nil
-	dstInfo, dstLocalErr := os.Stat(dstLocal)
+	dstInfo, dstLocalErr := os.Lstat(dstLocal)
 	if dstLocalErr == nil && dstInfo.IsDir() {
 		return syscall.EISDIR
 	}
 
 	// Rename whichever local copy src has, before the harder-to-undo cloud rename.
-	_, srcLocalErr := os.Stat(srcLocal)
-	_, srcCacheErr := os.Stat(srcCache)
+	_, srcLocalErr := os.Lstat(srcLocal)
+	_, srcCacheErr := os.Lstat(srcCache)
 	from, to := "", ""
 	switch {
 	case srcLocalErr == nil:
@@ -1136,7 +1140,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	// local
-	replaced, replacedErr := os.Stat(to)
+	replaced, replacedErr := os.Lstat(to)
 	localDstLost := replacedErr == nil && to == dstLocal
 	if from != "" {
 		if err := os.MkdirAll(filepath.Dir(to), dirPerm); err != nil {
@@ -1224,13 +1228,32 @@ func (c *TieredStorage) SyncDir(options internal.SyncDirOptions) error {
 	return c.NextComponent().SyncDir(options)
 }
 
-// Symlink operations
+// CreateLink creates a local-only symlink.
 func (c *TieredStorage) CreateLink(options internal.CreateLinkOptions) error {
-	return c.NextComponent().CreateLink(options)
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	if _, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name}); err == nil {
+		return syscall.EEXIST
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	localPath := c.localPath(options.Name)
+	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
+		return err
+	}
+	if err := os.Symlink(options.Target, localPath); err != nil {
+		log.Err("TieredStorage::CreateLink : %s failed [%v]", options.Name, err)
+		return err
+	}
+	c.diskUsage.Add(int64(len(options.Target)))
+	return nil
 }
 
+// ReadLink reads a local symlink.
 func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, error) {
-	return c.NextComponent().ReadLink(options)
+	return os.Readlink(c.localPath(options.Name))
 }
 
 func (c *TieredStorage) setHandleDirty(handle *handlemap.Handle) {
@@ -1262,7 +1285,7 @@ func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
 // It takes no lock: files move between trees by atomic rename.
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	localPath := c.localPath(options.Name)
-	info, err := os.Stat(localPath)
+	info, err := os.Lstat(localPath)
 	if err == nil {
 		return localAttr(options.Name, info), nil
 	}
@@ -1336,7 +1359,7 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 // FileUsed refreshes a local-owned file's LRU position.
 func (c *TieredStorage) FileUsed(name string) error {
 	localPath := c.localPath(name)
-	if _, err := os.Stat(localPath); err == nil {
+	if info, err := os.Lstat(localPath); err == nil && info.Mode().IsRegular() {
 		c.policy.Enqueue(name)
 	}
 	return nil

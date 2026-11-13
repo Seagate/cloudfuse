@@ -234,7 +234,7 @@ func (q *lruQueue) evictAll(names []string, onClose bool) {
 
 // evict uploads and removes local/name unless it is open. An evict-on-close
 // also requires cloudStale. On failure, the file stays queued. A name with no
-// local file is dequeued.
+// regular local file is dequeued, so links are never uploaded.
 func (q *lruQueue) evict(name string, onClose bool) {
 	flock := q.fileLocks.Get(name)
 	flock.Lock()
@@ -251,11 +251,12 @@ func (q *lruQueue) evict(name string, onClose bool) {
 	if flock.Count() > 0 {
 		return
 	}
-	if _, err := os.Stat(filepath.Join(q.localRoot, name)); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			log.Warn("lruQueue::evict : dropping %s [%v]", name, err)
-			q.Dequeue(name)
-		}
+	info, err := os.Lstat(filepath.Join(q.localRoot, name))
+	if errors.Is(err, os.ErrNotExist) || err == nil && !info.Mode().IsRegular() {
+		log.Warn("lruQueue::evict : dropping %s [%v]", name, err)
+		q.Dequeue(name)
+		return
+	} else if err != nil {
 		return
 	}
 
@@ -284,7 +285,7 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 		} else {
 			// A missing file may be mid-rename; evict rechecks under the file lock.
 			names = append(names, node.name)
-			if info, err := os.Stat(filepath.Join(q.localRoot, node.name)); err == nil {
+			if info, err := os.Lstat(filepath.Join(q.localRoot, node.name)); err == nil {
 				total += info.Size()
 			}
 		}
