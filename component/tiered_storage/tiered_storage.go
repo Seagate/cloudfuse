@@ -625,7 +625,6 @@ func (c *TieredStorage) checkCloudReachable(name string) error {
 // the configured default mode is reported instead.
 func localAttr(name string, info fs.FileInfo) *internal.ObjAttr {
 	attr := internal.NewLocalObjAttr(name, info)
-	attr.Mode &^= os.ModePerm
 	attr.Flags.Set(internal.PropFlagModeDefault)
 	return attr
 }
