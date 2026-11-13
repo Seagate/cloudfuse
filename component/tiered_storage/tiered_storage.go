@@ -498,13 +498,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	if err := c.checkCloudReachable(options.Src); err != nil {
 		return err
 	}
-	if _, err := os.Stat(dstLocal); err == nil {
-		return syscall.EEXIST
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
 	// cache/ is not pruned, so dst may be an empty leftover there.
-	_ = os.Remove(dstCache)
+	_ = syscall.Rmdir(dstCache)
 
 	// Rename locally first: it can fail (on Windows, for open files), but is
 	// cheap to undo. The cloud rename runs last.
@@ -514,9 +509,9 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		for _, m := range slices.Backward(moved) {
 			if err := os.Rename(m.to, m.from); err != nil {
 				log.Err(
-					"TieredStorage::RenameDir : reverting %s -> %s failed; local and cloud have diverged [%v]",
-					m.to,
+					"TieredStorage::RenameDir : %s -> %s revert failed! [%v]",
 					m.from,
+					m.to,
 					err,
 				)
 			}
@@ -535,7 +530,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		}
 		err := os.MkdirAll(filepath.Dir(m.to), dirPerm)
 		if err == nil {
-			err = os.Rename(m.from, m.to)
+			// Native rules: Unix replaces an empty directory; Windows refuses.
+			err = syscall.Rename(m.from, m.to)
 		}
 		if err != nil {
 			revert()

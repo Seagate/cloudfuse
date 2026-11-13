@@ -2327,17 +2327,28 @@ func (suite *tieredStorageTestSuite) TestRenameDirMovesCacheCopiesAndState() {
 	suite.assert.NoFileExists(suite.cacheFile("dst/cached"))
 }
 
-func (suite *tieredStorageTestSuite) TestRenameDirRefusesExistingLocalDestination() {
+func (suite *tieredStorageTestSuite) TestRenameDirReplacesEmptyLocalDestination() {
 	defer suite.cleanupTest()
 
-	suite.Require().
-		NoError(suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "src", Mode: 0755}))
-	suite.Require().
-		NoError(suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "dst", Mode: 0755}))
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: "src/file", Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(
+		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}),
+	)
+	suite.Require().NoError(os.Mkdir(suite.localFile("dst"), 0700))
 
-	err := suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
-	suite.assert.ErrorIs(err, syscall.EEXIST)
-	suite.assert.DirExists(suite.localFile("src"))
+	err = suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
+	if runtime.GOOS == "windows" {
+		suite.Require().ErrorIs(err, os.ErrExist)
+		suite.assert.FileExists(suite.localFile("src/file"))
+		suite.assert.DirExists(suite.localFile("dst"))
+		return
+	}
+	suite.Require().NoError(err)
+	suite.assert.FileExists(suite.localFile("dst/file"))
+	suite.assert.NoDirExists(suite.localFile("src"))
 }
 
 func TestRenameDirOfflineChangesNothing(t *testing.T) {

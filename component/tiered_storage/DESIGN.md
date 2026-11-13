@@ -313,12 +313,15 @@ because the tiered root is never exposed.
    the FUSE layer serializes a directory rename against everything beneath it
    (see [Locking](#locking)).
 2. Check cloud connectivity; fail early if disconnected.
-3. Cheap pre-checks: source exists, destination does not exist, destination
-   parent can be created.
+3. Cheap pre-checks: source exists, destination is missing or an empty
+   directory, destination parent can be created.
 4. **Rename locally first**: `local/src` → `local/dst`, then `cache/src` →
-   `cache/dst`, for whichever exist. If a local rename fails, revert any earlier
-   local rename and return the error. Map Windows access-denied errors to
-   `EBUSY`.
+   `cache/dst`, for whichever exist. Use `syscall.Rename` so the host OS rules
+   apply: Linux replaces an empty `local/dst`, Windows refuses any existing one.
+   Remove a leftover empty `cache/dst` first, since the host can't see it.
+   If a local rename fails, revert any earlier local rename and return the
+   error. Map Windows access-denied errors to `EBUSY`.
+   A failed rename may lose the replaced empty `local/dst`; this is accepted.
 5. **Rename in the cloud last.** On failure, revert the local renames in
    reverse order and return the error. If a revert fails, log an error naming
    both paths and stating that local and cloud have diverged.
@@ -371,8 +374,7 @@ For each candidate, with its file lock held:
    eviction.
 4. On success: delete `local/x` and remove it from the LRU.
 
-Empty directories left in `local/` are not pruned. They are harmless and also
-exist in the cloud namespace.
+Empty directories left in `local/` are not pruned. They are harmless.
 
 ### Evict on close
 
