@@ -89,8 +89,10 @@ const (
 	// The tiered root holds exactly these two trees. A file is in at most one.
 	localDirName = "local"
 	cacheDirName = "cache"
-	// The tiered root holds user data and is only accessed by this process (CWE-732).
-	dirPerm os.FileMode = 0700
+	// Everything under the tiered root is private to this process (CWE-732).
+	// Reported modes come from libfuse defaults, not from these.
+	dirPerm  os.FileMode = 0700
+	filePerm os.FileMode = 0600
 	// share of free disk space to use when max-size-mb is not set
 	defaultMaxSizeRatio = 0.8
 )
@@ -351,15 +353,11 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 	}
 
 	localPath := c.localPath(options.Name)
-	mode := options.Mode
-	if mode == 0 || runtime.GOOS == "windows" {
-		mode = common.DefaultDirectoryPermissionBits
-	}
 	// The parent may exist only in the cloud.
 	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
 		return err
 	}
-	if err := os.Mkdir(localPath, mode); err != nil {
+	if err := os.Mkdir(localPath, dirPerm); err != nil {
 		return err
 	}
 	if err := c.NextComponent().CreateDir(options); err != nil && !errors.Is(err, os.ErrExist) {
@@ -435,7 +433,7 @@ func (c *TieredStorage) StreamDir(
 				continue
 			}
 			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
-			page = append(page, internal.NewLocalObjAttr(entryName, info))
+			page = append(page, localAttr(entryName, info))
 		}
 	}
 
@@ -623,20 +621,25 @@ func (c *TieredStorage) checkCloudReachable(name string) error {
 	return &cloudErr
 }
 
+// localAttr describes a local file or directory. Local modes are private, so
+// the configured default mode is reported instead.
+func localAttr(name string, info fs.FileInfo) *internal.ObjAttr {
+	attr := internal.NewLocalObjAttr(name, info)
+	attr.Mode &^= os.ModePerm
+	attr.Flags.Set(internal.PropFlagModeDefault)
+	return attr
+}
+
 // File operations
 
 // createEmptyLocal creates a new, empty local-owned file. The file lock must
 // be held.
-func (c *TieredStorage) createEmptyLocal(name string, mode os.FileMode) error {
+func (c *TieredStorage) createEmptyLocal(name string) error {
 	localPath := c.localPath(name)
 	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
 		return err
 	}
-	file, err := common.OpenFile(
-		localPath,
-		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
-		c.fileMode(mode),
-	)
+	file, err := common.OpenFile(localPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
 	if err != nil {
 		return err
 	}
@@ -745,7 +748,7 @@ func (c *TieredStorage) CreateFile(
 		return nil, err
 	}
 
-	if err := c.createEmptyLocal(options.Name, options.Mode); err != nil {
+	if err := c.createEmptyLocal(options.Name); err != nil {
 		return nil, err
 	}
 	localPath := c.localPath(options.Name)
@@ -835,13 +838,13 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	} else {
-		attrs, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+		_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 		switch {
 		case errors.Is(err, os.ErrNotExist):
 			if options.Flags&os.O_CREATE == 0 {
 				return nil, syscall.ENOENT
 			}
-			if err := c.createEmptyLocal(options.Name, options.Mode); err != nil {
+			if err := c.createEmptyLocal(options.Name); err != nil {
 				return nil, err
 			}
 			path, created = localPath, true
@@ -851,13 +854,13 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			return nil, syscall.EEXIST
 		case truncate:
 			// The old content is discarded, so there is nothing to download.
-			if err := c.createEmptyLocal(options.Name, attrs.Mode.Perm()); err != nil {
+			if err := c.createEmptyLocal(options.Name); err != nil {
 				return nil, err
 			}
 			flock.CloudStale = true
 			path = localPath
 		default:
-			if err := c.downloadToCache(options.Name, attrs.Mode.Perm()); err != nil {
+			if err := c.downloadToCache(options.Name); err != nil {
 				return nil, err
 			}
 			path, cached = cachePath, true
@@ -877,27 +880,15 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 	return handle, nil
 }
 
-func (c *TieredStorage) fileMode(mode os.FileMode) os.FileMode {
-	if mode == 0 || runtime.GOOS == "windows" {
-		return common.DefaultFilePermissionBits
-	}
-	return mode
-}
-
 // downloadToCache copies a cloud object into cache/. The object's file lock
 // must be held, which keeps other openers from seeing a partial download. A
 // failed download is removed; startup removes any left by a crash.
-func (c *TieredStorage) downloadToCache(name string, mode os.FileMode) error {
+func (c *TieredStorage) downloadToCache(name string) error {
 	cachePath := c.cachePath(name)
 	if err := os.MkdirAll(filepath.Dir(cachePath), dirPerm); err != nil {
 		return err
 	}
-	// The mode matters if the file is later promoted to local/.
-	file, err := common.OpenFile(
-		cachePath,
-		os.O_CREATE|os.O_EXCL|os.O_WRONLY,
-		c.fileMode(mode),
-	)
+	file, err := common.OpenFile(cachePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
 	if err != nil {
 		return err
 	}
@@ -1070,44 +1061,20 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	return closeErr
 }
 
-// uploadLocal copies local/x to the cloud, with its mode and owner where the
-// platform has them. The file lock must be held.
+// uploadLocal copies local/x to the cloud. The file lock must be held.
 func (c *TieredStorage) uploadLocal(name string) error {
-	localPath := c.localPath(name)
-	f, err := common.Open(localPath)
+	f, err := common.Open(c.localPath(name))
 	if err != nil {
 		log.Err("TieredStorage::uploadLocal : %s open failed [%v]", name, err)
 		return err
 	}
 	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
 
 	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 	if err != nil {
 		log.Err("TieredStorage::uploadLocal : %s upload failed [%v]", name, err)
-		return err
 	}
-
-	// Windows files carry no POSIX mode or owner, so applying them would
-	// overwrite the cloud object's metadata with defaults.
-	owner, group, ok := common.GetFileOwner(info)
-	if !ok {
-		return nil
-	}
-	err = c.NextComponent().Chmod(internal.ChmodOptions{Name: name, Mode: info.Mode().Perm()})
-	if err != nil && !errors.Is(err, syscall.ENOTSUP) {
-		log.Err("TieredStorage::uploadLocal : %s chmod failed [%v]", name, err)
-		return err
-	}
-	err = c.NextComponent().Chown(internal.ChownOptions{Name: name, Owner: owner, Group: group})
-	if err != nil && !errors.Is(err, syscall.ENOTSUP) {
-		log.Err("TieredStorage::uploadLocal : %s chown failed [%v]", name, err)
-		return err
-	}
-	return nil
+	return err
 }
 
 // uploadandCleanFile evicts a closed local-owned file: it uploads local/x,
@@ -1301,7 +1268,7 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	localPath := c.localPath(options.Name)
 	info, err := os.Stat(localPath)
 	if err == nil {
-		return internal.NewLocalObjAttr(options.Name, info), nil
+		return localAttr(options.Name, info), nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -1309,75 +1276,13 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	return c.NextComponent().GetAttr(options)
 }
 
+// Chmod is ignored: every object reports the configured default mode.
 func (c *TieredStorage) Chmod(options internal.ChmodOptions) error {
-	flock := c.fileLocks.Get(options.Name)
-	flock.Lock()
-	defer flock.Unlock()
-
-	return c.changeAttr(
-		options.Name,
-		func() error { return c.NextComponent().Chmod(options) },
-		func(path string) error { return os.Chmod(path, options.Mode) },
-	)
+	return nil
 }
 
+// Chown is ignored: libfuse reports the mount owner for every object.
 func (c *TieredStorage) Chown(options internal.ChownOptions) error {
-	flock := c.fileLocks.Get(options.Name)
-	flock.Lock()
-	defer flock.Unlock()
-
-	return c.changeAttr(
-		options.Name,
-		func() error { return c.NextComponent().Chown(options) },
-		func(path string) error {
-			if runtime.GOOS == "windows" {
-				return nil
-			}
-			return os.Chown(path, options.Owner, options.Group)
-		},
-	)
-}
-
-// changeAttr applies a metadata change to the authoritative copy:
-//   - local/x: only the local file. Eviction uploads the change with the file.
-//   - cache/x: the cloud object, then the copy, which may later be promoted.
-//   - neither: only the cloud object.
-//
-// Directories exist in both places, so both are changed. The file lock must
-// be held.
-func (c *TieredStorage) changeAttr(
-	name string,
-	changeCloud func() error,
-	changeLocal func(path string) error,
-) error {
-	localPath := c.localPath(name)
-	cachePath := c.cachePath(name)
-
-	info, err := os.Stat(localPath)
-	switch {
-	case err == nil && !info.IsDir():
-		return changeLocal(localPath)
-	case err == nil:
-		if err := changeCloud(); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		return changeLocal(localPath)
-	case !errors.Is(err, os.ErrNotExist):
-		return err
-	}
-
-	if err := changeCloud(); err != nil {
-		return err
-	}
-	if _, err := os.Stat(cachePath); err == nil {
-		if err := changeLocal(cachePath); err != nil {
-			log.Warn(
-				"TieredStorage::changeAttr : %s changed in cloud, but not in cache [%v]",
-				name,
-				err,
-			)
-		}
-	}
 	return nil
 }
 
