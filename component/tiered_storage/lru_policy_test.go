@@ -185,6 +185,28 @@ func (suite *lruPolicyTestSuite) TestRenameKeepsPosition() {
 	suite.assert.False(found)
 }
 
+func (suite *lruPolicyTestSuite) TestEvictionKeepsNodeMidRename() {
+	defer suite.cleanupTest()
+
+	suite.Require().NoError(os.WriteFile(filepath.Join(local_path, "src"), nil, 0644))
+	suite.policy.Enqueue("src")
+
+	// RenameFile holds the file lock from the local rename until policy.Rename.
+	flock := suite.policy.fileLocks.Get("src")
+	flock.Lock()
+	suite.Require().NoError(
+		os.Rename(filepath.Join(local_path, "src"), filepath.Join(local_path, "dst")),
+	)
+	names := suite.policy.nominate(1, 10)
+	suite.assert.Equal([]string{"src"}, names)
+	suite.assert.True(queued(suite.policy, "src"))
+	suite.policy.Rename("src", "dst")
+	flock.Unlock()
+
+	suite.policy.evictAll(names, false)
+	suite.assert.True(queued(suite.policy, "dst"))
+}
+
 func (suite *lruPolicyTestSuite) TestEvictionRunsOnePass() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default policy generated in SetupTest

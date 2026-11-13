@@ -362,7 +362,8 @@ their write rate.
 
 For each candidate, with its file lock held:
 
-1. Skip it if it has open handles.
+1. Skip it if it has open handles. If `local/x` is gone, remove it from the
+   LRU and skip it.
 2. Upload `local/x` to the cloud, then apply the mode and owner/group read
    from the local file (Linux only). Windows files have no POSIX mode or owner,
    so applying their defaults would overwrite the cloud object's metadata.

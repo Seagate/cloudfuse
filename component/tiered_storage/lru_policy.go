@@ -25,6 +25,7 @@
 package tiered_storage
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -232,7 +233,8 @@ func (q *lruQueue) evictAll(names []string, onClose bool) {
 }
 
 // evict uploads and removes local/name unless it is open. An evict-on-close
-// also requires cloudStale. On failure, the file stays queued.
+// also requires cloudStale. On failure, the file stays queued. A name with no
+// local file is dequeued.
 func (q *lruQueue) evict(name string, onClose bool) {
 	flock := q.fileLocks.Get(name)
 	flock.Lock()
@@ -250,6 +252,10 @@ func (q *lruQueue) evict(name string, onClose bool) {
 		return
 	}
 	if _, err := os.Stat(filepath.Join(q.localRoot, name)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Warn("lruQueue::evict : dropping %s [%v]", name, err)
+			q.Dequeue(name)
+		}
 		return
 	}
 
@@ -275,13 +281,12 @@ func (q *lruQueue) nominate(bytesNeeded int64, limit int) []string {
 
 		if q.fileLocks.Get(node.name).Count() > 0 {
 			busy = append(busy, node)
-		} else if info, err := os.Stat(filepath.Join(q.localRoot, node.name)); err != nil {
-			log.Warn("lruQueue::nominate : dropping %s [%v]", node.name, err)
-			q.extractNode(node)
-			delete(q.nodes, node.name)
 		} else {
+			// A missing file may be mid-rename; evict rechecks under the file lock.
 			names = append(names, node.name)
-			total += info.Size()
+			if info, err := os.Stat(filepath.Join(q.localRoot, node.name)); err == nil {
+				total += info.Size()
+			}
 		}
 
 		node = prev
