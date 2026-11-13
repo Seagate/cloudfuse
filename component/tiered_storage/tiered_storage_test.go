@@ -1408,7 +1408,7 @@ func TestCheckCloudReachable(t *testing.T) {
 			storage := &TieredStorage{}
 			storage.SetNextComponent(next)
 
-			err := storage.checkCloudReachable("file")
+			_, err := storage.checkCloudReachable("file")
 			if !test.wantErr {
 				assert.NoError(t, err)
 				return

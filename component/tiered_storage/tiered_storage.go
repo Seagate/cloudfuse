@@ -369,7 +369,7 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	localPath := c.localPath(options.Name)
 	cachePath := c.cachePath(options.Name)
-	if err := c.checkCloudReachable(options.Name); err != nil {
+	if _, err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
 
@@ -495,7 +495,7 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		}
 	}()
 
-	if err := c.checkCloudReachable(options.Src); err != nil {
+	if _, err := c.checkCloudReachable(options.Src); err != nil {
 		return err
 	}
 	// cache/ is not pruned, so dst may be an empty leftover there.
@@ -600,21 +600,14 @@ func (c *TieredStorage) filesUnder(dir string) ([]string, error) {
 // avoids holding locks through SDK retries and exposing mixed local/cloud
 // state. Offline, only a plain not-exist from GetAttr lets the change go
 // ahead. It is a hint: callers still handle cloud failures afterwards.
-func (c *TieredStorage) checkCloudReachable(name string) error {
-	if c.NextComponent().CloudConnected() {
-		return nil
+func (c *TieredStorage) checkCloudReachable(name string) (getAttrErr error, cloudErr error) {
+	_, getAttrErr = c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	// prevent access if we're offline and the object might exist
+	if !c.NextComponent().CloudConnected() && !errors.Is(getAttrErr, os.ErrNotExist) {
+		log.Err("TieredStorage::checkCloudReachable : %s access denied (offline)", name)
+		cloudErr = common.NewCloudUnreachableError(errors.New("cloud storage is disconnected"))
 	}
-	_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-	if err != nil && os.IsNotExist(err) {
-		return nil
-	}
-	log.Err(
-		"TieredStorage::checkCloudReachable : refusing to change %s while the cloud is disconnected [%v]",
-		name,
-		err,
-	)
-	cloudErr := common.NewCloudUnreachableError(errors.New("cloud storage is disconnected"))
-	return &cloudErr
+	return getAttrErr, cloudErr
 }
 
 // localAttr describes a local file or directory. Local modes are private, so
@@ -762,7 +755,7 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	if err := c.checkCloudReachable(options.Name); err != nil {
+	if _, err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
 
@@ -1106,8 +1099,11 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	srcCache := c.cachePath(options.Src)
 	dstLocal := c.localPath(options.Dst)
 	dstCache := c.cachePath(options.Dst)
-	_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Src})
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	err, cloudErr := c.checkCloudReachable(options.Src)
+	if cloudErr != nil {
+		log.Err("TieredStorage::RenameFile : %s offline [%v]", options.Src, cloudErr)
+		return cloudErr
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Err("TieredStorage::RenameFile : %s cloud stat failed [%v]", options.Src, err)
 		return err
 	}
