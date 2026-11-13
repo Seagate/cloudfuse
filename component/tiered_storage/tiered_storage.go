@@ -1143,12 +1143,12 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	// local
 	if from != "" {
 		if err := os.MkdirAll(filepath.Dir(to), dirPerm); err != nil {
-			log.Err("TieredStorage::RenameFile : failed to create directory for %s [%v]", to, err)
+			log.Err("TieredStorage::RenameFile : %s dst directory creation failed [%v]", to, err)
 			return err
 		}
 		replaced, replacedErr := os.Stat(to)
 		if err := os.Rename(from, to); err != nil {
-			log.Err("TieredStorage::RenameFile : failed to rename %s -> %s [%v]", from, to, err)
+			log.Err("TieredStorage::RenameFile : %s -> %s failed [%v]", from, to, err)
 			return err
 		}
 		// The rename overwrote dst's copy in this tree, even if later reverted.
@@ -1158,25 +1158,21 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	// cloud
-	cloudErr := c.NextComponent().RenameFile(options)
-	neverUploaded := from == srcLocal && errors.Is(cloudErr, os.ErrNotExist)
+	err := c.NextComponent().RenameFile(options)
+	neverUploaded := from == srcLocal && errors.Is(err, os.ErrNotExist)
 	if neverUploaded {
 		// don't leave a dangling object at dst in the cloud
 		_ = c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Dst})
-	} else if cloudErr != nil && from != "" {
-		// revert local rename if cloud rename failed
-		if err := os.Rename(to, from); err != nil {
-			// complain loudly if names diverge
-			log.Err(
-				"TieredStorage::RenameFile : %s -> %s failed in cloud, and revert %s -> %s failed; local and cloud have diverged! [%v]",
-				options.Src,
-				options.Dst,
-				to,
-				from,
-				err,
-			)
+	} else if err != nil {
+		log.Err("TieredStorage::RenameFile : %s -> %s failed [%v]", options.Src, options.Dst, err)
+		if from != "" {
+			log.Info("TieredStorage::RenameFile : %s -> %s reverting...", from, to)
+			// revert local rename
+			if err := os.Rename(to, from); err != nil {
+				log.Err("TieredStorage::RenameFile : %s -> %s revert failed! [%v]", from, to, err)
+			}
 		}
-		return cloudErr
+		return err
 	}
 
 	// dst may have had a copy in the other tree. It was replaced, so drop it.
