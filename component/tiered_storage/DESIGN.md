@@ -276,6 +276,17 @@ Same pattern as Chmod. On upload, owner and group are read from the local file
 (Linux only). If the process cannot chown the local file, the change is not
 preserved for local-owned files. This loss is accepted.
 
+### Symlinks
+
+Symlinks are local-only and never followed; the kernel resolves them.
+
+- `CreateLink` creates the link in `local/`, failing with `EEXIST` if the name
+  exists anywhere. `ReadLink` reads only `local/`.
+- Paths under the tiered root are `Lstat`ed, never `Stat`ed. `OpenFile`
+  refuses a link with `ELOOP`.
+- Links never enter the LRU, and eviction drops any name that is not a regular
+  file, so a link's target is never uploaded.
+
 ## Directory operations
 
 Directories are not tracked by ownership. A directory exists in the virtual
