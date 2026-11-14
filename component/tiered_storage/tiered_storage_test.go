@@ -1892,6 +1892,7 @@ func (suite *tieredStorageTestSuite) TestSymlink() {
 	listed := listDir(suite.T(), suite.tieredStorage, "dir")
 	suite.Require().Len(listed, 1)
 	suite.assert.True(listed[0].IsSymlink())
+	suite.assert.EqualValues(len(link.Target), listed[0].Size)
 
 	_, err = suite.loopback.GetAttr(internal.GetAttrOptions{Name: link.Name})
 	suite.assert.ErrorIs(err, os.ErrNotExist)

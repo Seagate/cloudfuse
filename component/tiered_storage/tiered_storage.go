@@ -434,7 +434,7 @@ func (c *TieredStorage) StreamDir(
 				continue
 			}
 			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
-			page = append(page, localAttr(entryName, info))
+			page = append(page, c.localAttr(entryName, info))
 		}
 	}
 
@@ -613,8 +613,13 @@ func (c *TieredStorage) checkCloudReachable(name string) (getAttrErr error, clou
 
 // localAttr describes a local file or directory. Local modes are private, so
 // the configured default mode is reported instead.
-func localAttr(name string, info fs.FileInfo) *internal.ObjAttr {
+func (c *TieredStorage) localAttr(name string, info fs.FileInfo) *internal.ObjAttr {
 	attr := internal.NewLocalObjAttr(name, info)
+	if info.Mode()&os.ModeSymlink != 0 {
+		if target, err := os.Readlink(c.localPath(name)); err == nil {
+			attr.Size = int64(len(target))
+		}
+	}
 	attr.Flags.Set(internal.PropFlagModeDefault)
 	return attr
 }
@@ -1287,7 +1292,7 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	localPath := c.localPath(options.Name)
 	info, err := os.Lstat(localPath)
 	if err == nil {
-		return localAttr(options.Name, info), nil
+		return c.localAttr(options.Name, info), nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
