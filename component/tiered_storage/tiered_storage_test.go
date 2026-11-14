@@ -1913,18 +1913,25 @@ func (suite *tieredStorageTestSuite) TestSymlinkIsNeverFollowed() {
 	suite.Require().NoError(suite.tieredStorage.FileUsed("link"))
 	suite.assert.False(queued(policy, "link"))
 
-	// a link renamed over an open file is not enqueued on release
-	handle, err := suite.tieredStorage.CreateFile(
-		internal.CreateFileOptions{Name: "file", Mode: 0644},
-	)
-	suite.Require().NoError(err)
-	suite.Require().NoError(suite.tieredStorage.RenameFile(
-		internal.RenameFileOptions{Src: "link", Dst: "file"},
-	))
-	suite.Require().NoError(suite.tieredStorage.ReleaseFile(
-		internal.ReleaseFileOptions{Handle: handle},
-	))
-	suite.assert.False(queued(policy, "file"))
+	if runtime.GOOS == "windows" {
+		// Windows cannot rename over an open destination file.
+		suite.Require().NoError(suite.tieredStorage.RenameFile(
+			internal.RenameFileOptions{Src: "link", Dst: "file"},
+		))
+	} else {
+		// A link renamed over an open file is not enqueued on release.
+		handle, err := suite.tieredStorage.CreateFile(
+			internal.CreateFileOptions{Name: "file", Mode: 0644},
+		)
+		suite.Require().NoError(err)
+		suite.Require().NoError(suite.tieredStorage.RenameFile(
+			internal.RenameFileOptions{Src: "link", Dst: "file"},
+		))
+		suite.Require().NoError(suite.tieredStorage.ReleaseFile(
+			internal.ReleaseFileOptions{Handle: handle},
+		))
+		suite.assert.False(queued(policy, "file"))
+	}
 
 	// eviction drops a link without uploading it
 	policy.Enqueue("file")
