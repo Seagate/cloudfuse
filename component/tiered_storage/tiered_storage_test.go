@@ -1884,7 +1884,7 @@ func (suite *tieredStorageTestSuite) TestSymlink() {
 
 	target, err := suite.tieredStorage.ReadLink(internal.ReadLinkOptions{Name: link.Name})
 	suite.Require().NoError(err)
-	suite.assert.Equal(link.Target, target)
+	suite.assert.Equal(link.Target, filepath.ToSlash(target))
 	attr, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: link.Name})
 	suite.Require().NoError(err)
 	suite.assert.True(attr.IsSymlink())
