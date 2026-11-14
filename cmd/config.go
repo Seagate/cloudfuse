@@ -1368,7 +1368,7 @@ func (tui *appContext) validateCachePath() error {
 // Helper function to get the available disk space at the cache location and calculates
 // the cache size in GB based on the user-defined cache size percentage.
 func (tui *appContext) getAvailableCacheSize() error {
-	availableBlocks, _, err := common.GetAvailFree(tui.config.cacheLocation)
+	availableCacheSizeBytes, _, err := common.GetAvailFree(tui.config.cacheLocation)
 	if err != nil {
 		// If we fail to get the available cache size, we default to 80% of the available disk space
 		tui.config.cacheSize = "80"
@@ -1380,8 +1380,6 @@ func (tui *appContext) getAvailableCacheSize() error {
 		return returnMsg
 	}
 
-	const blockSize = 4096
-	availableCacheSizeBytes := availableBlocks * blockSize // Convert blocks to bytes
 	tui.config.availableCacheSizeGB = int(
 		availableCacheSizeBytes / (1024 * 1024 * 1024),
 	) // Convert to GB

@@ -1,0 +1,532 @@
+# Tiered Storage Design
+
+This document is the implementation reference for the `tiered_storage` component.
+It describes the target design. Where the current code differs, the code should
+be changed to match this document.
+
+## Purpose
+
+`tiered_storage` lets applications keep data on local storage without backing it
+up to the cloud. When local capacity runs low, the least recently used files are
+moved (evicted) to cloud storage. Evicted files remain accessible: opening one
+downloads a temporary copy, which is discarded when the file is closed.
+
+## Guiding principles
+
+- **Simplicity over perfect correctness.** The component has few users. Prefer a
+  small, understandable state machine over exhaustive bookkeeping.
+- **One authority per file.** At any moment, either the local copy or the cloud
+  copy of a file is authoritative, never both.
+- **Authority is encoded in the filesystem layout**, not in metadata. Recovery
+  after a crash requires no persisted state.
+- **Fail early.** Check everything that can be checked cheaply before changing
+  anything, and order steps so that the hardest-to-undo step runs last.
+
+## Assumptions and non-goals
+
+- A single mounted instance owns the cloud namespace. Concurrent writers to the
+  same bucket/container are unsupported; a stale local file may overwrite a newer
+  cloud object.
+- Local-owned data is intentionally **not** protected against loss of the local
+  disk. Keeping data local is the purpose of the component. The one exception
+  is [evict on close](#evict-on-close): a file that was modified after coming
+  from the cloud is uploaded and evicted after its last close, so the cloud
+  does not keep serving outdated content.
+- Every recovery edge case need not be perfect. Rare failures (for example, a
+  failed revert of a local rename) are logged and otherwise ignored.
+- The tiered root is a dedicated directory owned by cloudfuse. It is never
+  exposed to users or listed directly.
+
+## On-disk layout
+
+```text
+<tiered_root>/            # configured by tiered_storage.path
+  local/                  # authoritative local files (local-owned)
+  cache/                  # disposable copies of cloud-owned files
+```
+
+Object `dir/file` maps to `<tiered_root>/local/dir/file` or
+`<tiered_root>/cache/dir/file`. A file exists in at most one of the two trees.
+
+Both trees are on the same filesystem, so moving a file between them is an
+atomic rename.
+
+There is no staging directory and no partial-download suffix. `cache/` is
+disposable by definition, so a partially downloaded file in `cache/` needs the
+same recovery as a complete one: deletion at startup. The per-file lock
+serializes `OpenFile`, so no other opener can observe a partial download.
+
+There is no state snapshot.
+
+## Ownership states
+
+| State | Local location | Authoritative copy | Cloud copy |
+|---|---|---|---|
+| Local-owned | `local/` | Local | Absent or stale |
+| Cloud-owned, open | `cache/` | Cloud | Current |
+| Cloud-owned, closed | none | Cloud | Current |
+
+Transitions:
+
+| From | To | Trigger | Mechanism |
+|---|---|---|---|
+| (none) | Local-owned | Create | Create file in `local/` |
+| Cloud-owned, closed | Cloud-owned, open | Open | Download into `cache/` |
+| Cloud-owned, closed | Local-owned | Open with `O_TRUNC` | Create empty file in `local/`; no download |
+| Cloud-owned, open | Local-owned (`cloudStale`) | First mutation (write, truncate) | Rename `cache/x` → `local/x` before acknowledging |
+| Cloud-owned, open | Cloud-owned, closed | Last close | Delete `cache/x` |
+| Local-owned | Cloud-owned, closed | Eviction | Upload, then delete `local/x` |
+| Local-owned (`cloudStale`) | Cloud-owned, closed | Last close | Evict on close: same as eviction, but not limited by thresholds |
+
+Consequences:
+
+- Files in `cache/` are always clean. Any mutation promotes them first.
+- Files in `local/` are always treated as needing upload before deletion.
+- Location alone decides ownership. The only per-file hint,
+  `cloudStale`, is in memory only. Losing it is safe: the file stays
+  local-owned and is uploaded at normal eviction.
+
+## In-memory state
+
+- **Per-object file locks** (`common.LockMap`), with open-handle counts.
+- **LRU queue** of local-owned files, used for eviction.
+- **Cache size tracker**, covering both `local/` and `cache/`.
+- **Cache-copy handle mark**: a value in the handle's metadata, guarded by the
+  handle lock, set on handles opened on a `cache/` copy and removed when they
+  promote. It is a hint that lets writes on other handles skip promotion
+  without taking the file lock. Whether `x` is in `cache/` is still decided by
+  name, from the layout, under the file lock. The mark is per handle, not per
+  name, because a rename can change a handle's name while a write is checking
+  it. A handle's file never moves back into `cache/`, so the mark can be stale
+  only in the safe direction: after another handle promotes the file, this
+  handle's next write costs one extra lock and `stat`. This is not
+  `handlemap.HandleFlagCached`, which tells libfuse to read the file object
+  directly and bypass the pipeline. Tiered storage never sets that flag.
+- **`cloudStale` flag** (`common.LockMapItem.CloudStale`) on each object's file
+  lock item, guarded by that lock. When it is set, a cloud copy is known to
+  exist and to be outdated, so the file should be
+  [evicted on close](#evict-on-close). It has its own field instead of reusing
+  `file_cache`'s `DownloadTime` or the dirty-handle count, which mean
+  something different.
+  - Set on promotion (`cache/x` → `local/x`) and on an `O_TRUNC` open of a
+    cloud-owned file. Both of these already hold the file lock, and the cloud
+    copy is known to exist at that moment, so no network call is needed.
+  - Cleared when the file leaves `local/` (eviction or delete), or when a cloud
+    rename returns `ENOENT`.
+  - Not persisted or recovered after a restart.
+
+## Startup
+
+`Configure`:
+
+1. Ensure `<tiered_root>` exists.
+2. If `<tiered_root>` contains entries other than `local/`, `cache/`, and OS-managed volume entries, fail with a clear error.
+3. `RemoveAll(cache/)`, then recreate `local/` and `cache/`.
+4. If `max-size-mb` is not set, default it to 80% of free space plus the size of `local/`, since `local/` persists across mounts.
+
+`Start`:
+
+1. Walk `local/`. Every regular file is local-owned. Enqueue them in the LRU,
+   ordered by modification time (oldest at the tail).
+2. Start the eviction policy.
+
+## Shutdown
+
+Stop the eviction policy and wait for in-flight uploads. Pending evictions that
+have not started uploading are dropped. Leave `local/` in place.
+Nothing is persisted. `cache/` contents are discarded on next start.
+
+## Cloud connectivity rule
+
+Operations that change the namespace of something which might exist in the
+cloud (delete, rename) check `NextComponent().CloudConnected()` **after taking
+locks and before making any change**. If the cloud is not connected, they check
+`NextComponent().GetAttr()` as well. If there's no connection, and GetAttr returns
+anything other than a simple error satisfying os.IsNotExist(err), they fail immediately.
+No network call is made by these checks.
+
+Rationale:
+
+- Fails fast instead of holding locks while SDK retries and timeouts elapse.
+- Avoids exposing transient mixed state to listings and lookups, which do not
+  take file locks.
+- Avoids rename-then-revert churn visible to watchers, Explorer, and antivirus.
+
+The flag is a hint. Operations still handle cloud failures after the check.
+
+Writing to and creating local files does not require connectivity.
+
+## File operations
+
+### CreateFile / OpenFile with O_CREATE on a nonexistent object
+
+1. Take the file lock.
+2. Fail with `EEXIST` if the object exists locally or in the cloud.
+3. `MkdirAll` the parent in `local/`; create the file in `local/`.
+4. Return a handle.
+
+### OpenFile on an existing object
+
+1. Take the file lock.
+2. If `local/x` exists: open it.
+3. Else if `cache/x` exists (another handle has it open): open it.
+4. Else (cloud-owned, closed):
+   - With `O_TRUNC`: create an empty `local/x` and set `cloudStale`. The file
+     is now local-owned.
+   - Otherwise: download directly into `cache/x`. On failure (including
+     `ENOSPC` from the local filesystem), delete `cache/x` and return the
+     error.
+5. Increment the open count and return a handle.
+
+### WriteFile / TruncateFile
+
+1. If the handle's file is in `cache/`, take the file lock and promote: rename
+   `cache/x` → `local/x`, set `cloudStale`, then enqueue it in the LRU. Open
+   handles remain valid (see [Windows semantics](#windows-semantics)).
+2. Write/truncate the local file. There is no size pre-check. If the local
+   filesystem returns `ENOSPC`, return it to the caller.
+
+Promotion happens before the write is acknowledged, so an acknowledged write is
+always in `local/` and survives a crash.
+
+Promotion never replaces an existing `local/x`. If both exist, `cache/x` is a
+stray left by a failed cleanup, so it is deleted instead.
+
+### FlushFile / SyncFile
+
+Sync the local file. No upload.
+
+Uploading on flush would only protect local-owned data from local disk loss,
+which is a non-goal. Modified cloud files are uploaded after the last close
+instead (see [Evict on close](#evict-on-close)), so files that are flushed
+repeatedly while open are uploaded at most once per close.
+
+### ReleaseFile
+
+1. Take the file lock, decrement the open count, close the file.
+2. If other handles remain open, return.
+3. If the file is in `cache/`: delete it.
+4. If the file is in `local/`: enqueue it in the LRU. If `cloudStale` is set,
+   start an [evict on close](#evict-on-close) goroutine.
+
+### ReadInBuffer
+
+Read from the handle's file. No locking or state changes.
+
+### GetAttr
+
+1. If `local/x` exists, return its attributes. No cloud call.
+2. Otherwise return the cloud attributes.
+
+`cache/` copies are identical to the cloud object, so they never need to be
+consulted.
+
+### DeleteFile
+
+1. Take the file lock.
+2. Check cloud connectivity; fail early if disconnected.
+3. Delete in the cloud. Ignore `ENOENT` (a local-owned file may never have been
+   uploaded). Return any other error. Nothing has changed locally.
+4. Delete `local/x` or `cache/x` if present. Open handles remain valid.
+5. Remove the object from the LRU.
+
+The cloud delete runs first so a stale cloud copy can never resurface after the
+local copy is gone.
+
+### RenameFile
+
+1. Take both file locks in lexical order. A rename to itself does nothing.
+2. Check cloud connectivity; fail early if disconnected.
+3. Fail early if the destination exists and replacing it is not permitted
+   (`local/dst` is a directory).
+4. If the source is in `local/` or `cache/`: `MkdirAll` the destination parent
+   and rename the local file. If the source is in `cache/` and `local/dst`
+   exists, rename it over `local/dst`, so the replacement is atomic. The file
+   becomes local-owned, which costs at most a redundant upload.
+5. Rename in the cloud.
+   - `ENOENT` is acceptable if the source was in `local/` (never uploaded).
+   - On any other failure, rename the local file back and return the error. If
+     the revert fails, log an error naming both paths and stating that local and
+     cloud have diverged, then return the original error.
+6. If a replaced destination had a copy in the other tree (for example
+   `cache/dst` when `local/src` moved in), delete it, so the object is in at
+   most one tree. This runs only after the cloud rename succeeds, so a failed
+   rename cannot lose an authoritative `local/dst`.
+7. Update in-memory state: LRU entry, open-handle paths, lock counts. The
+   `cloudStale` flag moves with the file. If the cloud rename returned
+   `ENOENT`, clear it.
+
+A stale cloud copy of a local-owned file is renamed along with it, which is
+harmless: evict on close or normal eviction will overwrite it.
+
+### Permissions
+
+Chmod, chown, and all permissions mode bits are ignored. Default mode, set at mount, is used for everything.
+
+### Symlinks
+
+Symlinks are local-only and never followed; the kernel resolves them.
+
+- `CreateLink` creates the link in `local/`, failing with `EEXIST` if the name
+  exists anywhere. `ReadLink` reads only `local/`.
+- Paths under the tiered root are `Lstat`ed, never `Stat`ed. `OpenFile`
+  refuses a link with `ELOOP`.
+- Links never enter the LRU, and eviction drops any name that is not a regular
+  file, so a link's target is never uploaded.
+
+## Directory operations
+
+Directories are not tracked by ownership. A directory exists in the virtual
+namespace if it exists in the cloud or in `local/`.
+
+### CreateDir
+
+1. Fail with `EEXIST` if the directory exists in either place.
+2. Create it in `local/` and in the cloud (ignore cloud `EEXIST`).
+
+### DeleteDir
+
+1. Check cloud connectivity; fail early if disconnected.
+2. Delete in the cloud (ignore `ENOENT`).
+3. Remove `local/<dir>` and `cache/<dir>` if present.
+4. Return `ENOENT` only if it existed nowhere.
+
+### IsDirEmpty
+
+Empty only if `local/<dir>` is empty or missing **and** the cloud directory is
+empty.
+
+### StreamDir
+
+Merge cloud entries with `local/<dir>` entries. For entries present in both,
+local attributes win, as in `GetAttr`. Local entries are `Lstat`ed
+individually, because directory data can be stale on Windows for files being
+written. `cache/` is never listed. No name filtering is needed,
+because the tiered root is never exposed.
+
+### RenameDir
+
+1. List the files under `local/src` and `cache/src`, then lock each one and
+   its destination name. No name can appear under `src` meanwhile, because
+   the FUSE layer serializes a directory rename against everything beneath it
+   (see [Locking](#locking)).
+2. Check cloud connectivity; fail early if disconnected.
+3. Cheap pre-checks: source exists, destination is missing or an empty
+   directory, destination parent can be created.
+4. **Rename locally first**: `local/src` → `local/dst`, then `cache/src` →
+   `cache/dst`, for whichever exist. Use `syscall.Rename` so the host OS rules
+   apply: Linux replaces an empty `local/dst`, Windows refuses any existing one.
+   Remove a leftover empty `cache/dst` first, since the host can't see it.
+   If a local rename fails, revert any earlier local rename and return the
+   error. Map Windows access-denied errors to `EBUSY`.
+   A failed rename may lose the replaced empty `local/dst`; this is accepted.
+5. **Rename in the cloud last.** On failure, revert the local renames in
+   reverse order and return the error. If a revert fails, log an error naming
+   both paths and stating that local and cloud have diverged.
+6. Update in-memory state: LRU entries, open-handle paths, lock counts, and
+   `cloudStale` flags, which move with their files.
+
+Why local first:
+
+| Step | Can fail unpredictably | Cheap to undo |
+|---|---|---|
+| Local rename | Yes (Windows, open files) | Yes |
+| Cloud rename | Yes (S3 is copy+delete per object; partial failure possible) | No |
+
+The hardest-to-undo step runs last. A partial cloud failure leaves the cloud in
+a mixed state regardless of ordering; local-first does not make that worse.
+
+No Windows-specific open-file pre-check is needed. On Windows, NTFS refuses to
+rename a directory while any file beneath it is open, even with
+`FILE_SHARE_DELETE`. Because the local rename runs first, that refusal is the
+early failure, and it also covers handles held by other processes (antivirus,
+indexer, Explorer) that a handle-count check would miss. Linux keeps its native
+behavior of allowing the rename.
+
+## Eviction
+
+Eviction is always asynchronous. It runs only in the background LRU policy,
+which triggers when usage exceeds `high-threshold` and evicts until usage is
+below `low-threshold`. File operations never evict, and never wait for eviction.
+
+Threshold passes and [evict on close](#evict-on-close) each run on their own
+goroutine, one batch at a time, with up to 8 uploads in parallel per batch.
+Candidates stay in the LRU until they are evicted. If both pick the same file,
+the file lock serializes them and the second finds nothing to do.
+
+Rationale: synchronous eviction makes a write wait on cloud uploads, holds the
+writer's file lock across network calls, and adds a second eviction entry point
+with its own locking and target calculation. Letting writes fail with the
+local filesystem's `ENOSPC` is simpler and predictable. Users size
+`max-size-mb` and the thresholds so the background policy keeps headroom for
+their write rate.
+
+For each candidate, with its file lock held:
+
+1. Skip it if it has open handles. If `local/x` is gone, remove it from the
+   LRU and skip it.
+2. Upload `local/x` to the cloud.
+3. On upload failure: leave the file in place and keep it eligible for later
+   eviction.
+4. On success: delete `local/x` and remove it from the LRU.
+
+Empty directories left in `local/` are not pruned. They are harmless.
+
+### Evict on close
+
+A local-owned file with `cloudStale` set is evicted as soon as it is closed
+for the last time, whatever the usage thresholds say. A file that came from
+the cloud therefore returns to the cloud once it is no longer in use. The cloud
+copy does not stay stale until LRU eviction reaches the file, which may never
+happen for a frequently used file. It only affects files with `cloudStale`
+set. It is not configurable; an option can be added if users ask for one.
+
+`ReleaseFile` adds the name to a set of pending requests, wakes the
+evict-on-close goroutine, and returns. It never uploads inline. For each
+pending name, that goroutine takes the file lock, removes the request, and:
+
+1. Skips the file if it is no longer in `local/` or `cloudStale` is no longer
+   set. A file that was reopened is skipped by the eviction steps, because it
+   has open handles. Its next close makes a new request.
+2. Runs the [eviction](#eviction) steps for that file.
+3. On upload failure: logs the error. The file stays local-owned with
+   `cloudStale` set. It is retried at its next close or by normal eviction.
+   There is no retry loop.
+
+No connectivity pre-check is made. If the cloud is disconnected, the upload
+fails and the file stays local.
+
+Files without `cloudStale` set are not affected. Data created locally, and
+any file after a restart, stays local until threshold-driven eviction.
+
+Trade-off: a cloud file that is modified often is downloaded again on each
+reopen, as unmodified cloud files already are.
+
+## Capacity accounting
+
+- There is no space reservation. Writes, truncates, and downloads proceed
+  without checking size. `max-size-mb` is not a hard limit; it is only the
+  basis for `high-threshold` and `low-threshold`. Usage can temporarily exceed
+  it while background eviction catches up.
+- The only hard limit is the free space of the local filesystem. When it is
+  full, the filesystem's `ENOSPC` is passed up the call stack unchanged. This
+  can happen even though older files could have been evicted. This is a known
+  limitation, documented with the thresholds in `setup/baseConfig.yaml` and
+  `setup/advancedConfig.yaml`. The application may retry once background
+  eviction has freed space.
+- Usage is tracked incrementally after each write, truncate, download, and
+  delete, and periodically reconciled by measuring `local/` and `cache/`. Other
+  entries in `<tiered_root>` are not counted. Only the eviction policy reads it.
+
+## Locking
+
+- Per-object file locks serialize open, release, promotion, delete, rename, and
+  eviction for that object.
+- File operations never block on eviction.
+- `cloudStale` is only read or changed with the file lock held.
+- Lock order: file lock(s), then the LRU queue mutex. Never take a file lock
+  while holding the LRU queue mutex.
+- `RenameDir` relies on the FUSE layer for atomicity against other
+  operations. libfuse's high-level API write-locks the renamed path, so every
+  operation whose path passes through it waits until the rename returns. That
+  includes operations on open handles, because cgofuse does not set
+  `nullpath_ok`. WinFsp takes its volume rename lock exclusively for a rename
+  and shared for every create. Without this, a file created, opened, or renamed
+  under `src` after `RenameDir` lists it would be moved on disk without its
+  in-memory state (handle path, lock counts, LRU entry, cache-copy mark). An
+  acknowledged write could then land in a `cache/` copy that is later deleted,
+  or the local and cloud names could diverge. Moving to libfuse's low-level
+  API, or enabling `nullpath_ok`, would require a component-level lock here.
+  Background eviction does not depend on this; it is covered by file locks.
+- Operations on a handle lock the file lock for `handle.Path` directly. A
+  rename cannot change that path during the callback: libfuse holds the
+  handle's path lock for the whole callback, and WinFSP serializes a rename
+  with I/O on the same file through its file-node lock.
+- Multi-object operations take file locks in lexical order.
+- `GetAttr` and `StreamDir` do not take file locks. They rely on atomic renames
+  and on the connectivity pre-check to keep mixed-state windows short.
+
+## Windows semantics
+
+`common.OpenFile` opens files on Windows with
+`FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE`. This gives Linux-like
+behavior and allows a single code path:
+
+- **Promotion** renames an open file from `cache/` to `local/`; handles stay
+  valid.
+- **Delete while open** removes the file immediately; handles stay valid. No
+  delete-on-last-close tracking is needed.
+- **`replaceFile` is unnecessary.** Go's `os.Rename` on Windows already replaces
+  an existing destination. Use `os.Rename` directly.
+
+Limits:
+
+- Only handles opened through `common.OpenFile` have `FILE_SHARE_DELETE`. Always
+  use it for files under the tiered root (not `os.Open` or `os.CreateTemp`).
+  Other processes can still hold blocking handles, so delete/rename failures
+  during eviction and cleanup must be treated as retryable.
+- Directory renames fail while any file beneath is open (handled by
+  local-first ordering in `RenameDir`).
+- On older Windows delete semantics, a deleted-but-open file keeps its name
+  reserved until the last handle closes, blocking re-creation and parent
+  directory removal. This is acceptable behavior.
+
+## Crash recovery
+
+No recovery bookkeeping exists. Startup clears `cache/` and treats all of
+`local/` as authoritative.
+
+| Crash point | Outcome after restart |
+|---|---|
+| During download into `cache/` | Partial file deleted; cloud remains authoritative |
+| While a cloud file is open, unmodified | Cache copy deleted; cloud remains authoritative |
+| After promotion, before the write | Unchanged file in `local/`; one redundant upload on eviction |
+| After an acknowledged write | Data is in `local/`; preserved |
+| Before or during evict on close | `cloudStale` is lost; the file stays local-owned and the cloud copy stays stale until normal eviction |
+| During eviction upload | Local copy still authoritative; eviction retries |
+| After upload, before local delete | Redundant re-upload on next eviction |
+| During delete, after cloud delete | Local copy remains; user-visible as existing; delete can be retried |
+| During file/directory rename, between local and cloud steps | Local and cloud names diverge; accepted as rare |
+
+## Required tests
+
+- Startup clears `cache/`, recovers `local/` into the LRU by mtime, fails on
+  unexpected root entries, and ignores OS-managed root entries without counting
+  them toward usage.
+- Open of a cloud file downloads into `cache/`; last close deletes it.
+- First write to a cached file promotes it to `local/` while handles remain
+  valid.
+- `O_TRUNC` open of a cloud file creates an empty local-owned file without
+  downloading.
+- Delete and rename fail early when the cloud is disconnected, with no local
+  change.
+- `RenameFile` and `RenameDir` revert local renames when the cloud rename fails.
+- `RenameDir` collects affected names after taking locks.
+- Eviction skips open files, keeps files on upload failure, and deletes them on
+  success.
+- `cloudStale` is set by promotion and by `O_TRUNC` of a cloud file, is not
+  set by create, and is unset after a restart.
+- Last close of a `cloudStale` file evicts it (upload, then delete `local/x`)
+  regardless of thresholds. It is not evicted if it was reopened, deleted, or
+  renamed first.
+- Last close of a locally created file does not evict it.
+- A failed evict on close leaves the file in `local/` with `cloudStale` set,
+  and does not retry until the next close or normal eviction.
+- Writes and downloads are not size-checked: usage may exceed `max-size-mb`,
+  and an `ENOSPC` from the local filesystem is returned to the caller
+  unchanged (for downloads, after deleting the partial `cache/x`).
+- Windows: renaming a directory containing a file opened via `common.OpenFile`
+  fails cleanly, before any change, and is reported as `EBUSY`.
+- Windows: promotion and delete of open files succeed with handles remaining
+  usable.
+
+## Backlog - do not implement
+
+Ideas deferred to keep the current design simple. They are recorded here so
+they are not lost. Do not implement any of them until they are moved into the
+design above.
+
+- **Hard limit.** An option (like `file_cache`'s `hard-limit`) that enforces
+  `max-size-mb`. Writes, truncates, and downloads that would exceed it fail
+  with `ENOSPC` before touching the local filesystem, instead of relying on the
+  filesystem running out of space.

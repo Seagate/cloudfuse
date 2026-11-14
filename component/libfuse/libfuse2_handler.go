@@ -1066,6 +1066,12 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 		return -fuse.ENOENT
 	}
 
+	// protect other components from identical renames (although we may never see one in practice)
+	if srcPath == dstPath {
+		log.Warn("Libfuse::Rename : src and dst are identical: %s", srcPath)
+		return 0
+	}
+
 	srcAttr, srcErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: srcPath})
 	if srcErr != nil {
 		log.Err("Libfuse::Rename : Failed to get attributes of %s [%s]", srcPath, srcErr.Error())

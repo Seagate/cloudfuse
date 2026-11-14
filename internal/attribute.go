@@ -26,8 +26,10 @@
 package internal
 
 import (
+	"io/fs"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -67,6 +69,35 @@ func CreateObjAttrDir(path string) (attr *ObjAttr) {
 	attr.Flags = NewDirBitMap()
 	attr.Flags.Set(PropFlagModeDefault)
 
+	return attr
+}
+
+// NewLocalObjAttr creates object attributes for a file on the local disk.
+func NewLocalObjAttr(path string, info fs.FileInfo) *ObjAttr {
+	atime, ctime := common.GetFileTimes(info)
+	attr := &ObjAttr{
+		Path:  path,
+		Name:  info.Name(),
+		Size:  info.Size(),
+		Mode:  info.Mode(),
+		Mtime: info.ModTime(),
+		Atime: atime,
+		Ctime: ctime,
+	}
+
+	if runtime.GOOS == "windows" {
+		attr.Path = common.NormalizeObjectName(attr.Path)
+		attr.Name = common.NormalizeObjectName(attr.Name)
+		// Windows has no POSIX permissions; let libfuse supply the default.
+		attr.Mode &^= os.ModePerm
+		attr.Flags.Set(PropFlagModeDefault)
+	}
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		attr.Flags.Set(PropFlagSymlink)
+	} else if info.IsDir() {
+		attr.Flags.Set(PropFlagIsDir)
+	}
 	return attr
 }
 

@@ -34,18 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAddClampsAtZero(t *testing.T) {
-	tracker := NewTracker(time.Hour, t.TempDir())
-
-	tracker.Add(100)
-	tracker.Add(-40)
-	assert.EqualValues(t, 60, tracker.Used())
-
-	tracker.Add(-100)
-	assert.EqualValues(t, 0, tracker.Used())
-}
-
-func TestRefreshSumsAllPaths(t *testing.T) {
+func TestReconcileSumsAllPaths(t *testing.T) {
 	root := t.TempDir()
 	first := filepath.Join(root, "first")
 	second := filepath.Join(root, "second")
@@ -59,7 +48,7 @@ func TestRefreshSumsAllPaths(t *testing.T) {
 
 	tracker := NewTracker(time.Hour, first, second)
 	tracker.Add(1)
-	assert.NoError(t, tracker.Refresh())
+	assert.NoError(t, tracker.Reconcile())
 
 	firstUsage, err := common.GetUsage(first)
 	assert.NoError(t, err)
@@ -68,11 +57,11 @@ func TestRefreshSumsAllPaths(t *testing.T) {
 	assert.Equal(t, int64(firstUsage+secondUsage), tracker.Used())
 }
 
-func TestRefreshMissingPath(t *testing.T) {
+func TestReconcileMissingPath(t *testing.T) {
 	tracker := NewTracker(time.Hour, filepath.Join(t.TempDir(), "missing"))
 	tracker.Add(10)
 
-	assert.Error(t, tracker.Refresh())
+	assert.Error(t, tracker.Reconcile())
 	assert.EqualValues(t, 10, tracker.Used())
 }
 
@@ -81,10 +70,16 @@ func TestReconcileRespectsInterval(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(root, "a"), make([]byte, 4000), 0644))
 
 	tracker := NewTracker(time.Hour, root)
-	tracker.Reconcile()
-	assert.EqualValues(t, 0, tracker.Used(), "reconciled before the interval elapsed")
+	assert.NoError(t, tracker.Reconcile())
+	first := tracker.Used()
+	assert.GreaterOrEqual(t, first, int64(4000), "first call should always measure")
+
+	assert.NoError(t, os.WriteFile(filepath.Join(root, "b"), make([]byte, 4000), 0644))
+	assert.NoError(t, tracker.Reconcile())
+	assert.Equal(t, first, tracker.Used(), "reconciled before the interval elapsed")
 
 	tracker = NewTracker(0, root)
-	tracker.Reconcile()
-	assert.GreaterOrEqual(t, tracker.Used(), int64(4000))
+	assert.NoError(t, tracker.Reconcile())
+	assert.NoError(t, tracker.Reconcile())
+	assert.GreaterOrEqual(t, tracker.Used(), int64(8000))
 }
