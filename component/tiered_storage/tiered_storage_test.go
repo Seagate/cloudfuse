@@ -1388,11 +1388,8 @@ func TestCheckCloudReachable(t *testing.T) {
 		{name: "offline, not in cloud", getAttr: syscall.ENOENT},
 		{name: "offline, in cloud", wantErr: true},
 		{
-			name: "offline, unknown",
-			getAttr: func() error {
-				err := common.NewNoCachedDataError(syscall.ENOENT)
-				return &err
-			}(),
+			name:    "offline, unknown",
+			getAttr: common.NewNoCachedDataError(&common.CloudUnreachableError{}),
 			wantErr: true,
 		},
 	}
@@ -1401,10 +1398,8 @@ func TestCheckCloudReachable(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			next := internal.NewMockComponent(ctrl)
 			next.EXPECT().CloudConnected().Return(test.connected)
-			if !test.connected {
-				next.EXPECT().GetAttr(internal.GetAttrOptions{Name: "file"}).
-					Return(&internal.ObjAttr{}, test.getAttr)
-			}
+			next.EXPECT().GetAttr(internal.GetAttrOptions{Name: "file"}).
+				Return(&internal.ObjAttr{}, test.getAttr)
 			storage := &TieredStorage{}
 			storage.SetNextComponent(next)
 
