@@ -82,8 +82,7 @@ Consequences:
 
 - Files in `cache/` are always clean. Any mutation promotes them first.
 - Files in `local/` are always treated as needing upload before deletion.
-- Location alone decides ownership. No per-file `cloudBacked`, `isDirty`,
-  `modeDirty`, or `ownerDirty` flags are needed. The only per-file hint,
+- Location alone decides ownership. The only per-file hint,
   `cloudStale`, is in memory only. Losing it is safe: the file stays
   local-owned and is uploaded at normal eviction.
 
@@ -115,9 +114,6 @@ Consequences:
   - Cleared when the file leaves `local/` (eviction or delete), or when a cloud
     rename returns `ENOENT`.
   - Not persisted or recovered after a restart.
-
-Nothing else is required. File size, mode, and owner are read from the local
-file when needed.
 
 ## Startup
 
@@ -263,18 +259,9 @@ local copy is gone.
 A stale cloud copy of a local-owned file is renamed along with it, which is
 harmless: evict on close or normal eviction will overwrite it.
 
-### Chmod
+### Permissions
 
-- `local/x` exists: chmod the local file only. The mode is applied to the cloud
-  object when the file is uploaded (Linux only; see [Eviction](#eviction)).
-- `cache/x` exists: chmod the cloud object (authoritative), then the local copy.
-- Neither: chmod the cloud object.
-
-### Chown
-
-Same pattern as Chmod. On upload, owner and group are read from the local file
-(Linux only). If the process cannot chown the local file, the change is not
-preserved for local-owned files. This loss is accepted.
+Chmod, chown, and all permissions mode bits are ignored. Default mode, set at mount, is used for everything.
 
 ### Symlinks
 
@@ -378,9 +365,7 @@ For each candidate, with its file lock held:
 
 1. Skip it if it has open handles. If `local/x` is gone, remove it from the
    LRU and skip it.
-2. Upload `local/x` to the cloud, then apply the mode and owner/group read
-   from the local file (Linux only). Windows files have no POSIX mode or owner,
-   so applying their defaults would overwrite the cloud object's metadata.
+2. Upload `local/x` to the cloud.
 3. On upload failure: leave the file in place and keep it eligible for later
    eviction.
 4. On success: delete `local/x` and remove it from the LRU.
@@ -534,17 +519,6 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
   fails cleanly, before any change, and is reported as `EBUSY`.
 - Windows: promotion and delete of open files succeed with handles remaining
   usable.
-
-## Code removed by this design
-
-- Partial-download suffix and `replaceFile`.
-- Synchronous eviction and space reservation (`EvictNow`, `reserveSpace`, and
-  their call sites in `OpenFile`, `WriteFile`, and `TruncateFile`).
-- `FileNode` flags: `cloudBacked`, `isDirty`, `modeDirty`, `ownerDirty`, and
-  cached `mode`/`owner`/`group`. These are replaced by the single in-memory
-  `cloudStale` flag.
-- Name filtering of internal files in `StreamDir` and reserved-name checks in
-  `localPath`.
 
 ## Backlog - do not implement
 
