@@ -1029,14 +1029,12 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 		options.Handle.Path,
 	)
 
-	if !options.Handle.Dirty() {
-		return nil
-	}
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("TieredStorage::FlushFile : %s no file object in handle", options.Handle.Path)
 		return syscall.EBADF
 	}
+
 	err := f.Sync()
 	if err != nil {
 		log.Err("TieredStorage::FlushFile : %s sync failed [%v]", options.Handle.Path, err)
