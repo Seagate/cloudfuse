@@ -568,9 +568,11 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		moved = append(moved, m)
 	}
 
-	// A directory that exists only locally may be unknown to the cloud.
+	// Rename in the cloud
 	cloudErr := c.NextComponent().RenameDir(options)
+	// ignore ErrNotExist for directories that exist only locally
 	neverUploaded := srcLocalExists && errors.Is(cloudErr, os.ErrNotExist)
+	// revert on failure
 	if cloudErr != nil && !neverUploaded {
 		log.Err(
 			"TieredStorage::RenameDir : %s -> %s cloud rename failed [%v]",
@@ -582,12 +584,16 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		return cloudErr
 	}
 
+	// update bookkeeping
 	for _, src := range names {
 		dst := dstName(src)
+		// LRU
 		c.policy.Rename(src, dst)
 		sflock, dflock := c.fileLocks.Get(src), c.fileLocks.Get(dst)
+		// CloudStale
 		dflock.CloudStale, sflock.CloudStale = sflock.CloudStale, false
-		c.renameOpenHandles(src, dst, c.fileLocks.Get(src), c.fileLocks.Get(dst))
+		// Open handles
+		c.renameOpenHandles(src, dst, sflock, dflock)
 	}
 	return nil
 }
