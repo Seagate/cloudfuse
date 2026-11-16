@@ -271,6 +271,26 @@ Description: FUSE file system for interacting with S3 and Azure storage
 
 Package: cloudfuse
 Architecture: amd64
+Version: 2.4.2
+Priority: optional
+Section: utils
+Maintainer: Seagate Technology <cloudfuse@seagate.com>
+Installed-Size: 30637
+Depends: fuse, libfuse2, libc6 (>= 2.24)
+Filename: dists/stable/main/binary-amd64/cloudfuse_fuse2_2.4.2_linux_amd64.deb
+Size: 11029064
+MD5sum: 8bee628501058672e8cfe93dd9aa0380
+SHA1: 29cd11daf441d77994363676b095c3467f46ab83
+SHA256: 74e1e4b332b843b84d1fd0e47b42a753a2672a71068dc58555f053cf45fa8da3
+SHA512: 72234cb05af7b29a48a93308bdc3cb899f6690257c61603483fcecc62aec3a869b47988a461bfb209b753d498fac1fc95336efc1eefdec68026fd5056b11be8a
+Homepage: https://github.com/Seagate/cloudfuse
+Description: FUSE file system for interacting with S3 and Azure storage
+ Cloudfuse provides the ability to mount a cloud bucket in your local file
+ system. You can easily read and write to the cloud, and connect programs
+ on your computer to the cloud even if they're not cloud-aware.
+
+Package: cloudfuse
+Architecture: amd64
 Version: 2.0.0
 Priority: optional
 Section: utils
@@ -555,6 +575,26 @@ MD5sum: 9574b75fd2e6e2f5e3df1b6a99f0812d
 SHA1: e421ce7bc9f32b1ba83dd6084ccf192ca6775b2b
 SHA256: 30f687c32510e84632fda3378a0c90283736808511405f1dcd370685c48e481b
 SHA512: 435cefb829a2c4daf2df7107c248d3f5002098b8f2c552e38e426ee33cb1b40d06735e3e1057d8b41b2c588374ed3218acb2187b14efdce7cfd06b1917f69d3b
+Homepage: https://github.com/Seagate/cloudfuse
+Description: FUSE file system for interacting with S3 and Azure storage
+ Cloudfuse provides the ability to mount a cloud bucket in your local file
+ system. You can easily read and write to the cloud, and connect programs
+ on your computer to the cloud even if they're not cloud-aware.
+
+Package: cloudfuse
+Architecture: amd64
+Version: 2.4.2
+Priority: optional
+Section: utils
+Maintainer: Seagate Technology <cloudfuse@seagate.com>
+Installed-Size: 30639
+Depends: fuse3, libfuse3-3 | libfuse3-4, libc6 (>= 2.24)
+Filename: dists/stable/main/binary-amd64/cloudfuse_fuse3_2.4.2_linux_amd64.deb
+Size: 11029330
+MD5sum: 9805a3e91c8de4bbcdf80642af211e25
+SHA1: edcfc1591c6baf4e6adb41bcfe8b487cb38aa135
+SHA256: 97f73379828ee163e29296ac493ad147c56374283e70b424efa40513433797c0
+SHA512: 6e7f8d86b4b6792a278403ffdc06c13dcbc0e783ca04158a357bd7c879699f4e2a70b34dbf965859b581df2bb56aa64182c76b43e8d393c2c813cdf0d07520cd
 Homepage: https://github.com/Seagate/cloudfuse
 Description: FUSE file system for interacting with S3 and Azure storage
  Cloudfuse provides the ability to mount a cloud bucket in your local file
