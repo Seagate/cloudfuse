@@ -34,7 +34,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"syscall"
@@ -399,8 +398,7 @@ func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return localErr
 	}
-	// cache/ is not pruned, so it may hold this directory. Startup clears it
-	// if this fails.
+	// cache/ is not pruned, so it may hold this directory
 	_ = os.Remove(cachePath)
 
 	if errors.Is(localErr, os.ErrNotExist) && errors.Is(cloudErr, os.ErrNotExist) {
@@ -481,23 +479,29 @@ func (c *TieredStorage) StreamDir(
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("TieredStorage::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	// The FUSE layer keeps every other operation under src and dst out until
-	// this returns (libfuse's path tree lock; WinFsp's rename lock), so no
-	// name can appear under src after it is listed below.
+	// The FUSE layer prevents operations under src and dst until this returns
+	// (libfuse's path tree lock; WinFsp's rename lock), so no name can appear
+	// under src after it is listed below.
 
+	// get local paths
 	srcLocal := c.localPath(options.Src)
 	srcCache := c.cachePath(options.Src)
 	dstLocal := c.localPath(options.Dst)
 	dstCache := c.cachePath(options.Dst)
 
-	srcPrefix := common.JoinUnixFilepath(options.Src) + "/"
-	names, err := c.filesUnder(options.Src)
+	// list all src files in local storage
+	names, err := c.listPrefix(options.Src)
 	if err != nil {
+		log.Err("TieredStorage::RenameDir : %s failed to list local files [%v]", options.Src, err)
 		return err
 	}
+
+	// dstName converts names from src to dst
 	dstName := func(src string) string {
-		return common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, srcPrefix))
+		return common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, options.Src))
 	}
+
+	// lock all the local names involved
 	lockNames := make([]string, 0, len(names)*2)
 	for _, src := range names {
 		lockNames = append(lockNames, src, dstName(src))
@@ -513,16 +517,16 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		}
 	}()
 
+	// don't start something we can't finish
 	if _, err := c.checkCloudReachable(options.Src); err != nil {
 		return err
 	}
-	// cache/ is not pruned, so dst may be an empty leftover there.
-	_ = syscall.Rmdir(dstCache)
 
-	// Rename locally first: it can fail (on Windows, for open files), but is
-	// cheap to undo. The cloud rename runs last.
+	// each move represents a local rename operation
 	type move struct{ from, to string }
+	// moved keeps track of successfully renamed local directories
 	var moved []move
+	// define a local revert function to undo local renames in case of failure
 	revert := func() {
 		for _, m := range slices.Backward(moved) {
 			if err := os.Rename(m.to, m.from); err != nil {
@@ -535,28 +539,30 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 			}
 		}
 	}
+	// Rename locally first: it can fail (on Windows, for open files), but is
+	// cheap to undo. The cloud rename runs last.
 	srcLocalExists := false
 	for _, m := range []move{{srcLocal, dstLocal}, {srcCache, dstCache}} {
+		// check whether the source directory exists locally
 		if _, err := os.Lstat(m.from); errors.Is(err, os.ErrNotExist) {
 			continue
 		} else if err != nil {
 			revert()
 			return err
 		}
+		// remember whether the *local* source directory existed before the move
 		if m.from == srcLocal {
 			srcLocalExists = true
 		}
+		// move
 		err := os.MkdirAll(filepath.Dir(m.to), dirPerm)
 		if err == nil {
 			// Native rules: Unix replaces an empty directory; Windows refuses.
 			err = syscall.Rename(m.from, m.to)
 		}
+		// revert on error
 		if err != nil {
 			revert()
-			if runtime.GOOS == "windows" && errors.Is(err, os.ErrPermission) {
-				// Windows refuses to rename a directory with open files in it.
-				return syscall.EBUSY
-			}
 			return err
 		}
 		moved = append(moved, m)
@@ -586,9 +592,8 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	return nil
 }
 
-// filesUnder lists the object names of files beneath a directory in local/ and
-// cache/.
-func (c *TieredStorage) filesUnder(dir string) ([]string, error) {
+// listPrefix lists the object names of files beneath a directory in local/ and cache/
+func (c *TieredStorage) listPrefix(dir string) ([]string, error) {
 	var names []string
 	for _, tree := range []string{localDirName, cacheDirName} {
 		root := c.treePath(tree, dir)

@@ -48,7 +48,7 @@ stateDiagram-v2
 
 - Delete and rename check `CloudConnected()` after taking locks and before changing anything, so they fail fast when offline. ([details][connectivity])
 - `DeleteFile` deletes in the cloud first, so a stale copy can't resurface.
-- `RenameFile` and `RenameDir` rename locally first (cheap to undo, and on Windows an open file fails it early with `EBUSY`), then in the cloud, reverting locally if the cloud fails. ([file][renamefile], [dir][renamedir])
+- `RenameFile` and `RenameDir` rename locally first (cheap to undo, and on Windows an open file fails it early with access denied), then in the cloud, reverting locally if the cloud fails. ([file][renamefile], [dir][renamedir])
 - Permissions are not tracked: chmod and chown are ignored, and everything uses the default mode set at mount. ([details][permissions])
 - Symlinks are local-only and never uploaded. ([details][dir-ops])
 

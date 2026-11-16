@@ -2334,7 +2334,7 @@ func (suite *tieredStorageTestSuite) TestRenameDirectoryUpdatesOpenHandle() {
 	err = suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"})
 	if runtime.GOOS == "windows" {
 		// Windows refuses to rename a directory containing open files.
-		suite.Require().ErrorIs(err, syscall.EBUSY)
+		suite.Require().ErrorIs(err, os.ErrPermission)
 		suite.assert.Equal("src/open", handle.Path)
 		suite.assert.FileExists(suite.localFile("src/open"))
 		suite.Require().NoError(

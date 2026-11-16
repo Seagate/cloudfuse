@@ -316,9 +316,8 @@ because the tiered root is never exposed.
 4. **Rename locally first**: `local/src` → `local/dst`, then `cache/src` →
    `cache/dst`, for whichever exist. Use `syscall.Rename` so the host OS rules
    apply: Linux replaces an empty `local/dst`, Windows refuses any existing one.
-   Remove a leftover empty `cache/dst` first, since the host can't see it.
    If a local rename fails, revert any earlier local rename and return the
-   error. Map Windows access-denied errors to `EBUSY`.
+   error.
    A failed rename may lose the replaced empty `local/dst`; this is accepted.
 5. **Rename in the cloud last.** On failure, revert the local renames in
    reverse order and return the error. If a revert fails, log an error naming
@@ -516,7 +515,7 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
   and an `ENOSPC` from the local filesystem is returned to the caller
   unchanged (for downloads, after deleting the partial `cache/x`).
 - Windows: renaming a directory containing a file opened via `common.OpenFile`
-  fails cleanly, before any change, and is reported as `EBUSY`.
+  fails cleanly, before any change, with access denied, as on NTFS.
 - Windows: promotion and delete of open files succeed with handles remaining
   usable.
 
