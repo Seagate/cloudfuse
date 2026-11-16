@@ -55,12 +55,10 @@ type Tracker struct {
 	lastReconcile     atomic.Int64 // unix nanoseconds
 }
 
-// NewTracker tracks the combined size of paths. The total starts at zero; call
-// Refresh to seed it with a measurement.
+// NewTracker tracks the combined size of paths. The total starts at zero; the
+// first Reconcile seeds it with a measurement.
 func NewTracker(reconcileInterval time.Duration, paths ...string) *Tracker {
-	t := &Tracker{paths: paths, reconcileInterval: reconcileInterval}
-	t.lastReconcile.Store(time.Now().UnixNano())
-	return t
+	return &Tracker{paths: paths, reconcileInterval: reconcileInterval}
 }
 
 // Used returns the current cache usage in bytes.
@@ -68,27 +66,25 @@ func (t *Tracker) Used() int64 {
 	return t.used.Load()
 }
 
-// Add applies a signed change in bytes. The total is clamped at zero: drift
-// could otherwise drive it negative and hide a full cache.
+// Add applies a signed change in bytes.
 func (t *Tracker) Add(delta int64) {
-	if delta == 0 {
-		return
-	}
-	for {
-		current := t.used.Load()
-		next := max(current+delta, 0)
-		if t.used.CompareAndSwap(current, next) {
-			return
-		}
-	}
+	t.used.Add(delta)
 }
 
-// Refresh measures the tracked paths and replaces the running total.
-// Changes made while the measurement is in flight are lost, which is inherent
-// to reconciling against a moving target and is why it is not the hot path.
-func (t *Tracker) Refresh() error {
+// Reconcile measures the tracked paths and replaces the running total, but no
+// more often than reconcileInterval.
+// Changes made during the measurement can be lost, which is inherent
+// to reconciling against a moving target.
+func (t *Tracker) Reconcile() error {
+	// respect the interval
+	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
+		return nil
+	}
+	// record the time of this attempt; don't retry on failure.
 	t.lastReconcile.Store(time.Now().UnixNano())
-
+	// check the counter
+	beforeMeasurement := t.used.Load()
+	// measure
 	var measured int64
 	for _, path := range t.paths {
 		usage, err := common.GetUsage(path)
@@ -97,25 +93,26 @@ func (t *Tracker) Refresh() error {
 		}
 		measured += int64(usage)
 	}
-
-	previous := t.used.Swap(measured)
-	if drift := measured - previous; drift > driftWarnBytes || drift < -driftWarnBytes {
+	// swap the measured value in, and note the intermediate delta
+	beforeSwap := t.used.Swap(measured)
+	// log if the drift is significant
+	if drift := measured - beforeMeasurement; drift > driftWarnBytes || drift < -driftWarnBytes {
 		log.Info(
-			"Tracker::Refresh : corrected usage by %d bytes (was %d, now %d)",
+			"Tracker::Reconcile : corrected usage by %d bytes (was %d, now %d)",
 			drift,
-			previous,
+			beforeMeasurement,
 			measured,
 		)
 	}
-	return nil
-}
+	// did a lot of data get added during measurement?
+	deltaDuringMeasurement := beforeSwap - beforeMeasurement
+	if deltaDuringMeasurement > driftWarnBytes {
+		log.Info(
+			"Tracker::Reconcile : %d bytes were added during measurement. Re-adding...",
+			deltaDuringMeasurement,
+		)
+		t.used.Add(deltaDuringMeasurement)
+	}
 
-// Reconcile refreshes the running total, but no more often than reconcileInterval.
-func (t *Tracker) Reconcile() {
-	if time.Since(time.Unix(0, t.lastReconcile.Load())) < t.reconcileInterval {
-		return
-	}
-	if err := t.Refresh(); err != nil {
-		log.Err("Tracker::Reconcile : %v", err)
-	}
+	return nil
 }
