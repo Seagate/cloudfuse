@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **2.4.2** ##
+
+November 16th 2026
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Bug Fixes ###
+
+- [#1124](https://github.com/Seagate/cloudfuse/pull/1124) Stop constantly scanning cached files when file cache hard-limit is set.
+
 ## **2.4.1** ##
 
 October 28th 2026
