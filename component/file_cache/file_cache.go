@@ -1987,7 +1987,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
-	if f := options.Handle.GetFileObject(); f != nil && options.Handle.Dirty() {
+	if f := options.Handle.GetFileObject(); f != nil {
 		if err := f.Sync(); err != nil {
 			log.Err("FileCache::SyncFile : %s local sync failed [%v]", options.Handle.Path, err)
 			return syscall.EIO
