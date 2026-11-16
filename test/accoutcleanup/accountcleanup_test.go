@@ -34,15 +34,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 )
-
-//
-// This test will delete the containers that were created in the pipeline runs and deleted but backend has not deleted
-// them by some reason. We use this test in nightly pipeline in the start which will prevent storage account to not
-// get exploded by these temporary containers that were used in the tests.
-//
 
 func getGenericCredential() (*service.SharedKeyCredential, error) {
 	accountNameEnvVar := "STORAGE_ACCOUNT_NAME"
@@ -69,6 +64,8 @@ func getGenericServiceClient() (*service.Client, error) {
 
 func TestDeleteAllTempContainers(t *testing.T) {
 	ctx := context.Background()
+	// Coverage jobs time out at 60m, so older containers can't belong to a live run.
+	cutoff := time.Now().Add(-time.Hour)
 	svcClient, err := getGenericServiceClient()
 	if err != nil {
 		log.Fatal(err)
@@ -83,14 +80,11 @@ func TestDeleteAllTempContainers(t *testing.T) {
 		}
 
 		for _, cont := range resp.ContainerItems {
-			//
-			// containers created by block_blob_test.go start with prefix and containers created dynamically in
-			// pipelines runs have length 40. Delete all such containers if backend GC has skipped their deletion
-			// for some reason.
-			//
-			if strings.HasPrefix(*cont.Name, "fuseutc") || len(*cont.Name) == 40 {
+			// fuseutc*: block_blob_test.go; 40 chars: pipeline-generated.
+			isTemp := strings.HasPrefix(*cont.Name, "fuseutc") || len(*cont.Name) == 40
+			if isTemp && cont.Properties.LastModified.Before(cutoff) {
 				containerClient := svcClient.NewContainerClient(*cont.Name)
-				t.Log("Deleting container :", cont.Name)
+				t.Log("Deleting stale container:", *cont.Name)
 				_, err = containerClient.Delete(ctx, nil)
 				if err != nil {
 					t.Logf("Unable to delete %v : [%v]", cont.Name, err.Error())
@@ -101,5 +95,5 @@ func TestDeleteAllTempContainers(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	m.Run()
+	os.Exit(m.Run())
 }
