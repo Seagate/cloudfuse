@@ -1083,6 +1083,22 @@ func (suite *tieredStorageTestSuite) TestConfigureRejectsUnexpectedRootEntries()
 	suite.assert.FileExists(suite.cacheFile("cached"))
 }
 
+func TestConfigureRejectsMountPathConflict(t *testing.T) {
+	root := t.TempDir()
+	cached := filepath.Join(root, cacheDirName, "cached")
+	require.NoError(t, os.MkdirAll(filepath.Dir(cached), 0700))
+	require.NoError(t, os.WriteFile(cached, []byte("cached"), 0600))
+	require.NoError(t, config.ReadConfigFromReader(strings.NewReader(fmt.Sprintf(
+		"mount-path: %s%c.\ntiered_storage:\n  path: %s\n  max-size-mb: 1\n",
+		root, os.PathSeparator, root,
+	))))
+
+	storage := NewTieredStorageComponent().(*TieredStorage)
+	err := storage.Configure(true)
+	require.ErrorContains(t, err, "path is same as mount path")
+	assert.FileExists(t, cached)
+}
+
 func (suite *tieredStorageTestSuite) TestConfigureIgnoresOSManagedRootEntries() {
 	defer suite.cleanupTest()
 

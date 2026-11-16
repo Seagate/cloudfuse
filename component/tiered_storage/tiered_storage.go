@@ -193,12 +193,22 @@ func (c *TieredStorage) Configure(_ bool) error {
 	err := config.UnmarshalKey(c.Name(), &conf)
 	if err != nil {
 		log.Err("TieredStorage::Configure : config error [invalid config attributes]")
-		return fmt.Errorf("TieredStorage: config error [invalid config attributes]")
+		return fmt.Errorf("config error in %s [%w]", c.Name(), err)
 	}
 
 	c.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
 	if c.tmpPath == "" || c.tmpPath == "." {
-		return fmt.Errorf("TieredStorage: path not set in config")
+		log.Err("TieredStorage::Configure : path not set")
+		return fmt.Errorf("config error in %s [path not set]", c.Name())
+	}
+	var mountPath string
+	if err := config.UnmarshalKey("mount-path", &mountPath); err != nil {
+		log.Err("TieredStorage::Configure : unable to obtain mount path")
+		return fmt.Errorf("config error in %s [%w]", c.Name(), err)
+	}
+	if filepath.Clean(mountPath) == c.tmpPath {
+		log.Err("TieredStorage::Configure : path is same as mount path")
+		return fmt.Errorf("config error in %s [path is same as mount path]", c.Name())
 	}
 	if conf.HighThreshold == 0 {
 		conf.HighThreshold = defaultHighThreshold
@@ -207,23 +217,29 @@ func (c *TieredStorage) Configure(_ bool) error {
 		conf.LowThreshold = defaultLowThreshold
 	}
 	if conf.LowThreshold >= conf.HighThreshold || conf.HighThreshold > 100 {
-		return fmt.Errorf(
-			"TieredStorage: thresholds must satisfy 0 < low-threshold < high-threshold <= 100",
+		errMsg := fmt.Sprintf(
+			"invalid thresholds (%d < %d <= 100)",
+			conf.LowThreshold,
+			conf.HighThreshold,
 		)
+		log.Err("TieredStorage::Configure : %s", errMsg)
+		return fmt.Errorf("config error in %s [%s]", c.Name(), errMsg)
 	}
 
 	if err := c.prepareRoot(); err != nil {
-		log.Err("TieredStorage::Configure : %v", err)
-		return err
+		log.Err("TieredStorage::Configure : failed to prepare local storage %v", err)
+		return fmt.Errorf("config error in %s [failed to prepare local storage: %w]", c.Name(), err)
 	}
 	c.diskUsage = newDiskUsageTracker(c.tmpPath, reconcileCapacityInterval)
 	if err := c.diskUsage.Reconcile(); err != nil {
-		return fmt.Errorf("TieredStorage: failed to measure %s: %w", c.tmpPath, err)
+		log.Err("TieredStorage::Configure : failed to measure %s %v", c.tmpPath, err)
+		return fmt.Errorf("config error in %s [failed to measure %s: %w]", c.Name(), c.tmpPath, err)
 	}
 	if conf.MaxSizeMB == 0 {
 		free, _, err := common.GetAvailFree(c.tmpPath)
 		if err != nil {
-			return fmt.Errorf("TieredStorage: failed to get free space for %s: %w", c.tmpPath, err)
+			log.Err("TieredStorage::Configure : free space check failed %v", err)
+			return fmt.Errorf("config error in %s [free space check failed: %w]", c.Name(), err)
 		}
 		// local/ persists across mounts, so count it as available.
 		conf.MaxSizeMB = math.Floor(
@@ -232,7 +248,8 @@ func (c *TieredStorage) Configure(_ bool) error {
 		log.Info("TieredStorage::Configure : max-size-mb defaulted to %.0f", conf.MaxSizeMB)
 	}
 	if conf.MaxSizeMB <= 0 {
-		return fmt.Errorf("TieredStorage: max-size-mb must be greater than 0")
+		log.Err("TieredStorage::Configure : max-size-mb must be greater than 0")
+		return fmt.Errorf("config error in %s [max-size-mb must be greater than 0]", c.Name())
 	}
 	c.maxSize = conf.MaxSizeMB * common.MbToBytes
 
