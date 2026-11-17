@@ -778,7 +778,7 @@ func (c *TieredStorage) CreateFile(
 	if err != nil {
 		return nil, err
 	}
-	c.setHandleDirty(handle)
+	handle.SetDirty(c.fileLocks)
 	return handle, nil
 }
 
@@ -900,7 +900,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 		c.diskUsage.Add(-truncatedSize)
 	}
 	if created || truncate {
-		c.setHandleDirty(handle)
+		handle.SetDirty(c.fileLocks)
 	}
 	return handle, nil
 }
@@ -997,7 +997,7 @@ func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, erro
 	}
 
 	if bytesWritten > 0 {
-		c.setHandleDirty(options.Handle)
+		options.Handle.SetDirty(c.fileLocks)
 		if after, statErr := f.Stat(); beforeErr == nil && statErr == nil {
 			c.diskUsage.Add(after.Size() - before.Size())
 		}
@@ -1041,6 +1041,8 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 		return syscall.EIO
 	}
 
+	options.Handle.ClearDirty(c.fileLocks)
+
 	return nil
 }
 
@@ -1057,7 +1059,7 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		closeErr = f.Close()
 	}
 
-	c.clearHandleDirty(options.Handle)
+	options.Handle.ClearDirty(c.fileLocks)
 	options.Handle.Cleanup()
 
 	handlemap.Delete(options.Handle.ID)
@@ -1287,30 +1289,6 @@ func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, erro
 	return os.Readlink(c.localPath(options.Name))
 }
 
-func (c *TieredStorage) setHandleDirty(handle *handlemap.Handle) {
-	handle.Lock()
-	alreadyDirty := handle.Dirty()
-	if !alreadyDirty {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-	}
-	handle.Unlock()
-	if !alreadyDirty {
-		c.fileLocks.Get(handle.Path).IncDirty()
-	}
-}
-
-func (c *TieredStorage) clearHandleDirty(handle *handlemap.Handle) {
-	handle.Lock()
-	wasDirty := handle.Dirty()
-	if wasDirty {
-		handle.Flags.Clear(handlemap.HandleFlagDirty)
-	}
-	handle.Unlock()
-	if wasDirty {
-		c.fileLocks.Get(handle.Path).DecDirty()
-	}
-}
-
 // GetAttr answers from local/ when the file is local-owned, without a cloud
 // call. A cache/ copy matches the cloud object, so it is never consulted.
 // It takes no lock: files move between trees by atomic rename.
@@ -1382,7 +1360,7 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 		return err
 	}
 
-	c.setHandleDirty(options.Handle)
+	options.Handle.SetDirty(c.fileLocks)
 	c.diskUsage.Add(options.NewSize - info.Size())
 	return nil
 }
