@@ -29,6 +29,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -97,6 +98,21 @@ func (suite *HandleMapSuite) TestHandleFlags() {
 	val, found = h.GetValue("123")
 	suite.assert.False(found)
 	suite.assert.Empty(val)
+}
+
+func (suite *HandleMapSuite) TestDirtyHandleCount() {
+	locks := common.NewLockMap()
+	handle := NewHandle("file")
+
+	handle.SetDirty(locks)
+	handle.SetDirty(locks)
+	suite.assert.True(handle.Dirty())
+	suite.assert.Equal(uint32(1), locks.Get("file").DirtyCount())
+
+	handle.ClearDirty(locks)
+	handle.ClearDirty(locks)
+	suite.assert.False(handle.Dirty())
+	suite.assert.Zero(locks.Get("file").DirtyCount())
 }
 
 func (suite *HandleMapSuite) TestHandleMap() {

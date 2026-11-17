@@ -1330,7 +1330,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// If an empty file is created in cloud storage then there is no need to upload if FlushFile is called immediately after CreateFile.
 	if !fc.createEmptyFile {
-		fc.setHandleDirty(handle)
+		handle.SetDirty(fc.fileLocks)
 	}
 
 	// update state
@@ -1583,11 +1583,8 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	}
 
 	if flags&os.O_TRUNC != 0 {
-		// handle is already locked by openFileInternal; avoid recursive lock in setHandleDirty.
-		if !handle.Dirty() {
-			handle.Flags.Set(handlemap.HandleFlagDirty)
-			fc.fileLocks.Get(handle.Path).IncDirty()
-		}
+		// handle is already locked
+		handle.SetDirtyLocked(fc.fileLocks)
 	}
 
 	inf, err := f.Stat()
@@ -1855,7 +1852,7 @@ func (fc *FileCache) releaseFileInternal(
 			fc.addPendingOp(options.Handle.Path, pendingFlags{})
 		}
 		// clears the flag if the upload failed, since the handle is going away
-		fc.clearHandleDirty(options.Handle)
+		options.Handle.ClearDirty(fc.fileLocks)
 		// close the local file
 		err = errors.Join(err, options.Handle.GetFileObject().Close())
 	}
@@ -1977,7 +1974,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
-		fc.setHandleDirty(options.Handle)
+		options.Handle.SetDirty(fc.fileLocks)
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
@@ -2100,7 +2097,7 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 		// schedule is inactive - push to pendingOps
 		log.Info("FileCache::flushFileCloud : %s upload deferred (scheduled)", options.Handle.Path)
 		fc.addPendingOp(options.Handle.Path, pendingFlags{})
-		fc.clearHandleDirty(options.Handle)
+		options.Handle.ClearDirty(fc.fileLocks)
 		return nil
 	}
 
@@ -2109,7 +2106,7 @@ func (fc *FileCache) flushFileCloud(options internal.FlushFileOptions) error {
 	// handle errors and update flags
 	switch {
 	case err == nil:
-		fc.clearHandleDirty(options.Handle)
+		options.Handle.ClearDirty(fc.fileLocks)
 		fc.pendingOps.Delete(options.Handle.Path)
 	case isOffline(err) && fc.offlineAccess:
 		log.Warn("FileCache::flushFileCloud : %s upload delayed (offline)", options.Handle.Path)
@@ -2272,32 +2269,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	return attrs, nil
-}
-
-// setter
-func (fc *FileCache) setHandleDirty(handle *handlemap.Handle) {
-	handle.Lock()
-	alreadyDirty := handle.Dirty()
-	if !alreadyDirty {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-	}
-	handle.Unlock()
-	if !alreadyDirty {
-		fc.fileLocks.Get(handle.Path).IncDirty()
-	}
-}
-
-// setter
-func (fc *FileCache) clearHandleDirty(handle *handlemap.Handle) {
-	handle.Lock()
-	wasDirty := handle.Dirty()
-	if wasDirty {
-		handle.Flags.Clear(handlemap.HandleFlagDirty)
-	}
-	handle.Unlock()
-	if wasDirty {
-		fc.fileLocks.Get(handle.Path).DecDirty()
-	}
 }
 
 // RenameFile: Invalidate the file in local cache.
@@ -2518,7 +2489,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			fc.cacheSize.Add(options.NewSize - info.Size())
 		}
 
-		fc.setHandleDirty(options.Handle)
+		options.Handle.SetDirty(fc.fileLocks)
 
 		return nil
 	}
