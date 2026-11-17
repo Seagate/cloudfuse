@@ -138,14 +138,15 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 	return usedSpace, float64(usedSpace) / float64(totalSpace) * 100, nil
 }
 
-// GetAvailFree: Available blocks
-func GetAvailFree(path string) (uint64, uint64, error) {
+// GetAvailFree returns the bytes available to unprivileged users and the
+// total free bytes, including those reserved for root, on the filesystem
+// containing path.
+func GetAvailFree(path string) (avail, free uint64, err error) {
 	var stat unix.Statfs_t
-	err := unix.Statfs(path, &stat)
-	if err != nil {
+	if err := unix.Statfs(path, &stat); err != nil {
 		return 0, 0, err
 	}
-	return stat.Bavail, stat.Bfree, err
+	return stat.Bavail * uint64(stat.Frsize), stat.Bfree * uint64(stat.Frsize), nil
 }
 
 // GetAvailFree: Available blocks
