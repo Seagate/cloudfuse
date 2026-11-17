@@ -1,0 +1,8 @@
+# Scorecard scans module versions without Go call analysis.
+# GO-2026-5932 affects only golang.org/x/crypto/openpgp and its subpackages,
+# which Cloudfuse does not use.
+# https://osv.dev/vulnerability/GO-2026-5932
+# https://google.github.io/osv-scanner/configuration/#ignore-vulnerabilities-by-id
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "Cloudfuse does not use golang.org/x/crypto/openpgp or its subpackages; Scorecard reports a module-level match without Go call analysis."
