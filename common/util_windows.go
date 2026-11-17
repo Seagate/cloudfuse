@@ -28,10 +28,13 @@ package common
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/sys/windows"
@@ -113,6 +116,17 @@ func GetAvailFree(path string) (avail, free uint64, err error) {
 		return 0, 0, err
 	}
 	return avail, free, nil
+}
+
+// GetFileTimes returns the last access and creation times of a local file.
+// The modification time is available portably from info.ModTime.
+func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
+	stat, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return info.ModTime(), info.ModTime()
+	}
+	return time.Unix(0, stat.LastAccessTime.Nanoseconds()),
+		time.Unix(0, stat.CreationTime.Nanoseconds())
 }
 
 // GetFreeRam: Available ram

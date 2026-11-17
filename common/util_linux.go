@@ -31,10 +31,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -149,7 +152,17 @@ func GetAvailFree(path string) (avail, free uint64, err error) {
 	return stat.Bavail * uint64(stat.Frsize), stat.Bfree * uint64(stat.Frsize), nil
 }
 
-// GetAvailFree: Available blocks
+// GetFileTimes returns the access and change times of a local file. The
+// modification time is available portably from info.ModTime.
+func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return info.ModTime(), info.ModTime()
+	}
+	return time.Unix(stat.Atim.Sec, stat.Atim.Nsec), time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)
+}
+
+// GetFreeRam: Available ram
 func GetFreeRam() (uint64, error) {
 	var sysinfo unix.Sysinfo_t
 	err := unix.Sysinfo(&sysinfo)
