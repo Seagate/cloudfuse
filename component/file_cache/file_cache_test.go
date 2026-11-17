@@ -3897,7 +3897,7 @@ func (suite *fileCacheTestSuite) TestGetAttrOfflineLocalFallback() {
 	err = os.WriteFile(localPath, localData, 0777)
 	suite.assert.NoError(err)
 
-	offlineNoCacheErr := common.NoCachedDataError{
+	offlineNoCacheErr := &common.NoCachedDataError{
 		Message:    "no cached metadata",
 		CacheError: &common.CloudUnreachableError{},
 	}
