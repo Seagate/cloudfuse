@@ -1246,6 +1246,7 @@ func (suite *tieredStorageTestSuite) TestGetAttrCloudOnly() {
 	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.Require().NoError(err)
 	suite.assert.EqualValues(len("cloud data"), attrs.Size)
+	suite.assert.True(attrs.IsModeDefault())
 	suite.assert.NoFileExists(suite.localFile(path))
 }
 
@@ -1391,6 +1392,21 @@ func TestGetAttrLocalMakesNoCloudCall(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(t, 4, attrs.Size)
 	assert.True(t, attrs.IsModeDefault())
+}
+
+func TestGetAttrCloudUsesDefaultModeWithoutMutatingSource(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	next := internal.NewMockComponent(ctrl)
+	cloudAttr := &internal.ObjAttr{Name: "file", Path: "file"}
+	next.EXPECT().GetAttr(internal.GetAttrOptions{Name: "file"}).Return(cloudAttr, nil)
+	storage := &TieredStorage{}
+	storage.SetNextComponent(next)
+
+	attr, err := storage.GetAttr(internal.GetAttrOptions{Name: "file"})
+	require.NoError(t, err)
+	require.NotSame(t, cloudAttr, attr)
+	assert.True(t, attr.IsModeDefault())
+	assert.False(t, cloudAttr.IsModeDefault())
 }
 
 func TestCheckCloudReachable(t *testing.T) {
@@ -2261,14 +2277,18 @@ func TestStreamDirWithoutLocalEntriesStartsWithCloud(t *testing.T) {
 	next := internal.NewMockComponent(ctrl)
 	storage := &TieredStorage{tmpPath: t.TempDir()}
 	storage.SetNextComponent(next)
+	cloudAttr := &internal.ObjAttr{Path: "dir/a", Name: "a"}
 	next.EXPECT().StreamDir(internal.StreamDirOptions{Name: "dir"}).
-		Return([]*internal.ObjAttr{{Path: "dir/a", Name: "a"}}, "", nil)
+		Return([]*internal.ObjAttr{cloudAttr}, "", nil)
 
 	attrs, token, err := storage.StreamDir(internal.StreamDirOptions{Name: "dir"})
 	require.NoError(t, err)
 	assert.Empty(t, token)
 	require.Len(t, attrs, 1)
 	assert.Equal(t, "dir/a", attrs[0].Path)
+	assert.True(t, attrs[0].IsModeDefault())
+	assert.False(t, cloudAttr.IsModeDefault())
+	assert.NotSame(t, cloudAttr, attrs[0])
 }
 
 func (suite *tieredStorageTestSuite) TestRenameLocalOnlyDirectory() {

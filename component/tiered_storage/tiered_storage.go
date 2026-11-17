@@ -465,7 +465,7 @@ func (c *TieredStorage) StreamDir(
 		// attrs may be attr_cache's cached listing, so it is copied, not edited.
 		for _, attr := range attrs {
 			if _, isLocal := localNames[attr.Name]; !isLocal {
-				page = append(page, attr)
+				page = append(page, defaultModeAttr(attr))
 			}
 		}
 		// libfuse takes an empty page as the end of the listing.
@@ -650,6 +650,15 @@ func (c *TieredStorage) localAttr(name string, info fs.FileInfo) *internal.ObjAt
 	}
 	attr.Flags.Set(internal.PropFlagModeDefault)
 	return attr
+}
+
+func defaultModeAttr(attr *internal.ObjAttr) *internal.ObjAttr {
+	if attr == nil {
+		return nil
+	}
+	copy := *attr
+	copy.Flags.Set(internal.PropFlagModeDefault)
+	return &copy
 }
 
 // File operations
@@ -1302,7 +1311,11 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
-	return c.NextComponent().GetAttr(options)
+	attr, err := c.NextComponent().GetAttr(options)
+	if err != nil {
+		return attr, err
+	}
+	return defaultModeAttr(attr), nil
 }
 
 // Chmod is ignored: every object reports the configured default mode.
