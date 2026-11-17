@@ -1,0 +1,118 @@
+name: Native OSV scan
+
+on:
+  workflow_call:
+    inputs:
+      compare:
+        description: Compare against the PR or merge-group base
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  osv-scan:
+    name: Scan dependencies with Go call analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read # Required for uploading SARIF results to code scanning
+      contents: read # Required to check out and scan the repository
+      security-events: write # Required to publish code-scanning results
+    env:
+      CGO_ENABLED: "1"
+      GOFLAGS: -tags=fuse3
+      GOTOOLCHAIN: auto
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install FUSE development dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config fuse3 libfuse3-dev libfuse-dev
+
+      - name: Install Go
+        uses: actions/setup-go@v7.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install OSV-Scanner
+        env:
+          GOBIN: ${{ runner.temp }}/osv-bin
+        run: |
+          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0
+          echo "$GOBIN" >> "$GITHUB_PATH"
+
+      - name: Scan with Go call analysis
+        env:
+          COMPARE: ${{ inputs.compare }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        shell: bash
+        run: |
+          scan_ref() {
+            local label="$1" ref="$2" status=0
+            git checkout --detach "$ref"
+            osv-scanner scan source --recursive --call-analysis=go \
+              --format=json --output-file="$label-results.json" . \
+              2> "$RUNNER_TEMP/osv-$label.log" || status=$?
+            cat "$RUNNER_TEMP/osv-$label.log"
+            # Exit 1 means findings; the reporter decides whether they fail the check.
+            if [ "$status" -gt 1 ] || [ ! -s "$label-results.json" ]; then
+              echo "::error::OSV-Scanner did not complete the $label scan (exit $status)."
+              return 1
+            fi
+            if grep -q "Failed to run code analysis" "$RUNNER_TEMP/osv-$label.log"; then
+              echo "::error::OSV Go call analysis failed on the $label scan."
+              return 1
+            fi
+          }
+
+          if [ "$COMPARE" = "true" ]; then
+            if [ -z "$BASE_SHA" ]; then
+              echo "::error::No base commit is available for the comparison scan."
+              exit 1
+            fi
+            scan_ref old "$BASE_SHA"
+          fi
+          scan_ref new "$GITHUB_SHA"
+
+      - name: Report all vulnerabilities
+        if: ${{ !inputs.compare }}
+        uses: google/osv-scanner-action/osv-reporter-action@v2.7.0
+        with:
+          scan-args: |-
+            --output=results.sarif
+            --new=new-results.json
+            --gh-annotations=false
+            --fail-on-vuln=true
+
+      - name: Report new vulnerabilities
+        if: ${{ inputs.compare }}
+        uses: google/osv-scanner-action/osv-reporter-action@v2.7.0
+        with:
+          scan-args: |-
+            --output=results.sarif
+            --old=old-results.json
+            --new=new-results.json
+            --gh-annotations=true
+            --fail-on-vuln=true
+
+      - name: Upload scan results
+        if: ${{ !cancelled() && hashFiles('results.sarif') != '' }}
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: OSV Scanner SARIF file
+          path: |
+            results.sarif
+            *-results.json
+          retention-days: 5
+
+      - name: Upload to code scanning
+        if: ${{ !cancelled() && hashFiles('results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4.39.3
+        with:
+          sarif_file: results.sarif
