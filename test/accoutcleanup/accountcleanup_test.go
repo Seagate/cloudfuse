@@ -80,8 +80,9 @@ func TestDeleteAllTempContainers(t *testing.T) {
 		}
 
 		for _, cont := range resp.ContainerItems {
-			// fuseutc*: block_blob_test.go; 40 chars: pipeline-generated.
-			isTemp := strings.HasPrefix(*cont.Name, "fuseutc") || len(*cont.Name) == 40
+			// fuseutc*: block_blob_test.go; cloudfuse-ci-* and 40 chars: pipeline-generated.
+			isTemp := strings.HasPrefix(*cont.Name, "fuseutc") ||
+				strings.HasPrefix(*cont.Name, "cloudfuse-ci-") || len(*cont.Name) == 40
 			if isTemp && cont.Properties.LastModified.Before(cutoff) {
 				containerClient := svcClient.NewContainerClient(*cont.Name)
 				t.Log("Deleting stale container:", *cont.Name)

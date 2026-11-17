@@ -383,7 +383,7 @@ func (bc *BlockCache) getDefaultDiskSize(path string) uint64 {
 			err.Error(),
 		)
 	} else {
-		diskSize = uint64(0.8 * float64(bavail) * float64(4096))
+		diskSize = uint64(0.8 * float64(bavail))
 	}
 
 	return diskSize
@@ -2492,7 +2492,7 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	statfs := &common.Statfs_t{
 		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
 		Bavail:  uint64(max(0, available)) / uint64(blockSize),
-		Bfree:   free,
+		Bfree:   free / uint64(blockSize),
 		Bsize:   blockSize,
 		Ffree:   1e9,
 		Files:   1e9,
