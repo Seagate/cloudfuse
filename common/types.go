@@ -106,19 +106,19 @@ type CloudUnreachableError struct {
 	CloudStorageError error
 }
 
-func NewCloudUnreachableError(originalError error) CloudUnreachableError {
-	return CloudUnreachableError{
+func NewCloudUnreachableError(originalError error) *CloudUnreachableError {
+	return &CloudUnreachableError{
 		Message:           "Failed to connect to cloud storage",
 		CloudStorageError: originalError,
 	}
 }
-func (e CloudUnreachableError) Error() string {
+func (e *CloudUnreachableError) Error() string {
 	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CloudStorageError)
 }
-func (e CloudUnreachableError) Unwrap() error {
+func (e *CloudUnreachableError) Unwrap() error {
 	return e.CloudStorageError
 }
-func (e CloudUnreachableError) Is(target error) bool {
+func (e *CloudUnreachableError) Is(target error) bool {
 	_, ok := target.(*CloudUnreachableError)
 	return ok
 }
@@ -128,19 +128,19 @@ type NoCachedDataError struct {
 	CacheError error
 }
 
-func NewNoCachedDataError(originalError error) NoCachedDataError {
-	return NoCachedDataError{
+func NewNoCachedDataError(originalError error) *NoCachedDataError {
+	return &NoCachedDataError{
 		Message:    "Failed to connect to cloud storage",
 		CacheError: originalError,
 	}
 }
-func (e NoCachedDataError) Error() string {
+func (e *NoCachedDataError) Error() string {
 	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CacheError)
 }
-func (e NoCachedDataError) Unwrap() error {
+func (e *NoCachedDataError) Unwrap() error {
 	return e.CacheError
 }
-func (e NoCachedDataError) Is(target error) bool {
+func (e *NoCachedDataError) Is(target error) bool {
 	_, ok := target.(*NoCachedDataError)
 	return ok
 }

@@ -770,11 +770,6 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 
-		// check if destination already exists in cache
-		if item, found := ac.cache.get(options.Dst); found && item.exists() {
-			return os.ErrExist
-		}
-
 		// get the source directory
 		srcItem, found := ac.cache.get(options.Src)
 		if !found || !srcItem.exists() {

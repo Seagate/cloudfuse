@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: "1.27"
-      zig: 0.16.0
+      zig: 0.17.1
     permissions:
       contents: write # Needed to create releases
       id-token: write # Needed for signing with Cosign
