@@ -2474,29 +2474,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			// Recover missing fd on valid handles by reopening the cached path.
-			// This avoids issues when truncate arrives before the handle has a live file object.
-			localPath := filepath.Join(fc.tmpPath, options.Name)
-			reopened, reopenErr := fc.openCacheFile(localPath, os.O_RDWR, fc.defaultPermission)
-			if reopenErr == nil {
-				options.Handle.UnixFD = uint64(reopened.Fd())
-				options.Handle.SetFileObject(reopened)
-				f = reopened
-			}
-		}
-
-		if f == nil {
-			log.Warn(
-				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
-				options.Name,
-			)
-			options.Handle = nil
-		}
-	}
-
-	if options.Handle != nil {
-		f := options.Handle.GetFileObject()
-		if f == nil {
+			log.Err("FileCache::TruncateFile : %s missing fd in handle for", options.Name)
 			return syscall.EBADF
 		}
 
