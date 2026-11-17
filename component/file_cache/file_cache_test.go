@@ -753,7 +753,7 @@ func (suite *fileCacheTestSuite) TestStreamDirOfflineNoCachedData() {
 		Return(
 			nil,
 			"",
-			common.NoCachedDataError{
+			&common.NoCachedDataError{
 				Message:    "no cached metadata",
 				CacheError: &common.CloudUnreachableError{},
 			},
@@ -1919,7 +1919,7 @@ func (suite *fileCacheTestSuite) TestOpenFileOfflineMissingAttrsWithOverwrite() 
 	defer suite.cleanupTest()
 
 	path := "offline-open-overwrite-no-attrs"
-	noCachedDataErr := common.NoCachedDataError{
+	noCachedDataErr := &common.NoCachedDataError{
 		Message:    "no cached metadata",
 		CacheError: &common.CloudUnreachableError{},
 	}
@@ -3897,7 +3897,7 @@ func (suite *fileCacheTestSuite) TestGetAttrOfflineLocalFallback() {
 	err = os.WriteFile(localPath, localData, 0777)
 	suite.assert.NoError(err)
 
-	offlineNoCacheErr := common.NoCachedDataError{
+	offlineNoCacheErr := &common.NoCachedDataError{
 		Message:    "no cached metadata",
 		CacheError: &common.CloudUnreachableError{},
 	}

@@ -24,11 +24,9 @@ jobs:
         include:
           - job_name: linux-fuse3
             os: ubuntu-22.04
-            containerName: "test-cnt-ubn-fuse3"
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
             os: ubuntu-22.04
-            containerName: "test-cnt-ubn-fuse2"
             fuselib: libfuse-dev
 
     runs-on: ${{ matrix.os }}
@@ -42,7 +40,8 @@ jobs:
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
       MOUNT_READY_TIMEOUT: 60
-      zig: 0.16.0
+      zig: 0.17.1
+      CONTAINER_NAME: cloudfuse-ci-${{ matrix.job_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -96,7 +95,7 @@ jobs:
             env:
               AZTEST_BLOCK_ACC_NAME: ${{ secrets.AZTEST_BLOCK_ACC_NAME }}
               AZTEST_ADLS_ACC_NAME: ${{ secrets.AZTEST_ADLS_ACC_NAME }}
-              CONTAINER_NAME: ${{ matrix.containerName }}
+              CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
               AZTEST_BLOCK_KEY: ${{ secrets.AZTEST_BLOCK_KEY }}
               AZTEST_ADLS_KEY: ${{ secrets.AZTEST_ADLS_KEY }}
               AZTEST_BLOCK_SAS: ${{ secrets.AZTEST_BLOCK_SAS }}
@@ -110,6 +109,9 @@ jobs:
               AZTEST_TENANT: ${{ secrets.AZTEST_TENANT }}
               AZTEST_SECRET: ${{ secrets.AZTEST_SECRET }}
             run: |-
+              az storage container create --name "$CONTAINER_NAME" --account-name "$AZTEST_BLOCK_ACC_NAME" --account-key "$AZTEST_BLOCK_KEY" --only-show-errors --output none
+              az storage fs create --name "$CONTAINER_NAME" --account-name "$AZTEST_ADLS_ACC_NAME" --account-key "$AZTEST_ADLS_KEY" --only-show-errors --output none
+
               cnfFile=$HOME/azuretest.json
               echo $cnfFile
               touch $cnfFile
@@ -217,7 +219,7 @@ jobs:
           STO_ACC_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: Block Blob Coverage
@@ -316,7 +318,7 @@ jobs:
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          containerName: ${{ matrix.containerName }}
+          containerName: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${containerName} --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: Block Blob Coverage - Block Cache
@@ -371,7 +373,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_ADLS_CFG: ${{ env.cloudfuse_ADLS_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_ADLS_CFG}"
 
       - name: ADLS Coverage
@@ -671,7 +673,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_STREAM_CFG: ${{ env.cloudfuse_STREAM_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_STREAM_CFG}"
 
       - name: Block Blob Stream Preparation
@@ -723,7 +725,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: "CLI : Component Generation"
@@ -758,7 +760,7 @@ jobs:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         shell: bash {0}
         run: |-
           set +x
@@ -892,7 +894,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: |-
           set +x
           rm -rf ${MOUNT_DIR}/*
@@ -1000,7 +1002,7 @@ jobs:
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: Block Blob Coverage Proxy
@@ -1032,7 +1034,7 @@ jobs:
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_ADLS_CFG: ${{ env.cloudfuse_ADLS_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_ADLS_CFG}"
 
       - name: ADLS Coverage Proxy
@@ -1096,7 +1098,6 @@ jobs:
         include:
           - job_name: windows
             os: windows-latest
-            containerName: "test-cnt-win"
 
     runs-on: ${{ matrix.os }}
     env:
@@ -1110,6 +1111,7 @@ jobs:
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       # WinFsp creates MOUNT_DIR only once mounted, so readiness checks use `[ -d ]`.
       MOUNT_READY_TIMEOUT: 60
+      CONTAINER_NAME: cloudfuse-ci-${{ matrix.job_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1150,7 +1152,7 @@ jobs:
             env:
               AZTEST_BLOCK_ACC_NAME: ${{ secrets.AZTEST_BLOCK_ACC_NAME }}
               AZTEST_ADLS_ACC_NAME: ${{ secrets.AZTEST_ADLS_ACC_NAME }}
-              CONTAINER_NAME: ${{ matrix.containerName }}
+              CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
               AZTEST_BLOCK_KEY: ${{ secrets.AZTEST_BLOCK_KEY }}
               AZTEST_ADLS_KEY: ${{ secrets.AZTEST_ADLS_KEY }}
               AZTEST_BLOCK_SAS: ${{ secrets.AZTEST_BLOCK_SAS }}
@@ -1164,6 +1166,9 @@ jobs:
               AZTEST_TENANT: ${{ secrets.AZTEST_TENANT }}
               AZTEST_SECRET: ${{ secrets.AZTEST_SECRET }}
             run: |-
+              az storage container create --name "$env:CONTAINER_NAME" --account-name "$env:AZTEST_BLOCK_ACC_NAME" --account-key "$env:AZTEST_BLOCK_KEY" --only-show-errors --output none
+              az storage fs create --name "$env:CONTAINER_NAME" --account-name "$env:AZTEST_ADLS_ACC_NAME" --account-key "$env:AZTEST_ADLS_KEY" --only-show-errors --output none
+
               $cnfFile="~\azuretest.json"
               Write-Host $cnfFile
               $content = @"
@@ -1251,7 +1256,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: Block Blob Coverage
@@ -1350,7 +1355,7 @@ jobs:
           VERBOSE_LOG: false
           USE_HTTP: false
           WORK_DIR: ${{ env.WORK_DIR }}
-          containerName: ${{ matrix.containerName }}
+          containerName: ${{ env.CONTAINER_NAME }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${containerName} --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
@@ -1407,7 +1412,7 @@ jobs:
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_ADLS_CFG: ${{ env.cloudfuse_ADLS_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_ADLS_CFG}"
 
       - name: ADLS Coverage
@@ -1727,7 +1732,7 @@ jobs:
           VERBOSE_LOG: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_STREAM_CFG: ${{ env.cloudfuse_STREAM_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_STREAM_CFG}"
 
       # Need to fix these to run on Windows
@@ -1770,7 +1775,7 @@ jobs:
           USE_HTTP: false
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: "./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${CONTAINER_NAME} --temp-path=${TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       # Following tests don't work on Windows
@@ -1884,7 +1889,7 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
-          CONTAINER_NAME: ${{ matrix.containerName }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         run: |-
           set +x
           rm -rf ${MOUNT_DIR}/*

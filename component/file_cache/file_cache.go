@@ -1268,7 +1268,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	if !fc.NextComponent().CloudConnected() {
 		if !fc.offlineAccess {
 			log.Err("FileCache::CreateFile : %s failed (offline access disabled)", options.Name)
-			return nil, common.CloudUnreachableError{}
+			return nil, &common.CloudUnreachableError{}
 		}
 		// if the file is not in the cache and the cloud state is unknown, block access
 		if _, err := os.Stat(filepath.Join(fc.tmpPath, options.Name)); err != nil {
@@ -1630,7 +1630,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// block offline open calls when offline access is disabled
 	if !cloudConnected && !fc.offlineAccess {
 		log.Err("FileCache::OpenFile : %s Offline access is disabled", options.Name)
-		return nil, common.CloudUnreachableError{}
+		return nil, &common.CloudUnreachableError{}
 	}
 
 	// return err in case of authorization permission mismatch
@@ -1984,7 +1984,7 @@ func (fc *FileCache) WriteFile(options *internal.WriteFileOptions) (int, error) 
 
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
-	if f := options.Handle.GetFileObject(); f != nil && options.Handle.Dirty() {
+	if f := options.Handle.GetFileObject(); f != nil {
 		if err := f.Sync(); err != nil {
 			log.Err("FileCache::SyncFile : %s local sync failed [%v]", options.Handle.Path, err)
 			return syscall.EIO
