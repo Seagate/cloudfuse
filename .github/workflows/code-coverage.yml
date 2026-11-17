@@ -734,6 +734,16 @@ jobs:
         run: |-
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/generate_cmd.cov generate test_component || exit 1
 
+      - name: Create Mount All Config
+        env:
+          WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+        run: |-
+          MOUNT_ALL_CFG=${WORK_DIR}/cloudfuse_mountall.yaml
+          cp "${cloudfuse_CFG}" "${MOUNT_ALL_CFG}"
+          printf '\nmountall:\n  container-allowlist:\n    - %s\n' "${CONTAINER_NAME}" >> "${MOUNT_ALL_CFG}"
+
       - name: "CLI : Mount List"
         env:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
@@ -747,9 +757,9 @@ jobs:
         env:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
-          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          MOUNT_ALL_CFG: ${{ env.WORK_DIR }}/cloudfuse_mountall.yaml
         run: |-
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_cmd.cov mount all ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug || exit 1
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_cmd.cov mount all ${MOUNT_DIR} --config-file=${MOUNT_ALL_CFG} --log-level=log_debug || exit 1
           timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/list_cmd_all.cov mount list || exit 1
           ./cloudfuse.test unmount all
@@ -759,15 +769,15 @@ jobs:
         env:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
-          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          MOUNT_ALL_CFG: ${{ env.WORK_DIR }}/cloudfuse_mountall.yaml
           CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         shell: bash {0}
         run: |-
           set +x
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_cmd_all.cov mount all ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug || exit 1
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_cmd_all.cov mount all ${MOUNT_DIR} --config-file=${MOUNT_ALL_CFG} --log-level=log_debug || exit 1
           timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
-          cd $(MOUNT_DIR)/$(containerName)
-          ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont_fail.cov unmount $(MOUNT_DIR)/$(containerName)
+          cd "${MOUNT_DIR}/${CONTAINER_NAME}"
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/umnt_cmd_cont_fail.cov unmount "${MOUNT_DIR}/${CONTAINER_NAME}"
           cd -
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/umnt_cmd_cont.cov unmount ${MOUNT_DIR}/${CONTAINER_NAME} || exit 1
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/umnt_wild_cmd.cov unmount \"testmut*\" || exit 1
@@ -808,13 +818,14 @@ jobs:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         timeout-minutes: 2
         run: |-
           ./cloudfuse.test unmount all
           cp ${cloudfuse_CFG} /tmp/configMountall.yaml
           echo "mountall:" >> /tmp/configMountall.yaml
-          echo "  container-denylist:" >> /tmp/configMountall.yaml
-          echo "    - abcd" >> /tmp/configMountall.yaml
+          echo "  container-allowlist:" >> /tmp/configMountall.yaml
+          echo "    - ${CONTAINER_NAME}" >> /tmp/configMountall.yaml
           cat /tmp/configMountall.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/secure_encrypt_all2.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 || exit 1
           { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_all_cmd_secure2.cov mount all ${MOUNT_DIR} --config-file=${WORK_DIR}/cloudfuse.aes --passphrase=12312312312312312312312312312312 --log-level=log_debug --foreground=true & } || exit 1
@@ -867,16 +878,16 @@ jobs:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
-          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          MOUNT_ALL_CFG: ${{ env.WORK_DIR }}/cloudfuse_mountall.yaml
         run: |-
           set +x
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test unmount all
-          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_foreg_2.cov mount all ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --log-level=log_debug --foreground=true & } || exit 1
+          { ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/mount_foreg_2.cov mount all ${MOUNT_DIR} --config-file=${MOUNT_ALL_CFG} --log-level=log_debug --foreground=true & } || exit 1
           timeout ${MOUNT_READY_TIMEOUT}s bash -c 'until mount | grep -q "${MOUNT_DIR}"; do sleep 1; done'
-          echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> ${cloudfuse_CFG}
-          sed -i 's/timeout:.*/timeout: 300/' ${cloudfuse_CFG}
+          echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> ${MOUNT_ALL_CFG}
+          sed -i 's/timeout:.*/timeout: 300/' ${MOUNT_ALL_CFG}
           sleep 2
           ./cloudfuse.test unmount all
           timeout 10s bash -c 'until ! mount | grep -q "${MOUNT_DIR}"; do sleep 0.2; done'

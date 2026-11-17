@@ -870,6 +870,24 @@ func (suite *mountTestSuite) TestMountAllHelp() {
 	suite.assert.Contains(op, "all")
 }
 
+func TestFilterAllowedContainerList(t *testing.T) {
+	originalOptions := mountAllOpts
+	defer func() { mountAllOpts = originalOptions }()
+
+	containers := []string{"one", "two", "three"}
+	mountAllOpts = containerListingOptions{AllowList: []string{"two", "missing"}}
+	assert.ElementsMatch(t, []string{"two"}, filterAllowedContainerList(containers))
+
+	mountAllOpts = containerListingOptions{DenyList: []string{"two", "missing"}}
+	assert.ElementsMatch(t, []string{"one", "three"}, filterAllowedContainerList(containers))
+
+	mountAllOpts = containerListingOptions{
+		AllowList: []string{"one"},
+		DenyList:  []string{"one"},
+	}
+	assert.ElementsMatch(t, []string{"one"}, filterAllowedContainerList(containers))
+}
+
 // TestLoggingGoroutineIDDefaultBehavior ensures that when logging.goroutine-id is
 // not set in config, the mount code block sets it based on log level:
 // - LOG_DEBUG and above -> true
