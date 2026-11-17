@@ -145,7 +145,7 @@ manually install Cloudfuse.
 
 ## Basic Use
 
-The following describes how to use the Cloudfuse CLI. If you would like to use a GUI checkout the Cloudfuse GUI repo at <https://github.com/Seagate/cloudfuse-gui>.
+The following describes how to use the Cloudfuse CLI.
 
 1. Create a basic configuration file (TUI):
    If you would like an easy way to get started with cloudfuse, run the following to launch a TUI to configure cloudfuse. If you prefer to configure manually, checkout how to write a config file: <https://github.com/Seagate/cloudfuse/wiki/Config-File>
@@ -305,7 +305,7 @@ This command should then print out "Verified OK" is the checksum file is valid. 
 ### Health Monitor
 
 Cloudfuse also supports a health monitor.
-The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
+The health monitor allows customers to gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.
 Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
 
 ## Offline Access (New)
