@@ -1224,7 +1224,8 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	c.policy.Rename(options.Src, options.Dst)
-	dflock.CloudStale = sflock.CloudStale && !neverUploaded
+	promoted := from == srcCache && to == dstLocal
+	dflock.CloudStale = promoted || sflock.CloudStale && !neverUploaded
 	sflock.CloudStale = false
 	c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 	return nil
