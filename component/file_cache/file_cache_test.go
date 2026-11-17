@@ -2111,7 +2111,7 @@ func (suite *fileCacheTestSuite) TestSyncFileUploadFailureNotQueued() {
 
 	handle := handlemap.NewHandle(name)
 	handle.SetFileObject(f)
-	suite.fileCache.setHandleDirty(handle)
+	handle.SetDirty(suite.fileCache.fileLocks)
 
 	suite.mock.EXPECT().SyncFile(gomock.Any()).Return(nil)
 	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(&common.CloudUnreachableError{})

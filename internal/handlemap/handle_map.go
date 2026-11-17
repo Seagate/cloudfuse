@@ -97,6 +97,42 @@ func (handle *Handle) Dirty() bool {
 	return handle.Flags.IsSet(HandleFlagDirty)
 }
 
+// SetDirtyLocked marks the handle dirty and increments the dirty-handle count while its lock is already held.
+func (handle *Handle) SetDirtyLocked(fileLocks *common.LockMap) {
+	if !handle.Dirty() {
+		handle.Flags.Set(HandleFlagDirty)
+		fileLocks.Get(handle.Path).IncDirty()
+	}
+}
+
+// SetDirty marks the handle dirty and increments the dirty-handle count
+func (handle *Handle) SetDirty(fileLocks *common.LockMap) {
+	path := ""
+	handle.Lock()
+	if !handle.Dirty() {
+		handle.Flags.Set(HandleFlagDirty)
+		path = handle.Path
+	}
+	handle.Unlock()
+	if path != "" {
+		fileLocks.Get(path).IncDirty()
+	}
+}
+
+// ClearDirty clears the handle's dirty flag and decrements the dirty-handle count
+func (handle *Handle) ClearDirty(fileLocks *common.LockMap) {
+	path := ""
+	handle.Lock()
+	if handle.Dirty() {
+		handle.Flags.Clear(HandleFlagDirty)
+		path = handle.Path
+	}
+	handle.Unlock()
+	if path != "" {
+		fileLocks.Get(path).DecDirty()
+	}
+}
+
 // Cached : File is cached on local disk or not
 func (handle *Handle) Cached() bool {
 	return handle.Flags.IsSet(HandleFlagCached)
