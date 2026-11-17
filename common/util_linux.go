@@ -162,15 +162,6 @@ func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
 	return time.Unix(stat.Atim.Sec, stat.Atim.Nsec), time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)
 }
 
-// GetFileOwner returns the uid and gid of a local file.
-func GetFileOwner(info fs.FileInfo) (uid, gid int, ok bool) {
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return 0, 0, false
-	}
-	return int(stat.Uid), int(stat.Gid), true
-}
-
 // IsProtectedSystemFile reports false: Linux has no system file attribute.
 func IsProtectedSystemFile(info fs.FileInfo) bool {
 	return false

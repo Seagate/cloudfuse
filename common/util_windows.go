@@ -129,11 +129,6 @@ func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
 		time.Unix(0, stat.CreationTime.Nanoseconds())
 }
 
-// GetFileOwner reports no owner: Windows files carry no POSIX uid or gid.
-func GetFileOwner(info fs.FileInfo) (uid, gid int, ok bool) {
-	return 0, 0, false
-}
-
 // IsProtectedSystemFile reports whether info is marked both hidden and
 // system, which Explorer treats as a protected operating system file.
 func IsProtectedSystemFile(info fs.FileInfo) bool {
