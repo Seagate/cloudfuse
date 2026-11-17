@@ -40,7 +40,7 @@ jobs:
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
       MOUNT_READY_TIMEOUT: 60
-      zig: 0.16.0
+      zig: 0.17.1
       CONTAINER_NAME: cloudfuse-ci-${{ matrix.job_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     # Skip for dependabot updates

@@ -1268,7 +1268,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	if !fc.NextComponent().CloudConnected() {
 		if !fc.offlineAccess {
 			log.Err("FileCache::CreateFile : %s failed (offline access disabled)", options.Name)
-			return nil, common.CloudUnreachableError{}
+			return nil, &common.CloudUnreachableError{}
 		}
 		// if the file is not in the cache and the cloud state is unknown, block access
 		if _, err := os.Stat(filepath.Join(fc.tmpPath, options.Name)); err != nil {
@@ -1630,7 +1630,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// block offline open calls when offline access is disabled
 	if !cloudConnected && !fc.offlineAccess {
 		log.Err("FileCache::OpenFile : %s Offline access is disabled", options.Name)
-		return nil, common.CloudUnreachableError{}
+		return nil, &common.CloudUnreachableError{}
 	}
 
 	// return err in case of authorization permission mismatch
@@ -2420,29 +2420,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 		f := options.Handle.GetFileObject()
 		if f == nil {
-			// Recover missing fd on valid handles by reopening the cached path.
-			// This avoids issues when truncate arrives before the handle has a live file object.
-			localPath := filepath.Join(fc.tmpPath, options.Name)
-			reopened, reopenErr := fc.openCacheFile(localPath, os.O_RDWR, fc.defaultPermission)
-			if reopenErr == nil {
-				options.Handle.UnixFD = uint64(reopened.Fd())
-				options.Handle.SetFileObject(reopened)
-				f = reopened
-			}
-		}
-
-		if f == nil {
-			log.Warn(
-				"FileCache::TruncateFile : missing fd in handle, fallback to path truncate %s",
-				options.Name,
-			)
-			options.Handle = nil
-		}
-	}
-
-	if options.Handle != nil {
-		f := options.Handle.GetFileObject()
-		if f == nil {
+			log.Err("FileCache::TruncateFile : %s missing fd in handle for", options.Name)
 			return syscall.EBADF
 		}
 

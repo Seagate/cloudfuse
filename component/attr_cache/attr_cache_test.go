@@ -974,22 +974,16 @@ func (suite *attrCacheTestSuite) TestRenameDir() {
 			suite.assertNotInCache(truncatedSrc)
 			suite.assertNotInCache(truncatedDst)
 
-			// Error
-			// Destination Entry (ab) Already Exists
+			// Success
+			// Source Entry Exists and Destination Entry (ab) is an empty directory
 			a, ab, ac := suite.addDirectoryToCache(input.src)
 
-			suite.mock.EXPECT().RenameDir(options).Return(nil)
+			deleteFileOptions := internal.DeleteFileOptions{Name: truncatedDst + "/c1"}
+			suite.mock.EXPECT().DeleteFile(deleteFileOptions).Return(nil)
 
-			err = suite.attrCache.RenameDir(options)
-			suite.assert.True(os.IsExist(err))
-
-			// Success
-			// Source Entry Exists and Destination Entry Does Not Already Exist
-			deleteDirOptions := internal.DeleteDirOptions{Name: input.dst}
-			suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(nil)
-
-			err = suite.attrCache.DeleteDir(deleteDirOptions)
+			err = suite.attrCache.DeleteFile(deleteFileOptions)
 			suite.assert.NoError(err)
+			suite.assertExists(truncatedDst)
 
 			suite.mock.EXPECT().RenameDir(options).Return(nil)
 
