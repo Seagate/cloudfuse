@@ -28,25 +28,25 @@ stateDiagram-v2
     state "cloud only (closed)" as Cloud
     [*] --> Local: create
     Cloud --> Cache: open (download)
-    Cloud --> Local: open with O_TRUNC
-    Cache --> Local: first write (promote)
+    Cloud --> Local: open with O_TRUNC (delete cloud)
+    Cache --> Local: first write (rename, delete cloud)
     Cache --> Cloud: last close (delete copy)
     Local --> Cloud: eviction (upload, delete)
 ```
 
-- Promotion is an atomic rename done before the write is acknowledged, so acknowledged writes always survive a crash.
+- Promotion renames the cached file and deletes the cloud object before the write is acknowledged. On cloud-delete failure, the local rename is reverted and the write fails. ([details][file-ops])
 - Startup deletes `cache/` and loads `local/` into the LRU by mtime. ([startup][startup], [crash recovery][crash])
-- In-memory state is just per-file locks, the LRU, a size tracker, and the `cloudStale` hint below.
+- In-memory state is per-file locks, the LRU, a size tracker, and per-handle cache-copy marks.
 
 ## Eviction and capacity
 
 - Eviction runs only in the background: the LRU policy evicts from `high-threshold` down to `low-threshold`. Writes never wait for it. ([details][eviction])
-- **Evict on close:** a file promoted from the cloud is marked `cloudStale` (in memory only). After its last close it is evicted regardless of thresholds, so the cloud does not keep serving outdated content. ([details][evict-on-close])
+- Closing a promoted file leaves it local-owned; it is evicted only by the background policy.
 - There is no space reservation. `max-size-mb` only sets the thresholds; the hard limit is local free space, and `ENOSPC` is returned unchanged. ([details][capacity])
 
 ## Operations
 
-- Delete and rename check `CloudConnected()` after taking locks and before changing anything, so they fail fast when offline. ([details][connectivity])
+- Delete, rename, and promotion check `CloudConnected()` after taking locks and before changing anything, so they fail fast when offline. ([details][connectivity])
 - `DeleteFile` deletes in the cloud first, so a stale copy can't resurface.
 - `RenameFile` and `RenameDir` rename locally first (cheap to undo, and on Windows an open file fails it early with access denied), then in the cloud, reverting locally if the cloud fails. ([file][renamefile], [dir][renamedir])
 - Permissions are not tracked: chmod and chown are ignored, and everything uses the default mode set at mount. ([details][permissions])
@@ -64,7 +64,6 @@ See also: [per-operation details][file-ops], [test plan][tests], [backlog][backl
 [startup]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#startup
 [crash]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#crash-recovery
 [eviction]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#eviction
-[evict-on-close]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#evict-on-close
 [capacity]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#capacity-accounting
 [connectivity]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#cloud-connectivity-rule
 [renamefile]: https://github.com/Seagate/cloudfuse/blob/feature/tiered_storage/component/tiered_storage/DESIGN.md#renamefile

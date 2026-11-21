@@ -15,8 +15,8 @@ downloads a temporary copy, which is discarded when the file is closed.
 
 - **Simplicity over perfect correctness.** The component has few users. Prefer a
   small, understandable state machine over exhaustive bookkeeping.
-- **One authority per file.** At any moment, either the local copy or the cloud
-  copy of a file is authoritative, never both.
+- **One authority per file.** The local copy is authoritative when present;
+  otherwise the cloud copy is authoritative.
 - **Authority is encoded in the filesystem layout**, not in metadata. Recovery
   after a crash requires no persisted state.
 - **Fail early.** Check everything that can be checked cheaply before changing
@@ -59,7 +59,7 @@ There is no state snapshot to persist to disk.
 
 | State | Local location | Authoritative copy | Cloud copy |
 |---|---|---|---|
-| Local-owned | `local/` | Local | Absent |
+| Local-owned | `local/` | Local | Normally absent |
 | Cloud-owned, open | `cache/` | Cloud | Current |
 | Cloud-owned, closed | none | Cloud | Current |
 
@@ -78,7 +78,8 @@ Consequences:
 
 - Files in `cache/` are always clean. Any mutation promotes them first.
 - Files in `local/` are always treated as needing upload before deletion.
-- Location alone decides ownership.
+- Location alone decides ownership. A cloud copy can remain after an
+  interrupted operation; `local/` wins until eviction replaces that copy.
 
 ## In-memory state
 
@@ -121,8 +122,9 @@ Nothing is persisted. `cache/` contents are discarded on next start.
 ## Cloud connectivity rule
 
 Operations that change the namespace of something which might exist in the
-cloud (delete, rename) check `NextComponent().CloudConnected()` **after taking
-locks and before making any change**. If the cloud is not connected, they check
+cloud (delete, rename, and promotion including `O_TRUNC`) check
+`NextComponent().CloudConnected()` **after taking locks and before making any change**.
+If the cloud is not connected, they check
 `NextComponent().GetAttr()` as well. If there's no connection, and GetAttr returns
 anything other than a simple error satisfying os.IsNotExist(err), they fail immediately.
 No network call is made by these checks.
@@ -136,7 +138,8 @@ Rationale:
 
 The flag is a hint. Operations still handle cloud failures after the check.
 
-Writing to and creating local files does not require connectivity.
+Writing to and creating local-owned files does not require connectivity.
+Promoting a cloud-owned file requires a successful cloud delete before mutation.
 
 ## File operations
 
@@ -153,8 +156,9 @@ Writing to and creating local files does not require connectivity.
 2. If `local/x` exists: open it.
 3. Else if `cache/x` exists (another handle has it open): open it.
 4. Else (cloud-owned, closed):
-   - With `O_TRUNC`: create an empty `local/x` and delete the cloud object. The file
-     is now local-owned.
+   - With `O_TRUNC`: check cloud connectivity, create an empty `local/x`, and
+     delete the cloud object. On a delete error, remove the new local file and
+     return the error. The file is local-owned after the delete succeeds.
    - Otherwise: download directly into `cache/x`. On failure (including
      `ENOSPC` from the local filesystem), delete `cache/x` and return the
      error.
@@ -162,9 +166,12 @@ Writing to and creating local files does not require connectivity.
 
 ### WriteFile / TruncateFile
 
-1. If the handle's file is in `cache/`, take the file lock and promote: rename
-   `cache/x` → `local/x`, delete cloud object, then enqueue it in the LRU. Open
-   handles remain valid (see [Windows semantics](#windows-semantics)).
+1. If the handle's file is in `cache/`, take the file lock, check cloud
+  connectivity, and promote: rename `cache/x` → `local/x`, delete the cloud
+  object, then enqueue it in the LRU. Open handles remain valid (see
+  [Windows semantics](#windows-semantics)). If the delete fails, rename the
+  file back to `cache/x` and return the error without mutating it. Log a failed
+  revert; the local copy remains authoritative.
 2. Write/truncate the local file. There is no size pre-check. If the local
    filesystem returns `ENOSPC`, return it to the caller.
 
@@ -208,14 +215,16 @@ Read from the handle's file. No locking or state changes.
 3. Fail early if the destination exists and replacing it is not permitted
    (`local/dst` is a directory).
 4. If the source is in `local/` or `cache/`: `MkdirAll` the destination parent
-   and rename the local file. If the source is in `cache/` and `local/dst`
-   exists, rename it over `local/dst`, so the replacement is atomic. The file
-   becomes local-owned.
+  and rename the local file. A cached source stays in `cache/`, unless
+  `local/dst` exists, in which case rename it over `local/dst` and promote it.
 5. Rename in the cloud.
    - `ENOENT` is acceptable if the source was in `local/` (never uploaded).
    - On any other failure, rename the local file back and return the error. If
      the revert fails, log an error naming both paths and stating that local and
      cloud have diverged, then return the original error.
+  - If the destination is local-owned, delete any cloud object at `dst`.
+    Return a delete error; a cloud rename or replaced local destination may
+    already be irreversible, so log any resulting divergence.
 6. If a replaced destination had a copy in the other tree (for example
    `cache/dst` when `local/src` moved in), delete it, so the object is in at
    most one tree. This runs only after the cloud rename succeeds, so a failed
@@ -262,7 +271,9 @@ empty.
 
 ### StreamDir
 
-Merge cloud entries with `local/<dir>` entries. Each file will only be in one or the other. `cache/` is never listed.
+Merge cloud entries with `local/<dir>` entries. Local entries take precedence
+over cloud entries of the same name, including across cloud pages; interrupted
+operations can leave both copies. `cache/` is never listed.
 
 ### RenameDir
 
@@ -399,18 +410,26 @@ Limits:
 ## Crash recovery
 
 No recovery bookkeeping exists. Startup clears `cache/` and treats all of
-`local/` as authoritative.
+`local/` as authoritative, even if a cloud object with the same name remains.
+Listings suppress that cloud duplicate. An eviction overwrites it before
+removing the local file.
 
 | Crash point | Outcome after restart |
 |---|---|
 | During download into `cache/` | Partial file deleted; cloud remains authoritative |
 | While a cloud file is open, unmodified | Cache copy deleted; cloud remains authoritative |
+| After promotion rename, before cloud delete | Local copy remains authoritative; cloud copy may still exist |
 | After promotion, before the write | Unchanged file in `local/`; one redundant upload on eviction |
+| During `O_TRUNC`, after creating `local/` but before cloud delete | Empty local file is authoritative; old cloud copy may still exist |
 | After an acknowledged write | Data is in `local/`; preserved |
 | During eviction upload | Local copy still authoritative; eviction retries |
 | After upload, before local delete | Redundant re-upload on next eviction |
 | During delete, after cloud delete | Local copy remains; user-visible as existing; delete can be retried |
 | During file/directory rename, between local and cloud steps | Local and cloud names diverge; accepted as rare |
+
+A cloud delete can succeed remotely but return an error. Reverting promotion
+after such an ambiguous failure can leave only a `cache/` copy, which startup
+discards; this rare failure is not recovered by this design.
 
 ## Required tests
 
@@ -418,10 +437,14 @@ No recovery bookkeeping exists. Startup clears `cache/` and treats all of
   unexpected root entries, and ignores OS-managed root entries without counting
   them toward usage.
 - Open of a cloud file downloads into `cache/`; last close deletes it.
-- First write to a cached file promotes it to `local/` while handles remain
-  valid.
+- First write to a cached file deletes the cloud object and promotes it to
+  `local/` while handles remain valid; a failed cloud delete prevents the write
+  and reverts the local rename.
 - `O_TRUNC` open of a cloud file creates an empty local-owned file without
-  downloading.
+  downloading, deletes the cloud object, and fails without retaining the new
+  local file if the delete fails.
+- An interrupted promotion leaves `local/` authoritative and listings do not
+  duplicate a remaining cloud object.
 - Delete and rename fail early when the cloud is disconnected, with no local
   change.
 - `RenameFile` and `RenameDir` revert local renames when the cloud rename fails.
