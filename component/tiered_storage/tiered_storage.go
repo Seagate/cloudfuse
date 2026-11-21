@@ -651,9 +651,8 @@ func defaultModeAttr(attr *internal.ObjAttr) *internal.ObjAttr {
 	if attr == nil {
 		return nil
 	}
-	copy := *attr
-	copy.Flags.Set(internal.PropFlagModeDefault)
-	return &copy
+	attr.Flags.Set(internal.PropFlagModeDefault)
+	return attr
 }
 
 // File operations
