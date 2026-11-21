@@ -28,7 +28,7 @@ stateDiagram-v2
     state "cloud only (closed)" as Cloud
     [*] --> Local: create
     Cloud --> Cache: open (download)
-    Cloud --> Local: open with O_TRUNC (delete cloud)
+    Cloud --> Local: overwrite (e.g. O_TRUNC) (delete cloud)
     Cache --> Local: first write (rename, delete cloud)
     Cache --> Cloud: last close (delete copy)
     Local --> Cloud: eviction (upload, delete)
