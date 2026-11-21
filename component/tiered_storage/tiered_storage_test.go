@@ -394,21 +394,6 @@ func (suite *tieredStorageTestSuite) TestReleaseDeletesCachedCopy() {
 	suite.assert.Equal(used-int64(len("cloud data")), suite.tieredStorage.diskUsage.Used())
 }
 
-// promoteCloudFile writes data to the cloud, then opens and modifies it
-// through tiered storage, leaving it local-owned.
-func (suite *tieredStorageTestSuite) promoteCloudFile(path, data string) *handlemap.Handle {
-	suite.writeCloudFile(path, data)
-	handle, err := suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR},
-	)
-	suite.Require().NoError(err)
-	_, err = suite.tieredStorage.WriteFile(
-		&internal.WriteFileOptions{Handle: handle, Data: []byte("LOCAL")},
-	)
-	suite.Require().NoError(err)
-	return handle
-}
-
 func (suite *tieredStorageTestSuite) TestReadInBuffer() {
 	defer suite.cleanupTest()
 	// Setup
