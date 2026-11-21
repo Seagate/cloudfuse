@@ -1199,7 +1199,15 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	neverUploaded := from == srcLocal && errors.Is(err, os.ErrNotExist)
 	if neverUploaded {
 		// don't leave a dangling object at dst in the cloud
-		_ = c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Dst})
+		if err := c.NextComponent().
+			DeleteFile(internal.DeleteFileOptions{Name: options.Dst}); err != nil &&
+			!errors.Is(err, os.ErrNotExist) {
+			log.Warn(
+				"TieredStorage::RenameFile : %s cloud dst delete failed [%v]",
+				options.Dst,
+				err,
+			)
+		}
 	} else if err != nil {
 		log.Err("TieredStorage::RenameFile : %s -> %s failed [%v]", options.Src, options.Dst, err)
 		if localDstLost {
