@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -357,4 +358,8 @@ func (suite *lruPolicyTestSuite) TestStopPolicyMidUpload() {
 
 	err = os.RemoveAll(cache_path)
 	suite.assert.NoError(err)
+}
+
+func TestLRUPolicyTestSuite(t *testing.T) {
+	suite.Run(t, new(lruPolicyTestSuite))
 }
