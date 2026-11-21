@@ -27,10 +27,8 @@ package tiered_storage
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"sync"
 	"time"
 
@@ -71,10 +69,7 @@ type lruQueue struct {
 	mu         sync.Mutex
 	nodes      map[string]*lruNode
 	head, tail *lruNode
-	// closed holds evict-on-close requests not yet handled.
-	closed map[string]struct{}
 
-	wake chan struct{}
 	stop chan struct{}
 	wg   sync.WaitGroup
 
@@ -84,8 +79,6 @@ type lruQueue struct {
 func newLRUQueue(cfg lruQueueConfig) *lruQueue {
 	return &lruQueue{
 		nodes:          make(map[string]*lruNode),
-		closed:         make(map[string]struct{}),
-		wake:           make(chan struct{}, 1),
 		lruQueueConfig: cfg,
 	}
 }
@@ -111,10 +104,7 @@ func (q *lruQueue) StartPolicy() error {
 	}
 
 	q.stop = make(chan struct{})
-
-	// start eviction goroutines
 	q.wg.Go(q.watchCapacity)
-	q.wg.Go(q.watchCloses)
 
 	return nil
 }
@@ -157,38 +147,6 @@ func (q *lruQueue) watchCapacity() {
 	}
 }
 
-func (q *lruQueue) watchCloses() {
-	for {
-		select {
-		case <-q.stop:
-			return
-		case <-q.wake:
-			q.evictClosed()
-		}
-	}
-}
-
-// EvictOnClose asks for name to be evicted ahead of its LRU turn, if it is
-// still closed and cloudStale when its turn comes. It does not block.
-func (q *lruQueue) EvictOnClose(name string) {
-	q.mu.Lock()
-	q.closed[name] = struct{}{}
-	q.mu.Unlock()
-
-	select {
-	case q.wake <- struct{}{}:
-	default:
-	}
-}
-
-func (q *lruQueue) evictClosed() {
-	q.mu.Lock()
-	names := slices.Collect(maps.Keys(q.closed))
-	q.mu.Unlock()
-
-	q.evictAll(names, true)
-}
-
 // evictDownTo runs one eviction pass toward targetUsed.
 func (q *lruQueue) evictDownTo(targetUsed int64) {
 	used := q.size.Used()
@@ -225,29 +183,20 @@ func (q *lruQueue) evictAll(names []string, onClose bool) {
 			break
 		}
 		wg.Go(func() {
-			q.evict(name, onClose)
+			q.evict(name)
 			<-sem
 		})
 	}
 	wg.Wait()
 }
 
-// evict uploads and removes local/name unless it is open. An evict-on-close
-// also requires cloudStale. On failure, the file stays queued. A name with no
+// evict uploads and removes local/name unless it is open. On failure, the file stays queued. A name with no
 // regular local file is dequeued, so links are never uploaded.
-func (q *lruQueue) evict(name string, onClose bool) {
+func (q *lruQueue) evict(name string) {
 	flock := q.fileLocks.Get(name)
 	flock.Lock()
 	defer flock.Unlock()
 
-	if onClose {
-		q.mu.Lock()
-		delete(q.closed, name)
-		q.mu.Unlock()
-		if !flock.CloudStale {
-			return
-		}
-	}
 	if flock.Count() > 0 {
 		return
 	}

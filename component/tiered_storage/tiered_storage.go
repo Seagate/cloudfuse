@@ -268,10 +268,8 @@ func (c *TieredStorage) Configure(_ bool) error {
 	return nil
 }
 
-// prepareRoot lays out the tiered root and discards cache/ from any previous
-// run. Entries other than local/, cache/, and OS-managed volume entries are
-// refused rather than guessed at, since they may hold data from an older layout
-// or a misconfigured path.
+// prepareRoot lays out the tiered root and discards cache/ from any previous run.
+// Fail if anything other than local/, cache/, and OS-managed volume entries exists.
 func (c *TieredStorage) prepareRoot() error {
 	if err := os.MkdirAll(c.tmpPath, dirPerm); err != nil {
 		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
@@ -309,9 +307,9 @@ func (c *TieredStorage) prepareRoot() error {
 	return nil
 }
 
-// osManagedRootEntries are created by the OS or filesystem at the root of a
-// volume, so they are expected when the tiered root is a volume root. The NTFS
-// names also appear when an NTFS or exFAT volume is mounted on Linux.
+// osManagedRootEntries are created by the OS or filesystem at the root of a volume,
+// so they are expected when the tiered root is a volume root.
+// The NTFS names also appear when an NTFS or exFAT volume is mounted on Linux.
 var osManagedRootEntries = []string{"System Volume Information", "$RECYCLE.BIN", "lost+found"}
 
 // isOSManagedEntry reports whether a tiered root entry belongs to the OS.
@@ -363,44 +361,48 @@ func (c *TieredStorage) treePath(tree, name string) string {
 
 // Directory operations
 func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
+	// exists?
 	if _, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name}); err == nil {
 		return syscall.EEXIST
 	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Err("TieredStorage::CreateDir : %s GetAttr failed [%v]", options.Name, err)
 		return err
 	}
-
+	// local
 	localPath := c.localPath(options.Name)
-	// The parent may exist only in the cloud.
-	if err := os.MkdirAll(filepath.Dir(localPath), dirPerm); err != nil {
+	if err := os.MkdirAll(localPath, dirPerm); err != nil {
+		log.Err("TieredStorage::CreateDir : %s MkdirAll failed [%v]", options.Name, err)
 		return err
 	}
-	if err := os.Mkdir(localPath, dirPerm); err != nil {
-		return err
-	}
+	// cloud
 	if err := c.NextComponent().CreateDir(options); err != nil && !errors.Is(err, os.ErrExist) {
+		log.Err("TieredStorage::CreateDir : %s cloud failure", options.Name)
 		return err
 	}
 	return nil
 }
 
+// Delete empty directory (emptiness is guaranteed by the caller)
 func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
-	localPath := c.localPath(options.Name)
-	cachePath := c.cachePath(options.Name)
+	// fail fast
 	if _, err := c.checkCloudReachable(options.Name); err != nil {
 		return err
 	}
-
+	// cloud
 	cloudErr := c.NextComponent().DeleteDir(options)
 	if cloudErr != nil && !errors.Is(cloudErr, os.ErrNotExist) {
 		return cloudErr
 	}
-	localErr := os.Remove(localPath)
+	// local
+	localErr := os.Remove(c.localPath(options.Name))
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return localErr
 	}
-	// cache/ is not pruned, so it may hold this directory
-	_ = os.Remove(cachePath)
-
+	if err := os.Remove(c.cachePath(options.Name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		// just log it - the request is still successful
+		log.Warn("TieredStorage::DeleteDir : %s failed to clear cache copy", options.Name)
+	}
+	// not found
 	if errors.Is(localErr, os.ErrNotExist) && errors.Is(cloudErr, os.ErrNotExist) {
 		return syscall.ENOENT
 	}
@@ -408,72 +410,67 @@ func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 }
 
 func (c *TieredStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
-	localPath := c.localPath(options.Name)
-	entries, localErr := os.ReadDir(localPath)
+	// local
+	entries, localErr := os.ReadDir(c.localPath(options.Name))
 	if localErr == nil && len(entries) > 0 {
 		return false
 	}
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return false
 	}
+	// cloud
 	return c.NextComponent().IsDirEmpty(options)
 }
 
 func (c *TieredStorage) StreamDir(
 	options internal.StreamDirOptions,
 ) ([]*internal.ObjAttr, string, error) {
-	localPath := c.localPath(options.Name)
-
-	entries, localErr := os.ReadDir(localPath)
-	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
-		return nil, "", localErr
-	}
-	localExists := localErr == nil
-	localNames := make(map[string]struct{}, len(entries))
-	for _, entry := range entries {
-		localNames[entry.Name()] = struct{}{}
-	}
-
-	// Local entries win, as in GetAttr. They are listed with the first page,
-	// and their names are dropped from every cloud page. cache/ copies match
-	// the cloud, so cache/ is never listed.
 	var page []*internal.ObjAttr
+	// local
+	entries, err := os.ReadDir(c.localPath(options.Name))
+	localExists := !errors.Is(err, os.ErrNotExist)
+	if localExists && err != nil {
+		log.Err("TieredStorage::StreamDir : %s ReadDir failed [%v]", options.Name, err)
+		return nil, "", err
+	}
+	// list local entries on the first page
 	if options.Token == "" {
 		for _, entry := range entries {
-			// On Windows this is the directory data, whose size can lag for an
-			// open file, as on NTFS itself.
 			info, err := entry.Info()
 			if err != nil {
-				// Evicted since ReadDir, so the cloud lists it.
-				delete(localNames, entry.Name())
 				continue
 			}
 			entryName := common.JoinUnixFilepath(options.Name, entry.Name())
 			page = append(page, c.localAttr(entryName, info))
 		}
 	}
-
-	for {
-		attrs, token, err := c.NextComponent().StreamDir(options)
-		if errors.Is(err, os.ErrNotExist) && localExists {
-			// A directory that exists only locally may be unknown to the cloud.
-			return page, "", nil
-		}
-		if err != nil {
-			return nil, "", err
-		}
-		// attrs may be attr_cache's cached listing, so it is copied, not edited.
-		for _, attr := range attrs {
-			if _, isLocal := localNames[attr.Name]; !isLocal {
-				page = append(page, defaultModeAttr(attr))
-			}
-		}
-		// libfuse takes an empty page as the end of the listing.
-		if len(page) > 0 || token == "" {
-			return page, token, nil
-		}
-		options.Token = token
+	// cloud
+	attrs, token, err := c.NextComponent().StreamDir(options)
+	cloudExists := !errors.Is(err, os.ErrNotExist)
+	if cloudExists && err != nil {
+		log.Err("TieredStorage::StreamDir : %s cloud failed [%v]", options.Name, err)
+		return page, "", err
 	}
+	// remove duplicate entries
+	localNames := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		localNames[entry.Name()] = struct{}{}
+	}
+	for _, attr := range attrs {
+		if _, local := localNames[attr.Name]; local {
+			if !attr.IsDir() {
+				log.Warn("TieredStorage::StreamDir : %s stale object found", attr.Name)
+			}
+			continue
+		}
+		page = append(page, defaultModeAttr(attr))
+	}
+	// don't return cloud ENOENT if local exists
+	if localExists || cloudExists {
+		err = nil
+	}
+
+	return page, token, err
 }
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
@@ -590,8 +587,6 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 		// LRU
 		c.policy.Rename(src, dst)
 		sflock, dflock := c.fileLocks.Get(src), c.fileLocks.Get(dst)
-		// CloudStale
-		dflock.CloudStale, sflock.CloudStale = sflock.CloudStale, false
 		// Open handles
 		c.renameOpenHandles(src, dst, sflock, dflock)
 	}
@@ -704,7 +699,7 @@ func (c *TieredStorage) openHandle(
 }
 
 // promote makes an open cloud-owned file local-owned before its first
-// change: cache/x is renamed to local/x, marked cloudStale, and enqueued in the
+// change: cache/x is renamed to local/x, its cloud object is deleted, and it's enqueued in the
 // LRU. Open handles stay valid. It does nothing if cache/x is gone, because
 // another handle promoted it or it was deleted. The file lock must be held.
 func (c *TieredStorage) promote(name string) error {
@@ -732,7 +727,10 @@ func (c *TieredStorage) promote(name string) error {
 		log.Err("TieredStorage::promote : %s rename to local failed [%v]", name, err)
 		return err
 	}
-	c.fileLocks.Get(name).CloudStale = true
+	if err := c.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: name}); err != nil {
+		// don't fail the promotion if the cloud object cannot be deleted.
+		log.Err("TieredStorage::promote : %s failed to delete cloud object [%v]", name, err)
+	}
 	c.policy.Enqueue(name)
 	return nil
 }
@@ -768,17 +766,18 @@ func (c *TieredStorage) onCacheCopy(handle *handlemap.Handle) bool {
 func (c *TieredStorage) CreateFile(
 	options internal.CreateFileOptions,
 ) (*handlemap.Handle, error) {
+	// flock
 	flock := c.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
-
+	// collision check
 	_, err := c.GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err == nil {
 		return nil, syscall.EEXIST
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
-
+	// create
 	if err := c.createEmptyLocal(options.Name); err != nil {
 		return nil, err
 	}
@@ -825,7 +824,6 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 		}
 	}
 	c.policy.Dequeue(options.Name)
-	flock.CloudStale = false
 
 	if !found {
 		return syscall.ENOENT
@@ -891,7 +889,6 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 			if err := c.createEmptyLocal(options.Name); err != nil {
 				return nil, err
 			}
-			flock.CloudStale = true
 			path = localPath
 		default:
 			if err := c.downloadToCache(options.Name); err != nil {
@@ -1088,9 +1085,6 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 	}
 	if info, err := os.Lstat(localPath); err == nil && info.Mode().IsRegular() {
 		c.policy.Enqueue(name)
-		if flock.CloudStale {
-			c.policy.EvictOnClose(name)
-		}
 	}
 	return closeErr
 }
@@ -1123,7 +1117,6 @@ func (c *TieredStorage) uploadandCleanFile(name string) error {
 		log.Err("TieredStorage::uploadandCleanFile : %s remove failed [%v]", name, err)
 		return err
 	}
-	c.fileLocks.Get(name).CloudStale = false
 	return nil
 }
 
@@ -1233,9 +1226,6 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	c.policy.Rename(options.Src, options.Dst)
-	promoted := from == srcCache && to == dstLocal
-	dflock.CloudStale = promoted || sflock.CloudStale && !neverUploaded
-	sflock.CloudStale = false
 	c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 	return nil
 }
@@ -1303,6 +1293,7 @@ func (c *TieredStorage) ReadLink(options internal.ReadLinkOptions) (string, erro
 // call. A cache/ copy matches the cloud object, so it is never consulted.
 // It takes no lock: files move between trees by atomic rename.
 func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
+	// local
 	localPath := c.localPath(options.Name)
 	info, err := os.Lstat(localPath)
 	if err == nil {
@@ -1311,6 +1302,8 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
+
+	// cloud
 	attr, err := c.NextComponent().GetAttr(options)
 	if err != nil {
 		return attr, err

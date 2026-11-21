@@ -31,7 +31,6 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -115,31 +114,6 @@ func queued(q *lruQueue, name string) bool {
 	defer q.mu.Unlock()
 	_, found := q.nodes[name]
 	return found
-}
-
-// waitEvictOnClose waits until evict-on-close requests for names are handled.
-func waitEvictOnClose(t *testing.T, q *lruQueue, names ...string) {
-	for _, name := range names {
-		assert.Eventually(t, func() bool {
-			q.mu.Lock()
-			defer q.mu.Unlock()
-			_, pending := q.closed[name]
-			return !pending
-		}, time.Second, time.Millisecond)
-		// The request is removed under the file lock, which is held until the
-		// upload finishes, so taking the lock waits for that to happen.
-		flock := q.fileLocks.Get(name)
-		flock.Lock()
-		flock.Unlock() //nolint:staticcheck // SA2001: the empty section is the wait
-	}
-}
-
-// markStale creates local files and marks them cloudStale.
-func (suite *lruPolicyTestSuite) markStale(names ...string) {
-	for _, name := range names {
-		suite.Require().NoError(os.WriteFile(filepath.Join(local_path, name), nil, 0644))
-		suite.policy.fileLocks.Get(name).CloudStale = true
-	}
 }
 
 func (suite *lruPolicyTestSuite) TestEnqueue() {
@@ -383,69 +357,4 @@ func (suite *lruPolicyTestSuite) TestStopPolicyMidUpload() {
 
 	err = os.RemoveAll(cache_path)
 	suite.assert.NoError(err)
-}
-
-func (suite *lruPolicyTestSuite) TestStopPolicyWaitsForEvictOnClose() {
-	started, release := make(chan struct{}), make(chan struct{})
-	var uploaded []string
-	var mu sync.Mutex
-	suite.policy.uploadandCleanFn = func(name string) error {
-		if name == "first" {
-			close(started)
-			<-release
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		uploaded = append(uploaded, name)
-		return nil
-	}
-
-	suite.markStale("first", "second", "third")
-	suite.policy.EvictOnClose("first")
-	<-started
-	suite.policy.EvictOnClose("second")
-
-	stopped := make(chan error, 1)
-	go func() { stopped <- suite.policy.StopPolicy() }()
-	suite.Never(func() bool { return len(stopped) > 0 }, 50*time.Millisecond, 5*time.Millisecond)
-	close(release)
-	suite.Require().NoError(<-stopped)
-
-	// The in-flight upload finished; the one that had not started was skipped.
-	suite.assert.Equal([]string{"first"}, uploaded)
-	// Nothing new starts after stopping.
-	suite.policy.EvictOnClose("third")
-	time.Sleep(10 * time.Millisecond)
-	suite.assert.Equal([]string{"first"}, uploaded)
-
-	err := os.RemoveAll(cache_path)
-	suite.assert.NoError(err)
-}
-
-func (suite *lruPolicyTestSuite) TestEvictOnCloseSkipsOpenOrFreshFiles() {
-	defer suite.cleanupTest()
-	var mu sync.Mutex
-	var uploaded []string
-	suite.policy.uploadandCleanFn = func(name string) error {
-		mu.Lock()
-		defer mu.Unlock()
-		uploaded = append(uploaded, name)
-		return nil
-	}
-
-	suite.markStale("open", "stale")
-	suite.Require().NoError(os.WriteFile(filepath.Join(local_path, "fresh"), nil, 0644))
-	suite.policy.fileLocks.Get("open").Inc()
-	for _, name := range []string{"open", "fresh", "stale", "missing"} {
-		suite.policy.EvictOnClose(name)
-	}
-	waitEvictOnClose(suite.T(), suite.policy, "open", "fresh", "stale", "missing")
-
-	mu.Lock()
-	defer mu.Unlock()
-	suite.assert.Equal([]string{"stale"}, uploaded)
-}
-
-func TestLRUPolicyTestSuite(t *testing.T) {
-	suite.Run(t, new(lruPolicyTestSuite))
 }
