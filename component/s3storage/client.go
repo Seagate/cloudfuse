@@ -213,7 +213,7 @@ func (cl *Client) Configure(cfg Config) error {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
 
 		if cl.Config.startOffline {
-			pErr := parseS3Err(err, "ListBuckets")
+			pErr := parseS3Err(err, "Configure ListBuckets")
 			if errors.Is(pErr, &common.CloudUnreachableError{}) {
 				log.Warn("Client::Configure : S3 endpoint unreachable, starting offline")
 				return pErr
