@@ -207,32 +207,23 @@ func (cl *Client) Configure(cfg Config) error {
 
 	// ListBuckets here to test connection to S3 backend
 	listCtx, cancelList := context.WithTimeout(ctx, initialConnectionTimeout)
+	defer cancelList()
 	bucketList, err := cl.ListBuckets(listCtx)
-	cancelList()
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
-
-		if cl.Config.startOffline {
-			pErr := parseS3Err(err, "Configure ListBuckets")
-			if errors.Is(pErr, &common.CloudUnreachableError{}) {
-				log.Warn("Client::Configure : S3 endpoint unreachable, starting offline")
-				return pErr
-			}
+		pErr := parseS3Err(err, "Configure ListBuckets")
+		if cl.Config.startOffline && errors.Is(pErr, &common.CloudUnreachableError{}) {
+			return pErr
 		}
-
 		if _, ok := errors.AsType[*smithy.OperationError](err); ok {
 			if re, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 				// Endpoint is invalid or could not connect to endpoint
 				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
-					log.Err(
-						"Client::Configure : Error trying to connect to endpoint. Invalid endpoint. : %v",
-						err,
-					)
+					log.Err("Client::Configure : Invalid endpoint [%v]", err)
 					return errInvalidEndpoint
 				}
 			}
 		}
-
 		if ae, ok := errors.AsType[smithy.APIError](err); ok {
 			// If error is forbidden, then credentials were incorrect
 			if ae.ErrorCode() == "Forbidden" || ae.ErrorCode() == "AccessDenied" {
@@ -242,7 +233,7 @@ func (cl *Client) Configure(cfg Config) error {
 			if ae.ErrorCode() == "SignatureDoesNotMatch" {
 				return errInvalidSecretKey
 			}
-			fmt.Println(ae.Error())
+			fmt.Fprintln(os.Stderr, ae.Error())
 		}
 		return err
 	}
