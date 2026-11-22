@@ -58,14 +58,14 @@ type tieredStorageTestSuite struct {
 	assert            *assert.Assertions
 	tieredStorage     *TieredStorage
 	loopback          internal.Component
-	cache_path        string // uses os.Separator (filepath.Join)
+	tier_path         string // uses os.Separator (filepath.Join)
 	fake_storage_path string // uses os.Separator (filepath.Join)
 	useMock           bool
 	mockCtrl          *gomock.Controller
 	mock              *internal.MockComponent
 }
 
-func newLoopbackFS(cachePath string) internal.Component {
+func newLoopbackFS() internal.Component {
 	loopback := loopback.NewLoopbackFSComponent()
 	_ = loopback.Configure(true)
 	return loopback
@@ -97,22 +97,22 @@ func (suite *tieredStorageTestSuite) SetupTest() {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	rand := randomString(8)
-	suite.cache_path = filepath.Join(home_dir, "file_cache"+rand)
+	suite.tier_path = filepath.Join(home_dir, "tiered_storage"+rand)
 	suite.fake_storage_path = filepath.Join(home_dir, "fake_storage"+rand)
 	defaultConfig := fmt.Sprintf(
 		"tiered_storage:\n  path: %s\n  max-size-mb: 1.0\n  offload-io: true\n\nloopbackfs:\n  path: %s",
-		suite.cache_path,
+		suite.tier_path,
 		suite.fake_storage_path,
 	)
 	suite.useMock = false
 	log.Debug("%s", defaultConfig)
 
 	// Delete the temp directories created
-	err = os.RemoveAll(suite.cache_path)
+	err = os.RemoveAll(suite.tier_path)
 	if err != nil {
 		fmt.Printf(
 			"tieredStorageTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
-			suite.cache_path,
+			suite.tier_path,
 			err,
 		)
 	}
@@ -139,7 +139,7 @@ func (suite *tieredStorageTestSuite) setupTestHelper(configuration string) {
 		// always simulate being offline
 		suite.mock.EXPECT().CloudConnected().AnyTimes().Return(false)
 	} else {
-		suite.loopback = newLoopbackFS(suite.fake_storage_path)
+		suite.loopback = newLoopbackFS()
 		suite.tieredStorage = newTestTieredStorage(suite.loopback)
 		err = suite.loopback.Start(context.Background())
 		suite.assert.NoError(err)
@@ -164,7 +164,7 @@ func (suite *tieredStorageTestSuite) cleanupTest() {
 	}
 
 	// Delete the temp directories created
-	err = os.RemoveAll(suite.cache_path)
+	err = os.RemoveAll(suite.tier_path)
 	suite.assert.NoError(err)
 	err = os.RemoveAll(suite.fake_storage_path)
 	suite.assert.NoError(err)
@@ -172,17 +172,17 @@ func (suite *tieredStorageTestSuite) cleanupTest() {
 
 // localFile returns where the component keeps a local-owned file.
 func (suite *tieredStorageTestSuite) localFile(name string) string {
-	return filepath.Join(suite.cache_path, localDirName, filepath.FromSlash(name))
+	return filepath.Join(suite.tier_path, localDirName, filepath.FromSlash(name))
 }
 
 // cacheFile returns where the component keeps an open cloud-owned file.
 func (suite *tieredStorageTestSuite) cacheFile(name string) string {
-	return filepath.Join(suite.cache_path, cacheDirName, filepath.FromSlash(name))
+	return filepath.Join(suite.tier_path, cacheDirName, filepath.FromSlash(name))
 }
 
 //Testing OpenFile
 
-func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
+func (suite *tieredStorageTestSuite) TestOpenFileCloud() {
 	defer suite.cleanupTest()
 	path := "file7"
 
@@ -202,7 +202,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 		internal.OpenFileOptions{
 			Name:  path,
 			Flags: os.O_RDWR,
-			Mode:  0666, //random mode, since we didn't do the other stuff yet
+			Mode:  0666,
 		},
 	)
 	suite.Require().NoError(err)
@@ -214,26 +214,16 @@ func (suite *tieredStorageTestSuite) TestOpenFileNotInCache() {
 	suite.assert.NoFileExists(suite.localFile(path))
 }
 
-func (suite *tieredStorageTestSuite) TestOpenFileInCache() {
+func (suite *tieredStorageTestSuite) TestOpenFileLocal() {
 	defer suite.cleanupTest()
 	path := "file8"
-	handle, _ := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	testData := "test data"
-	data := []byte(testData)
-	_, err := suite.tieredStorage.WriteFile(
-		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
-	)
-	suite.assert.NoError(err)
-	err = suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle})
-	suite.assert.NoError(err)
+	_, err := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.Require().NoError(err)
 
-	// Download is required
-	handle, err = suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.tieredStorage.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 	suite.assert.NoError(err)
 	suite.assert.Equal(path, handle.Path)
 	suite.assert.False(handle.Dirty())
-
-	// File should exist in cache
 	suite.assert.FileExists(suite.localFile(path))
 }
 
@@ -246,40 +236,36 @@ func (suite *tieredStorageTestSuite) TestOpenFileOCreate() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(path, handle.Path)
 	suite.assert.True(handle.Dirty())
-	// File should exist in cache
 	suite.assert.FileExists(suite.localFile(path))
-
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileOCreateExistsLocal() {
 	defer suite.cleanupTest()
 	path := "file10"
-	handle, _ := suite.tieredStorage.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0777},
+	)
+	suite.Require().NoError(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err := suite.tieredStorage.WriteFile(
+	_, err = suite.tieredStorage.WriteFile(
 		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
 	)
-	suite.assert.NoError(err)
+	suite.Require().NoError(err)
 	err = suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle})
-	suite.assert.NoError(err)
+	suite.Require().NoError(err)
 
-	// Download is required
 	handle, err = suite.tieredStorage.OpenFile(
 		internal.OpenFileOptions{Name: path, Flags: os.O_CREATE, Mode: 0777},
 	)
 	suite.assert.NoError(err)
 	suite.assert.Equal(path, handle.Path)
 	suite.assert.False(handle.Dirty())
-
-	// File should exist in cache
 	suite.assert.FileExists(suite.localFile(path))
-
 	//Make sure data didn't get modified
 	d, err := os.ReadFile(suite.localFile(path))
 	suite.assert.NoError(err)
 	suite.assert.Equal(data, d)
-
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileOCreateExistsCloud() {
@@ -362,7 +348,7 @@ func (suite *tieredStorageTestSuite) TestCreateFile() {
 	suite.assert.NoError(err)
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
-	// Path should be added to the file cache
+	// Path should be added to local
 	suite.assert.FileExists(suite.localFile(path))
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
@@ -542,7 +528,7 @@ func (suite *tieredStorageTestSuite) TestReleaseLocalToLRUQueue() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(path, handle.Path)
 	suite.assert.True(handle.Dirty())
-	// File should exist in cache
+	// File should exist in local
 	suite.assert.FileExists(suite.localFile(path))
 
 	// 2. Release this local file
@@ -756,7 +742,7 @@ func (suite *tieredStorageTestSuite) TestDeleteFileCloud() {
 	err = suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)
 
-	// Path should not be in file cache
+	// Path should not be in local
 	suite.assert.NoFileExists(suite.localFile(file))
 
 	//file should not exist in cloud
@@ -780,7 +766,7 @@ func (suite *tieredStorageTestSuite) TestDeleteFileLocal() {
 	err = suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)
 
-	// Path should not be in file cache
+	// Path should not be in local
 	suite.assert.NoFileExists(suite.localFile(file))
 
 }
@@ -833,7 +819,7 @@ func TestDeleteFileOfflineChangesNothing(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
 
-	storage := &TieredStorage{tmpPath: root, fileLocks: common.NewLockMap()}
+	storage := &TieredStorage{tieredRoot: root, fileLocks: common.NewLockMap()}
 	storage.SetNextComponent(next)
 	next.EXPECT().CloudConnected().Return(false)
 	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)
@@ -851,7 +837,7 @@ func TestRenameFileOfflineChangesNothing(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
 
-	storage := &TieredStorage{tmpPath: root, fileLocks: common.NewLockMap()}
+	storage := &TieredStorage{tieredRoot: root, fileLocks: common.NewLockMap()}
 	storage.SetNextComponent(next)
 	next.EXPECT().CloudConnected().Return(false)
 	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)
@@ -891,14 +877,14 @@ func (suite *tieredStorageTestSuite) TestFlushFile() {
 	//Verify Data is still on the disk
 	d, _ := os.ReadFile(suite.localFile(file))
 	suite.assert.Equal(data, d)
-	//Check that handle is still dirty
-	suite.assert.True(handle.Dirty())
+	//Check that handle is clean
+	suite.assert.False(handle.Dirty())
 
 }
 
 func TestLocalPath(t *testing.T) {
-	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "root")}
-	localRoot := filepath.Join(storage.tmpPath, localDirName)
+	storage := &TieredStorage{tieredRoot: filepath.Join(string(os.PathSeparator), "root")}
+	localRoot := filepath.Join(storage.tieredRoot, localDirName)
 	absoluteName, err := filepath.Abs("file")
 	require.NoError(t, err)
 
@@ -927,11 +913,11 @@ func TestLocalPath(t *testing.T) {
 }
 
 func TestCachePath(t *testing.T) {
-	storage := &TieredStorage{tmpPath: filepath.Join(string(os.PathSeparator), "root")}
+	storage := &TieredStorage{tieredRoot: filepath.Join(string(os.PathSeparator), "root")}
 
 	assert.Equal(
 		t,
-		filepath.Join(storage.tmpPath, cacheDirName, "dir", "file"),
+		filepath.Join(storage.tieredRoot, cacheDirName, "dir", "file"),
 		storage.cachePath("dir/file"),
 	)
 	assert.Empty(t, storage.cachePath("../file"))
@@ -965,7 +951,7 @@ func (suite *tieredStorageTestSuite) TestConfigureClearsCacheAndKeepsLocal() {
 func (suite *tieredStorageTestSuite) TestConfigureRejectsUnexpectedRootEntries() {
 	defer suite.cleanupTest()
 
-	stray := filepath.Join(suite.cache_path, "stray")
+	stray := filepath.Join(suite.tier_path, "stray")
 	suite.Require().NoError(os.WriteFile(stray, []byte("old layout"), 0644))
 	suite.Require().NoError(os.WriteFile(suite.cacheFile("cached"), []byte("c"), 0644))
 
@@ -999,7 +985,7 @@ func (suite *tieredStorageTestSuite) TestConfigureIgnoresOSManagedRootEntries() 
 	const osDataSize = 1 << 20
 	osEntries := []string{"System Volume Information", "$Recycle.Bin", "lost+found"}
 	for _, name := range osEntries {
-		dir := filepath.Join(suite.cache_path, name)
+		dir := filepath.Join(suite.tier_path, name)
 		suite.Require().NoError(os.MkdirAll(dir, 0700))
 		suite.Require().
 			NoError(os.WriteFile(filepath.Join(dir, "os-data"), make([]byte, osDataSize), 0600))
@@ -1008,7 +994,7 @@ func (suite *tieredStorageTestSuite) TestConfigureIgnoresOSManagedRootEntries() 
 	suite.Require().NoError(suite.restart())
 
 	for _, name := range osEntries {
-		suite.assert.FileExists(filepath.Join(suite.cache_path, name, "os-data"))
+		suite.assert.FileExists(filepath.Join(suite.tier_path, name, "os-data"))
 	}
 	// Only local/ and cache/ count against max-size-mb.
 	suite.assert.Less(suite.tieredStorage.diskUsage.Used(), int64(osDataSize))
@@ -1216,15 +1202,15 @@ func (suite *tieredStorageTestSuite) TestStartRecoversLocalFilesByMtime() {
 func TestUploadFailureKeepsLocalFile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	next := internal.NewMockComponent(ctrl)
-	cachePath := t.TempDir()
-	localPath := filepath.Join(cachePath, localDirName, "file")
+	tieredRoot := t.TempDir()
+	localPath := filepath.Join(tieredRoot, localDirName, "file")
 	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
 
 	storage := &TieredStorage{
-		tmpPath:   cachePath,
-		fileLocks: common.NewLockMap(),
-		diskUsage: newDiskUsageTracker(cachePath, 0),
+		tieredRoot: tieredRoot,
+		fileLocks:  common.NewLockMap(),
+		diskUsage:  newDiskUsageTracker(tieredRoot, 0),
 	}
 	storage.SetNextComponent(next)
 	next.EXPECT().CopyFromFile(gomock.Any()).Return(errors.New("upload failed"))
@@ -1238,15 +1224,15 @@ func TestEvictionUploadsNoModeOrOwner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	next := internal.NewMockComponent(ctrl)
 	path := "local-metadata"
-	cachePath := t.TempDir()
-	localPath := filepath.Join(cachePath, localDirName, path)
+	tieredRoot := t.TempDir()
+	localPath := filepath.Join(tieredRoot, localDirName, path)
 	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0600))
 
 	storage := &TieredStorage{
-		tmpPath:   cachePath,
-		fileLocks: common.NewLockMap(),
-		diskUsage: newDiskUsageTracker(cachePath, 0),
+		tieredRoot: tieredRoot,
+		fileLocks:  common.NewLockMap(),
+		diskUsage:  newDiskUsageTracker(tieredRoot, 0),
 	}
 	storage.SetNextComponent(next)
 
@@ -1265,7 +1251,7 @@ func TestGetAttrLocalMakesNoCloudCall(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
 
-	storage := &TieredStorage{tmpPath: root}
+	storage := &TieredStorage{tieredRoot: root}
 	storage.SetNextComponent(next)
 
 	attrs, err := storage.GetAttr(internal.GetAttrOptions{Name: "file"})
@@ -2054,7 +2040,7 @@ func TestDeleteDirOfflineChangesNothing(t *testing.T) {
 	localPath := filepath.Join(root, localDirName, "dir")
 	require.NoError(t, os.MkdirAll(localPath, 0700))
 
-	storage := &TieredStorage{tmpPath: root}
+	storage := &TieredStorage{tieredRoot: root}
 	storage.SetNextComponent(next)
 	next.EXPECT().CloudConnected().Return(false)
 	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)
@@ -2115,7 +2101,7 @@ func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(localDir, name), []byte("local"), 0600))
 	}
 
-	storage := &TieredStorage{tmpPath: root}
+	storage := &TieredStorage{tieredRoot: root}
 	storage.SetNextComponent(next)
 	// Every name on the second cloud page is local, so that page must be
 	// skipped rather than returned empty. attr_cache returns its cached
@@ -2144,7 +2130,7 @@ func TestStreamDirListsLocalEntriesOnceAcrossPages(t *testing.T) {
 func TestStreamDirWithoutLocalEntriesStartsWithCloud(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	next := internal.NewMockComponent(ctrl)
-	storage := &TieredStorage{tmpPath: t.TempDir()}
+	storage := &TieredStorage{tieredRoot: t.TempDir()}
 	storage.SetNextComponent(next)
 	cloudAttr := &internal.ObjAttr{Path: "dir/a", Name: "a"}
 	next.EXPECT().StreamDir(internal.StreamDirOptions{Name: "dir"}).
@@ -2316,7 +2302,7 @@ func TestRenameDirOfflineChangesNothing(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(localPath), 0700))
 	require.NoError(t, os.WriteFile(localPath, []byte("data"), 0644))
 
-	storage := &TieredStorage{tmpPath: root, fileLocks: common.NewLockMap()}
+	storage := &TieredStorage{tieredRoot: root, fileLocks: common.NewLockMap()}
 	storage.SetNextComponent(next)
 	next.EXPECT().CloudConnected().Return(false)
 	next.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, nil)

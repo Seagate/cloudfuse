@@ -58,11 +58,11 @@ type TieredStorage struct {
 
 	policy *lruQueue
 
-	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
-	tmpPath   string          // uses os.Separator (filepath.Join)
+	fileLocks  *common.LockMap // uses object name (common.JoinUnixFilepath)
+	tieredRoot string          // uses os.Separator (filepath.Join)
 
 	diskUsage *cache_size.Tracker
-	maxSize   float64
+	maxSize   float64 // bytes
 }
 
 type TieredStorageOptions struct {
@@ -82,18 +82,16 @@ const (
 	numUploadWorkers          = 8
 	capacityPollInterval      = time.Second
 	reconcileCapacityInterval = 5 * time.Minute
-	// cacheCopyKey marks a handle opened on a cache/ copy. It is not
-	// handlemap.HandleFlagCached, which tells libfuse to read the file object
-	// directly.
+	// hint key set on handles opened from cache/
 	cacheCopyKey = "tieredStorage.cacheCopy"
-	// The tiered root holds exactly these two trees. A file is in at most one.
+	// on the host filesystem, the tiered root has two subdirectories:
+	// local-tier files are kept in local/; copies of cloud files are kept in cache/
 	localDirName = "local"
 	cacheDirName = "cache"
-	// Everything under the tiered root is private to this process (CWE-732).
-	// Reported modes come from libfuse defaults, not from these.
+	// backing storage is private to this process
 	dirPerm  os.FileMode = 0700
 	filePerm os.FileMode = 0600
-	// share of free disk space to use when max-size-mb is not set
+	// default fraction of free storage on the host filesystem to use for the local tier
 	defaultMaxSizeRatio = 0.8
 )
 
@@ -132,15 +130,12 @@ func (c *TieredStorage) Start(ctx context.Context) error {
 // recoverLocalFiles enqueues every file in local/ in the LRU, oldest
 // modification time at the tail. Every such file is local-owned.
 func (c *TieredStorage) recoverLocalFiles() error {
-	if c.policy == nil {
-		return nil
-	}
 	type localFile struct {
 		name  string
 		mtime time.Time
 	}
 	var files []localFile
-	localRoot := filepath.Join(c.tmpPath, localDirName)
+	localRoot := filepath.Join(c.tieredRoot, localDirName)
 	err := filepath.WalkDir(localRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -195,8 +190,8 @@ func (c *TieredStorage) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%w]", c.Name(), err)
 	}
 
-	c.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
-	if c.tmpPath == "" || c.tmpPath == "." {
+	c.tieredRoot = filepath.Clean(common.ExpandPath(conf.TmpPath))
+	if c.tieredRoot == "" || c.tieredRoot == "." {
 		log.Err("TieredStorage::Configure : path not set")
 		return fmt.Errorf("config error in %s [path not set]", c.Name())
 	}
@@ -205,7 +200,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 		log.Err("TieredStorage::Configure : unable to obtain mount path")
 		return fmt.Errorf("config error in %s [%w]", c.Name(), err)
 	}
-	if filepath.Clean(mountPath) == c.tmpPath {
+	if filepath.Clean(mountPath) == c.tieredRoot {
 		log.Err("TieredStorage::Configure : path is same as mount path")
 		return fmt.Errorf("config error in %s [path is same as mount path]", c.Name())
 	}
@@ -229,13 +224,13 @@ func (c *TieredStorage) Configure(_ bool) error {
 		log.Err("TieredStorage::Configure : failed to prepare local storage %v", err)
 		return fmt.Errorf("config error in %s [failed to prepare local storage: %w]", c.Name(), err)
 	}
-	c.diskUsage = newDiskUsageTracker(c.tmpPath, reconcileCapacityInterval)
+	c.diskUsage = newDiskUsageTracker(c.tieredRoot, reconcileCapacityInterval)
 	if err := c.diskUsage.Reconcile(); err != nil {
-		log.Err("TieredStorage::Configure : failed to measure %s %v", c.tmpPath, err)
-		return fmt.Errorf("config error in %s [failed to measure %s: %w]", c.Name(), c.tmpPath, err)
+		log.Err("TieredStorage::Configure : failed to measure %s %v", c.tieredRoot, err)
+		return fmt.Errorf("config error in %s [failed to measure used space: %w]", c.Name(), err)
 	}
 	if conf.MaxSizeMB == 0 {
-		free, _, err := common.GetAvailFree(c.tmpPath)
+		free, _, err := common.GetAvailFree(c.tieredRoot)
 		if err != nil {
 			log.Err("TieredStorage::Configure : free space check failed %v", err)
 			return fmt.Errorf("config error in %s [free space check failed: %w]", c.Name(), err)
@@ -253,7 +248,7 @@ func (c *TieredStorage) Configure(_ bool) error {
 	c.maxSize = conf.MaxSizeMB * common.MbToBytes
 
 	c.policy = newLRUQueue(lruQueueConfig{
-		localRoot:        filepath.Join(c.tmpPath, localDirName),
+		localRoot:        filepath.Join(c.tieredRoot, localDirName),
 		maxSize:          c.maxSize,
 		fileLocks:        c.fileLocks,
 		size:             c.diskUsage,
@@ -271,12 +266,12 @@ func (c *TieredStorage) Configure(_ bool) error {
 // prepareRoot lays out the tiered root and discards cache/ from any previous run.
 // Fail if anything other than local/, cache/, and OS-managed volume entries exists.
 func (c *TieredStorage) prepareRoot() error {
-	if err := os.MkdirAll(c.tmpPath, dirPerm); err != nil {
-		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tmpPath, err)
+	if err := os.MkdirAll(c.tieredRoot, dirPerm); err != nil {
+		return fmt.Errorf("TieredStorage: failed to create %s: %w", c.tieredRoot, err)
 	}
-	entries, err := os.ReadDir(c.tmpPath)
+	entries, err := os.ReadDir(c.tieredRoot)
 	if err != nil {
-		return fmt.Errorf("TieredStorage: failed to read %s: %w", c.tmpPath, err)
+		return fmt.Errorf("TieredStorage: failed to read %s: %w", c.tieredRoot, err)
 	}
 	for _, entry := range entries {
 		name := entry.Name()
@@ -289,18 +284,18 @@ func (c *TieredStorage) prepareRoot() error {
 		}
 		return fmt.Errorf(
 			"TieredStorage: %s contains unexpected entry %q; it may only contain %s and %s (move existing files into %s)",
-			c.tmpPath,
+			c.tieredRoot,
 			name,
 			localDirName,
 			cacheDirName,
-			filepath.Join(c.tmpPath, localDirName),
+			filepath.Join(c.tieredRoot, localDirName),
 		)
 	}
-	if err := os.RemoveAll(filepath.Join(c.tmpPath, cacheDirName)); err != nil {
+	if err := os.RemoveAll(filepath.Join(c.tieredRoot, cacheDirName)); err != nil {
 		return fmt.Errorf("TieredStorage: failed to clear %s: %w", cacheDirName, err)
 	}
 	for _, tree := range []string{localDirName, cacheDirName} {
-		if err := os.MkdirAll(filepath.Join(c.tmpPath, tree), dirPerm); err != nil {
+		if err := os.MkdirAll(filepath.Join(c.tieredRoot, tree), dirPerm); err != nil {
 			return fmt.Errorf("TieredStorage: failed to create %s: %w", tree, err)
 		}
 	}
@@ -356,7 +351,7 @@ func (c *TieredStorage) treePath(tree, name string) string {
 	if osName != "" && !filepath.IsLocal(osName) {
 		return ""
 	}
-	return filepath.Join(c.tmpPath, tree, osName)
+	return filepath.Join(c.tieredRoot, tree, osName)
 }
 
 // Directory operations
@@ -379,6 +374,7 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 		log.Err("TieredStorage::CreateDir : %s cloud failure", options.Name)
 		return err
 	}
+
 	return nil
 }
 
@@ -406,6 +402,7 @@ func (c *TieredStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	if errors.Is(localErr, os.ErrNotExist) && errors.Is(cloudErr, os.ErrNotExist) {
 		return syscall.ENOENT
 	}
+
 	return nil
 }
 
@@ -651,6 +648,7 @@ func defaultModeAttr(attr *internal.ObjAttr) *internal.ObjAttr {
 	if attr == nil {
 		return nil
 	}
+	// this modifies the entry in the attribute cache, but it's harmless
 	attr.Flags.Set(internal.PropFlagModeDefault)
 	return attr
 }
@@ -691,7 +689,7 @@ func (c *TieredStorage) openHandle(
 	}
 	if cached {
 		// The handle is not published yet, so it needs no lock.
-		handle.SetValue(cacheCopyKey, true)
+		handle.SetValue(cacheCopyKey, struct{}{})
 	}
 	flock.Inc()
 	return handle, nil
@@ -1312,10 +1310,7 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 
 	// cloud
 	attr, err := c.NextComponent().GetAttr(options)
-	if err != nil {
-		return attr, err
-	}
-	return defaultModeAttr(attr), nil
+	return defaultModeAttr(attr), err
 }
 
 // Chmod is ignored: every object reports the configured default mode.
@@ -1391,7 +1386,7 @@ func (c *TieredStorage) FileUsed(name string) error {
 func (c *TieredStorage) StatFs() (*common.Statfs_t, bool, error) {
 	const blockSize = 4096
 
-	physicalFree, _, err := common.GetAvailFree(c.tmpPath)
+	physicalFree, _, err := common.GetAvailFree(c.tieredRoot)
 	if err != nil {
 		return nil, false, err
 	}
