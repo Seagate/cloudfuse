@@ -196,6 +196,14 @@ func (cl *Client) Configure(cfg Config) error {
 		})
 	}
 
+	// Create transfermanager client for uploads and downloads
+	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = cl.Config.partSize
+		o.Concurrency = cl.Config.concurrency
+		o.MultipartUploadThreshold = cl.Config.uploadCutoff
+		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
+	})
+
 	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets(ctx)
 	if err != nil {
@@ -203,6 +211,11 @@ func (cl *Client) Configure(cfg Config) error {
 
 		if _, ok := errors.AsType[*smithy.OperationError](err); ok {
 			if re, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
+				// No response: offline or unresolvable endpoint (indistinguishable)
+				if re.HTTPStatusCode() == 0 && cl.Config.startOffline {
+					log.Warn("Client::Configure : S3 endpoint unreachable, starting offline")
+					return common.NewCloudUnreachableError(err)
+				}
 				// Endpoint is invalid or could not connect to endpoint
 				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
 					log.Err(
@@ -272,14 +285,6 @@ func (cl *Client) Configure(cfg Config) error {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
 		return err
 	}
-
-	// Create transfermanager client for uploads and downloads
-	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
-		o.PartSizeBytes = cl.Config.partSize
-		o.Concurrency = cl.Config.concurrency
-		o.MultipartUploadThreshold = cl.Config.uploadCutoff
-		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
-	})
 
 	return nil
 }
