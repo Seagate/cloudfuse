@@ -209,13 +209,16 @@ func (cl *Client) Configure(cfg Config) error {
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
 
+		if cl.Config.startOffline {
+			pErr := parseS3Err(err, "ListBuckets")
+			if errors.Is(pErr, &common.CloudUnreachableError{}) {
+				log.Warn("Client::Configure : S3 endpoint unreachable, starting offline")
+				return pErr
+			}
+		}
+
 		if _, ok := errors.AsType[*smithy.OperationError](err); ok {
 			if re, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
-				// No response: offline or unresolvable endpoint (indistinguishable)
-				if re.HTTPStatusCode() == 0 && cl.Config.startOffline {
-					log.Warn("Client::Configure : S3 endpoint unreachable, starting offline")
-					return common.NewCloudUnreachableError(err)
-				}
 				// Endpoint is invalid or could not connect to endpoint
 				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
 					log.Err(
