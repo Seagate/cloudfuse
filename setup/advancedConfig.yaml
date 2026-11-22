@@ -215,7 +215,7 @@ s3storage:
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
   require-dir-markers: true|false <require every directory to have a marker and never use prefix listings to discover directories. Turns on enable-dir-marker if it is not set.>
   health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>
-  start-offline: true|false <allow mounting when the S3 endpoint is unreachable; starts in offline mode and reconnects automatically. Requires bucket-name. Default - false>
+  start-offline: true|false <enable mounting offline; reconnects automatically. Requires bucket-name to be set.>
 
 # Mount all configuration
 mountall:
