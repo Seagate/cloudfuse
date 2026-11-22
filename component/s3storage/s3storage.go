@@ -52,8 +52,6 @@ type S3Storage struct {
 	state    connectionState
 	ctx      context.Context
 	cancelFn context.CancelFunc
-	// set when start-offline let Configure succeed without a connection
-	startupErr error
 }
 
 type connectionState struct {
@@ -177,7 +175,8 @@ func (s3 *S3Storage) configureAndTest(isParent bool) error {
 	if err != nil && s3.stConfig.startOffline &&
 		errors.Is(err, &common.CloudUnreachableError{}) {
 		log.Warn("S3Storage::configureAndTest : Cloud unreachable, starting offline [%s]", err)
-		s3.startupErr = err
+		currentTime := time.Now()
+		s3.state.firstOffline = &currentTime
 		return nil
 	}
 	return err
@@ -199,8 +198,10 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 			s3.CloudConnected()
 		}
 	}()
-	if s3.startupErr != nil {
-		s3.updateConnectionState(s3.startupErr)
+	// started offline (start-offline)
+	if s3.state.firstOffline != nil {
+		s3.cancelFn()
+		s3.state.retryTicker.Reset(s3.stConfig.healthCheckInterval)
 	}
 
 	return nil
