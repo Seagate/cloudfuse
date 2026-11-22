@@ -232,7 +232,7 @@ func (cl *Client) Configure(cfg Config) error {
 			if ae.ErrorCode() == "SignatureDoesNotMatch" {
 				return errInvalidSecretKey
 			}
-			fmt.Fprintln(os.Stderr, ae.Error())
+			fmt.Println(ae.Error())
 		}
 		return err
 	}
