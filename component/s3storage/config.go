@@ -112,10 +112,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 
 	// bucket cannot be auto-detected without a connection
 	if opt.StartOffline && opt.BucketName == "" {
-		return fmt.Errorf(
-			"%w: start-offline requires bucket-name to be set",
-			errInvalidConfigField,
-		)
+		return fmt.Errorf("%w: start-offline requires bucket-name to be set", errInvalidConfigField)
 	}
 	s3.stConfig.startOffline = opt.StartOffline
 
