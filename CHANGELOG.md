@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **2.5.0** ##
+
+Unreleased
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Features ###
+
+- Add s3storage `start-offline` option to allow mounting without a connection to cloud storage
+
 ## **2.4.2** ##
 
 November 16th 2026
