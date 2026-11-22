@@ -236,6 +236,8 @@ func (cl *Client) Configure(cfg Config) error {
 		}
 		return err
 	}
+	// OFFLINE STARTUP CUTOFF
+	// code below only runs when not starting offline
 
 	// if no bucket-name was set, default to the first authorized bucket in the list
 	if cl.Config.AuthConfig.BucketName == "" {
