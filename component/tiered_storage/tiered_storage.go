@@ -472,24 +472,14 @@ func (c *TieredStorage) StreamDir(
 
 func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("TieredStorage::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
+	// Note: Changes under src and dst are blocked until this returns
 
-	// The FUSE layer prevents operations under src and dst until this returns
-	// (libfuse's path tree lock; WinFsp's rename lock), so no name can appear
-	// under src after it is listed below.
-
-	// get local paths
-	srcLocal := c.localPath(options.Src)
-	srcCache := c.cachePath(options.Src)
-	dstLocal := c.localPath(options.Dst)
-	dstCache := c.cachePath(options.Dst)
-
-	// list all src files in local storage
+	// list all src files on the host filesystem
 	names, err := c.listPrefix(options.Src)
 	if err != nil {
 		log.Err("TieredStorage::RenameDir : %s failed to list local files [%v]", options.Src, err)
 		return err
 	}
-
 	// dstName converts names from src to dst
 	dstName := func(src string) string {
 		return common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, options.Src))
@@ -536,6 +526,10 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	// Rename locally first: it can fail (on Windows, for open files), but is
 	// cheap to undo. The cloud rename runs last.
 	srcLocalExists := false
+	srcLocal := c.localPath(options.Src)
+	srcCache := c.cachePath(options.Src)
+	dstLocal := c.localPath(options.Dst)
+	dstCache := c.cachePath(options.Dst)
 	for _, m := range []move{{srcLocal, dstLocal}, {srcCache, dstCache}} {
 		// check whether the source directory exists locally
 		if _, err := os.Lstat(m.from); errors.Is(err, os.ErrNotExist) {
