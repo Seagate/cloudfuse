@@ -62,9 +62,8 @@ import (
 )
 
 const (
-	symlinkKey               = "is_symlink"
-	defaultRegion            = "us-east-1"
-	initialConnectionTimeout = 5 * time.Second
+	symlinkKey    = "is_symlink"
+	defaultRegion = "us-east-1"
 )
 
 type Client struct {
@@ -206,7 +205,7 @@ func (cl *Client) Configure(cfg Config) error {
 	})
 
 	// ListBuckets here to test connection to S3 backend
-	listCtx, cancelList := context.WithTimeout(ctx, initialConnectionTimeout)
+	listCtx, cancelList := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelList()
 	bucketList, err := cl.ListBuckets(listCtx)
 	if err != nil {
