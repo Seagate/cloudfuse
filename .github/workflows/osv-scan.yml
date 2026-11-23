@@ -82,7 +82,7 @@ jobs:
 
       - name: Report all vulnerabilities
         if: ${{ !inputs.compare }}
-        uses: google/osv-scanner-action/osv-reporter-action@v2.7.0
+        uses: google/osv-scanner-action/osv-reporter-action@v2.7.1
         with:
           scan-args: |-
             --output=results.sarif
@@ -92,7 +92,7 @@ jobs:
 
       - name: Report new vulnerabilities
         if: ${{ inputs.compare }}
-        uses: google/osv-scanner-action/osv-reporter-action@v2.7.0
+        uses: google/osv-scanner-action/osv-reporter-action@v2.7.1
         with:
           scan-args: |-
             --output=results.sarif
