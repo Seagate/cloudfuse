@@ -876,11 +876,17 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 		case exclusive:
 			return nil, syscall.EEXIST
 		case truncate:
-			// The old content is discarded, so there is nothing to download.
+			// local
 			if err := c.createEmptyLocal(options.Name); err != nil {
 				return nil, err
 			}
 			path = localPath
+			// delete in cloud
+			if err := c.NextComponent().
+				DeleteFile(internal.DeleteFileOptions{Name: options.Name}); err != nil {
+				// No need to act on cloud delete failure, since local will mask it
+				log.Err("TieredStorage::OpenFile : %s cloud delete failed [%v]", options.Name, err)
+			}
 		default:
 			if err := c.downloadToCache(options.Name); err != nil {
 				return nil, err
@@ -1129,15 +1135,15 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	srcCache := c.cachePath(options.Src)
 	dstLocal := c.localPath(options.Dst)
 	dstCache := c.cachePath(options.Dst)
-	err, cloudErr := c.checkCloudReachable(options.Src)
+	getAttrErr, cloudErr := c.checkCloudReachable(options.Src)
 	if cloudErr != nil {
 		log.Err("TieredStorage::RenameFile : %s offline [%v]", options.Src, cloudErr)
 		return cloudErr
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Err("TieredStorage::RenameFile : %s cloud stat failed [%v]", options.Src, err)
-		return err
+	} else if getAttrErr != nil && !errors.Is(getAttrErr, os.ErrNotExist) {
+		log.Err("TieredStorage::RenameFile : %s cloud stat failed [%v]", options.Src, getAttrErr)
+		return getAttrErr
 	}
-	cloudExists := err == nil
+	cloudSrcExists := getAttrErr == nil
 	dstInfo, dstLocalErr := os.Lstat(dstLocal)
 	if dstLocalErr == nil && dstInfo.IsDir() {
 		return syscall.EISDIR
@@ -1184,34 +1190,43 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	// cloud
-	if cloudExists {
-		err = c.NextComponent().RenameFile(options)
-	}
-	neverUploaded := from == srcLocal && errors.Is(err, os.ErrNotExist)
-	if neverUploaded {
-		// don't leave a dangling object at dst in the cloud
-		if err := c.NextComponent().
-			DeleteFile(internal.DeleteFileOptions{Name: options.Dst}); err != nil &&
-			!errors.Is(err, os.ErrNotExist) {
-			log.Warn(
-				"TieredStorage::RenameFile : %s cloud dst delete failed [%v]",
-				options.Dst,
-				err,
-			)
+	var renameErr error
+	if to == dstLocal {
+		// file is local-owned - make sure src is removed from the cloud
+		if cloudSrcExists {
+			if err := c.NextComponent().
+				DeleteFile(internal.DeleteFileOptions{Name: options.Src}); err != nil {
+				// fail the rename
+				renameErr = fmt.Errorf("%s cloud src delete failed: %w", options.Src, err)
+			}
 		}
-	} else if err != nil {
-		log.Err("TieredStorage::RenameFile : %s -> %s failed [%v]", options.Src, options.Dst, err)
+		if renameErr == nil {
+			if err := c.NextComponent().
+				DeleteFile(internal.DeleteFileOptions{Name: options.Dst}); err != nil &&
+				!errors.Is(err, os.ErrNotExist) {
+				// a dangling cloud dst is not critical, since local dst exists
+				log.Err("TieredStorage::RenameFile : %s dst delete failed [%v]", options.Dst, err)
+			}
+		}
+	} else {
+		// file is cloud-owned
+		if err := c.NextComponent().RenameFile(options); err != nil {
+			renameErr = fmt.Errorf("%s -> %s rename failed: %w", options.Src, options.Dst, err)
+		}
+	}
+	// revert and report errors
+	if renameErr != nil {
+		log.Err("TieredStorage::RenameFile : %v", renameErr)
 		if localDstLost {
 			log.Err("TieredStorage::RenameFile : %s lost", to)
 		}
 		if from != "" {
 			log.Info("TieredStorage::RenameFile : %s -> %s reverting...", from, to)
-			// revert local rename
 			if err := os.Rename(to, from); err != nil {
 				log.Err("TieredStorage::RenameFile : %s -> %s revert failed! [%v]", from, to, err)
 			}
 		}
-		return err
+		return renameErr
 	}
 
 	// dst may have had a copy in the other tree. It was replaced, so drop it.

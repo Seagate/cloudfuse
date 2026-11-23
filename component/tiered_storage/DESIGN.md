@@ -218,13 +218,17 @@ Read from the handle's file. No locking or state changes.
   and rename the local file. A cached source stays in `cache/`, unless
   `local/dst` exists, in which case rename it over `local/dst` and promote it.
 5. Rename in the cloud.
-   - `ENOENT` is acceptable if the source was in `local/` (never uploaded).
-   - On any other failure, rename the local file back and return the error. If
-     the revert fails, log an error naming both paths and stating that local and
-     cloud have diverged, then return the original error.
-  - If the destination is local-owned, delete any cloud object at `dst`.
-    Return a delete error; a cloud rename or replaced local destination may
-    already be irreversible, so log any resulting divergence.
+
+    | From | To | Cloud Rename? | Delete Cloud Src? | Delete Cloud Dst? | Revert on Failure? |
+    | --- | --- | --- | --- | --- | --- |
+    | local | local | no | yes | yes | yes |
+    | cache | local | no | yes | yes | yes |
+    | cache | cache | yes | no | no | yes |
+    | "" | "" | yes | no | no | no |
+
+    To revert, rename the local file back and return the error. If the revert fails,
+    log an error naming both paths and stating that local and cloud have diverged,
+    then return the original error.
 6. If a replaced destination had a copy in the other tree (for example
    `cache/dst` when `local/src` moved in), delete it, so the object is in at
    most one tree. This runs only after the cloud rename succeeds, so a failed
