@@ -1112,6 +1112,15 @@ func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
 	defer suite.cleanupTest()
 
 	const path = "local-and-cloud"
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0644},
+	)
+	suite.Require().NoError(err)
+	_, err = suite.tieredStorage.WriteFile(
+		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte("local data")},
+	)
+	suite.Require().NoError(err)
+
 	cloudHandle, err := suite.loopback.CreateFile(
 		internal.CreateFileOptions{Name: path, Mode: 0644},
 	)
@@ -1123,15 +1132,6 @@ func (suite *tieredStorageTestSuite) TestGetAttrPrefersLocalData() {
 	suite.Require().NoError(
 		suite.loopback.ReleaseFile(internal.ReleaseFileOptions{Handle: cloudHandle}),
 	)
-
-	handle, err := suite.tieredStorage.OpenFile(
-		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0644},
-	)
-	suite.Require().NoError(err)
-	_, err = suite.tieredStorage.WriteFile(
-		&internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte("local data")},
-	)
-	suite.Require().NoError(err)
 
 	attrs, err := suite.tieredStorage.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.Require().NoError(err)
