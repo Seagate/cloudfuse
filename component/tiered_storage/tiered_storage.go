@@ -1153,6 +1153,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	_, srcLocalErr := os.Lstat(srcLocal)
 	_, srcCacheErr := os.Lstat(srcCache)
 	from, to := "", ""
+	promotion := false
 	switch {
 	case srcLocalErr == nil:
 		log.Debug("TieredStorage::RenameFile : %s -> %s src is local", options.Src, options.Dst)
@@ -1163,6 +1164,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	case srcCacheErr == nil && dstLocalErr == nil:
 		log.Debug("TieredStorage::RenameFile : %s -> %s cache -> local", options.Src, options.Dst)
 		from, to = srcCache, dstLocal
+		promotion = true
 	case srcCacheErr == nil:
 		log.Debug("TieredStorage::RenameFile : %s -> %s cache -> cache", options.Src, options.Dst)
 		from, to = srcCache, dstCache
@@ -1240,6 +1242,9 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	c.policy.Rename(options.Src, options.Dst)
+	if promotion {
+		c.policy.Enqueue(options.Dst)
+	}
 	c.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 	return nil
 }
