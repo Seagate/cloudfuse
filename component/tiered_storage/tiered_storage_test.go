@@ -1452,10 +1452,9 @@ func (suite *tieredStorageTestSuite) TestTruncateCloudFileByPath() {
 	suite.Require().NoError(suite.tieredStorage.TruncateFile(
 		internal.TruncateFileOptions{Name: path, NewSize: 4},
 	))
-	attrs, err := suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
-	suite.Require().NoError(err)
-	suite.assert.EqualValues(4, attrs.Size)
-	suite.assert.NoFileExists(suite.localFile(path))
+	_, err = suite.loopback.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.ErrorIs(err, os.ErrNotExist)
+	suite.assert.FileExists(suite.localFile(path))
 }
 
 func (suite *tieredStorageTestSuite) TestHandlesNeverSetLibfuseCachedFlag() {
