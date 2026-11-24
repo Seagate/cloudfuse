@@ -114,23 +114,33 @@ type s3StorageTestSuite struct {
 }
 
 func TestUploadReaderAtToObjectUploadError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		switch request.Method {
-		case http.MethodPost:
-			_, _ = io.WriteString(writer, "<InitiateMultipartUploadResult><UploadId>upload</UploadId></InitiateMultipartUploadResult>")
-		case http.MethodPut:
-			writer.WriteHeader(http.StatusForbidden)
-			_, _ = io.WriteString(writer, "<Error><Code>AccessDenied</Code><Message>upload rejected</Message></Error>")
-		case http.MethodDelete:
-			writer.WriteHeader(http.StatusNoContent)
-		case http.MethodGet:
-			writer.WriteHeader(http.StatusNotFound)
-			_, _ = io.WriteString(writer, "<Error><Code>NoSuchUpload</Code></Error>")
-		}
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.Method {
+			case http.MethodPost:
+				_, _ = io.WriteString(
+					writer,
+					"<InitiateMultipartUploadResult><UploadId>upload</UploadId></InitiateMultipartUploadResult>",
+				)
+			case http.MethodPut:
+				writer.WriteHeader(http.StatusForbidden)
+				_, _ = io.WriteString(
+					writer,
+					"<Error><Code>AccessDenied</Code><Message>upload rejected</Message></Error>",
+				)
+			case http.MethodDelete:
+				writer.WriteHeader(http.StatusNoContent)
+			case http.MethodGet:
+				writer.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(writer, "<Error><Code>NoSuchUpload</Code></Error>")
+			}
+		}),
+	)
 	defer server.Close()
 
-	client := &Client{Connection: Connection{Config: Config{AuthConfig: s3AuthConfig{BucketName: "bucket"}}}}
+	client := &Client{
+		Connection: Connection{Config: Config{AuthConfig: s3AuthConfig{BucketName: "bucket"}}},
+	}
 	testSuite := &s3StorageTestSuite{
 		awsS3Client: s3.New(s3.Options{
 			Region:       "us-east-1",
@@ -141,7 +151,13 @@ func TestUploadReaderAtToObjectUploadError(t *testing.T) {
 		s3Storage: &S3Storage{Storage: client},
 	}
 	data := make([]byte, 5*MB+1)
-	err := testSuite.uploadReaderAtToObject(context.Background(), bytes.NewReader(data), int64(len(data)), "key", 5)
+	err := testSuite.uploadReaderAtToObject(
+		context.Background(),
+		bytes.NewReader(data),
+		int64(len(data)),
+		"key",
+		5,
+	)
 	assert.ErrorContains(t, err, "upload rejected")
 }
 
@@ -247,10 +263,16 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 				UploadId: &uploadID,
 			})
 			if listErr != nil {
-				return errors.Join(err, fmt.Errorf("checking aborted multipart upload: %w", listErr))
+				return errors.Join(
+					err,
+					fmt.Errorf("checking aborted multipart upload: %w", listErr),
+				)
 			}
 			if len(resp.Parts) != 0 {
-				return errors.Join(err, errors.New("abort multipart upload failed and unable to delete all parts"))
+				return errors.Join(
+					err,
+					errors.New("abort multipart upload failed and unable to delete all parts"),
+				)
 			}
 			return err
 		}
