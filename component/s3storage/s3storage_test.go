@@ -94,7 +94,6 @@ type storageTestConfiguration struct {
 	UploadCutoffMb            int64  `json:"upload-cutoff-mb"`
 	DisableConcurrentDownload bool   `json:"disable-concurrent-download"`
 	UsePathStyle              bool   `json:"use-path-style"`
-	DisableUsage              bool   `json:"disable-usage"`
 	EnableDirMarker           bool   `json:"enable-dir-marker"`
 	EnableChecksum            bool   `json:"enable-checksum"`
 }
@@ -379,7 +378,7 @@ func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf(
 		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
 			"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
-			"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n  disable-usage: %t\n"+
+			"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n"+
 			"  enable-dir-marker: %t\n  enable-checksum: %t\n",
 		testParams.BucketName,
 		testParams.KeyID,
@@ -393,7 +392,6 @@ func generateConfigYaml(testParams storageTestConfiguration) string {
 		testParams.UploadCutoffMb,
 		testParams.DisableConcurrentDownload,
 		testParams.UsePathStyle,
-		testParams.DisableUsage,
 		testParams.EnableDirMarker,
 		testParams.EnableChecksum,
 	)

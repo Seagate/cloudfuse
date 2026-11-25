@@ -44,33 +44,7 @@ type SizeTracker struct {
 	internal.BaseComponent
 	mountSize           *MountSize
 	totalBucketCapacity uint64
-	displayCapacity     uint64
-	serverCount         uint64
-	evictionMode        EvictionMode
-	bucketUsage         uint64
-	statSizeOffset      uint64
 	hardLimitEnabled    bool
-}
-
-type EvictionMode int
-
-const (
-	Normal    EvictionMode = iota // 0
-	Overuse                       // 1
-	Emergency                     // 2
-)
-
-func (e EvictionMode) String() string {
-	switch e {
-	case Normal:
-		return "Normal"
-	case Overuse:
-		return "Overuse"
-	case Emergency:
-		return "Emergency"
-	default:
-		return fmt.Sprintf("Unknown(%d)", int(e))
-	}
 }
 
 type SizeTrackerOptions struct {
@@ -82,13 +56,6 @@ type SizeTrackerOptions struct {
 const compName = "size_tracker"
 const blockSize = int64(4096)
 const defaultJournalName = "mount_size.dat"
-
-// these usage thresholds determine when the eviction mode changes
-const targetUtilization = 0.9                                          // 90%
-const hysteresisMargin = 0.02                                          // 2%
-const overuseThreshold = targetUtilization + hysteresisMargin          // 92%
-const emergencyThreshold = overuseThreshold + .05                      // 97%
-const bucketNormalizedThreshold = targetUtilization - hysteresisMargin // 88%
 
 var _ internal.Component = &SizeTracker{}
 
@@ -134,38 +101,8 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	if conf.TotalBucketCapacity != 0 {
-		// TODO: document these units
-		st.totalBucketCapacity = conf.TotalBucketCapacity * common.MbToBytes
-		// set display capacity
-		st.displayCapacity = st.totalBucketCapacity
-		if config.IsSet("libfuse.display-capacity-mb") {
-			var confDisplayCapacityMb uint64
-			err = config.UnmarshalKey("libfuse.display-capacity-mb", &confDisplayCapacityMb)
-			if err == nil {
-				st.displayCapacity = confDisplayCapacityMb * common.MbToBytes
-			} else {
-				log.Err("SizeTracker::Configure : Invalid display capacity")
-			}
-		}
-		// allowing displayCapacity to be larger than totalBucketCapacity causes errors
-		if st.displayCapacity > st.totalBucketCapacity {
-			log.Err(
-				"SizeTracker::Configure : display capacity (%d MB) exceeds total bucket capacity (%d MB)",
-				st.displayCapacity/common.MbToBytes,
-				conf.TotalBucketCapacity,
-			)
-			return fmt.Errorf(
-				"SizeTracker: invalid configuration [size_tracker.bucket-capacity-fallback (%d MB)"+
-					" cannot be less than libfuse.display-capacity-mb (%d MB)]",
-				st.displayCapacity/common.MbToBytes,
-				conf.TotalBucketCapacity,
-			)
-		}
-		// calculate server count
-		// round to the nearest whole number
-		st.serverCount = (st.totalBucketCapacity + st.displayCapacity/2) / st.displayCapacity
-	}
+	// TODO: document these units
+	st.totalBucketCapacity = conf.TotalBucketCapacity * common.MbToBytes
 
 	st.hardLimitEnabled = conf.HardLimit
 	if st.hardLimitEnabled && st.totalBucketCapacity == 0 {
@@ -356,60 +293,8 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 	log.Trace("SizeTracker::StatFs")
 
-	blocks := st.mountSize.GetSize() / uint64(blockSize)
-
-	if st.totalBucketCapacity != 0 {
-		stat, ret, err := st.NextComponent().StatFs()
-
-		if err == nil && ret {
-			// Custom logic for use with Nx Plugin
-			// The Nx VMS evicts data until utilization is at 90% (of display capacity)
-			// Use a size offset to show the Nx eviction threshold at our desired utilization
-			// Only update the offset when bucket usage is updated
-			returnedBucketUsage := stat.Blocks * uint64(blockSize)
-			isBucketUsageUpdated := returnedBucketUsage != st.bucketUsage
-			if isBucketUsageUpdated {
-				// record the updated usage
-				st.bucketUsage = returnedBucketUsage
-				// convert everything to float64
-				bucketCapacity := float64(st.totalBucketCapacity)
-				bucketUsage := float64(returnedBucketUsage)
-				displayCapacity := float64(st.displayCapacity)
-				serverUsage := float64(st.mountSize.GetSize())
-				serverCount := float64(st.serverCount)
-				sizeOffset := float64(st.statSizeOffset)
-				nxEvictionThreshold := targetUtilization * displayCapacity
-				intendedCapacity := bucketCapacity / serverCount
-				// Use a finite state machine. The evictionMode is the state.
-				// calculate bucket usage and update eviction mode accordingly
-				st.updateState(bucketUsage / bucketCapacity)
-				switch st.evictionMode {
-				case Normal:
-					// the server count starts as the bucket capacity divided by the display capacity
-					// if the server count has been incremented, offset the tracked size
-					sizeOffset = nxEvictionThreshold - targetUtilization*intendedCapacity
-				case Overuse:
-					// drive to a utilization target below the bucketNormalizedThreshold
-					normalizationTargetFactor := bucketNormalizedThreshold - hysteresisMargin
-					sizeOffset = nxEvictionThreshold - normalizationTargetFactor*intendedCapacity
-				case Emergency:
-					// just report the whole bucket usage
-					sizeOffset = bucketUsage - serverUsage
-				}
-				st.statSizeOffset = uint64(max(0, sizeOffset))
-				log.Info(
-					"SizeTracker::StatFs : Bucket usage updated - evictionMode=%s, sizeOffset=%d bytes",
-					st.evictionMode,
-					st.statSizeOffset,
-				)
-			}
-		}
-		// add the offset
-		blocks += st.statSizeOffset / uint64(blockSize)
-	}
-
 	stat := common.Statfs_t{
-		Blocks: blocks,
+		Blocks: st.mountSize.GetSize() / uint64(blockSize),
 		// there is no set capacity limit in cloud storage
 		// so we use zero for free and avail
 		// this zero value is used in the libfuse component to recognize that cloud storage responded
@@ -431,27 +316,6 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 	)
 
 	return &stat, true, nil
-}
-
-func (st *SizeTracker) updateState(bucketUsageFactor float64) {
-	switch st.evictionMode {
-	case Normal:
-		if bucketUsageFactor > overuseThreshold {
-			st.evictionMode = Overuse
-		}
-	case Overuse:
-		if bucketUsageFactor < bucketNormalizedThreshold {
-			st.evictionMode = Normal
-		} else if bucketUsageFactor > emergencyThreshold {
-			st.evictionMode = Emergency
-			// severe overuse strongly suggests an incorrect server count
-			st.serverCount++
-		}
-	case Emergency:
-		if bucketUsageFactor < bucketNormalizedThreshold {
-			st.evictionMode = Normal
-		}
-	}
 }
 
 func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {

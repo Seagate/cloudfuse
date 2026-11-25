@@ -37,7 +37,6 @@ import (
 	"net/url"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -49,7 +48,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -58,7 +56,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
-	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
 const (
@@ -1436,35 +1433,6 @@ func (cl *Client) combineSmallBlocks(
 		}
 	}
 	return newBlockList, nil
-}
-
-func (cl *Client) GetUsedSize(ctx context.Context) (uint64, error) {
-	headBucketOutput, err := cl.headBucket(ctx, cl.Config.AuthConfig.BucketName)
-	if err != nil {
-		return 0, err
-	}
-
-	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
-	if !ok || response == nil {
-		return 0, fmt.Errorf("failed GetRawResponse from HeadBucketOutput")
-	}
-
-	headerValue, ok := response.Header["X-Rstor-Size"]
-	if !ok {
-		headerValue, ok = response.Header["X-Lyve-Size"]
-	}
-	if !ok || len(headerValue) == 0 {
-		return 0, fmt.Errorf(
-			"HeadBucket response has no size header (is the endpoint not Lyve Cloud?)",
-		)
-	}
-
-	bucketSizeBytes, err := strconv.ParseUint(headerValue[0], 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return bucketSizeBytes, nil
 }
 
 func (cl *Client) GetCommittedBlockList(
