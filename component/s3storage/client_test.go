@@ -227,13 +227,13 @@ func unsetEnv(t *testing.T, key string) {
 
 func (s *clientTestSuite) TestCredentialsErrorInvalidKeyID() {
 	defer s.cleanupTest()
-	// setup
+	srv := newS3ErrorServer(s.T(), http.StatusForbidden, "InvalidAccessKeyId")
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: us-east-1\n  use-path-style: true",
 		storageTestConfigurationParameters.BucketName,
 		"WRONGKEYID",
 		storageTestConfigurationParameters.SecretKey,
-		storageTestConfigurationParameters.Endpoint,
+		srv.URL,
 	)
 	// S3 connection creation should fail
 	err := s.setupTestHelper(config, false)
@@ -386,22 +386,26 @@ func (s *clientTestSuite) TestDefaultConfig() {
 
 func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
 	defer s.cleanupTest()
-	// setup
-	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	s.T().Setenv("AWS_ACCESS_KEY_ID", "ENVKEYID")
+	s.T().Setenv("AWS_SECRET_ACCESS_KEY", "ENVSECRET")
+	// AccessDenied only when signed with the config key ID
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		code := "SignatureDoesNotMatch"
+		if strings.Contains(r.Header.Get("Authorization"), "Credential=CONFIGKEYID/") {
+			code = "AccessDenied"
+		}
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, "<Error><Code>%s</Code></Error>", code)
+	}))
+	defer srv.Close()
 	config := fmt.Sprintf(
-		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s",
+		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: CONFIGKEYID\n  secret-key: CONFIGSECRET\n  region: us-east-1\n  use-path-style: true",
 		storageTestConfigurationParameters.BucketName,
-		s.client.Config.AuthConfig.Endpoint,
-		storageTestConfigurationParameters.KeyID,
-		"WRONGSECRETKEY",
+		srv.URL,
 	)
-	// Wrong credentials should take precedence, so S3 connection should fail
+	// config credentials take precedence over env
 	err := s.setupTestHelper(config, false)
-	s.assert.Error(err)
-
-	os.Unsetenv("AWS_ACCESS_KEY_ID")
-	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+	s.assert.Equal(errInvalidCredential, err)
 }
 
 func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
