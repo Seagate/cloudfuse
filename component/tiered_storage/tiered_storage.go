@@ -33,6 +33,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -369,11 +370,7 @@ func (c *TieredStorage) CreateDir(options internal.CreateDirOptions) error {
 		log.Err("TieredStorage::CreateDir : %s MkdirAll failed [%v]", options.Name, err)
 		return err
 	}
-	// cloud
-	if err := c.NextComponent().CreateDir(options); err != nil && !errors.Is(err, os.ErrExist) {
-		log.Err("TieredStorage::CreateDir : %s cloud failure", options.Name)
-		return err
-	}
+	// the cloud will be updated on eviction
 
 	return nil
 }
@@ -1099,11 +1096,26 @@ func (c *TieredStorage) uploadLocal(name string) error {
 	}
 	defer f.Close()
 
+	// make sure parent directory exists first
+	parent := getParentDir(name)
+	if _, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: parent}); err != nil {
+		if err := c.NextComponent().CreateDir(internal.CreateDirOptions{Name: parent}); err != nil {
+			log.Err("TieredStorage::uploadLocal : %s create parent dir failed [%v]", name, err)
+		}
+	}
 	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 	if err != nil {
 		log.Err("TieredStorage::uploadLocal : %s upload failed [%v]", name, err)
 	}
 	return err
+}
+
+func getParentDir(childPath string) string {
+	parentDir := path.Dir(internal.TruncateDirName(childPath))
+	if parentDir == "." {
+		parentDir = ""
+	}
+	return parentDir
 }
 
 // uploadandCleanFile evicts a closed local-owned file: it uploads local/x,
