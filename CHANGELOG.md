@@ -1,5 +1,9 @@
 # Cloudfuse Changelog #
 
+## **Unreleased** ##
+
+Stop using Lyve Cloud
+
 ## **2.4.2** ##
 
 November 16th 2026
