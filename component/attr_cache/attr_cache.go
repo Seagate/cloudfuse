@@ -551,11 +551,11 @@ func (ac *AttrCache) StreamDir(
 			pathList = cachedPathList
 			nextToken = cachedToken
 		} else {
-			// return whatever entries we have (but only if the token is empty)
+			// return a complete listing from the tree (if the token is empty)
 			entry, found := ac.cache.get(options.Name)
-			if options.Token == "" && found {
+			if options.Token == "" && found && entry.listingComplete {
 				for _, v := range entry.children {
-					if v.exists() && v.valid() {
+					if v.exists() {
 						pathList = append(pathList, v.attr)
 					}
 				}
@@ -586,7 +586,7 @@ func (ac *AttrCache) StreamDir(
 		// this will allow us to serve directory listings from this cache
 		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
 		// if the listing is complete, record the fact that we have a complete listing
-		if nextToken == "" {
+		if ac.cacheOnList && nextToken == "" {
 			ac.markListingComplete(options.Name)
 		}
 	} else {
