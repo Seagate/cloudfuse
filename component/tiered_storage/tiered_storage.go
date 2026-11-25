@@ -1096,18 +1096,32 @@ func (c *TieredStorage) uploadLocal(name string) error {
 	}
 	defer f.Close()
 
-	// make sure parent directory exists first
-	parent := getParentDir(name)
-	if _, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: parent}); err != nil {
-		if err := c.NextComponent().CreateDir(internal.CreateDirOptions{Name: parent}); err != nil {
-			log.Err("TieredStorage::uploadLocal : %s create parent dir failed [%v]", name, err)
-		}
+	if err := c.mkdirAllCloud(getParentDir(name)); err != nil {
+		log.Err("TieredStorage::uploadLocal : %s mkdirAllCloud failed [%v]", name, err)
+		return err
 	}
 	err = c.NextComponent().CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 	if err != nil {
 		log.Err("TieredStorage::uploadLocal : %s upload failed [%v]", name, err)
 	}
 	return err
+}
+
+// uploadDir ensures that the given directory exists in the cloud, and is anchored to the directory tree
+func (c *TieredStorage) mkdirAllCloud(name string) error {
+	if name == "" {
+		return nil
+	}
+	if _, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name}); err != nil {
+		if err := c.mkdirAllCloud(getParentDir(name)); err != nil {
+			return err
+		}
+		if err := c.NextComponent().CreateDir(internal.CreateDirOptions{Name: name}); err != nil {
+			log.Err("TieredStorage::mkdirAllCloud : %s create failed [%v]", name, err)
+			return err
+		}
+	}
+	return nil
 }
 
 func getParentDir(childPath string) string {
