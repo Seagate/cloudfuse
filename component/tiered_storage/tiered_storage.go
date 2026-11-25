@@ -565,6 +565,10 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 
 	// Rename in the cloud
 	cloudErr := c.NextComponent().RenameDir(options)
+	// ensure parent directory exists in the cloud
+	if cloudErr == nil {
+		_ = c.mkdirAllCloud(getParentDir(options.Dst))
+	}
 	// ignore ErrNotExist for directories that exist only locally
 	neverUploaded := srcLocalExists && errors.Is(cloudErr, os.ErrNotExist)
 	// revert on failure
@@ -1248,6 +1252,9 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		}
 	} else {
 		// file is cloud-owned
+		if err := c.mkdirAllCloud(getParentDir(options.Dst)); err != nil {
+			renameErr = fmt.Errorf("%s create dst parent failed: %w", options.Dst, err)
+		}
 		if err := c.NextComponent().RenameFile(options); err != nil {
 			renameErr = fmt.Errorf("%s -> %s rename failed: %w", options.Src, options.Dst, err)
 		}
