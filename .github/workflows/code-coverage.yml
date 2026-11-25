@@ -30,7 +30,22 @@ jobs:
             fuselib: libfuse-dev
 
     runs-on: ${{ matrix.os }}
+
+    services:
+      localstack:
+        image: localstack/localstack:s3-community-archive@sha256:b14111811a1071ff8e05ea2d89fac68dc3aa115bcb0b053f5502a1dfffba4ff8
+        env:
+          SERVICES: s3
+          AWS_DEFAULT_REGION: us-east-1
+        ports:
+          - 4566:4566
+
     env:
+      AWS_ENDPOINT: http://localhost:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_BUCKET_NAME: test
       MOUNT_DIR: "/home/runner/blob_mnt"
       TEMP_DIR: "/home/runner/cloudfuse_tmp"
       BLOCK_TEMP_DIR: "/home/runner/cloudfuse_block_tmp"
@@ -63,6 +78,16 @@ jobs:
         with:
           version: ${{ env.zig }}
           cache-key: coverage-${{ env.zig }}-${{ matrix.job_name }}
+
+      - name: Bootstrap S3 bucket on LocalStack
+        id: s3-bucket
+        background: true
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        run: |
+          timeout 120s bash -c 'until aws --endpoint-url "${AWS_ENDPOINT}" s3 ls >/dev/null 2>&1; do sleep 1; done'
+          aws --endpoint-url "${AWS_ENDPOINT}" s3 mb "s3://${AWS_BUCKET_NAME}" || true
+          aws --endpoint-url "${AWS_ENDPOINT}" s3 ls
 
       - parallel:
           - name: checkout
@@ -138,22 +163,17 @@ jobs:
               echo "}" >> $cnfFile
 
           - name: Create S3 Configuration File
-            env:
-              S3TEST_BUCKET_NAME: ${{ secrets.S3TEST_BUCKET_NAME }}
-              S3TEST_ACCESS_KEY: ${{ secrets.S3TEST_ACCESS_KEY }}
-              S3TEST_SECRET_KEY: ${{ secrets.S3TEST_SECRET_KEY }}
-              S3TEST_ENDPOINT: ${{ secrets.S3TEST_ENDPOINT }}
-              S3TEST_REGION: ${{ secrets.S3TEST_REGION }}
             run: |-
               cnfFile=$HOME/s3test.json
               echo $cnfFile
               touch $cnfFile
               echo "{" > $cnfFile
-              echo "\"bucket-name\"": "\"${S3TEST_BUCKET_NAME}\"", >> $cnfFile
-              echo "\"access-key\"": "\"${S3TEST_ACCESS_KEY}\"", >> $cnfFile
-              echo "\"secret-key\"": "\"${S3TEST_SECRET_KEY}\"", >> $cnfFile
-              echo "\"endpoint\"": "\"${S3TEST_ENDPOINT}\"", >> $cnfFile
-              echo "\"region\"": "\"${S3TEST_REGION}\"" >> $cnfFile
+              echo "\"bucket-name\"": "\"${AWS_BUCKET_NAME}\"", >> $cnfFile
+              echo "\"access-key\"": "\"${AWS_ACCESS_KEY_ID}\"", >> $cnfFile
+              echo "\"secret-key\"": "\"${AWS_SECRET_ACCESS_KEY}\"", >> $cnfFile
+              echo "\"endpoint\"": "\"${AWS_ENDPOINT}\"", >> $cnfFile
+              echo "\"region\"": "\"${AWS_REGION}\"", >> $cnfFile
+              echo "\"use-path-style\"": true >> $cnfFile
               echo "}" >> $cnfFile
 
       - name: Install Go
@@ -187,6 +207,9 @@ jobs:
           else
             ./build.sh
           fi
+
+      - name: Wait for S3 bucket
+        wait: s3-bucket
 
       - name: UT Code Coverage
         shell: bash
@@ -463,11 +486,11 @@ jobs:
 
       - name: Create Config File - S3
         env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
         run: |-
@@ -562,11 +585,11 @@ jobs:
 
       - name: Create Config File - S3 - Block Cache
         env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
@@ -611,11 +634,11 @@ jobs:
 
       - name: Create Config File - S3 with Size Tracker
         env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
         run: |-
