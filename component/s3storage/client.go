@@ -132,25 +132,7 @@ func (cl *Client) Configure(cfg Config) error {
 		}
 	}
 
-	var err error
-	if cl.Config.AuthConfig.Region == "" {
-		region, exists := os.LookupEnv("AWS_REGION")
-		if !exists {
-			cl.Config.AuthConfig.Region, err = getRegionFromEndpoint(cl.Config.AuthConfig.Endpoint)
-			if err != nil {
-				cl.Config.AuthConfig.Region = defaultRegion
-			}
-		} else {
-			cl.Config.AuthConfig.Region = region
-		}
-	}
-
-	if cl.Config.AuthConfig.Endpoint == "" {
-		cl.Config.AuthConfig.Endpoint = fmt.Sprintf(
-			"https://s3.%s.sv15.lyve.seagate.com",
-			cl.Config.AuthConfig.Region,
-		)
-	}
+	cl.setRegionAndEndpoint()
 
 	ctx := context.Background()
 
@@ -321,6 +303,30 @@ func (cl *Client) filterAuthorizedBuckets(
 		authorizedBucketList = append(authorizedBucketList, bucketName)
 	}
 	return authorizedBucketList
+}
+
+// setRegionAndEndpoint fills in a missing region (AWS_REGION, then endpoint, then default)
+// and a missing endpoint (derived from region).
+func (cl *Client) setRegionAndEndpoint() {
+	if cl.Config.AuthConfig.Region == "" {
+		region, exists := os.LookupEnv("AWS_REGION")
+		if !exists {
+			var err error
+			cl.Config.AuthConfig.Region, err = getRegionFromEndpoint(cl.Config.AuthConfig.Endpoint)
+			if err != nil {
+				cl.Config.AuthConfig.Region = defaultRegion
+			}
+		} else {
+			cl.Config.AuthConfig.Region = region
+		}
+	}
+
+	if cl.Config.AuthConfig.Endpoint == "" {
+		cl.Config.AuthConfig.Endpoint = fmt.Sprintf(
+			"https://s3.%s.sv15.lyve.seagate.com",
+			cl.Config.AuthConfig.Region,
+		)
+	}
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
