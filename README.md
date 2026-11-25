@@ -22,7 +22,7 @@
 
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
-Cloudfuse can run in two modes: caching, where the cloud is the source of truth and local disk holds a temporary copy for speed, or tiered storage, where local disk is the primary copy and the cloud is overflow for data that no longer fits locally.
+Cloudfuse can run in two modes: caching, where the cloud is the source of truth and local disk holds a temporary copy for speed, or tiered storage (Beta), where local disk is the primary copy and the cloud is overflow for data that no longer fits locally.
 Cloudfuse is a fork of [blobfuse2](https://github.com/Azure/azure-storage-fuse), and adds S3 support and Windows support.
 Cloudfuse supports clouds with an S3 or Azure interface.
 
@@ -36,7 +36,7 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
 - [Offline Access (New)](#offline-access-new)
-- [Tiered Storage](#tiered-storage)
+- [Tiered Storage (Beta)](#tiered-storage-beta)
 - [Command Line Interface](#command-line-interface)
 - [Limitations](#limitations)
 - [License](#license)
@@ -315,7 +315,9 @@ Cloudfuse now supports offline access through the `file_cache` component. When c
 
 > **Note:** Cloudfuse uses eventual consistency with last-writer-wins semantics. Offline access can extend the consistency window indefinitely and **increases the risk of data conflicts in multi-client setups!** See [component/file_cache/OfflineAccess.md](component/file_cache/OfflineAccess.md) for full details and configuration guidance.
 
-## Tiered Storage
+## Tiered Storage (Beta)
+
+> **Beta:** Tiered storage is available for testing but is not yet generally supported.
 
 Use `tiered_storage` for on-prem-first configurations, when you want cloud storage to expand existing local storage. To minimize cloud storage costs, `tiered_storage` keeps only one copy of each file: files stay on local disk until local storage fills up, and then the least recently used files are moved to the cloud.
 

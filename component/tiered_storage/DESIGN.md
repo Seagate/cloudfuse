@@ -1,4 +1,6 @@
-# Tiered Storage Design
+# Tiered Storage Design (Beta)
+
+> **Beta:** Tiered storage is available for testing but is not yet generally supported.
 
 This document is the implementation reference for the `tiered_storage` component.
 It describes the target design. Where the current code differs, the code should

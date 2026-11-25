@@ -1,4 +1,6 @@
-# Tiered Storage
+# Tiered Storage (Beta)
+
+> **Beta:** Tiered storage is available for testing but is not yet generally supported.
 
 Adds the `tiered_storage` component, which keeps data on local storage without backing it up to the cloud. When local usage gets high, the least recently used files are uploaded and deleted locally (evicted). Evicted files stay accessible: opening one downloads a temporary copy, which is discarded on close.
 

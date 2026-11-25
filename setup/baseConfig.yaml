@@ -124,7 +124,7 @@ file_cache:
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
 
-# Tiered storage configuration
+# Tiered storage configuration (BETA)
 tiered_storage:
   path: <path to local storage. Files remain local until eviction. Cloudfuse keeps files in its 'local' subfolder and temporary copies of open cloud files in 'cache', and refuses to start if anything else is in the path, except OS folders such as 'System Volume Information' and 'lost+found', so the root of a drive works.>
   max-size-mb: <maximum local storage size in MB. Default - 80% of free disk space, counting existing local files as free>
