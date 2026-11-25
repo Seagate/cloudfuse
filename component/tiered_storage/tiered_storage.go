@@ -1117,19 +1117,24 @@ func (c *TieredStorage) uploadLocal(name string) error {
 	return err
 }
 
-// uploadDir ensures that the given directory exists in the cloud, and is anchored to the directory tree
+// mkdirAllCloud ensures the given directory and its ancestors in the cloud
 func (c *TieredStorage) mkdirAllCloud(name string) error {
 	if name == "" {
 		return nil
 	}
-	if _, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name}); err != nil {
-		if err := c.mkdirAllCloud(getParentDir(name)); err != nil {
-			return err
-		}
-		if err := c.NextComponent().CreateDir(internal.CreateDirOptions{Name: name}); err != nil {
+	if err := c.mkdirAllCloud(getParentDir(name)); err != nil {
+		return err
+	}
+	_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	if errors.Is(err, os.ErrNotExist) {
+		err := c.NextComponent().CreateDir(internal.CreateDirOptions{Name: name})
+		if err != nil && errors.Is(err, os.ErrExist) {
 			log.Err("TieredStorage::mkdirAllCloud : %s create failed [%v]", name, err)
 			return err
 		}
+	} else if err != nil {
+		log.Err("TieredStorage::mkdirAllCloud : %s cloud stat failed [%v]", name, err)
+		return err
 	}
 	return nil
 }
