@@ -192,11 +192,6 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
 		})
 
-		checksumCRC32 = partResp.ChecksumCRC32
-		checksumCRC32C = partResp.ChecksumCRC32C
-		checksumSHA1 = partResp.ChecksumSHA1
-		checksumSHA256 = partResp.ChecksumSHA256
-
 		if err != nil {
 			_, _ = s.awsS3Client.AbortMultipartUpload(
 				context.Background(),
@@ -215,11 +210,16 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 				Key:      aws.String(key),
 				UploadId: &uploadID,
 			})
-			if len(resp.Parts) != 0 {
+			if resp != nil && len(resp.Parts) != 0 {
 				return errors.New("abort multipart upload failed and unable to delete all parts")
 			}
 			return err
 		}
+
+		checksumCRC32 = partResp.ChecksumCRC32
+		checksumCRC32C = partResp.ChecksumCRC32C
+		checksumSHA1 = partResp.ChecksumSHA1
+		checksumSHA256 = partResp.ChecksumSHA256
 
 		// copy etag and part number to verify later
 		if partResp != nil {
@@ -266,7 +266,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			Key:      aws.String(key),
 			UploadId: &uploadID,
 		})
-		if len(resp.Parts) != 0 {
+		if resp != nil && len(resp.Parts) != 0 {
 			return errors.New("abort multipart upload failed and unable to delete all parts")
 		}
 		return err
