@@ -1254,8 +1254,7 @@ func (c *TieredStorage) RenameFile(options internal.RenameFileOptions) error {
 		// file is cloud-owned
 		if err := c.mkdirAllCloud(getParentDir(options.Dst)); err != nil {
 			renameErr = fmt.Errorf("%s create dst parent failed: %w", options.Dst, err)
-		}
-		if err := c.NextComponent().RenameFile(options); err != nil {
+		} else if err := c.NextComponent().RenameFile(options); err != nil {
 			renameErr = fmt.Errorf("%s -> %s rename failed: %w", options.Src, options.Dst, err)
 		}
 	}
