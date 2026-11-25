@@ -552,6 +552,7 @@ func (ac *AttrCache) StreamDir(
 			nextToken = cachedToken
 		} else {
 			// return a complete listing from the tree (if the token is empty)
+			ac.cacheLock.RLock()
 			entry, found := ac.cache.get(options.Name)
 			if options.Token == "" && found && entry.listingComplete {
 				for _, v := range entry.children {
@@ -563,6 +564,7 @@ func (ac *AttrCache) StreamDir(
 				// the cloud is unavailable, and we have nothing to provide
 				err = common.NewNoCachedDataError(err)
 			}
+			ac.cacheLock.RUnlock()
 		}
 	}
 	// values should be returned in ascending order by key, without duplicates
@@ -608,8 +610,8 @@ func (ac *AttrCache) fetchCachedDirList(
 		return nil, "", fmt.Errorf("cache on list is disabled")
 	}
 	// start accessing the cache
-	ac.cacheLock.Lock()
-	defer ac.cacheLock.Unlock()
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
 	// get directory cache item
 	listDirCache, found := ac.cache.get(path)
 	if !found {
@@ -629,7 +631,7 @@ func (ac *AttrCache) fetchCachedDirList(
 	// check timeout
 	if time.Since(cachedListSegment.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
-		return cachedListSegment.entries, "", fmt.Errorf(
+		return cachedListSegment.entries, cachedListSegment.nextToken, fmt.Errorf(
 			"%s directory listing segment %s cache expired",
 			path,
 			token,
