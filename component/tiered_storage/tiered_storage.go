@@ -441,13 +441,17 @@ func (c *TieredStorage) StreamDir(
 			page = append(page, c.localAttr(entryName, info))
 		}
 	}
-	// cloud
+	// cloud (allow offline results)
 	attrs, token, err := c.NextComponent().StreamDir(options)
-	cloudExists := !errors.Is(err, os.ErrNotExist)
-	if cloudExists && err != nil {
+	if attrs != nil {
+		err = nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		err = syscall.ENOENT
+	} else if err != nil {
 		log.Err("TieredStorage::StreamDir : %s cloud failed [%v]", options.Name, err)
 		return page, "", err
 	}
+	cloudExists := !errors.Is(err, os.ErrNotExist)
 	// remove duplicate entries
 	localNames := make(map[string]struct{}, len(entries))
 	for _, entry := range entries {
@@ -1324,6 +1328,13 @@ func (c *TieredStorage) GetAttr(options internal.GetAttrOptions) (*internal.ObjA
 
 	// cloud
 	attr, err := c.NextComponent().GetAttr(options)
+	// allow offline results
+	if errors.Is(err, os.ErrNotExist) {
+		err = syscall.ENOENT
+	} else if attr != nil {
+		err = nil
+	}
+
 	return defaultModeAttr(attr), err
 }
 
