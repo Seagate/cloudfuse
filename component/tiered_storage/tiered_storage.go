@@ -1128,7 +1128,7 @@ func (c *TieredStorage) mkdirAllCloud(name string) error {
 	_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if errors.Is(err, os.ErrNotExist) {
 		err := c.NextComponent().CreateDir(internal.CreateDirOptions{Name: name})
-		if err != nil && errors.Is(err, os.ErrExist) {
+		if err != nil && !errors.Is(err, os.ErrExist) {
 			log.Err("TieredStorage::mkdirAllCloud : %s create failed [%v]", name, err)
 			return err
 		}
