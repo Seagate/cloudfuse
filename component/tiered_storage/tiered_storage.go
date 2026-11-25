@@ -412,7 +412,13 @@ func (c *TieredStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		return false
 	}
-	// cloud
+	// cloud - check GetAttr first, to save a List call
+	_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	if errors.Is(err, os.ErrNotExist) {
+		return true
+	} else if err != nil {
+		return false
+	}
 	return c.NextComponent().IsDirEmpty(options)
 }
 
