@@ -1135,6 +1135,12 @@ jobs:
       # WinFsp creates MOUNT_DIR only once mounted, so readiness checks use `[ -d ]`.
       MOUNT_READY_TIMEOUT: 60
       CONTAINER_NAME: cloudfuse-ci-${{ matrix.job_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+      # Windows runners can't run service containers, so S3 tests use moto.
+      AWS_ENDPOINT: http://127.0.0.1:5000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_BUCKET_NAME: test
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1155,6 +1161,23 @@ jobs:
           # can be used on Windows as on macOS and Linux
           $path = (get-command mingw32-make.exe).Path
           Copy-Item -Path $path -Destination (Join-Path (Split-Path -Path $path) 'make.exe')
+
+      - name: Start moto S3 server
+        id: moto
+        background: true
+        shell: pwsh
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        run: |
+          python -m pip install --quiet "moto[server]==5.2.6"
+          Start-Process -FilePath python -ArgumentList '-m', 'moto.server', '-H', '127.0.0.1', '-p', '5000' -WindowStyle Hidden
+          $deadline = (Get-Date).AddSeconds(120)
+          do {
+            Start-Sleep -Seconds 1
+            aws --endpoint-url $env:AWS_ENDPOINT s3 ls *> $null
+          } until ($LASTEXITCODE -eq 0 -or (Get-Date) -gt $deadline)
+          aws --endpoint-url $env:AWS_ENDPOINT s3 mb "s3://$env:AWS_BUCKET_NAME"
+          aws --endpoint-url $env:AWS_ENDPOINT s3 ls
 
       - parallel:
           - name: checkout
@@ -1221,22 +1244,17 @@ jobs:
             shell: powershell
 
           - name: Create S3 Configuration File on Windows
-            env: # Added
-              S3TEST_BUCKET_NAME: ${{ secrets.S3TEST_BUCKET_NAME }}
-              S3TEST_ACCESS_KEY: ${{ secrets.S3TEST_ACCESS_KEY }}
-              S3TEST_SECRET_KEY: ${{ secrets.S3TEST_SECRET_KEY }}
-              S3TEST_ENDPOINT: ${{ secrets.S3TEST_ENDPOINT }}
-              S3TEST_REGION: ${{ secrets.S3TEST_REGION }}
             run: |-
               $cnfFile="~\s3test.json"
               Write-Host $cnfFile
               $content = @"
               {
-                "bucket-name": "$env:S3TEST_BUCKET_NAME",
-                "access-key": "$env:S3TEST_ACCESS_KEY",
-                "secret-key": "$env:S3TEST_SECRET_KEY",
-                "endpoint": "$env:S3TEST_ENDPOINT",
-                "region": "$env:S3TEST_REGION"
+                "bucket-name": "$env:AWS_BUCKET_NAME",
+                "access-key": "$env:AWS_ACCESS_KEY_ID",
+                "secret-key": "$env:AWS_SECRET_ACCESS_KEY",
+                "endpoint": "$env:AWS_ENDPOINT",
+                "region": "$env:AWS_REGION",
+                "use-path-style": true
               }
               "@
               $content | Out-File -FilePath $cnfFile -Encoding Ascii
@@ -1256,6 +1274,9 @@ jobs:
       - name: Build
         run: |
           ./build.sh
+
+      - name: Wait for moto
+        wait: moto
 
       - name: UT Code Coverage
         shell: bash
@@ -1529,11 +1550,11 @@ jobs:
       - name: Create Config File - S3
         shell: bash
         env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
         run: |-
@@ -1635,11 +1656,11 @@ jobs:
       - name: Create Config File - S3 - Block Cache
         shell: bash
         env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
           BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
@@ -1689,11 +1710,11 @@ jobs:
       - name: Create Config File - S3 with Size Tracker
         shell: bash
         env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          S3_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          S3_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          S3_REGION: ${{ env.AWS_REGION }}
+          S3_SECRET_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
         run: |-
@@ -2064,9 +2085,9 @@ jobs:
         run: go version
 
       - name: Build cleanup tests
-        run: go test -c -o ./cleanup-bin/ ./test/accoutcleanup ./test/s3cleanup
+        run: go test -c -o ./cleanup-bin/ ./test/accoutcleanup
 
-      # Each cleanup targets a different storage account/bucket, so they are independent.
+      # Each cleanup targets a different storage account, so they are independent.
       - parallel:
           - name: Cleanup Blob Storage
             run: ./cleanup-bin/accoutcleanup.test -test.timeout 120m -test.v
@@ -2079,12 +2100,3 @@ jobs:
             env:
               STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
               STORAGE_ACCOUNT_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
-
-          - name: Cleanup S3 Storage
-            run: ./cleanup-bin/s3cleanup.test -test.timeout 120m -test.v
-            env:
-              AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-              AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-              AWS_REGION: "${{ secrets.S3TEST_REGION }}"
-              S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-              S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
