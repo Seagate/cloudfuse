@@ -207,11 +207,110 @@ func (suite *tieredStorageTestSuite) TestOpenFileCloud() {
 	)
 	suite.Require().NoError(err)
 	suite.assert.Equal(path, handle.Path)
-	suite.assert.True(suite.tieredStorage.onCacheCopy(handle))
+
+	// Cloud files are opened lazily: nothing is downloaded until first access.
+	flock := suite.tieredStorage.fileLocks.Get(path)
+	suite.assert.True(flock.LazyOpen)
+	suite.assert.EqualValues(1, flock.Count())
+	suite.assert.False(openCompleted(handle))
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	suite.Require().NoError(suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle}))
+	suite.assert.NoFileExists(suite.cacheFile(path))
 
 	// Cloud files are downloaded into cache/, not local/.
+	output := make([]byte, len(testData))
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: handle, Data: output},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Equal(testData, string(output))
+	suite.assert.False(flock.LazyOpen)
+	suite.assert.True(suite.tieredStorage.onCacheCopy(handle))
 	suite.assert.FileExists(suite.cacheFile(path))
 	suite.assert.NoFileExists(suite.localFile(path))
+
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+	suite.assert.NoFileExists(suite.cacheFile(path))
+}
+
+func (suite *tieredStorageTestSuite) TestLazyOpenReleaseWithoutAccess() {
+	defer suite.cleanupTest()
+	const path = "lazy-unread"
+	suite.writeCloudFile(path, "cloud data")
+	used := suite.tieredStorage.diskUsage.Used()
+
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
+	)
+	suite.Require().NoError(err)
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+
+	flock := suite.tieredStorage.fileLocks.Get(path)
+	suite.assert.False(flock.LazyOpen)
+	suite.assert.Zero(flock.Count())
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	suite.assert.Equal(used, suite.tieredStorage.diskUsage.Used())
+}
+
+// A lazy handle has no data, so deleting its file before first access makes the access fail.
+func (suite *tieredStorageTestSuite) TestLazyHandleFailsAfterDelete() {
+	defer suite.cleanupTest()
+	const path = "lazy-deleted"
+	suite.writeCloudFile(path, "cloud data")
+
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
+	)
+	suite.Require().NoError(err)
+	suite.Require().NoError(suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: path}))
+	suite.assert.False(suite.tieredStorage.fileLocks.Get(path).LazyOpen)
+
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: handle, Data: make([]byte, 4)},
+	)
+	suite.assert.Error(err)
+	suite.assert.NoFileExists(suite.cacheFile(path))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+}
+
+func (suite *tieredStorageTestSuite) TestRenameDirMovesLazyHandle() {
+	defer suite.cleanupTest()
+
+	suite.writeCloudFile("src/lazy", "cloud")
+	handle, err := suite.tieredStorage.OpenFile(
+		internal.OpenFileOptions{Name: "src/lazy", Flags: os.O_RDONLY},
+	)
+	suite.Require().NoError(err)
+	handlemap.Add(handle)
+
+	suite.Require().
+		NoError(suite.tieredStorage.RenameDir(internal.RenameDirOptions{Src: "src", Dst: "dst"}))
+	suite.assert.Equal("dst/lazy", handle.Path)
+	suite.assert.True(suite.tieredStorage.fileLocks.Get("dst/lazy").LazyOpen)
+	suite.assert.False(suite.tieredStorage.fileLocks.Get("src/lazy").LazyOpen)
+
+	buffer := make([]byte, len("cloud"))
+	_, err = suite.tieredStorage.ReadInBuffer(
+		&internal.ReadInBufferOptions{Handle: handle, Data: buffer},
+	)
+	suite.Require().NoError(err)
+	suite.assert.Equal("cloud", string(buffer))
+	suite.Require().
+		NoError(suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle}))
+}
+
+// openCached opens a file and completes any lazy open, so a cloud file has a cache/ copy.
+func (suite *tieredStorageTestSuite) openCached(
+	options internal.OpenFileOptions,
+) (*handlemap.Handle, error) {
+	handle, err := suite.tieredStorage.OpenFile(options)
+	if err != nil {
+		return nil, err
+	}
+	return handle, suite.tieredStorage.completeOpen(handle)
 }
 
 func (suite *tieredStorageTestSuite) TestOpenFileLocal() {
@@ -284,7 +383,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileOCreateExistsCloud() {
 	suite.assert.NoError(err)
 
 	//open file through tiered storage, should succeed and return a handle with correct path
-	handle, err = suite.tieredStorage.OpenFile(
+	handle, err = suite.openCached(
 		internal.OpenFileOptions{
 			Name:  path,
 			Flags: os.O_CREATE,
@@ -361,7 +460,7 @@ func (suite *tieredStorageTestSuite) TestReleaseDeletesCachedCopy() {
 	suite.writeCloudFile(path, "cloud data")
 
 	openRead := internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY}
-	first, err := suite.tieredStorage.OpenFile(openRead)
+	first, err := suite.openCached(openRead)
 	suite.Require().NoError(err)
 	second, err := suite.tieredStorage.OpenFile(openRead)
 	suite.Require().NoError(err)
@@ -433,7 +532,7 @@ func (suite *tieredStorageTestSuite) TestWriteReadDirtyState() {
 	suite.assert.NoError(err)
 
 	//open file through tiered storage, should succeed and return a handle with correct path
-	handle, openErr := suite.tieredStorage.OpenFile(
+	handle, openErr := suite.openCached(
 		internal.OpenFileOptions{
 			Name:  path,
 			Flags: os.O_RDWR,
@@ -753,7 +852,7 @@ func (suite *tieredStorageTestSuite) TestDeleteFileOpenCachedAndPromoted() {
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("cached", "cloud")
-	cached, err := suite.tieredStorage.OpenFile(
+	cached, err := suite.openCached(
 		internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY},
 	)
 	suite.Require().NoError(err)
@@ -1358,7 +1457,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileSharesCacheCopy() {
 	const path = "shared-cache"
 	suite.writeCloudFile(path, "cloud data")
 
-	first, err := suite.tieredStorage.OpenFile(
+	first, err := suite.openCached(
 		internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY},
 	)
 	suite.Require().NoError(err)
@@ -1461,7 +1560,7 @@ func (suite *tieredStorageTestSuite) TestHandlesNeverSetLibfuseCachedFlag() {
 	// HandleFlagCached makes libfuse read the file object directly; tiered
 	// storage reads go through ReadInBuffer whatever tree the file is in.
 	suite.writeCloudFile("cloud", "data")
-	cloud, err := suite.tieredStorage.OpenFile(
+	cloud, err := suite.openCached(
 		internal.OpenFileOptions{Name: "cloud", Flags: os.O_RDWR},
 	)
 	suite.Require().NoError(err)
@@ -1532,7 +1631,7 @@ func (suite *tieredStorageTestSuite) TestPromoteNeverOverwritesLocalFile() {
 
 	const path = "both-trees"
 	suite.writeCloudFile(path, "old cloud")
-	handle, err := suite.tieredStorage.OpenFile(
+	handle, err := suite.openCached(
 		internal.OpenFileOptions{Name: path, Flags: os.O_RDWR},
 	)
 	suite.Require().NoError(err)
@@ -1609,7 +1708,7 @@ func (suite *tieredStorageTestSuite) TestOpenFileExclusiveChangesNothing() {
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("cached", "cloud data")
-	reader, err := suite.tieredStorage.OpenFile(
+	reader, err := suite.openCached(
 		internal.OpenFileOptions{Name: "cached", Flags: os.O_RDONLY},
 	)
 	suite.Require().NoError(err)
@@ -2204,7 +2303,7 @@ func (suite *tieredStorageTestSuite) TestRenameDirMovesCacheCopiesAndState() {
 
 	suite.writeCloudFile("src/cached", "cloud")
 	suite.writeCloudFile("src/sub/promoted", "cloud")
-	cached, err := suite.tieredStorage.OpenFile(
+	cached, err := suite.openCached(
 		internal.OpenFileOptions{Name: "src/cached", Flags: os.O_RDONLY},
 	)
 	suite.Require().NoError(err)
@@ -2299,7 +2398,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileCloudFailureRevertsLocalRenam
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("src", "data")
-	handle, err := suite.tieredStorage.OpenFile(
+	handle, err := suite.openCached(
 		internal.OpenFileOptions{Name: "src", Flags: os.O_RDWR, Mode: 0644},
 	)
 	suite.Require().NoError(err)
@@ -2321,7 +2420,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileDeletesStateObjects() {
 
 	suite.writeCloudFile("src", "data")
 	// pull src into cache
-	handle, err := suite.tieredStorage.OpenFile(
+	handle, err := suite.openCached(
 		internal.OpenFileOptions{Name: "src", Flags: os.O_RDWR, Mode: 0644},
 	)
 	suite.Require().NoError(err)
@@ -2359,7 +2458,7 @@ func (suite *tieredStorageTestSuite) TestRenameOpenCachedFile() {
 	defer suite.cleanupTest()
 
 	suite.writeCloudFile("src", "data")
-	handle, err := suite.tieredStorage.OpenFile(
+	handle, err := suite.openCached(
 		internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY, Mode: 0644},
 	)
 	suite.Require().NoError(err)
@@ -2434,7 +2533,7 @@ func (suite *tieredStorageTestSuite) TestRenameFileReplacesCopyInOtherTree() {
 	suite.Require().NoError(
 		suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: dstHandle}),
 	)
-	srcHandle, err := suite.tieredStorage.OpenFile(
+	srcHandle, err := suite.openCached(
 		internal.OpenFileOptions{Name: "src", Flags: os.O_RDONLY},
 	)
 	suite.Require().NoError(err)
@@ -2466,7 +2565,7 @@ func (suite *tieredStorageTestSuite) TestRenameDirCloudFailureRevertsLocalRename
 		internal.CreateDirOptions{Name: "src", Mode: 0755},
 	))
 	suite.writeCloudFile("src/cloud", "data")
-	cloudHandle, err := suite.tieredStorage.OpenFile(
+	cloudHandle, err := suite.openCached(
 		internal.OpenFileOptions{Name: "src/cloud", Flags: os.O_RDONLY, Mode: 0644},
 	)
 	suite.Require().NoError(err)

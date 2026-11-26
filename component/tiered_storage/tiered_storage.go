@@ -49,7 +49,8 @@ import (
 )
 
 // TieredStorage keeps new data local and uses cloud storage as overflow.
-// Cloud objects are cached only while open. Symlinks are local-only, never
+// Cloud objects are opened lazily (downloaded on first access) and cached
+// only while open. Symlinks are local-only, never
 // followed (the kernel resolves them), and never evicted.
 //
 // Lock order: evictMu, file locks (lexical order), then lruQueue.mu. Never
@@ -74,6 +75,11 @@ type TieredStorageOptions struct {
 	LowThreshold  uint32 `config:"low-threshold"  yaml:"low-threshold,omitempty"`
 }
 
+// openFileOptions is stored on a lazily opened handle until its first access.
+type openFileOptions struct {
+	flags int
+}
+
 const (
 	compName           = "tiered_storage"
 	defaultMaxEviction = 5000
@@ -85,6 +91,8 @@ const (
 	reconcileCapacityInterval = 5 * time.Minute
 	// hint key set on handles opened from cache/
 	cacheCopyKey = "tieredStorage.cacheCopy"
+	// key set on lazily opened handles (same key as file_cache)
+	openFileOptionsKey = "openFileOptions"
 	// on the host filesystem, the tiered root has two subdirectories:
 	// local-tier files are kept in local/; copies of cloud files are kept in cache/
 	localDirName = "local"
@@ -481,12 +489,15 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("TieredStorage::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 	// Note: Changes under src and dst are blocked until this returns
 
-	// list all src files on the host filesystem
+	// list all src files on the host filesystem, and lazily opened files that are only in the cloud
 	names, err := c.listPrefix(options.Src)
 	if err != nil {
 		log.Err("TieredStorage::RenameDir : %s failed to list local files [%v]", options.Src, err)
 		return err
 	}
+	names = append(names, openHandleNames(options.Src)...)
+	slices.Sort(names)
+	names = slices.Compact(names)
 	// dstName converts names from src to dst
 	dstName := func(src string) string {
 		return common.JoinUnixFilepath(options.Dst, strings.TrimPrefix(src, options.Src))
@@ -595,6 +606,22 @@ func (c *TieredStorage) RenameDir(options internal.RenameDirOptions) error {
 	return nil
 }
 
+// openHandleNames lists the object names of open handles beneath a directory
+func openHandleNames(dir string) []string {
+	var names []string
+	prefix := dir + "/"
+	handlemap.GetHandles().Range(func(key, value any) bool {
+		handle := value.(*handlemap.Handle)
+		handle.Lock()
+		if strings.HasPrefix(handle.Path, prefix) {
+			names = append(names, handle.Path)
+		}
+		handle.Unlock()
+		return true
+	})
+	return names
+}
+
 // listPrefix lists the object names of files beneath a directory in local/ and cache/
 func (c *TieredStorage) listPrefix(dir string) ([]string, error) {
 	var names []string
@@ -683,21 +710,105 @@ func (c *TieredStorage) openHandle(
 	cached bool,
 	flock *common.LockMapItem,
 ) (*handlemap.Handle, error) {
-	file, err := common.OpenFile(path, flags&^(os.O_CREATE|os.O_EXCL), 0)
-	if err != nil {
+	handle := newHandle(name, flags)
+	// The handle is not published yet, so it needs no lock.
+	if err := setFileObject(handle, path, flags, cached); err != nil {
 		return nil, err
 	}
+	flock.Inc()
+	flock.LazyOpen = false
+	return handle, nil
+}
+
+// newHandle creates a handle that has no file object yet.
+func newHandle(name string, flags int) *handlemap.Handle {
 	handle := handlemap.NewHandle(name)
-	handle.SetFileObject(file)
 	if flags&os.O_APPEND != 0 {
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
+	return handle
+}
+
+// setFileObject opens path and attaches it to handle. The handle must be
+// unpublished or locked.
+func setFileObject(handle *handlemap.Handle, path string, flags int, cached bool) error {
+	file, err := common.OpenFile(path, flags&^(os.O_CREATE|os.O_EXCL), 0)
+	if err != nil {
+		return err
+	}
+	handle.SetFileObject(file)
 	if cached {
-		// The handle is not published yet, so it needs no lock.
 		handle.SetValue(cacheCopyKey, struct{}{})
 	}
-	flock.Inc()
-	return handle, nil
+	return nil
+}
+
+// openCompleted reports whether a handle has a file object, i.e. it is not
+// waiting on a lazy open.
+func openCompleted(handle *handlemap.Handle) bool {
+	handle.Lock()
+	defer handle.Unlock()
+	_, found := handle.GetValue(openFileOptionsKey)
+	return !found
+}
+
+// completeOpen ensures a file isn't in lazy open state before a handle's first access.
+func (c *TieredStorage) completeOpen(handle *handlemap.Handle) error {
+	if openCompleted(handle) {
+		return nil
+	}
+	flock := c.fileLocks.Get(handle.Path)
+	// openFileInternal requires flock be locked before it's called
+	flock.Lock()
+	defer flock.Unlock()
+	return c.openFileInternal(handle, flock)
+}
+
+// flock must be held
+func (c *TieredStorage) openFileInternal(
+	handle *handlemap.Handle,
+	flock *common.LockMapItem,
+) error {
+	handle.Lock()
+	defer handle.Unlock()
+
+	val, found := handle.GetValue(openFileOptionsKey)
+	if !found {
+		return nil
+	}
+	fileOptions := val.(openFileOptions)
+	name := handle.Path
+	log.Trace("TieredStorage::openFileInternal : name=%s", name)
+
+	localPath := c.localPath(name)
+	cachePath := c.cachePath(name)
+	path, cached := "", false
+	if info, err := os.Lstat(localPath); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return syscall.ELOOP
+		}
+		path = localPath
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	} else if _, err := os.Lstat(cachePath); err == nil {
+		path, cached = cachePath, true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	} else {
+		if err := c.downloadToCache(name); err != nil {
+			log.Err("TieredStorage::openFileInternal : %s download failed [%v]", name, err)
+			return err
+		}
+		path, cached = cachePath, true
+	}
+
+	if err := setFileObject(handle, path, fileOptions.flags, cached); err != nil {
+		log.Err("TieredStorage::openFileInternal : %s open failed [%v]", name, err)
+		return err
+	}
+	handle.RemoveValue(openFileOptionsKey)
+	flock.LazyOpen = false
+	return nil
 }
 
 // promote makes an open cloud-owned file local-owned before its first
@@ -826,6 +937,8 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 		}
 	}
 	c.policy.Dequeue(options.Name)
+	// update file state
+	flock.LazyOpen = false
 
 	if !found {
 		return syscall.ENOENT
@@ -834,61 +947,77 @@ func (c *TieredStorage) DeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
-	flock := c.fileLocks.Get(options.Name)
-	flock.Lock()
-	defer flock.Unlock()
-
+	log.Trace("TieredStorage::OpenFile : name=%s flags=%d", options.Name, options.Flags)
 	localPath := c.localPath(options.Name)
 	cachePath := c.cachePath(options.Name)
 	exclusive := options.Flags&os.O_CREATE != 0 && options.Flags&os.O_EXCL != 0
 	truncate := options.Flags&os.O_TRUNC != 0
 
+	flock := c.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	// find file
 	path, cached, created := "", false, false
 	var truncatedSize int64
 	if info, err := os.Lstat(localPath); err == nil {
+		log.Trace("TieredStorage::OpenFile : %s in local", options.Name)
 		if exclusive {
+			log.Err("TieredStorage::OpenFile : %s already exists (local)", options.Name)
 			return nil, syscall.EEXIST
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
+			log.Err("TieredStorage::OpenFile : %s is a symlink", options.Name)
 			return nil, syscall.ELOOP
 		}
 		path = localPath
 		truncatedSize = info.Size()
 	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Err("TieredStorage::OpenFile : %s Lstat failed (local) [%v]", options.Name, err)
 		return nil, err
 	} else if info, err := os.Lstat(cachePath); err == nil {
+		log.Trace("TieredStorage::OpenFile : %s in cache", options.Name)
 		if exclusive {
+			log.Err("TieredStorage::OpenFile : %s already exists (cache)", options.Name)
 			return nil, syscall.EEXIST
 		}
-		// Another handle has this cloud-owned file open.
 		path, cached = cachePath, true
 		if truncate {
 			if err := c.promote(options.Name); err != nil {
+				log.Err("TieredStorage::OpenFile : %s promote failed [%v]", options.Name, err)
 				return nil, err
 			}
 			path, cached = localPath, false
 			truncatedSize = info.Size()
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Err("TieredStorage::OpenFile : %s Lstat failed (cache) [%v]", options.Name, err)
 		return nil, err
 	} else {
+		// cloud
 		_, err := c.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 		switch {
 		case errors.Is(err, os.ErrNotExist):
+			log.Trace("TieredStorage::OpenFile : %s does not exist", options.Name)
 			if options.Flags&os.O_CREATE == 0 {
 				return nil, syscall.ENOENT
 			}
 			if err := c.createEmptyLocal(options.Name); err != nil {
+				log.Err("TieredStorage::OpenFile : %s create failed [%v]", options.Name, err)
 				return nil, err
 			}
 			path, created = localPath, true
 		case err != nil:
+			log.Err("TieredStorage::OpenFile : %s GetAttr failed [%v]", options.Name, err)
 			return nil, err
 		case exclusive:
+			log.Err("TieredStorage::OpenFile : %s already exists (cloud)", options.Name)
 			return nil, syscall.EEXIST
 		case truncate:
 			// local
+			log.Trace("TieredStorage::OpenFile : %s truncate (cloud)", options.Name)
 			if err := c.createEmptyLocal(options.Name); err != nil {
+				log.Err("TieredStorage::OpenFile : %s create failed [%v]", options.Name, err)
 				return nil, err
 			}
 			path = localPath
@@ -899,7 +1028,18 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 				log.Err("TieredStorage::OpenFile : %s cloud delete failed [%v]", options.Name, err)
 			}
 		default:
+			log.Trace("TieredStorage::OpenFile : %s in cloud", options.Name)
+			if c.NextComponent().CloudConnected() {
+				// use a lazy open algorithm to avoid downloading unnecessarily
+				handle := newHandle(options.Name, options.Flags)
+				handle.SetValue(openFileOptionsKey, openFileOptions{flags: options.Flags})
+				flock.Inc()
+				flock.LazyOpen = true
+				return handle, nil
+			}
+			// offline: fail now rather than on first access
 			if err := c.downloadToCache(options.Name); err != nil {
+				log.Err("TieredStorage::OpenFile : %s download failed [%v]", options.Name, err)
 				return nil, err
 			}
 			path, cached = cachePath, true
@@ -908,6 +1048,7 @@ func (c *TieredStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.H
 
 	handle, err := c.openHandle(options.Name, path, options.Flags, cached, flock)
 	if err != nil {
+		log.Err("TieredStorage::OpenFile : %s openHandle failed [%v]", options.Name, err)
 		return nil, err
 	}
 	if truncate {
@@ -965,6 +1106,9 @@ func (c *TieredStorage) removeFile(path string) error {
 }
 
 func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int, error) {
+	if err := c.completeOpen(options.Handle); err != nil {
+		return 0, err
+	}
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err(
@@ -983,6 +1127,9 @@ func (c *TieredStorage) ReadInBuffer(options *internal.ReadInBufferOptions) (int
 }
 
 func (c *TieredStorage) WriteFile(options *internal.WriteFileOptions) (int, error) {
+	if err := c.completeOpen(options.Handle); err != nil {
+		return 0, err
+	}
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		return 0, syscall.EBADF
@@ -1043,6 +1190,11 @@ func (c *TieredStorage) FlushFile(options internal.FlushFileOptions) error {
 		options.Handle.Path,
 	)
 
+	// a lazily opened handle has nothing to flush
+	if !openCompleted(options.Handle) {
+		return nil
+	}
+
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("TieredStorage::FlushFile : %s no file object in handle", options.Handle.Path)
@@ -1073,6 +1225,8 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 		closeErr = f.Close()
 	}
 
+	// if file has not been read or written through this handle, there is nothing to close.
+	_, noCachedHandle := options.Handle.GetValue(openFileOptionsKey)
 	options.Handle.ClearDirty(c.fileLocks)
 	options.Handle.Cleanup()
 
@@ -1080,6 +1234,10 @@ func (c *TieredStorage) ReleaseFile(options internal.ReleaseFileOptions) error {
 
 	if flock.Count() > 0 {
 		return closeErr
+	}
+	// if this is the last lazy handle, clear the lazy flag
+	if noCachedHandle {
+		flock.LazyOpen = false
 	}
 
 	cachePath := c.cachePath(name)
@@ -1302,6 +1460,9 @@ func (c *TieredStorage) renameOpenHandles(
 	sflock, dflock *common.LockMapItem,
 ) {
 	if sflock.Count() > 0 {
+		// dst is in the lazy open state only if all its handles (old and new) are
+		dflock.LazyOpen = sflock.LazyOpen && (dflock.Count() == 0 || dflock.LazyOpen)
+		sflock.LazyOpen = false
 		handlemap.GetHandles().Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
 			// TODO: do we have to lock before checking the name?
@@ -1422,6 +1583,9 @@ func (c *TieredStorage) TruncateFile(options internal.TruncateFileOptions) error
 	flock.Lock()
 	defer flock.Unlock()
 
+	if err := c.openFileInternal(options.Handle, flock); err != nil {
+		return err
+	}
 	file := options.Handle.GetFileObject()
 	if file == nil {
 		return syscall.EBADF
