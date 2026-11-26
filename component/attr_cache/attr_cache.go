@@ -528,6 +528,9 @@ func (ac *AttrCache) StreamDir(
 	// listing cache is not complete, so call cloud storage
 	pathList, nextToken, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
+		if pathList == nil {
+			pathList = make([]*internal.ObjAttr, 0)
+		}
 		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
 			options.Name, len(pathList), nextToken)
 		// cache returned list
@@ -551,11 +554,13 @@ func (ac *AttrCache) StreamDir(
 			pathList = cachedPathList
 			nextToken = cachedToken
 		} else {
-			// return whatever entries we have (but only if the token is empty)
+			// return a complete listing from the tree (if the token is empty)
+			ac.cacheLock.RLock()
 			entry, found := ac.cache.get(options.Name)
-			if options.Token == "" && found {
+			if options.Token == "" && found && entry.listingComplete {
+				pathList = make([]*internal.ObjAttr, 0, len(entry.children))
 				for _, v := range entry.children {
-					if v.exists() && v.valid() {
+					if v.exists() {
 						pathList = append(pathList, v.attr)
 					}
 				}
@@ -563,6 +568,7 @@ func (ac *AttrCache) StreamDir(
 				// the cloud is unavailable, and we have nothing to provide
 				err = common.NewNoCachedDataError(err)
 			}
+			ac.cacheLock.RUnlock()
 		}
 	}
 	// values should be returned in ascending order by key, without duplicates
@@ -586,7 +592,7 @@ func (ac *AttrCache) StreamDir(
 		// this will allow us to serve directory listings from this cache
 		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
 		// if the listing is complete, record the fact that we have a complete listing
-		if nextToken == "" {
+		if ac.cacheOnList && nextToken == "" {
 			ac.markListingComplete(options.Name)
 		}
 	} else {
@@ -608,8 +614,8 @@ func (ac *AttrCache) fetchCachedDirList(
 		return nil, "", fmt.Errorf("cache on list is disabled")
 	}
 	// start accessing the cache
-	ac.cacheLock.Lock()
-	defer ac.cacheLock.Unlock()
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
 	// get directory cache item
 	listDirCache, found := ac.cache.get(path)
 	if !found {
@@ -629,7 +635,7 @@ func (ac *AttrCache) fetchCachedDirList(
 	// check timeout
 	if time.Since(cachedListSegment.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
-		return cachedListSegment.entries, "", fmt.Errorf(
+		return cachedListSegment.entries, cachedListSegment.nextToken, fmt.Errorf(
 			"%s directory listing segment %s cache expired",
 			path,
 			token,

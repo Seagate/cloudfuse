@@ -129,6 +129,17 @@ func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
 		time.Unix(0, stat.CreationTime.Nanoseconds())
 }
 
+// IsProtectedSystemFile reports whether info is marked both hidden and
+// system, which Explorer treats as a protected operating system file.
+func IsProtectedSystemFile(info fs.FileInfo) bool {
+	stat, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return false
+	}
+	const protected = windows.FILE_ATTRIBUTE_HIDDEN | windows.FILE_ATTRIBUTE_SYSTEM
+	return stat.FileAttributes&protected == protected
+}
+
 // GetFreeRam: Available ram
 func GetFreeRam() (uint64, error) {
 	v, err := mem.VirtualMemory()

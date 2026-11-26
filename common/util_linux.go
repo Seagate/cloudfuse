@@ -162,6 +162,11 @@ func GetFileTimes(info fs.FileInfo) (atime, ctime time.Time) {
 	return time.Unix(stat.Atim.Sec, stat.Atim.Nsec), time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)
 }
 
+// IsProtectedSystemFile reports false: Linux has no system file attribute.
+func IsProtectedSystemFile(info fs.FileInfo) bool {
+	return false
+}
+
 // GetFreeRam: Available ram
 func GetFreeRam() (uint64, error) {
 	var sysinfo unix.Sysinfo_t

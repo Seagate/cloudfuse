@@ -37,6 +37,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"runtime"
@@ -53,6 +55,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +97,6 @@ type storageTestConfiguration struct {
 	UploadCutoffMb            int64  `json:"upload-cutoff-mb"`
 	DisableConcurrentDownload bool   `json:"disable-concurrent-download"`
 	UsePathStyle              bool   `json:"use-path-style"`
-	DisableUsage              bool   `json:"disable-usage"`
 	EnableDirMarker           bool   `json:"enable-dir-marker"`
 	EnableChecksum            bool   `json:"enable-checksum"`
 }
@@ -108,6 +110,54 @@ type s3StorageTestSuite struct {
 	s3Storage   *S3Storage
 	config      string
 	bucket      string
+}
+
+func TestUploadReaderAtToObjectUploadError(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.Method {
+			case http.MethodPost:
+				_, _ = io.WriteString(
+					writer,
+					"<InitiateMultipartUploadResult><UploadId>upload</UploadId></InitiateMultipartUploadResult>",
+				)
+			case http.MethodPut:
+				writer.WriteHeader(http.StatusForbidden)
+				_, _ = io.WriteString(
+					writer,
+					"<Error><Code>AccessDenied</Code><Message>upload rejected</Message></Error>",
+				)
+			case http.MethodDelete:
+				writer.WriteHeader(http.StatusNoContent)
+			case http.MethodGet:
+				writer.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(writer, "<Error><Code>NoSuchUpload</Code></Error>")
+			}
+		}),
+	)
+	defer server.Close()
+
+	client := &Client{
+		Connection: Connection{Config: Config{AuthConfig: s3AuthConfig{BucketName: "bucket"}}},
+	}
+	testSuite := &s3StorageTestSuite{
+		awsS3Client: s3.New(s3.Options{
+			Region:       "us-east-1",
+			Credentials:  credentials.NewStaticCredentialsProvider("key", "secret", ""),
+			BaseEndpoint: aws.String(server.URL),
+			UsePathStyle: true,
+		}),
+		s3Storage: &S3Storage{Storage: client},
+	}
+	data := make([]byte, 5*MB+1)
+	err := testSuite.uploadReaderAtToObject(
+		context.Background(),
+		bytes.NewReader(data),
+		int64(len(data)),
+		"key",
+		5,
+	)
+	assert.ErrorContains(t, err, "upload rejected")
 }
 
 // s.uploadReaderAtToObject uploads a buffer in parts to an object.
@@ -193,11 +243,6 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
 		})
 
-		checksumCRC32 = partResp.ChecksumCRC32
-		checksumCRC32C = partResp.ChecksumCRC32C
-		checksumSHA1 = partResp.ChecksumSHA1
-		checksumSHA256 = partResp.ChecksumSHA256
-
 		if err != nil {
 			_, _ = s.awsS3Client.AbortMultipartUpload(
 				context.Background(),
@@ -211,19 +256,26 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			)
 
 			// AWS states you need to call listparts to verify that multipart upload was properly aborted
-			resp, _ := s.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
+			resp, listErr := s.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
 				Bucket:   aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 				Key:      aws.String(key),
 				UploadId: &uploadID,
 			})
-			if len(resp.Parts) != 0 {
-				return errors.New("abort multipart upload failed and unable to delete all parts")
+			if listErr != nil {
+				return errors.Join(err, fmt.Errorf("failed to verify aborted upload: %w", listErr))
+			}
+			if resp != nil && len(resp.Parts) != 0 {
+				return errors.Join(err, errors.New("aborted upload parts remain"))
 			}
 			return err
 		}
 
 		// copy etag and part number to verify later
 		if partResp != nil {
+			checksumCRC32 = partResp.ChecksumCRC32
+			checksumCRC32C = partResp.ChecksumCRC32C
+			checksumSHA1 = partResp.ChecksumSHA1
+			checksumSHA256 = partResp.ChecksumSHA256
 			partNum := partNumber
 			etag := strings.Trim(*partResp.ETag, "\"")
 			cPart := types.CompletedPart{
@@ -267,7 +319,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			Key:      aws.String(key),
 			UploadId: &uploadID,
 		})
-		if len(resp.Parts) != 0 {
+		if resp != nil && len(resp.Parts) != 0 {
 			return errors.New("abort multipart upload failed and unable to delete all parts")
 		}
 		return err
@@ -379,7 +431,7 @@ func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf(
 		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
 			"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
-			"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n  disable-usage: %t\n"+
+			"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n"+
 			"  enable-dir-marker: %t\n  enable-checksum: %t\n",
 		testParams.BucketName,
 		testParams.KeyID,
@@ -393,7 +445,6 @@ func generateConfigYaml(testParams storageTestConfiguration) string {
 		testParams.UploadCutoffMb,
 		testParams.DisableConcurrentDownload,
 		testParams.UsePathStyle,
-		testParams.DisableUsage,
 		testParams.EnableDirMarker,
 		testParams.EnableChecksum,
 	)
@@ -3146,7 +3197,7 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 		key,
 		int64(blockSizeMB),
 	)
-	s.assert.NoError(err)
+	s.Require().NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
 	h.CacheObj.BlockOffsetList = bol
