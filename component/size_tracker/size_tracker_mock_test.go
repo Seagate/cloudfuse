@@ -138,6 +138,21 @@ func (suite *sizeTrackerMockTestSuite) TestStatFsWithoutBucketCapacity() {
 	suite.assert.Equal(uint64(0), stat.Bfree)
 }
 
+func (suite *sizeTrackerMockTestSuite) TestConfigureDisplayCapacityExceedsBucketCapacity() {
+	defer suite.cleanupTest()
+
+	cfg := fmt.Sprintf(
+		"libfuse:\n  display-capacity-mb: 11\nsize_tracker:\n  journal-name: %s\n  bucket-capacity-fallback: 10",
+		journal_test_name,
+	)
+	_ = config.ReadConfigFromReader(strings.NewReader(cfg))
+	st := NewSizeTrackerComponent()
+	suite.assert.ErrorContains(
+		st.Configure(true),
+		"cannot be less than libfuse.display-capacity-mb",
+	)
+}
+
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestSizeTrackerMockTestSuite(t *testing.T) {

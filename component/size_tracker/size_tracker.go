@@ -104,6 +104,26 @@ func (st *SizeTracker) Configure(_ bool) error {
 	// TODO: document these units
 	st.totalBucketCapacity = conf.TotalBucketCapacity * common.MbToBytes
 
+	if st.totalBucketCapacity != 0 && config.IsSet("libfuse.display-capacity-mb") {
+		var displayCapacityMb uint64
+		err = config.UnmarshalKey("libfuse.display-capacity-mb", &displayCapacityMb)
+		if err != nil {
+			log.Err("SizeTracker::Configure : Invalid display capacity")
+		} else if displayCapacityMb > conf.TotalBucketCapacity {
+			log.Err(
+				"SizeTracker::Configure : display capacity (%d MB) exceeds total bucket capacity (%d MB)",
+				displayCapacityMb,
+				conf.TotalBucketCapacity,
+			)
+			return fmt.Errorf(
+				"SizeTracker: invalid configuration [size_tracker.bucket-capacity-fallback (%d MB)"+
+					" cannot be less than libfuse.display-capacity-mb (%d MB)]",
+				conf.TotalBucketCapacity,
+				displayCapacityMb,
+			)
+		}
+	}
+
 	st.hardLimitEnabled = conf.HardLimit
 	if st.hardLimitEnabled && st.totalBucketCapacity == 0 {
 		log.Warn(
