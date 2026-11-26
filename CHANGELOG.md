@@ -9,6 +9,10 @@ This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storag
 
 - Add s3storage `start-offline` option to allow mounting without a connection to cloud storage
 
+### Changes ###
+
+- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Remove Lyve Cloud default and end bucket size (`X-Lyve-Size`) support
+
 ## **2.4.2** ##
 
 November 16th 2026
