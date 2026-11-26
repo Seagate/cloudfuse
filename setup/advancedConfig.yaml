@@ -139,7 +139,7 @@ attr_cache:
 # Size tracker related configuration
 size_tracker:
   journal-name: <custom name for the size journal file. Default - generated from container/bucket name>
-  bucket-capacity-fallback: <total bucket capacity in MB for StatFs calculations. Used for display and eviction mode management. Default - not set>
+  bucket-capacity-fallback: <total bucket capacity in MB. Used by hard-limit. Must be at least libfuse.display-capacity-mb. Default - not set>
   hard-limit: true|false <enforce bucket capacity; writes beyond capacity return ENOSPC. Default - false>
 
 # Loopback configuration
@@ -202,7 +202,7 @@ s3storage:
   secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
   region: <S3 region. Default - us-east-1 or region provided in endpoint>
   profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
-  endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
+  endpoint: <S3 endpoint URL. Default - AWS S3 endpoint for the region>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
   part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
   upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>
@@ -211,7 +211,6 @@ s3storage:
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
   use-path-style: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
-  disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
   require-dir-markers: true|false <require every directory to have a marker and never use prefix listings to discover directories. Turns on enable-dir-marker if it is not set.>
   health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>

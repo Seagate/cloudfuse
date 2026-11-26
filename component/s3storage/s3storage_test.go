@@ -97,7 +97,6 @@ type storageTestConfiguration struct {
 	UploadCutoffMb            int64  `json:"upload-cutoff-mb"`
 	DisableConcurrentDownload bool   `json:"disable-concurrent-download"`
 	UsePathStyle              bool   `json:"use-path-style"`
-	DisableUsage              bool   `json:"disable-usage"`
 	EnableDirMarker           bool   `json:"enable-dir-marker"`
 	EnableChecksum            bool   `json:"enable-checksum"`
 }
@@ -268,7 +267,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 					fmt.Errorf("checking aborted multipart upload: %w", listErr),
 				)
 			}
-			if len(resp.Parts) != 0 {
+			if resp != nil && len(resp.Parts) != 0 {
 				return errors.Join(
 					err,
 					errors.New("abort multipart upload failed and unable to delete all parts"),
@@ -276,6 +275,11 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			}
 			return err
 		}
+
+		checksumCRC32 = partResp.ChecksumCRC32
+		checksumCRC32C = partResp.ChecksumCRC32C
+		checksumSHA1 = partResp.ChecksumSHA1
+		checksumSHA256 = partResp.ChecksumSHA256
 
 		// copy etag and part number to verify later
 		if partResp != nil {
@@ -326,7 +330,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			Key:      aws.String(key),
 			UploadId: &uploadID,
 		})
-		if len(resp.Parts) != 0 {
+		if resp != nil && len(resp.Parts) != 0 {
 			return errors.New("abort multipart upload failed and unable to delete all parts")
 		}
 		return err
@@ -438,7 +442,7 @@ func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf(
 		"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
 			"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
-			"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n  disable-usage: %t\n"+
+			"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n"+
 			"  enable-dir-marker: %t\n  enable-checksum: %t\n",
 		testParams.BucketName,
 		testParams.KeyID,
@@ -452,7 +456,6 @@ func generateConfigYaml(testParams storageTestConfiguration) string {
 		testParams.UploadCutoffMb,
 		testParams.DisableConcurrentDownload,
 		testParams.UsePathStyle,
-		testParams.DisableUsage,
 		testParams.EnableDirMarker,
 		testParams.EnableChecksum,
 	)
