@@ -348,7 +348,7 @@ func (s3 *S3Storage) StreamDir(
 		options.Offset,
 		options.Count,
 	)
-	objectList := make([]*internal.ObjAttr, 0)
+	var objectList []*internal.ObjAttr
 
 	path := formatListDirName(options.Name)
 	var iteration int           // = 0
@@ -363,7 +363,7 @@ func (s3 *S3Storage) StreamDir(
 		s3.updateConnectionState(err)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
-			return objectList, "", err
+			return objectList, *marker, err
 		}
 		objectList = append(objectList, newList...)
 		marker = nextMarker

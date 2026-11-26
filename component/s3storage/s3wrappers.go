@@ -435,8 +435,6 @@ func (cl *Client) List(
 		ContinuationToken: token,
 	}
 	paginator := s3.NewListObjectsV2Paginator(cl.AwsS3Client, params)
-	// initialize list to be returned
-	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process a single result page
 	output, err := paginator.NextPage(ctx)
 	if err != nil {
@@ -445,7 +443,7 @@ func (cl *Client) List(
 			bucketName,
 			prefix,
 		)
-		return objectAttrList, nil, parseS3Err(err, attemptedAction)
+		return nil, nil, parseS3Err(err, attemptedAction)
 	}
 
 	if output.IsTruncated != nil && *output.IsTruncated {
@@ -454,6 +452,8 @@ func (cl *Client) List(
 		nextMarker = nil
 	}
 
+	// build listing
+	objectAttrList := make([]*internal.ObjAttr, 0)
 	// documentation for this S3 data structure:
 	// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 	for _, value := range output.Contents {
