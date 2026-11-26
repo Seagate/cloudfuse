@@ -214,7 +214,8 @@ func (suite *tieredStorageTestSuite) TestOpenFileCloud() {
 	suite.assert.EqualValues(1, flock.Count())
 	suite.assert.False(openCompleted(handle))
 	suite.assert.NoFileExists(suite.cacheFile(path))
-	suite.Require().NoError(suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle}))
+	suite.Require().
+		NoError(suite.tieredStorage.FlushFile(internal.FlushFileOptions{Handle: handle}))
 	suite.assert.NoFileExists(suite.cacheFile(path))
 
 	// Cloud files are downloaded into cache/, not local/.
