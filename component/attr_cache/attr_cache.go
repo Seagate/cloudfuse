@@ -528,6 +528,9 @@ func (ac *AttrCache) StreamDir(
 	// listing cache is not complete, so call cloud storage
 	pathList, nextToken, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
+		if pathList == nil {
+			pathList = make([]*internal.ObjAttr, 0)
+		}
 		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
 			options.Name, len(pathList), nextToken)
 		// cache returned list
@@ -555,6 +558,7 @@ func (ac *AttrCache) StreamDir(
 			ac.cacheLock.RLock()
 			entry, found := ac.cache.get(options.Name)
 			if options.Token == "" && found && entry.listingComplete {
+				pathList = make([]*internal.ObjAttr, 0, len(entry.children))
 				for _, v := range entry.children {
 					if v.exists() {
 						pathList = append(pathList, v.attr)
