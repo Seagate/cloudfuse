@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **Unreleased** ##
+
+### Changes ###
+
+- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Remove Lyve Cloud bucket size (`X-Lyve-Size`) support from S3 StatFs, and the `s3storage.disable-usage` option
+- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Remove size_tracker multi-server eviction offset; StatFs now reports only the tracked mount size
+- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) S3 endpoint no longer defaults to Lyve Cloud; when unset, the AWS SDK resolves it (`AWS_ENDPOINT_URL`, shared config, or AWS S3)
+- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Run S3 tests against local emulators instead of Lyve Cloud
+
 ## **2.4.2** ##
 
 November 16th 2026
