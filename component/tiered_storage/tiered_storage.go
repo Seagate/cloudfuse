@@ -446,10 +446,10 @@ func (c *TieredStorage) StreamDir(
 	}
 	// cloud (allow offline results)
 	attrs, token, err := c.NextComponent().StreamDir(options)
-	if attrs != nil {
-		err = nil
-	} else if errors.Is(err, os.ErrNotExist) {
+	if errors.Is(err, os.ErrNotExist) {
 		err = syscall.ENOENT
+	} else if attrs != nil {
+		err = nil
 	} else if err != nil {
 		log.Err("TieredStorage::StreamDir : %s cloud failed [%v]", options.Name, err)
 		return page, "", err
