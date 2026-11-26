@@ -276,11 +276,6 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			return err
 		}
 
-		checksumCRC32 = partResp.ChecksumCRC32
-		checksumCRC32C = partResp.ChecksumCRC32C
-		checksumSHA1 = partResp.ChecksumSHA1
-		checksumSHA256 = partResp.ChecksumSHA256
-
 		// copy etag and part number to verify later
 		if partResp != nil {
 			checksumCRC32 = partResp.ChecksumCRC32
