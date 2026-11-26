@@ -1,13 +1,17 @@
 # Cloudfuse Changelog #
 
-## **Unreleased** ##
+## **2.5.0** ##
+
+Unreleased
+This version is based on [blobfuse2 2.5.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.5.2) (upstream).
+
+### Features ###
+
+- Add s3storage `start-offline` option to allow mounting without a connection to cloud storage
 
 ### Changes ###
 
-- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Remove Lyve Cloud bucket size (`X-Lyve-Size`) support from S3 StatFs, and the `s3storage.disable-usage` option
-- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Remove size_tracker multi-server eviction offset; StatFs now reports only the tracked mount size
-- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) S3 endpoint no longer defaults to Lyve Cloud; when unset, the AWS SDK resolves it (`AWS_ENDPOINT_URL`, shared config, or AWS S3)
-- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Run S3 tests against local emulators instead of Lyve Cloud
+- [#1153](https://github.com/Seagate/cloudfuse/pull/1153) Remove Lyve Cloud default and end bucket size (`X-Lyve-Size`) support
 
 ## **2.4.2** ##
 

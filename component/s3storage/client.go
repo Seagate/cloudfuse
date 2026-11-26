@@ -171,24 +171,33 @@ func (cl *Client) Configure(cfg Config) error {
 		o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
 	})
 
+	// Create transfermanager client for uploads and downloads
+	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = cl.Config.partSize
+		o.Concurrency = cl.Config.concurrency
+		o.MultipartUploadThreshold = cl.Config.uploadCutoff
+		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
+	})
+
 	// ListBuckets here to test connection to S3 backend
-	bucketList, err := cl.ListBuckets(ctx)
+	listCtx, cancelList := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelList()
+	bucketList, err := cl.ListBuckets(listCtx)
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
-
+		pErr := parseS3Err(err, "Configure ListBuckets")
+		if cl.Config.startOffline && errors.Is(pErr, &common.CloudUnreachableError{}) {
+			return pErr
+		}
 		if _, ok := errors.AsType[*smithy.OperationError](err); ok {
 			if re, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 				// Endpoint is invalid or could not connect to endpoint
 				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
-					log.Err(
-						"Client::Configure : Error trying to connect to endpoint. Invalid endpoint. : %v",
-						err,
-					)
+					log.Err("Client::Configure : Invalid endpoint [%v]", err)
 					return errInvalidEndpoint
 				}
 			}
 		}
-
 		if ae, ok := errors.AsType[smithy.APIError](err); ok {
 			// If error is forbidden, then credentials were incorrect
 			if ae.ErrorCode() == "Forbidden" || ae.ErrorCode() == "AccessDenied" {
@@ -202,6 +211,8 @@ func (cl *Client) Configure(cfg Config) error {
 		}
 		return err
 	}
+	// OFFLINE STARTUP CUTOFF
+	// code below only runs when not starting offline
 
 	// if no bucket-name was set, default to the first authorized bucket in the list
 	if cl.Config.AuthConfig.BucketName == "" {
@@ -247,14 +258,6 @@ func (cl *Client) Configure(cfg Config) error {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
 		return err
 	}
-
-	// Create transfermanager client for uploads and downloads
-	cl.transferManager = transfermanager.New(cl.AwsS3Client, func(o *transfermanager.Options) {
-		o.PartSizeBytes = cl.Config.partSize
-		o.Concurrency = cl.Config.concurrency
-		o.MultipartUploadThreshold = cl.Config.uploadCutoff
-		o.ChecksumAlgorithm = tmtypes.ChecksumAlgorithm(cl.Config.checksumAlgorithm)
-	})
 
 	return nil
 }

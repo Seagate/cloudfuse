@@ -37,6 +37,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"runtime"
@@ -53,6 +55,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
@@ -107,6 +110,54 @@ type s3StorageTestSuite struct {
 	s3Storage   *S3Storage
 	config      string
 	bucket      string
+}
+
+func TestUploadReaderAtToObjectUploadError(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.Method {
+			case http.MethodPost:
+				_, _ = io.WriteString(
+					writer,
+					"<InitiateMultipartUploadResult><UploadId>upload</UploadId></InitiateMultipartUploadResult>",
+				)
+			case http.MethodPut:
+				writer.WriteHeader(http.StatusForbidden)
+				_, _ = io.WriteString(
+					writer,
+					"<Error><Code>AccessDenied</Code><Message>upload rejected</Message></Error>",
+				)
+			case http.MethodDelete:
+				writer.WriteHeader(http.StatusNoContent)
+			case http.MethodGet:
+				writer.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(writer, "<Error><Code>NoSuchUpload</Code></Error>")
+			}
+		}),
+	)
+	defer server.Close()
+
+	client := &Client{
+		Connection: Connection{Config: Config{AuthConfig: s3AuthConfig{BucketName: "bucket"}}},
+	}
+	testSuite := &s3StorageTestSuite{
+		awsS3Client: s3.New(s3.Options{
+			Region:       "us-east-1",
+			Credentials:  credentials.NewStaticCredentialsProvider("key", "secret", ""),
+			BaseEndpoint: aws.String(server.URL),
+			UsePathStyle: true,
+		}),
+		s3Storage: &S3Storage{Storage: client},
+	}
+	data := make([]byte, 5*MB+1)
+	err := testSuite.uploadReaderAtToObject(
+		context.Background(),
+		bytes.NewReader(data),
+		int64(len(data)),
+		"key",
+		5,
+	)
+	assert.ErrorContains(t, err, "upload rejected")
 }
 
 // s.uploadReaderAtToObject uploads a buffer in parts to an object.
@@ -205,24 +256,26 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(
 			)
 
 			// AWS states you need to call listparts to verify that multipart upload was properly aborted
-			resp, _ := s.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
+			resp, listErr := s.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
 				Bucket:   aws.String(s.s3Storage.Storage.(*Client).Config.AuthConfig.BucketName),
 				Key:      aws.String(key),
 				UploadId: &uploadID,
 			})
+			if listErr != nil {
+				return errors.Join(err, fmt.Errorf("failed to verify aborted upload: %w", listErr))
+			}
 			if resp != nil && len(resp.Parts) != 0 {
-				return errors.New("abort multipart upload failed and unable to delete all parts")
+				return errors.Join(err, errors.New("aborted upload parts remain"))
 			}
 			return err
 		}
 
-		checksumCRC32 = partResp.ChecksumCRC32
-		checksumCRC32C = partResp.ChecksumCRC32C
-		checksumSHA1 = partResp.ChecksumSHA1
-		checksumSHA256 = partResp.ChecksumSHA256
-
 		// copy etag and part number to verify later
 		if partResp != nil {
+			checksumCRC32 = partResp.ChecksumCRC32
+			checksumCRC32C = partResp.ChecksumCRC32C
+			checksumSHA1 = partResp.ChecksumSHA1
+			checksumSHA256 = partResp.ChecksumSHA256
 			partNum := partNumber
 			etag := strings.Trim(*partResp.ETag, "\"")
 			cPart := types.CompletedPart{
@@ -3144,7 +3197,7 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 		key,
 		int64(blockSizeMB),
 	)
-	s.assert.NoError(err)
+	s.Require().NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
 	h.CacheObj.BlockOffsetList = bol

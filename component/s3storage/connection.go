@@ -58,6 +58,7 @@ type Config struct {
 	enableDirMarker           bool
 	requireDirMarkers         bool
 	healthCheckInterval       time.Duration
+	startOffline              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go

@@ -172,6 +172,13 @@ func (s3 *S3Storage) OnConfigChange() {
 func (s3 *S3Storage) configureAndTest(isParent bool) error {
 	var err error
 	s3.Storage, err = NewConnection(s3.stConfig)
+	if err != nil && s3.stConfig.startOffline &&
+		errors.Is(err, &common.CloudUnreachableError{}) {
+		log.Warn("S3Storage::configureAndTest : Cloud unreachable, starting offline [%s]", err)
+		currentTime := time.Now()
+		s3.state.firstOffline = &currentTime
+		return nil
+	}
 	return err
 }
 
@@ -191,6 +198,11 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 			s3.CloudConnected()
 		}
 	}()
+	// started offline (start-offline)
+	if s3.state.firstOffline != nil {
+		s3.cancelFn()
+		s3.state.retryTicker.Reset(s3.stConfig.healthCheckInterval)
+	}
 
 	return nil
 }
