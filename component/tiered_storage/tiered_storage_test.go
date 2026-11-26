@@ -2013,7 +2013,8 @@ func (suite *tieredStorageTestSuite) TestCreateDirUnderCloudOnlyParent() {
 		suite.tieredStorage.CreateDir(internal.CreateDirOptions{Name: "parent/child", Mode: 0755}),
 	)
 	suite.assert.DirExists(suite.localFile("parent/child"))
-	suite.assert.DirExists(filepath.Join(suite.fake_storage_path, "parent", "child"))
+	// cloud dir is created on eviction
+	suite.assert.NoDirExists(filepath.Join(suite.fake_storage_path, "parent", "child"))
 }
 
 func (suite *tieredStorageTestSuite) TestLocalEntriesReportDefaultMode() {
