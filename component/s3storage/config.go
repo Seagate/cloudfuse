@@ -54,7 +54,6 @@ type Options struct {
 	EnableChecksum            bool                    `config:"enable-checksum"               yaml:"enable-checksum,omitempty"`
 	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm"            yaml:"checksum-algorithm,omitempty"`
 	UsePathStyle              bool                    `config:"use-path-style"                yaml:"use-path-style,omitempty"`
-	DisableUsage              bool                    `config:"disable-usage"                 yaml:"disable-usage,omitempty"`
 	EnableDirMarker           bool                    `config:"enable-dir-marker"             yaml:"enable-dir-marker,omitempty"`
 	RequireDirMarkers         bool                    `config:"require-dir-markers"           yaml:"require-dir-markers,omitempty"`
 	HealthCheckIntervalSec    int                     `config:"health-check-interval-sec"     yaml:"health-check-interval-sec,omitempty"`
@@ -91,7 +90,6 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 	s3.stConfig.usePathStyle = opt.UsePathStyle
-	s3.stConfig.disableUsage = opt.DisableUsage
 	s3.stConfig.enableDirMarker = opt.EnableDirMarker
 	s3.stConfig.requireDirMarkers = opt.RequireDirMarkers
 	// require-dir-markers implies enable-dir-marker. Turn it on automatically,

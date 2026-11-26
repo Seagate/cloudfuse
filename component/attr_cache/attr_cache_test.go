@@ -793,6 +793,26 @@ func (suite *attrCacheTestSuite) TestStreamDirOfflineNoData() {
 	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
 }
 
+func (suite *attrCacheTestSuite) TestStreamDirOfflineCompleteEmpty() {
+	defer suite.cleanupTest()
+
+	suite.addPathToCache("dir/")
+	dir, found := suite.attrCache.cache.get("dir")
+	suite.Require().True(found)
+	dir.listingComplete = true
+
+	options := internal.StreamDirOptions{Name: "dir"}
+	suite.mock.EXPECT().StreamDir(options).
+		Return(nil, "", common.NewCloudUnreachableError(errors.New("network unavailable")))
+
+	result, token, err := suite.attrCache.StreamDir(options)
+	suite.assert.NotNil(result)
+	suite.assert.Empty(result)
+	suite.assert.Empty(token)
+	suite.assert.ErrorIs(err, &common.CloudUnreachableError{})
+	suite.assert.NotErrorIs(err, &common.NoCachedDataError{})
+}
+
 // Test whether the attribute cache correctly tracks which directories are in cloud storage
 func (suite *attrCacheTestSuite) TestDirInCloud() {
 	defer suite.cleanupTest()
