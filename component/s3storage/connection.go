@@ -55,7 +55,6 @@ type Config struct {
 	checksumAlgorithm         types.ChecksumAlgorithm
 	usePathStyle              bool
 	disableSymlink            bool
-	disableUsage              bool
 	enableDirMarker           bool
 	requireDirMarkers         bool
 	healthCheckInterval       time.Duration
@@ -141,5 +140,4 @@ type S3Connection interface {
 	CommitBlocks(ctx context.Context, name string, blockList []string) error
 
 	NewCredentialKey(_, _ string) error
-	GetUsedSize(ctx context.Context) (uint64, error)
 }
