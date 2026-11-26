@@ -202,7 +202,7 @@ s3storage:
   secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
   region: <S3 region. Default - us-east-1 or region provided in endpoint>
   profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
-  endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
+  endpoint: <S3 endpoint URL. Default - AWS S3 endpoint for the region>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
   part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
   upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>

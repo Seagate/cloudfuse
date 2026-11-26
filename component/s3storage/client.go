@@ -132,7 +132,7 @@ func (cl *Client) Configure(cfg Config) error {
 		}
 	}
 
-	cl.setRegionAndEndpoint()
+	cl.setRegion()
 
 	ctx := context.Background()
 
@@ -162,18 +162,14 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Create an Amazon S3 service client
-	if cl.Config.usePathStyle {
-		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-			o.UsePathStyle = true
+	cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+		o.UsePathStyle = cl.Config.usePathStyle
+		// Without an endpoint, the SDK resolves one (AWS_ENDPOINT_URL, shared config, or AWS)
+		if cl.Config.AuthConfig.Endpoint != "" {
 			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
-			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-		})
-	} else {
-		cl.AwsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cl.Config.AuthConfig.Endpoint)
-			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-		})
-	}
+		}
+		o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+	})
 
 	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets(ctx)
@@ -305,9 +301,8 @@ func (cl *Client) filterAuthorizedBuckets(
 	return authorizedBucketList
 }
 
-// setRegionAndEndpoint fills in a missing region (AWS_REGION, then endpoint, then default)
-// and a missing endpoint (derived from region).
-func (cl *Client) setRegionAndEndpoint() {
+// setRegion fills in a missing region (AWS_REGION, then endpoint, then default).
+func (cl *Client) setRegion() {
 	if cl.Config.AuthConfig.Region == "" {
 		region, exists := os.LookupEnv("AWS_REGION")
 		if !exists {
@@ -319,13 +314,6 @@ func (cl *Client) setRegionAndEndpoint() {
 		} else {
 			cl.Config.AuthConfig.Region = region
 		}
-	}
-
-	if cl.Config.AuthConfig.Endpoint == "" {
-		cl.Config.AuthConfig.Endpoint = fmt.Sprintf(
-			"https://s3.%s.sv15.lyve.seagate.com",
-			cl.Config.AuthConfig.Region,
-		)
 	}
 }
 

@@ -370,18 +370,18 @@ func (s *clientTestSuite) TestSetRegionFromEnvVar() {
 	defer s.cleanupTest()
 	s.T().Setenv("AWS_REGION", "ap-southeast-1")
 	cl := &Client{}
-	cl.setRegionAndEndpoint()
+	cl.setRegion()
 	s.assert.Equal("ap-southeast-1", cl.Config.AuthConfig.Region)
-	s.assert.Equal("https://s3.ap-southeast-1.sv15.lyve.seagate.com", cl.Config.AuthConfig.Endpoint)
+	s.assert.Empty(cl.Config.AuthConfig.Endpoint)
 }
 
 func (s *clientTestSuite) TestDefaultConfig() {
 	defer s.cleanupTest()
 	unsetEnv(s.T(), "AWS_REGION")
 	cl := &Client{}
-	cl.setRegionAndEndpoint()
+	cl.setRegion()
 	s.assert.Equal("us-east-1", cl.Config.AuthConfig.Region)
-	s.assert.Equal("https://s3.us-east-1.sv15.lyve.seagate.com", cl.Config.AuthConfig.Endpoint)
+	s.assert.Empty(cl.Config.AuthConfig.Endpoint)
 }
 
 func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
@@ -449,16 +449,22 @@ func (s *clientTestSuite) TestCredentialPrecedenceRegion() {
 	defer s.cleanupTest()
 	s.T().Setenv("AWS_REGION", "us-east-1")
 	cl := &Client{Config: Config{AuthConfig: s3AuthConfig{Region: "ap-southeast-1"}}}
-	cl.setRegionAndEndpoint()
+	cl.setRegion()
 	// config region takes precedence over AWS_REGION
 	s.assert.Equal("ap-southeast-1", cl.Config.AuthConfig.Region)
 }
 
-func (s *clientTestSuite) TestSetEndpointFromRegion() {
+func (s *clientTestSuite) TestEndpointFromEnvWhenUnset() {
 	defer s.cleanupTest()
-	cl := &Client{Config: Config{AuthConfig: s3AuthConfig{Region: "us-west-2"}}}
-	cl.setRegionAndEndpoint()
-	s.assert.Equal("https://s3.us-west-2.sv15.lyve.seagate.com", cl.Config.AuthConfig.Endpoint)
+	srv := newS3ErrorServer(s.T(), http.StatusForbidden, "AccessDenied")
+	s.T().Setenv("AWS_ENDPOINT_URL", srv.URL)
+	config := fmt.Sprintf(
+		"s3storage:\n  bucket-name: %s\n  key-id: KEYID\n  secret-key: SECRET\n  region: us-east-1\n  use-path-style: true",
+		storageTestConfigurationParameters.BucketName,
+	)
+	// SDK-resolved endpoint is used when none is configured
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidCredential, err)
 }
 
 func (s *clientTestSuite) TestSetRegionFromEndpoint() {
@@ -467,7 +473,7 @@ func (s *clientTestSuite) TestSetRegionFromEndpoint() {
 	cl := &Client{
 		Config: Config{AuthConfig: s3AuthConfig{Endpoint: "https://s3.us-west-1.wasabisys.com"}},
 	}
-	cl.setRegionAndEndpoint()
+	cl.setRegion()
 	s.assert.Equal("us-west-1", cl.Config.AuthConfig.Region)
 	s.assert.Equal("https://s3.us-west-1.wasabisys.com", cl.Config.AuthConfig.Endpoint)
 }
